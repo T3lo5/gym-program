@@ -13,7 +13,7 @@ pluginManagement {
                 useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
             }
             if (requested.id.id == "org.jetbrains.kotlin.plugin.serialization") {
-                useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+                useModule("org.jetbrains.kotlin:kotlin-serialization:1.9.24")
             }
         }
     }
