@@ -45,6 +45,7 @@ dependencies {
     // Wear OS Core (correct artifact coordinates)
     implementation("androidx.wear.compose:compose-material:1.3.1")
     implementation("androidx.wear.compose:compose-foundation:1.3.1")
+    implementation("androidx.wear.compose:compose-material3:1.5.0")
     implementation("androidx.wear.tiles:tiles:1.2.0")
     implementation("androidx.wear.watchface:watchface:1.2.1")
     implementation("androidx.wear.watchface:watchface-complications-rendering:1.2.1")

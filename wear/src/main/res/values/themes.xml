@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.TreinosWear" parent="androidx.wear.compose.material.Theme.Material">
+    <style name="Theme.TreinosWear" parent="androidx.wear.compose.material3.Theme.Material3">
         <item name="colorPrimary">@color/purple_700</item>
         <item name="colorError">@color/red_500</item>
     </style>
