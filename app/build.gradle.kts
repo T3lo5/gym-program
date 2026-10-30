@@ -65,6 +65,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-compose:1.8.2")
 
+    // Material Components (for XML themes)
+    implementation("com.google.android.material:material:1.11.0")
+
     // Compose BOM (2024.04.01 = Compose 1.6.8, compatible with Kotlin 1.9.24)
     implementation(platform("androidx.compose:compose-bom:2024.04.01"))
 
