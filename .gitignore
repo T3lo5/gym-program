@@ -7,7 +7,7 @@ local.properties
 *.iml
 .gradle/
 gradle.properties
-gradle/wrapper/gradle-wrapper.jar
+# gradle/wrapper/gradle-wrapper.jar  # COMMITTED - needed for CI/CD
 
 # ============================================================
 # Android Studio / IDE
