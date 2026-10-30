@@ -55,9 +55,9 @@ dependencies {
 
     // DataStore (preferences)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("androidx.datastore:datastore-preferences-rxjava2:1.1.1")
+    implementation("androidx.datastore:datastore-preferences-core:1.1.1")
 
-    // RxJava (for DataStore rxjava2 and BackendDiscoveryManager)
+    // RxJava (for BackendDiscoveryManager)
     implementation("io.reactivex.rxjava2:rxjava:2.2.21")
     implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
 

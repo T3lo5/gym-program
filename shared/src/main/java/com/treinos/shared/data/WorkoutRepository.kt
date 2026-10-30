@@ -93,7 +93,7 @@ class WorkoutRepository(
 
     // Days
     suspend fun addDay(planId: Long, name: String, isRestDay: Boolean = false): Long {
-        val days = workoutDayDao.getByPlanId(planId).first()
+        val days = workoutDayDao.getByPlanId(planId).firstOrNull() ?: emptyList()
         val maxOrder = days.maxByOrNull { it.dayOrder }?.dayOrder ?: -1
         return workoutDayDao.insert(WorkoutDay(
             planId = planId,
