@@ -3,6 +3,9 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
+        maven {
+            url = uri("https://dl.google.com/dl/android/maven2/")
+        }
     }
     resolutionStrategy {
         eachPlugin {
@@ -11,6 +14,9 @@ pluginManagement {
             }
             if (requested.id.id == "org.jetbrains.kotlin.android") {
                 useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+            }
+            if (requested.id.id == "com.google.devtools.ksp") {
+                useModule("com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:1.9.24-1.0.14")
             }
         }
     }
