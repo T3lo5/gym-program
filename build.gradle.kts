@@ -1,9 +1,9 @@
 plugins {
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
 }
 
 buildscript {
-    extra["kotlin_version"] = "1.9.24"
+    extra["kotlin_version"] = "2.0.21"
     extra["room_version"] = "2.6.1"
     extra["hilt_version"] = "2.48.1"
     extra["retrofit_version"] = "2.11.0"
