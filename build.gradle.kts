@@ -1,5 +1,4 @@
 buildscript {
-    extra["compose_version"] = "1.6.7"
     extra["kotlin_version"] = "1.9.24"
     extra["room_version"] = "2.6.1"
     extra["hilt_version"] = "2.48.1"
@@ -8,7 +7,6 @@ buildscript {
     extra["coroutines_version"] = "1.8.0"
     extra["lifecycle_version"] = "2.7.0"
     extra["wear_version"] = "1.3.1"
-    extra["material3_version"] = "1.3.1"
     extra["coil_version"] = "2.7.0"
     extra["navigation_version"] = "2.7.7"
     extra["datastore_version"] = "1.1.1"

@@ -28,7 +28,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.6.7"
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
 
     packaging {
@@ -53,11 +53,11 @@ dependencies {
     // Wear Data Layer
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
 
-    // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    implementation("androidx.compose.ui:ui:1.6.7")
-    implementation("androidx.compose.foundation:foundation:1.6.7")
-    implementation("androidx.compose.runtime:runtime-livedata:1.6.7")
+    // Compose BOM (2024.04.01 = Compose 1.6.8, compatible with Kotlin 1.9.24)
+    implementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.runtime:runtime-livedata")
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
