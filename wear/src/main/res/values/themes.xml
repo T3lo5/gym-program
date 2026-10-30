@@ -1,6 +1,5 @@
 <resources>
-    <style name="Theme.TreinosWear" parent="androidx.wear.compose.material3.Theme.Material3">
-        <!-- Use default Material3 theme, only override colorPrimary and colorError -->
+    <style name="Theme.TreinosWear" parent="androidx.wear.compose.material.Theme.Material">
         <item name="colorPrimary">@color/purple_700</item>
         <item name="colorError">@color/red_500</item>
     </style>
