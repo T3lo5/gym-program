@@ -209,4 +209,4 @@ Projeto pessoal — PRs bem-vindos para melhorias de UX, correções de bugs, ou
 
 ---
 
-**Desenvolvido para uso pessoal — custo R$ 0/mês 💪**
+**Desenvolvido para uso pessoal — custo R$ 0/mês 💪**# CI trigger
