@@ -34,6 +34,9 @@ dependencies {
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
 
+    // AndroidX Annotations (needed for @NonNull, @Nullable in Room/kapt)
+    implementation("androidx.annotation:annotation:1.7.1")
+
     // Room
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
