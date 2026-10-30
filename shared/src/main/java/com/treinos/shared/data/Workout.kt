@@ -7,8 +7,8 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
 @Entity(
-    tableName = "workout_plans",
-    indices = [Index("createdAt"), Index("isActive")],
+    tableName = "workout_days",
+    indices = [Index("planId"), Index("dayOrder")],
     foreignKeys = [
         ForeignKey(
             entity = WorkoutPlan::class,
