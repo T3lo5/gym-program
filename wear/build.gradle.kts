@@ -42,13 +42,13 @@ dependencies {
     // Project
     implementation(project(":shared"))
 
-    // Wear OS Core (versions from original working build)
-    implementation("androidx.wear:wear-compose-material:1.3.1")
-    implementation("androidx.wear:wear-compose-foundation:1.3.1")
-    implementation("androidx.wear:wear-tiles:1.2.1")
-    implementation("androidx.wear:wear-watchface:1.2.1")
-    implementation("androidx.wear:wear-watchface-complications-rendering:1.2.1")
-    implementation("androidx.wear:wear-watchface-data:1.2.1")
+    // Wear OS Core (correct artifact coordinates)
+    implementation("androidx.wear.compose:compose-material:1.3.1")
+    implementation("androidx.wear.compose:compose-foundation:1.3.1")
+    implementation("androidx.wear.tiles:tiles:1.2.0")
+    implementation("androidx.wear.watchface:watchface:1.2.1")
+    implementation("androidx.wear.watchface:watchface-complications-rendering:1.2.1")
+    implementation("androidx.wear.watchface:watchface-data:1.2.1")
 
     // Wear Data Layer
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
@@ -68,5 +68,5 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("androidx.wear:wear-compose-material:1.3.1")
+    testImplementation("androidx.wear.compose:compose-material:1.3.1")
 }
