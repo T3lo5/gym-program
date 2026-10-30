@@ -15,7 +15,7 @@ data class Exercise(
     val equipment: String?,       // body only, dumbbell, barbell, cable, etc.
     val primaryMuscles: List<String>,
     val secondaryMuscles: List<String>,
-    val instructions: List<String>,
+    val instructions: List<String?>,  // free-exercise-db has nulls in lists
     val category: String,         // strength | cardio | stretching | powerlifting | plyometrics | olympic weightlifting | strongman
     val images: List<String>,
     // Local-only fields (not from free-exercise-db)
