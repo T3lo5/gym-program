@@ -35,8 +35,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TreinosApp"
         android:usesCleartextTraffic="true"
-        tools:targetApi="31"
-        tools:overrideLibrary="com.treinos.wear">
+        tools:targetApi="31">
 
         <activity
             android:name=".ui.MainActivity"
