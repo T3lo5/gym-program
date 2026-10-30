@@ -12,6 +12,9 @@ pluginManagement {
             if (requested.id.id == "org.jetbrains.kotlin.android") {
                 useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
             }
+            if (requested.id.id == "org.jetbrains.kotlin.kapt") {
+                useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+            }
         }
     }
 }
