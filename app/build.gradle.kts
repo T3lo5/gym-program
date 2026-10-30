@@ -71,7 +71,7 @@ dependencies {
     implementation("androidx.compose.material3:material3-window-size-class:1.3.1")
 
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.03.00"))
     implementation("androidx.compose.ui:ui:1.6.7")
     implementation("androidx.compose.ui:ui-graphics:1.6.7")
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.7")
