@@ -1,0 +1,16 @@
+<resources>
+    <color name="purple_700">#6750A4</color>
+    <color name="purple_500">#9C7CF3</color>
+    <color name="teal_200">#00CDC2</color>
+    <color name="teal_700">#006E6B</color>
+    <color name="red_500">#B3261E</color>
+    <color name="background_dark">#000000</color>
+    <color name="surface_dark">#1C1B1F</color>
+    <color name="on_surface_dark">#E6E1E5</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="rest_timer_bg">#1B5E20</color>
+    <color name="rest_timer_text">#E8F5E9</color>
+    <color name="work_timer_bg">#E65100</color>
+    <color name="work_timer_text">#FFF3E0</color>
+</resources>

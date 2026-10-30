@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  treinos-backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: treinos-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - SENSENOVA_API_KEY=${SENSENOVA_API_KEY}
+      - SENSENOVA_BASE_URL=https://token.sensenova.ai/v1
+      - MODEL_ID=sensenova-6.8-flash-lite
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./back/app:/app/app  # hot reload for dev
+    restart: unless-stopped
+    networks:
+      - treinos-network
+
+networks:
+  treinos-network:
+    driver: bridge

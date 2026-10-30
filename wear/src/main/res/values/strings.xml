@@ -1,0 +1,12 @@
+<resources>
+    <string name="wear_app_name">Treinos Watch</string>
+    <string name="current_exercise">Exercício Atual</string>
+    <string name="next_exercise">Próximo</string>
+    <string name="rest_timer">Descanso</string>
+    <string name="series">Séries</string>
+    <string name="reps">Reps</string>
+    <string name="set_format">%d de %d</string>
+    <string name="workout_finished">Treino Concluído!</string>
+    <string name="skip_rest">Pular Descanso</string>
+    <string name="next_set">Próxima Série</string>
+</resources>
