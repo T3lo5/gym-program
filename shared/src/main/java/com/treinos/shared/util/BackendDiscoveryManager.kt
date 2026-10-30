@@ -5,16 +5,11 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.rx2.RxPreferenceDataStoreBuilder
-import androidx.datastore.preferences.rx2.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -26,7 +21,7 @@ object BackendDiscovery {
     const val DEFAULT_PORT = 3000
     const val DATASTORE_KEY = "backend_base_url"
     
-    private const val KEY_BASE_URL = stringPreferencesKey(DATASTORE_KEY)
+    val KEY_BASE_URL = stringPreferencesKey(DATASTORE_KEY)
 }
 
 class BackendDiscoveryManager(

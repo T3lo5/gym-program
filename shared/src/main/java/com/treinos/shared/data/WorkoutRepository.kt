@@ -22,7 +22,7 @@ class WorkoutRepository(
 
     suspend fun getPlanWithDaysAndExercises(id: Long): WorkoutPlanWithDetails? {
         val plan = workoutPlanDao.getById(id) ?: return null
-        val daysWithExercises = workoutDayDao.getDaysWithExercises(id)
+        val daysWithExercises = workoutPlanDao.getDaysWithExercises(id)
         return WorkoutPlanWithDetails(plan, daysWithExercises)
     }
 
@@ -93,9 +93,8 @@ class WorkoutRepository(
 
     // Days
     suspend fun addDay(planId: Long, name: String, isRestDay: Boolean = false): Long {
-        val maxOrder = workoutDayDao.getByPlanId(planId)
-            .first()
-            .maxByOrNull { it.dayOrder }?.dayOrder ?: -1
+        val days = workoutDayDao.getByPlanId(planId).first()
+        val maxOrder = days.maxByOrNull { it.dayOrder }?.dayOrder ?: -1
         return workoutDayDao.insert(WorkoutDay(
             planId = planId,
             name = name,
@@ -130,8 +129,8 @@ class WorkoutRepository(
         notes: String = "",
         isSuperset: Boolean = false
     ) {
-        val maxOrder = workoutDayDao.getExercisesByDayId(dayId)
-            .maxByOrNull { it.exerciseOrder }?.exerciseOrder ?: -1
+        val exercises = workoutDayDao.getExercisesByDayId(dayId)
+        val maxOrder = exercises.maxByOrNull { it.exerciseOrder }?.exerciseOrder ?: -1
         workoutDayDao.insertExercise(WorkoutPlanExercise(
             dayId = dayId,
             exerciseId = exerciseId,
