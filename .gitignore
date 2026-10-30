@@ -6,7 +6,7 @@ build/
 local.properties
 *.iml
 .gradle/
-gradle.properties
+# gradle.properties  # COMMITTED - needed for CI/CD
 # gradle/wrapper/gradle-wrapper.jar  # COMMITTED - needed for CI/CD
 
 # ============================================================
