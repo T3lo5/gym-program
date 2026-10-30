@@ -11,7 +11,6 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     defaults:
       run:
         working-directory: .
@@ -46,10 +45,11 @@ jobs:
       # ============================================================
       # 3. Build APKs
       # ============================================================
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Assemble debug and release APKs
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease --no-daemon --info
+        run: ./gradlew assembleDebug assembleRelease --no-daemon --info
 
       # ============================================================
       # 4. Upload APKs as artifacts
@@ -67,16 +67,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       # ============================================================
-      # 5. (Opcional) Assinar APK com keystore fixo
-      # ============================================================
-      - name: Sign debug APK (se necessário)
-        if: false  # Debug usa keystore padrão do Android, não precisa assinar
-        run: |
-          echo "Debug APKs já são assinados automaticamente pelo Android Gradle Plugin"
-          echo "Para assinar release, use: ./gradlew signingReport"
-
-      # ============================================================
-      # 6. Informações úteis
+      # 5. Build summary
       # ============================================================
       - name: Build summary
         run: |
