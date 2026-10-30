@@ -42,16 +42,13 @@ dependencies {
     // Project
     implementation(project(":shared"))
 
-    // Wear OS BOM (manages Wear Compose, Tiles, Watch Face versions)
-    implementation(platform("androidx.wear:wear-compose-bom:1.3.1"))
-
-    // Wear OS Core (versions from BOM)
-    implementation("androidx.wear:wear-compose-material")
-    implementation("androidx.wear:wear-compose-foundation")
-    implementation("androidx.wear:wear-tiles")
-    implementation("androidx.wear:wear-watchface")
-    implementation("androidx.wear:wear-watchface-complications-rendering")
-    implementation("androidx.wear:wear-watchface-data")
+    // Wear OS Core (explicit versions that exist)
+    implementation("androidx.wear:wear-compose-material:1.2.0")
+    implementation("androidx.wear:wear-compose-foundation:1.2.0")
+    implementation("androidx.wear:wear-tiles:1.2.0")
+    implementation("androidx.wear:wear-watchface:1.2.0")
+    implementation("androidx.wear:wear-watchface-complications-rendering:1.2.0")
+    implementation("androidx.wear:wear-watchface-data:1.2.0")
 
     // Wear Data Layer
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
@@ -71,5 +68,5 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("androidx.wear:wear-compose-material")
+    testImplementation("androidx.wear:wear-compose-material:1.2.0")
 }
