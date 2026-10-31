@@ -76,6 +76,8 @@ android {
 
 dependencies {
     // Project
+    implementation(project(":shared"))
+    // Project
 
     // Android Core
     implementation("androidx.core:core-ktx:1.12.0")
