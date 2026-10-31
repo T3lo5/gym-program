@@ -1,18 +1,15 @@
 package com.treinos.shared.data
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 class WorkoutRepository(
     private val workoutPlanDao: WorkoutPlanDao,
     private val workoutDayDao: WorkoutDayDao,
-    private val exerciseDao: ExerciseDao
+    private val exerciseDao: ExerciseDao,
+    private val workoutSessionDao: WorkoutSessionDao,
+    private val sessionExerciseLogDao: SessionExerciseLogDao,
+    private val setLogDao: SetLogDao
 ) {
 
     // Plans
@@ -94,8 +91,8 @@ class WorkoutRepository(
 
     // Days
     suspend fun addDay(planId: Long, name: String, isRestDay: Boolean = false): Long {
-        val days = workoutDayDao.getByPlanId(planId).first()
-        val maxOrder = if (days.isEmpty()) -1 else days.maxOf { it.dayOrder }
+        val days = workoutPlanDao.getDaysWithExercises(planId)
+        val maxOrder = if (days.isEmpty()) -1 else days.maxOf { it.day.dayOrder }
         return workoutDayDao.insert(
             WorkoutDay(
                 planId = planId,
@@ -149,25 +146,29 @@ class WorkoutRepository(
     }
 
     // Workout sessions
-    fun getSessionsForPlan(planId: Long): Flow<List<WorkoutSession>> = workoutPlanDao.getSessionsForPlan(planId)
-    fun getAllSessions(): Flow<List<WorkoutSession>> = workoutPlanDao.getAllSessions()
-    fun getActiveSession(): Flow<WorkoutSession?> = workoutPlanDao.getActiveSession()
+    fun getSessionsForPlan(planId: Long): Flow<List<WorkoutSession>> = workoutSessionDao.getByPlanId(planId)
+    fun getAllSessions(): Flow<List<WorkoutSession>> = workoutSessionDao.getRecentSessions(100)
+    fun getActiveSession(): Flow<WorkoutSession?> = kotlinx.coroutines.flow.flow {
+        emit(workoutSessionDao.getActiveSession())
+    }
 
     suspend fun startSession(planId: Long, dayId: Long): Long {
         val session = WorkoutSession(
             planId = planId,
             dayId = dayId,
-            startedAt = System.currentTimeMillis()
+            startedAt = System.currentTimeMillis(),
+            status = "in_progress"
         )
-        return workoutPlanDao.insertSession(session)
+        return workoutSessionDao.insert(session)
     }
 
     suspend fun endSession(sessionId: Long, durationMinutes: Int?) {
-        val session = workoutPlanDao.getSessionById(sessionId) ?: return
-        workoutPlanDao.updateSession(
+        val session = workoutSessionDao.getById(sessionId) ?: return
+        workoutSessionDao.update(
             session.copy(
                 endedAt = System.currentTimeMillis(),
                 durationMinutes = durationMinutes,
+                status = "completed",
                 completed = true
             )
         )
@@ -188,7 +189,7 @@ class WorkoutRepository(
             exerciseId = exerciseId,
             startedAt = System.currentTimeMillis()
         )
-        val logId = workoutPlanDao.insertExerciseLog(log)
+        val logId = sessionExerciseLogDao.insert(log)
         val setLog = SetLog(
             exerciseLogId = logId,
             setNumber = setNumber,
@@ -196,16 +197,15 @@ class WorkoutRepository(
             reps = reps,
             rpe = rpe,
             completed = completed,
-            notes = notes,
             completedAt = if (completed) System.currentTimeMillis() else null
         )
-        workoutPlanDao.insertSetLog(setLog)
+        setLogDao.insert(setLog)
         return logId
     }
 
     suspend fun completeSet(setLogId: Long) {
-        val setLog = workoutPlanDao.getSetLogById(setLogId) ?: return
-        workoutPlanDao.updateSetLog(
+        val setLog = setLogDao.getById(setLogId) ?: return
+        setLogDao.update(
             setLog.copy(
                 completed = true,
                 completedAt = System.currentTimeMillis()
