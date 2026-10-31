@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -33,34 +37,30 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.CheckCircle
-import androidx.material3.icons.filled.Close
-import androidx.material3.icons.filled.FitnessCenter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiGenerationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    state: AiGenerationState,
+    state: WorkoutEditorViewModel.AiGenerationState,
     viewModel: WorkoutEditorViewModel
 ) {
     AlertDialog(
-        onDismissRequest = { if (state != AiGenerationState.Generating) onDismiss() },
+        onDismissRequest = { if (state != WorkoutEditorViewModel.AiGenerationState.Generating) onDismiss() },
         title = { Text(when (state) {
-            AiGenerationState.Idle -> "Gerar treino com IA"
-            AiGenerationState.Generating -> "Gerando treino..."
-            AiGenerationState.Success -> "Treino gerado!"
-            AiGenerationState.Error -> "Erro na geração"
+            WorkoutEditorViewModel.AiGenerationState.Idle -> "Gerar treino com IA"
+            WorkoutEditorViewModel.AiGenerationState.Generating -> "Gerando treino..."
+            WorkoutEditorViewModel.AiGenerationState.Success -> "Treino gerado!"
+            WorkoutEditorViewModel.AiGenerationState.Error -> "Erro na geração"
         }) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (state) {
-                    AiGenerationState.Idle -> {
+                    WorkoutEditorViewModel.AiGenerationState.Idle -> {
                         Text("A IA vai criar um treino baseado nas suas preferências. Revise antes de salvar.")
                     }
-                    AiGenerationState.Generating -> {
+                    WorkoutEditorViewModel.AiGenerationState.Generating -> {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(48.dp),
@@ -69,7 +69,7 @@ fun AiGenerationDialog(
                         }
                         Text("Isso pode levar alguns segundos...", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    AiGenerationState.Success -> {
+                    WorkoutEditorViewModel.AiGenerationState.Success -> {
                         val plan = viewModel.plan
                         plan?.let { p ->
                             Row(
@@ -77,7 +77,7 @@ fun AiGenerationDialog(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                                    Icon(FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 32.dp)
+                                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -87,7 +87,7 @@ fun AiGenerationDialog(
                             Text("Revise no editor e salve se gostar.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    AiGenerationState.Error -> {
+                    WorkoutEditorViewModel.AiGenerationState.Error -> {
                         Text(viewModel.error ?: "Erro desconhecido. Tente novamente.", color = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -95,23 +95,16 @@ fun AiGenerationDialog(
         },
         confirmButton = {
             when (state) {
-                AiGenerationState.Idle -> Button(onClick = { viewModel.generateWithAi() }) { Text("Gerar") }
-                AiGenerationState.Generating -> Button(onClick = {}, enabled = false) { Text("Gerando...") }
-                AiGenerationState.Success -> Button(onClick = { onConfirm(); onDismiss() }) { Text("Ir para o editor") }
-                AiGenerationState.Error -> Button(onClick = { viewModel.generateWithAi() }) { Text("Tentar novamente") }
+                WorkoutEditorViewModel.AiGenerationState.Idle -> Button(onClick = { viewModel.generateWithAi() }) { Text("Gerar") }
+                WorkoutEditorViewModel.AiGenerationState.Generating -> Button(onClick = {}, enabled = false) { Text("Gerando...") }
+                WorkoutEditorViewModel.AiGenerationState.Success -> Button(onClick = { onConfirm(); onDismiss() }) { Text("Ir para o editor") }
+                WorkoutEditorViewModel.AiGenerationState.Error -> Button(onClick = { viewModel.generateWithAi() }) { Text("Tentar novamente") }
             }
         },
         dismissButton = {
-            if (state != AiGenerationState.Generating) {
-                Button(onClick = onDismiss) { Text(state == AiGenerationState.Success ? "Fechar" : "Cancelar") }
+            if (state != WorkoutEditorViewModel.AiGenerationState.Generating) {
+                Button(onClick = onDismiss) { Text(if (state == WorkoutEditorViewModel.AiGenerationState.Success) "Fechar" else "Cancelar") }
             }
         }
     )
-}
-
-enum class AiGenerationState {
-    Idle,
-    Generating,
-    Success,
-    Error
 }

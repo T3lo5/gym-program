@@ -4,11 +4,12 @@ import android.content.Context
 import com.treinos.shared.data.AppDatabase
 import com.treinos.shared.data.ExerciseDao
 import com.treinos.shared.data.ExerciseRepository
+import com.treinos.shared.data.SessionExerciseLogDao
 import com.treinos.shared.data.SetLogDao
 import com.treinos.shared.data.WorkoutDayDao
 import com.treinos.shared.data.WorkoutPlanDao
+import com.treinos.shared.data.WorkoutRepository
 import com.treinos.shared.data.WorkoutSessionDao
-import com.treinos.shared.data.SessionExerciseLogDao
 import com.treinos.shared.util.BackendRepository
 import dagger.Module
 import dagger.Provides
@@ -53,4 +54,12 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideExerciseRepository(dao: ExerciseDao, backendRepository: BackendRepository): ExerciseRepository = ExerciseRepository(dao, backendRepository)
+
+    @Provides
+    @Singleton
+    fun provideWorkoutRepository(
+        workoutPlanDao: WorkoutPlanDao,
+        workoutDayDao: WorkoutDayDao,
+        exerciseDao: ExerciseDao
+    ): WorkoutRepository = WorkoutRepository(workoutPlanDao, workoutDayDao, exerciseDao)
 }

@@ -1,11 +1,29 @@
 package com.treinos.app.ui.navigation
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.treinos.app.ui.exercisepicker.ExercisePickerScreen
 import com.treinos.app.ui.exercisepicker.ExercisePickerViewModel
 import com.treinos.app.ui.history.HistoryScreen
@@ -20,7 +38,8 @@ import com.treinos.app.ui.workoutlist.WorkoutListScreen
 import com.treinos.app.ui.workoutlist.WorkoutListViewModel
 
 @Composable
-fun AppNavHost(navController: NavController = rememberNavController()) {
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+fun AppNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController, startDestination = "workouts") {
         composable("workouts") {
             WorkoutListScreen(
@@ -30,16 +49,16 @@ fun AppNavHost(navController: NavController = rememberNavController()) {
         }
         composable(
             route = "workout_detail/{planId}",
-            arguments = listOf(androidx.navigation.navArgument("planId") { type = androidx.navigation.NavType.LongType })
+            arguments = listOf(navArgument("planId") { type = NavType.LongType })
         ) { backStackEntry ->
-            val planId = backStackEntry.getInt("planId")!!
+            val planId = backStackEntry.arguments?.getLong("planId") ?: 0L
             WorkoutDetailScreen(planId = planId, navController = navController)
         }
         composable(
             route = "workout_editor/{planId}",
-            arguments = listOf(androidx.navigation.navArgument("planId") { type = androidx.navigation.NavType.StringType })
+            arguments = listOf(navArgument("planId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val planId = backStackEntry.getString("planId") ?: "new"
+            val planId = backStackEntry.arguments?.getString("planId") ?: "new"
             WorkoutEditorScreen(
                 navController = navController,
                 planId = planId,
@@ -48,24 +67,24 @@ fun AppNavHost(navController: NavController = rememberNavController()) {
         }
         composable(
             route = "exercise_picker/{dayId}",
-            arguments = listOf(androidx.navigation.navArgument("dayId") { type = androidx.navigation.NavType.StringType })
+            arguments = listOf(navArgument("dayId") { type = NavType.LongType })
         ) { backStackEntry ->
-            val dayId = backStackEntry.getString("dayId")!!
+            val dayId = backStackEntry.arguments?.getLong("dayId") ?: 0L
             ExercisePickerScreen(
                 navController = navController,
-                dayId = dayId,
+                dayId = dayId.toString(),
                 viewModel = hiltViewModel<ExercisePickerViewModel>()
             )
         }
         composable(
             route = "workout_execution/{planId}/{dayId}",
             arguments = listOf(
-                androidx.navigation.navArgument("planId") { type = androidx.navigation.NavType.IntType },
-                androidx.navigation.navArgument("dayId") { type = androidx.navigation.NavType.IntType }
+                navArgument("planId") { type = NavType.LongType },
+                navArgument("dayId") { type = NavType.LongType }
             )
         ) { backStackEntry ->
-            val planId = backStackEntry.getInt("planId")!!
-            val dayId = backStackEntry.getInt("dayId")!!
+            val planId = backStackEntry.arguments?.getLong("planId") ?: 0L
+            val dayId = backStackEntry.arguments?.getLong("dayId") ?: 0L
             WorkoutExecutionScreen(
                 navController = navController,
                 planId = planId,
@@ -74,90 +93,69 @@ fun AppNavHost(navController: NavController = rememberNavController()) {
             )
         }
         composable("exercise_list") { ExerciseListScreen() }
-        composable("history") { HistoryScreen() }
-        composable("settings") { SettingsScreen() }
-        composable("backend_config") { BackendConfigScreen(navController = navController, viewModel = hiltViewModel<SettingsViewModel>()) }
+        composable("history") { HistoryScreen(navController = navController) }
+        composable("settings") { SettingsScreen(navController = navController) }
+        composable("backend_config") {
+            BackendConfigScreen(
+                navController = navController,
+                viewModel = hiltViewModel<SettingsViewModel>()
+            )
+        }
     }
 }
 
 @Composable
-fun WorkoutDetailScreen(planId: Int, navController: NavController) {
-    androidx.compose.material3.Scaffold(
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+fun WorkoutDetailScreen(planId: Long, navController: NavController) {
+    Scaffold(
         topBar = {
-            androidx.compose.material3.TopAppBar(
-                title = { androidx.compose.material3.Text("Detalhes do Treino") },
+            TopAppBar(
+                title = { Text("Detalhes do Treino") },
                 navigationIcon = {
-                    androidx.compose.material3.IconButton(onClick = { navController.popBackStack() }) {
-                        androidx.compose.material3.Icon(androidx.material3.icons.filled.ArrowBack, contentDescription = "Voltar")
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                     }
                 }
             )
         }
     ) { innerPadding ->
-        androidx.compose.foundation.layout.Column(
-            modifier = androidx.compose.foundation.layout.Modifier
+        Column(
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            androidx.compose.material3.Text("Detalhes do Treino #$planId", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            androidx.compose.material3.Button(onClick = { navController.navigate("workout_execution/$planId/0") }) {
-                androidx.compose.material3.Text("Iniciar Treino")
+            Text(
+                "Detalhes do Treino #$planId",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Button(onClick = { navController.navigate("workout_execution/$planId/0") }) {
+                Text("Iniciar Treino")
             }
         }
     }
 }
 
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun ExerciseListScreen() {
-    androidx.compose.material3.Scaffold(
+    Scaffold(
         topBar = {
-            androidx.compose.material3.TopAppBar(title = { androidx.compose.material3.Text("Exercícios") })
+            TopAppBar(title = { Text("Exercícios") })
         }
     ) { innerPadding ->
-        androidx.compose.foundation.layout.Column(
-            modifier = androidx.compose.foundation.layout.Modifier
+        Column(
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            androidx.compose.material3.Text("Catálogo de Exercícios", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun HistoryScreen() {
-    androidx.compose.material3.Scaffold(
-        topBar = {
-            androidx.compose.material3.TopAppBar(title = { androidx.compose.material3.Text("Histórico") })
-        }
-    ) { innerPadding ->
-        androidx.compose.foundation.layout.Column(
-            modifier = androidx.compose.foundation.layout.Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            androidx.compose.material3.Text("Histórico de Treinos", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun SettingsScreen() {
-    androidx.compose.material3.Scaffold(
-        topBar = {
-            androidx.compose.material3.TopAppBar(title = { androidx.compose.material3.Text("Configurações") })
-        }
-    ) { innerPadding ->
-        androidx.compose.foundation.layout.Column(
-            modifier = androidx.compose.foundation.layout.Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            androidx.compose.material3.Text("Configurações", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text(
+                "Catálogo de Exercícios",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

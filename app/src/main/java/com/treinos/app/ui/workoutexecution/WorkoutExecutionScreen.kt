@@ -5,13 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateInt
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.dragAndDropSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +23,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,7 +58,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DynamicProvidableCompositionLocal
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,36 +68,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.keyboard.KeyboardOptions
-import androidx.compose.ui.input.keyboard.KeyboardType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.lifecycleScope
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.CheckCircle
-import androidx.material3.icons.filled.Close
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Pause
-import androidx.material3.icons.filled.PlayArrow
-import androidx.material3.icons.filled.Settings
-import androidx.material3.icons.filled.SkipNext
-import androidx.material3.icons.filled.SkipPrevious
-import androidx.material3.icons.filled.Stop
-import androidx.material3.icons.filled.Timer
-import androidx.material3.icons.filled.Vibration
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.getInt
-import androidx.navigation.compose.getString
 import androidx.navigation.compose.rememberNavController
 import com.treinos.app.R
-import com.treinos.shared.data.SessionExerciseLogWithExercise
 import com.treinos.shared.data.SetLog
 import com.treinos.shared.data.WorkoutPlanExercise
 import kotlinx.coroutines.launch
@@ -93,16 +89,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun WorkoutExecutionScreen(
     navController: NavController,
-    planId: Int,
-    dayId: Int,
+    planId: Long,
+    dayId: Long,
     viewModel: WorkoutExecutionViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     // Start session on first composition
-    val started = remember { mutableStateOf(false) }
-    if (!started.value) {
-        started.value = true
-        lifecycleScope.launch { viewModel.startSession(planId.toLong(), dayId.toLong()) }
+    LaunchedEffect(planId, dayId) {
+        viewModel.startSession(planId, dayId)
     }
 
     val session by remember { mutableStateOf(viewModel.session) }
@@ -119,6 +113,7 @@ fun WorkoutExecutionScreen(
 
     val colors = MaterialTheme.colorScheme
     val isInRest = isRestRunning && restTimer > 0
+    var showExitDialog by remember { mutableStateOf(false) }
 
     // Session timer format
     val sessionTime = formatDuration(elapsedSeconds)
@@ -152,7 +147,7 @@ fun WorkoutExecutionScreen(
                 },
                 actions = {
                     IconButton(onClick = { /* TODO: Settings */ }) {
-                        Icon(Settings, contentDescription = "Configurações")
+                        Icon(Icons.Default.Settings, contentDescription = "Configurações")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -185,8 +180,8 @@ fun WorkoutExecutionScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontal) {
-                        Text(isInRest ? "DESCANSO" : "TREINO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isInRest) colors.onSecondaryContainer else colors.onPrimaryContainer)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (isInRest) "DESCANSO" else "TREINO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isInRest) colors.onSecondaryContainer else colors.onPrimaryContainer)
                         Text(
                             if (isInRest) restTime else sessionTime,
                             fontSize = 36.sp,
@@ -211,7 +206,7 @@ fun WorkoutExecutionScreen(
                         ) {
                             // Exercise image
                             Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                                Icon(FitnessCenter, contentDescription = null, tint = colors.primary, size = 40.dp)
+                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = colors.primary, modifier = Modifier.size(40.dp))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(exercise.namePt ?: exercise.name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -274,7 +269,7 @@ fun WorkoutExecutionScreen(
                                     enabled = currentIndex > 0,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(SkipPrevious, contentDescription = "Anterior")
+                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Anterior")
                                     Text("Anterior")
                                 }
                                 Button(
@@ -282,8 +277,8 @@ fun WorkoutExecutionScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(currentIndex == exerciseLogs.size - 1 ? "Finalizar" : "Próximo")
-                                    Icon(SkipNext, contentDescription = "Próximo")
+                                    Text(if (currentIndex == exerciseLogs.size - 1) "Finalizar" else "Próximo")
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Próximo")
                                 }
                             }
                         }
@@ -300,7 +295,6 @@ fun WorkoutExecutionScreen(
         }
     }
 
-    var showExitDialog by remember { mutableStateOf(false) }
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
@@ -320,6 +314,7 @@ fun WorkoutExecutionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetRow(
     set: SetLog,
@@ -351,7 +346,7 @@ fun SetRow(
                 contentAlignment = Alignment.Center
             ) {
                 if (isCompleted) {
-                    Icon(CheckCircle, contentDescription = "Concluído", tint = colors.primary, size = 24.dp)
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Concluído", tint = colors.primary, modifier = Modifier.size(24.dp))
                 } else {
                     Text("$setNumber", fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = colors.onSurfaceVariant)
                 }
@@ -434,7 +429,7 @@ fun RestTimerControls(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Timer, contentDescription = null, tint = colors.onSecondaryContainer)
+                Icon(Icons.Default.Timer, contentDescription = null, tint = colors.onSecondaryContainer)
                 Text("Timer de Descanso", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.onSecondaryContainer)
             }
 
@@ -450,8 +445,8 @@ fun RestTimerControls(
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(if (isRunning) Pause else PlayArrow, contentDescription = null)
-                    Text(if (isRunning) "Pausar" : "Iniciar")
+                    Icon(if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null)
+                    Text(if (isRunning) "Pausar" else "Iniciar")
                 }
                 Button(
                     onClick = onSkip,
@@ -459,7 +454,7 @@ fun RestTimerControls(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Pular")
-                    Icon(SkipNext, contentDescription = null)
+                    Icon(Icons.Default.SkipNext, contentDescription = null)
                 }
             }
         }
@@ -472,5 +467,3 @@ fun formatDuration(seconds: Long): String {
     val s = seconds % 60
     return if (h > 0) "%02d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
-
-import androidx.material3.icons.filled.Undo

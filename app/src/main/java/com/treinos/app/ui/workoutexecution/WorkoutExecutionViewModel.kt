@@ -5,22 +5,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.treinos.shared.data.Exercise
+import com.treinos.shared.data.ExerciseDao
+import com.treinos.shared.data.SessionExerciseLog
+import com.treinos.shared.data.SessionExerciseLogDao
+import com.treinos.shared.data.SetLog
+import com.treinos.shared.data.SetLogDao
+import com.treinos.shared.data.WorkoutDayDao
+import com.treinos.shared.data.WorkoutPlanExercise
 import com.treinos.shared.data.WorkoutRepository
 import com.treinos.shared.data.WorkoutSession
-import com.treinos.shared.data.SessionExerciseLog
-import com.treinos.shared.data.SetLog
-import com.treinos.shared.data.WorkoutPlanExercise
-import com.treinos.shared.data.Exercise
+import com.treinos.shared.data.WorkoutSessionDao
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import kotlin.math.max
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
-    private val repository: WorkoutRepository
+    private val repository: WorkoutRepository,
+    private val workoutSessionDao: WorkoutSessionDao,
+    private val sessionExerciseLogDao: SessionExerciseLogDao,
+    private val setLogDao: SetLogDao,
+    private val exerciseDao: ExerciseDao,
+    private val workoutDayDao: WorkoutDayDao
 ) : ViewModel() {
 
     // Session state
@@ -34,7 +42,11 @@ class WorkoutExecutionViewModel @Inject constructor(
     var currentExerciseIndex: Int
         get() = _currentExerciseIndex
         set(value) {
-            _currentExerciseIndex = value.coerceIn(0, exerciseLogs.size - 1)
+            _currentExerciseIndex = if (exerciseLogs.isEmpty()) {
+                0
+            } else {
+                value.coerceIn(0, exerciseLogs.size - 1)
+            }
         }
 
     // Timer state
@@ -64,22 +76,22 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun startSession(planId: Long, dayId: Long) {
         viewModelScope.launch {
-            val sessionId = repository.workoutSessionDao.insert(
-                com.treinos.shared.data.WorkoutSession(
+            val sessionId = workoutSessionDao.insert(
+                WorkoutSession(
                     planId = planId,
                     dayId = dayId,
                     status = "in_progress",
                     startedAt = System.currentTimeMillis()
                 )
             )
-            val session = repository.workoutSessionDao.getById(sessionId)!!
+            val session = workoutSessionDao.getById(sessionId)!!
             _session = session
 
             // Create exercise logs from plan
-            val planExercises = repository.workoutDayDao.getExercisesByDayId(dayId)
-            val logs = planExercises.mapIndexed { index, planEx ->
-                val logId = repository.sessionExerciseLogDao.insert(
-                    com.treinos.shared.data.SessionExerciseLog(
+            val planExercises = workoutDayDao.getExercisesByDayId(dayId)
+            val logs = planExercises.mapIndexed { _, planEx ->
+                val logId = sessionExerciseLogDao.insert(
+                    SessionExerciseLog(
                         sessionId = sessionId,
                         exerciseId = planEx.exerciseId,
                         exerciseOrder = planEx.exerciseOrder,
@@ -88,8 +100,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 )
                 // Create empty set logs
                 (1..planEx.sets).forEach { setNum ->
-                    repository.setLogDao.insert(
-                        com.treinos.shared.data.SetLog(
+                    setLogDao.insert(
+                        SetLog(
                             exerciseLogId = logId,
                             setNumber = setNum,
                             isCompleted = false
@@ -97,15 +109,16 @@ class WorkoutExecutionViewModel @Inject constructor(
                     )
                 }
                 SessionExerciseLogWithExercise(
-                    log = com.treinos.shared.data.SessionExerciseLog(
+                    log = SessionExerciseLog(
                         id = logId,
                         sessionId = sessionId,
                         exerciseId = planEx.exerciseId,
                         exerciseOrder = planEx.exerciseOrder,
                         plannedSets = planEx.sets
                     ),
-                    exercise = repository.exerciseDao.getById(planEx.exerciseId),
-                    planExercise = planEx
+                    exercise = exerciseDao.getById(planEx.exerciseId),
+                    planExercise = planEx,
+                    sets = setLogDao.getByExerciseLogId(logId)
                 )
             }
             _exerciseLogs = logs
@@ -134,11 +147,9 @@ class WorkoutExecutionViewModel @Inject constructor(
         durationSeconds: Long?
     ) {
         viewModelScope.launch {
-            repository.setLogDao.update(
-                com.treinos.shared.data.SetLog(
-                    id = 0, // will be found by query
-                    exerciseLogId = exerciseLogId,
-                    setNumber = setNumber,
+            val existing = setLogDao.getByExerciseLogAndSet(exerciseLogId, setNumber)
+            setLogDao.update(
+                (existing ?: SetLog(exerciseLogId = exerciseLogId, setNumber = setNumber)).copy(
                     reps = reps,
                     weightKg = weightKg,
                     rpe = rpe,
@@ -148,8 +159,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 )
             )
             // Update exercise log completed count
-            val log = repository.sessionExerciseLogDao.getById(exerciseLogId)!!
-            repository.sessionExerciseLogDao.update(
+            val log = sessionExerciseLogDao.getById(exerciseLogId)!!
+            sessionExerciseLogDao.update(
                 log.copy(completedSets = log.completedSets + 1)
             )
             refreshExerciseLogs()
@@ -158,17 +169,17 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun uncompleteSet(exerciseLogId: Long, setNumber: Int) {
         viewModelScope.launch {
-            repository.setLogDao.update(
-                com.treinos.shared.data.SetLog(
-                    id = 0,
-                    exerciseLogId = exerciseLogId,
-                    setNumber = setNumber,
-                    isCompleted = false,
-                    completedAt = null
+            val existing = setLogDao.getByExerciseLogAndSet(exerciseLogId, setNumber)
+            if (existing != null) {
+                setLogDao.update(
+                    existing.copy(
+                        isCompleted = false,
+                        completedAt = null
+                    )
                 )
-            )
-            val log = repository.sessionExerciseLogDao.getById(exerciseLogId)!!
-            repository.sessionExerciseLogDao.update(
+            }
+            val log = sessionExerciseLogDao.getById(exerciseLogId)!!
+            sessionExerciseLogDao.update(
                 log.copy(completedSets = max(0, log.completedSets - 1))
             )
             refreshExerciseLogs()
@@ -178,15 +189,16 @@ class WorkoutExecutionViewModel @Inject constructor(
     private fun refreshExerciseLogs() {
         val sessionId = _session?.id ?: return
         viewModelScope.launch {
-            val logsWithSets = repository.workoutSessionDao.getExercisesWithLogs(sessionId).first()
+            val logsWithSets = workoutSessionDao.getExercisesWithLogs(sessionId)
+            val session = workoutSessionDao.getById(sessionId) ?: return@launch
             _exerciseLogs = logsWithSets.map { logWithSets ->
-                val planEx = repository.workoutDayDao.getExerciseInDay(
-                    repository.workoutSessionDao.getById(sessionId)!!.dayId,
+                val planEx = workoutDayDao.getExerciseInDay(
+                    session.dayId,
                     logWithSets.log.exerciseId
                 )
                 SessionExerciseLogWithExercise(
                     log = logWithSets.log,
-                    exercise = repository.exerciseDao.getById(logWithSets.log.exerciseId),
+                    exercise = exerciseDao.getById(logWithSets.log.exerciseId),
                     planExercise = planEx,
                     sets = logWithSets.sets
                 )
@@ -239,7 +251,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     private fun finishSession() {
         _session?.let { session ->
             viewModelScope.launch {
-                repository.workoutSessionDao.update(
+                workoutSessionDao.update(
                     session.copy(
                         status = "completed",
                         endedAt = System.currentTimeMillis(),
@@ -258,7 +270,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     fun cancelSession() {
         _session?.let { session ->
             viewModelScope.launch {
-                repository.workoutSessionDao.update(
+                workoutSessionDao.update(
                     session.copy(status = "cancelled", endedAt = System.currentTimeMillis())
                 )
             }

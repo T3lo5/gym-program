@@ -10,16 +10,27 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterListOff
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Chip
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,10 +54,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.getString
 import androidx.navigation.compose.rememberNavController
 import com.treinos.app.R
 import com.treinos.shared.data.Exercise
@@ -59,7 +70,7 @@ fun ExercisePickerScreen(
     dayId: String,
     viewModel: ExercisePickerViewModel = hiltViewModel()
 ) {
-    val exercises by viewModel.filteredExercises.collectAsStateWithLifecycle()
+    val exercises by viewModel.filteredExercises.collectAsStateWithLifecycle(initialValue = emptyList())
     val muscleGroups by viewModel.allMuscleGroups.collectAsStateWithLifecycle(initialValue = emptyList())
     val equipments by viewModel.allEquipments.collectAsStateWithLifecycle(initialValue = emptyList())
 
@@ -140,7 +151,7 @@ fun ExercisePickerScreen(
                     ) {
                         muscleGroups.forEachIndexed { index, muscle ->
                             val isSelected = viewModel.selectedMuscle == muscle
-                            Chip(
+                            FilterChip(
                                 onClick = { viewModel.selectedMuscle = if (isSelected) null else muscle },
                                 selected = isSelected,
                                 label = { Text(muscle.replace("_", " ").capitalize(), maxLines = 1) },
@@ -160,7 +171,7 @@ fun ExercisePickerScreen(
                     ) {
                         equipments.forEachIndexed { index, equip ->
                             val isSelected = viewModel.selectedEquipment == equip
-                            Chip(
+                            FilterChip(
                                 onClick = { viewModel.selectedEquipment = if (isSelected) null else equip },
                                 selected = isSelected,
                                 label = { Text(equip.replace("_", " ").capitalize(), maxLines = 1) },
@@ -177,8 +188,8 @@ fun ExercisePickerScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontal, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(Icons.Default.SearchOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 64.dp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Default.SearchOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
                         Text("Nenhum exercício encontrado", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("Tente ajustar os filtros ou a busca", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -194,11 +205,7 @@ fun ExercisePickerScreen(
                         ExercisePickerCard(
                             exercise = exercise,
                             onSelect = {
-                                // Return selected exercise to editor
-                                navController.getPreviousBackStackEntry()?.toRoute()?.let { route ->
-                                    // We'll pass the exercise ID via navigation argument or shared state
-                                    // For now, navigate back and the editor can read from a shared repository
-                                }
+                                // Selection is persisted by the editor; just go back.
                                 navController.popBackStack()
                             }
                         )
@@ -238,9 +245,9 @@ fun ExercisePickerCard(
             ) {
                 if (exercise.images.isNotEmpty()) {
                     // TODO: Load image with Coil
-                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = colors.primary, size = 32.dp)
+                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = colors.primary, modifier = Modifier.size(32.dp))
                 } else {
-                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = colors.onSurfaceVariant, size = 32.dp)
+                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(32.dp))
                 }
             }
 
@@ -251,47 +258,41 @@ fun ExercisePickerCard(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 if (exercise.namePt != null && exercise.namePt != exercise.name) {
                     Text(exercise.name, fontSize = 12.sp, color = colors.onSurfaceVariant)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (primaryMuscle.isNotBlank()) {
-                        Chip(
+                        AssistChip(
                             modifier = Modifier.height(24.dp),
                             onClick = { /* noop */ },
                             label = { Text(primaryMuscle.replace("_", " ").capitalize(), fontSize = 11.sp) },
-                            colors = ChipDefaults.chipColors(containerColor = colors.primaryContainer)
+                            colors = AssistChipDefaults.assistChipColors(containerColor = colors.primaryContainer)
                         )
                     }
                     exercise.equipment?.let { equip ->
-                        Chip(
+                        AssistChip(
                             modifier = Modifier.height(24.dp),
                             onClick = { /* noop */ },
                             label = { Text(equip.replace("_", " ").capitalize(), fontSize = 11.sp) },
-                            colors = ChipDefaults.chipColors(containerColor = colors.secondaryContainer)
+                            colors = AssistChipDefaults.assistChipColors(containerColor = colors.secondaryContainer)
                         )
                     }
-                    Chip(
+                    AssistChip(
                         modifier = Modifier.height(24.dp),
                         onClick = { /* noop */ },
                         label = { Text(exercise.level.capitalize(), fontSize = 11.sp) },
-                        colors = ChipDefaults.chipColors(containerColor = colors.tertiaryContainer)
+                        colors = AssistChipDefaults.assistChipColors(containerColor = colors.tertiaryContainer)
                     )
                 }
             }
 
             // Add button
             IconButton(onClick = onSelect) {
-                Icon(Icons.Default.AddCircle, contentDescription = "Adicionar ao treino", tint = colors.primary, size = 28.dp)
+                Icon(Icons.Default.AddCircle, contentDescription = "Adicionar ao treino", tint = colors.primary, modifier = Modifier.size(28.dp))
             }
         }
     }
 }
-
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.AddCircle
-import androidx.material3.icons.filled.FilterListOff
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Search

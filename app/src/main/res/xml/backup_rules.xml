@@ -2,5 +2,4 @@
 <full-backup-content>
     <include domain="database" path="treinos_database" />
     <include domain="sharedpref" path="." />
-    <exclude domain="file" path="cache" />
 </full-backup-content>

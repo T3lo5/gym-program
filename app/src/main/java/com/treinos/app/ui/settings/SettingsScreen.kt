@@ -7,13 +7,27 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,7 +41,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.navigation.NavController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,22 +48,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.CheckCircle
-import androidx.material3.icons.filled.Close
-import androidx.material3.icons.filled.Cloud
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Settings
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.treinos.app.ui.settings.BackendConfigScreen
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,15 +85,16 @@ fun SettingsScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Backend Connection Section
-            SettingsSection(title = "Conexão com Backend", icon = Cloud) {
+            SettingsSection(title = "Conexão com Backend", icon = Icons.Default.Cloud) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -94,7 +103,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = backendUrl,
-                            onValueChange = { viewModel._backendUrl = it },
+                            onValueChange = { viewModel.updateBackendUrl(it) },
                             label = { Text("URL do Backend") },
                             placeholder = { Text("http://192.168.x.x:3000") },
                             modifier = Modifier.fillMaxWidth(),
@@ -112,7 +121,7 @@ fun SettingsScreen(
                                 if (backendStatus == SettingsViewModel.BackendStatus.Connecting) {
                                     androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                 } else {
-                                    Icon(Cloud, contentDescription = null)
+                                    Icon(Icons.Default.Cloud, contentDescription = null)
                                     Text("Testar Conexão")
                                 }
                             }
@@ -120,7 +129,7 @@ fun SettingsScreen(
                             when (backendStatus) {
                                 SettingsViewModel.BackendStatus.Connected -> {
                                     Box(contentAlignment = Alignment.CenterStart) {
-                                        Icon(CheckCircle, contentDescription = "Conectado", tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Default.CheckCircle, contentDescription = "Conectado", tint = MaterialTheme.colorScheme.primary)
                                         Text("  Conectado", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                                     }
                                 }
@@ -146,7 +155,7 @@ fun SettingsScreen(
             }
 
             // AI Generation Preferences
-            SettingsSection(title = "Geração de Treino (IA)", icon = FitnessCenter) {
+            SettingsSection(title = "Geração de Treino (IA)", icon = Icons.Default.FitnessCenter) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -158,7 +167,7 @@ fun SettingsScreen(
                             Text("Equipamentos disponíveis", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             EquipmentChips(
                                 selected = availableEquipment,
-                                onChange = { viewModel._availableEquipment = it },
+                                onChange = { viewModel.availableEquipment = it },
                                 allOptions = listOf(
                                     "body only", "dumbbell", "barbell", "cable", "bands",
                                     "kettlebells", "machine", "medicine ball", "foam roll", "e-z curl bar", "exercise ball"
@@ -171,7 +180,7 @@ fun SettingsScreen(
                             Text("Foco muscular", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             EquipmentChips(
                                 selected = targetMuscles,
-                                onChange = { viewModel._targetMuscles = it },
+                                onChange = { viewModel.targetMuscles = it },
                                 allOptions = listOf(
                                     "chest", "back", "legs", "shoulders", "arms",
                                     "abdominals", "glutes", "quadriceps", "hamstrings", "calves",
@@ -188,7 +197,7 @@ fun SettingsScreen(
                                     val isSelected = currentLevel == level
                                     androidx.compose.material3.FilterChip(
                                         selected = isSelected,
-                                        onClick = { viewModel._currentLevel = level },
+                                        onClick = { viewModel.currentLevel = level },
                                         label = { Text(level.capitalize()) }
                                     )
                                 }
@@ -200,7 +209,7 @@ fun SettingsScreen(
                             Text("Duração da sessão: ${sessionDuration} min", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             androidx.compose.material3.Slider(
                                 value = sessionDuration.toFloat(),
-                                onValueChange = { viewModel._sessionDurationMinutes = it.roundToInt() },
+                                onValueChange = { viewModel.sessionDurationMinutes = it.roundToInt() },
                                 valueRange = 20f..180f,
                                 steps = 16
                             )
@@ -210,7 +219,7 @@ fun SettingsScreen(
             }
 
             // Backend Configuration
-            SettingsSection(title = "Conexão com Backend", icon = Cloud) {
+            SettingsSection(title = "Conexão com Backend", icon = Icons.Default.Cloud) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -220,13 +229,13 @@ fun SettingsScreen(
                         SettingsRow(
                             title = "Configurar Backend",
                             subtitle = "Descoberta automática (mDNS) ou IP manual",
-                            icon = Cloud,
+                            icon = Icons.Default.Cloud,
                             onClick = { navController.navigate("backend_config") }
                         )
                         SettingsRow(
                             title = "Testar conexão atual",
                             subtitle = "${if (backendStatus == SettingsViewModel.BackendStatus.Connected) "Conectado" else if (backendStatus == SettingsViewModel.BackendStatus.Error) "Erro" else "Não testado"}",
-                            icon = if (backendStatus == SettingsViewModel.BackendStatus.Connected) CheckCircle else Cloud,
+                            icon = if (backendStatus == SettingsViewModel.BackendStatus.Connected) Icons.Default.CheckCircle else Icons.Default.Cloud,
                             onClick = { viewModel.testBackendConnection() },
                             enabled = backendStatus != SettingsViewModel.BackendStatus.Connecting
                         )
@@ -235,7 +244,7 @@ fun SettingsScreen(
             }
 
             // Data Management
-            SettingsSection(title = "Dados", icon = Settings) {
+            SettingsSection(title = "Dados", icon = Icons.Default.Settings) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -288,7 +297,7 @@ fun SettingsScreen(
 @Composable
 fun SettingsSection(
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    icon: ImageVector? = null,
     content: @Composable () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -297,7 +306,7 @@ fun SettingsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            icon?.let { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 20.dp) }
+            icon?.let { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         content()
@@ -308,17 +317,19 @@ fun SettingsSection(
 fun SettingsRow(
     title: String,
     subtitle: String,
-    icon: androidx.compose.material.icons.filled.Icon,
+    icon: ImageVector,
     destructive: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     androidx.compose.material3.ListItem(
-        modifier = Modifier.fillMaxWidth().fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onClick() },
         headlineContent = { Text(title, color = if (destructive) colors.error else colors.onSurface) },
         supportingContent = { Text(subtitle, color = colors.onSurfaceVariant) },
-        leadingContent = { Icon(icon, contentDescription = null, tint = if (destructive) colors.error else colors.primary) },
-        onClick = onClick
+        leadingContent = { Icon(icon, contentDescription = null, tint = if (destructive) colors.error else colors.primary) }
     )
 }
 

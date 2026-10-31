@@ -47,6 +47,15 @@ function main() {
     const exercises = Array.isArray(data) ? data : data.exercises;
     console.log(`Found ${exercises.length} exercises`);
 
+    // The JVM limits a single method to 64 KB of bytecode. A single listOf()
+    // with hundreds of Exercise objects overflows that limit, so split the
+    // catalog into small private factory functions.
+    const CHUNK_SIZE = 30;
+    const chunks = [];
+    for (let i = 0; i < exercises.length; i += CHUNK_SIZE) {
+        chunks.push(exercises.slice(i, i + CHUNK_SIZE));
+    }
+
     const outputLines = [
         'package com.treinos.shared.data',
         '',
@@ -57,29 +66,38 @@ function main() {
         ' * DO NOT EDIT MANUALLY',
         ' */',
         'object ExerciseCatalog {',
-        '    val allExercises: List<Exercise> = listOf('
+        '    val allExercises: List<Exercise> ='
     ];
 
-    for (const ex of exercises) {
-        outputLines.push('        Exercise(');
-        outputLines.push(`            id = ${toKotlinString(ex.id)},`);
-        outputLines.push(`            name = ${toKotlinString(ex.name)},`);
-        outputLines.push(`            force = ${toKotlinString(ex.force)},`);
-        outputLines.push(`            level = ${toKotlinString(ex.level)},`);
-        outputLines.push(`            mechanic = ${toKotlinString(ex.mechanic)},`);
-        outputLines.push(`            equipment = ${toKotlinString(ex.equipment)},`);
-        outputLines.push(`            primaryMuscles = ${toKotlinList(ex.primaryMuscles)},`);
-        outputLines.push(`            secondaryMuscles = ${toKotlinList(ex.secondaryMuscles)},`);
-        outputLines.push(`            instructions = ${toKotlinList(ex.instructions)},`);
-        outputLines.push(`            category = ${toKotlinString(ex.category)},`);
-        outputLines.push(`            images = ${toKotlinList(ex.images)},`);
-        outputLines.push(`            namePt = null,`);
-        outputLines.push(`            isFavorite = false,`);
-        outputLines.push(`            lastUsedTimestamp = 0L`);
-        outputLines.push('        ),');
-    }
+    chunks.forEach((_, index) => {
+        const suffix = index < chunks.length - 1 ? ' +' : '';
+        outputLines.push(`        group${index + 1}()${suffix}`);
+    });
 
-    outputLines.push('    )');
+    chunks.forEach((chunk, index) => {
+        outputLines.push('');
+        outputLines.push(`    private fun group${index + 1}(): List<Exercise> = listOf(`);
+        for (const ex of chunk) {
+            outputLines.push('        Exercise(');
+            outputLines.push(`            id = ${toKotlinString(ex.id)},`);
+            outputLines.push(`            name = ${toKotlinString(ex.name)},`);
+            outputLines.push(`            force = ${toKotlinString(ex.force)},`);
+            outputLines.push(`            level = ${toKotlinString(ex.level)},`);
+            outputLines.push(`            mechanic = ${toKotlinString(ex.mechanic)},`);
+            outputLines.push(`            equipment = ${toKotlinString(ex.equipment)},`);
+            outputLines.push(`            primaryMuscles = ${toKotlinList(ex.primaryMuscles)},`);
+            outputLines.push(`            secondaryMuscles = ${toKotlinList(ex.secondaryMuscles)},`);
+            outputLines.push(`            instructions = ${toKotlinList(ex.instructions)},`);
+            outputLines.push(`            category = ${toKotlinString(ex.category)},`);
+            outputLines.push(`            images = ${toKotlinList(ex.images)},`);
+            outputLines.push(`            namePt = null,`);
+            outputLines.push(`            isFavorite = false,`);
+            outputLines.push(`            lastUsedTimestamp = 0L`);
+            outputLines.push('        ),');
+        }
+        outputLines.push('    )');
+    });
+
     outputLines.push('}');
 
     const outputPath = path.join(outputDir, 'ExerciseCatalog.kt');

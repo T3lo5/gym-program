@@ -10,10 +10,10 @@ import com.treinos.shared.data.WorkoutRepository
 import com.treinos.shared.util.BackendRepository
 import com.treinos.shared.util.GenerateRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutEditorViewModel @Inject constructor(
@@ -175,6 +175,11 @@ class WorkoutEditorViewModel @Inject constructor(
 
     suspend fun deleteDay(dayId: Long) {
         repository.deleteDay(dayId)
+        refreshDays()
+    }
+
+    suspend fun updateDay(day: com.treinos.shared.data.WorkoutDay) {
+        repository.updateDay(day)
         refreshDays()
     }
 

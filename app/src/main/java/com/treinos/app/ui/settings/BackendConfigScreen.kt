@@ -11,11 +11,31 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -41,18 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.CheckCircle
-import androidx.material3.icons.filled.Close
-import androidx.material3.icons.filled.Cloud
-import androidx.material3.icons.filled.Delete
-import androidx.material3.icons.filled.Download
-import androidx.material3.icons.filled.Edit
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Save
-import androidx.material3.icons.filled.Search
-import androidx.material3.icons.filled.Settings
-import androidx.material3.icons.filled.Upload
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -82,11 +90,12 @@ fun BackendConfigScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Auto-discovery section
@@ -101,7 +110,7 @@ fun BackendConfigScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("Descoberta Automática (mDNS)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     
@@ -126,7 +135,7 @@ fun BackendConfigScreen(
                             if (backendStatus == SettingsViewModel.BackendStatus.Connecting) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Search, contentDescription = null)
+                                Icon(Icons.Default.Search, contentDescription = null)
                                 Text("Procurar na rede")
                             }
                         }
@@ -134,7 +143,7 @@ fun BackendConfigScreen(
                         when (backendStatus) {
                             SettingsViewModel.BackendStatus.Connected -> {
                                 Box(contentAlignment = Alignment.CenterStart) {
-                                    Icon(CheckCircle, contentDescription = "Encontrado", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Encontrado", tint = MaterialTheme.colorScheme.primary)
                                     Text("  Backend encontrado!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                                 }
                             }
@@ -164,18 +173,18 @@ fun BackendConfigScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("Configuração Manual", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     
                     OutlinedTextField(
                         value = backendUrl,
-                        onValueChange = { viewModel._backendUrl = it },
+                        onValueChange = { viewModel.updateBackendUrl(it) },
                         label = { Text("URL do Backend") },
                         placeholder = { Text("http://192.168.x.x:3000") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        leadingIcon = { Icon(Cloud, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) }
                     )
                     
                     Row(
@@ -189,7 +198,7 @@ fun BackendConfigScreen(
                             if (backendStatus == SettingsViewModel.BackendStatus.Connecting) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Cloud, contentDescription = null)
+                                Icon(Icons.Default.Cloud, contentDescription = null)
                                 Text("Testar Conexão")
                             }
                         }
@@ -197,7 +206,7 @@ fun BackendConfigScreen(
                         when (backendStatus) {
                             SettingsViewModel.BackendStatus.Connected -> {
                                 Box(contentAlignment = Alignment.CenterStart) {
-                                    Icon(CheckCircle, contentDescription = "Conectado", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Conectado", tint = MaterialTheme.colorScheme.primary)
                                     Text("  Conectado!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                                 }
                             }
@@ -220,7 +229,7 @@ fun BackendConfigScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Save, contentDescription = null)
+                        Icon(Icons.Default.Save, contentDescription = null)
                         Text("Salvar e Usar")
                     }
                     
@@ -257,13 +266,13 @@ fun BackendConfigScreen(
                             SavedUrlRow(
                                 url = "http://10.0.2.2:3000",
                                 label = "Emulador Android",
-                                onUse = { viewModel._backendUrl = "http://10.0.2.2:3000"; showSavedUrl = false },
+                                onUse = { viewModel.updateBackendUrl("http://10.0.2.2:3000"); showSavedUrl = false },
                                 onDelete = { /* TODO */ }
                             )
                             SavedUrlRow(
                                 url = "http://192.168.1.42:3000",
                                 label = "PC da rede local",
-                                onUse = { viewModel._backendUrl = "http://192.168.1.42:3000"; showSavedUrl = false },
+                                onUse = { viewModel.updateBackendUrl("http://192.168.1.42:3000"); showSavedUrl = false },
                                 onDelete = { /* TODO */ }
                             )
                         }
@@ -320,7 +329,7 @@ fun SavedUrlRow(
             Text("Usar")
         }
         androidx.compose.material3.IconButton(onClick = onDelete) {
-            Icon(Delete, contentDescription = "Remover", tint = colors.error)
+            Icon(Icons.Default.Delete, contentDescription = "Remover", tint = colors.error)
         }
     }
 }

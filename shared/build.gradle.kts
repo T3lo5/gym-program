@@ -1,8 +1,6 @@
 plugins {
     id("com.android.library") version "8.5.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
-    id("org.jetbrains.kotlin.kapt") version "1.9.24"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
 }
 
 android {
@@ -21,56 +19,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xopt-in=kotlin.RequiresOptIn")
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1,DEPENDENCIES,LICENSE,LICENSE.txt,NOTICE,NOTICE.txt}"
-        }
     }
 }
 
 dependencies {
-    // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
-
-    // AndroidX Annotations (needed for @NonNull, @Nullable in Room/kapt)
     implementation("androidx.annotation:annotation:1.7.1")
-
-    // Room
-    val room_version = "2.6.1"
-    implementation("androidx.room:room-runtime:$room_version")
-    implementation("androidx.room:room-ktx:$room_version")
-    kapt("androidx.room:room-compiler:$room_version")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-
-    // Lifecycle / ViewModel / LiveData
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
-
-    // DataStore (preferences)
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("androidx.datastore:datastore-preferences-core:1.1.1")
-
-    // RxJava (for BackendDiscoveryManager)
-    implementation("io.reactivex.rxjava2:rxjava:2.2.21")
-    implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
-
-    // Serialization (JSON)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-
-    // Retrofit (BackendApi uses @GET, @POST, @Body annotations)
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-    // Testing
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
-    testImplementation("androidx.arch.core:core-testing:2.2.0")
-    testImplementation("androidx.room:room-testing:2.6.1")
 }

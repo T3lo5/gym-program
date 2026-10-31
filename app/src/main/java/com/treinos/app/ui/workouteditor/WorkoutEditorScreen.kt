@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.dragAndDrop
-import androidx.compose.foundation.gestures.dragAndDropSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +19,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -46,29 +56,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.keyboard.KeyboardOptions
-import androidx.compose.ui.input.keyboard.KeyboardType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.lifecycleScope
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.Add
-import androidx.material3.icons.filled.Check
-import androidx.material3.icons.filled.Close
-import androidx.material3.icons.filled.Delete
-import androidx.material3.icons.filled.DragIndicator
-import androidx.material3.icons.filled.Edit
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Psychology
-import androidx.material3.icons.filled.Save
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.getInt
-import androidx.navigation.compose.getString
 import androidx.navigation.compose.rememberNavController
 import com.treinos.app.R
 import com.treinos.shared.data.WorkoutDayWithExercises
@@ -85,9 +83,10 @@ fun WorkoutEditorScreen(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     val isNewPlan = planId == null || planId == "new"
-    
+    val scope = rememberCoroutineScope()
+
     // Load plan if editing
-    androidx.lifecycle.lifecycleScope.launch {
+    LaunchedEffect(planId) {
         if (!isNewPlan) {
             planId?.toLongOrNull()?.let { viewModel.loadPlan(it) }
         } else {
@@ -114,7 +113,7 @@ fun WorkoutEditorScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(isNewPlan ? stringResource(R.string.new_workout) : "Editar Treino", fontWeight = FontWeight.Bold)
+                    Text(if (isNewPlan) stringResource(R.string.new_workout) else "Editar Treino", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -128,10 +127,10 @@ fun WorkoutEditorScreen(
                             onClick = { viewModel.generateWithAi() },
                             enabled = aiState == WorkoutEditorViewModel.AiGenerationState.Idle && (plan?.id ?: 0L) > 0
                         ) {
-                            Icon(Psychology, contentDescription = "Gerar com IA", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Psychology, contentDescription = "Gerar com IA", tint = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = { showSaveDialog = true }) {
-                            Icon(Save, contentDescription = "Salvar", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Default.Save, contentDescription = "Salvar", tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 },
@@ -222,8 +221,8 @@ fun WorkoutEditorScreen(
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontal, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 48.dp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                             Text("Nenhum dia adicionado", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Button(onClick = { showAddDayDialog = true }) {
                                 Text("Adicionar Primeiro Dia")
@@ -239,16 +238,27 @@ fun WorkoutEditorScreen(
                                 onAddExercise = { 
                                     navController.navigate("exercise_picker/${dayWithExercises.day.id}") 
                                 },
+                                onDeleteExercise = { exerciseId ->
+                                    scope.launch {
+                                        viewModel.removeExerciseFromDay(dayWithExercises.day.id, exerciseId)
+                                    }
+                                },
                                 onDeleteDay = { 
-                                    viewModel.deleteDay(dayWithExercises.day.id) 
+                                    scope.launch {
+                                        viewModel.deleteDay(dayWithExercises.day.id)
+                                    }
                                 },
                                 onToggleRestDay = { 
                                     val updated = dayWithExercises.day.copy(isRestDay = !dayWithExercises.day.isRestDay)
-                                    viewModel.updateDay(updated)
+                                    scope.launch {
+                                        viewModel.updateDay(updated)
+                                    }
                                 },
                                 onReorder = { fromIndex, toIndex ->
                                     val orders = days.mapIndexed { i, d -> d.day.id to (if (i == fromIndex) toIndex else if (i == toIndex) fromIndex else i) }
-                                    viewModel.reorderDays(orders)
+                                    scope.launch {
+                                        viewModel.reorderDays(orders)
+                                    }
                                 }
                             )
                         }
@@ -262,7 +272,7 @@ fun WorkoutEditorScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Icon(Add, contentDescription = "Adicionar dia")
+                    Icon(Icons.Default.Add, contentDescription = "Adicionar dia")
                 }
             }
         }
@@ -272,11 +282,11 @@ fun WorkoutEditorScreen(
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text(isNewPlan ? "Salvar Novo Treino" : "Salvar Alterações") },
+            title = { Text(if (isNewPlan) "Salvar Novo Treino" else "Salvar Alterações") },
             text = { Text("Nome: $nameText\nDias: ${days.size}") },
             confirmButton = {
                 Button(onClick = {
-                    lifecycleScope.launch {
+                    scope.launch {
                         val savedId = viewModel.savePlan(
                             name = nameText,
                             description = descriptionText,
@@ -327,7 +337,7 @@ fun WorkoutEditorScreen(
             confirmButton = {
                 Button(onClick = {
                     if (newDayName.isNotBlank()) {
-                        lifecycleScope.launch {
+                        scope.launch {
                             viewModel.addDay(newDayName, newDayIsRest)
                             newDayName = ""
                             newDayIsRest = false
@@ -363,6 +373,7 @@ fun DayEditorCard(
     dayIndex: Int,
     dayWithExercises: WorkoutDayWithExercises,
     onAddExercise: () -> Unit,
+    onDeleteExercise: (String) -> Unit,
     onDeleteDay: () -> Unit,
     onToggleRestDay: () -> Unit,
     onReorder: (Int, Int) -> Unit
@@ -387,13 +398,10 @@ fun DayEditorCard(
             ) {
                 // Drag handle
                 Icon(
-                    DragIndicator,
+                    Icons.Default.DragIndicator,
                     contentDescription = "Arrastar para reordenar",
                     tint = colors.onSurfaceVariant
                 )
-                    .dragAndDropSource(
-                        data = androidx.compose.foundation.gestures.ClipData.newPlainText("day", day.id.toString())
-                    )
 
                 // Day name + rest day toggle
                 Column(modifier = Modifier.weight(1f)) {
@@ -404,12 +412,11 @@ fun DayEditorCard(
                     )
                     if (day.isRestDay) {
                         androidx.compose.material3.Badge(
-                            badgeContent = { Text("DESCANSO", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                            colors = androidx.material3.material3.BadgeDefaults.badgeColors(
-                                containerColor = colors.secondaryContainer,
-                                contentColor = colors.onSecondaryContainer
-                            )
-                        )
+                            containerColor = colors.secondaryContainer,
+                            contentColor = colors.onSecondaryContainer
+                        ) {
+                            Text("DESCANSO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
@@ -417,16 +424,16 @@ fun DayEditorCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(onClick = onToggleRestDay) {
                         Icon(
-                            if (day.isRestDay) Check else Icons.Default.FitnessCenter,
+                            if (day.isRestDay) Icons.Default.Check else Icons.Default.FitnessCenter,
                             contentDescription = if (day.isRestDay) "Marcar como treino" else "Marcar como descanso",
                             tint = colors.primary
                         )
                     }
                     IconButton(onClick = onAddExercise) {
-                        Icon(Add, contentDescription = "Adicionar exercício", tint = colors.primary)
+                        Icon(Icons.Default.Add, contentDescription = "Adicionar exercício", tint = colors.primary)
                     }
                     IconButton(onClick = onDeleteDay) {
-                        Icon(Delete, contentDescription = "Excluir dia", tint = colors.error)
+                        Icon(Icons.Default.Delete, contentDescription = "Excluir dia", tint = colors.error)
                     }
                 }
             }
@@ -452,7 +459,7 @@ fun DayEditorCard(
                                 // TODO: Open exercise detail editor
                             },
                             onDelete = {
-                                viewModel.removeExerciseFromDay(day.id, planEx.exerciseId)
+                                onDeleteExercise(planEx.exerciseId)
                             }
                         )
                     }
@@ -475,7 +482,7 @@ fun ExerciseInDayRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp, start = 48.dp),
+            .padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -492,10 +499,10 @@ fun ExerciseInDayRow(
         // Actions
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             IconButton(onClick = onEdit) {
-                Icon(Edit, contentDescription = "Editar série", tint = colors.primary, size = 20.dp)
+                Icon(Icons.Default.Edit, contentDescription = "Editar série", tint = colors.primary, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onDelete) {
-                Icon(Delete, contentDescription = "Remover exercício", tint = colors.error, size = 20.dp)
+                Icon(Icons.Default.Delete, contentDescription = "Remover exercício", tint = colors.error, modifier = Modifier.size(20.dp))
             }
         }
     }

@@ -13,9 +13,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -38,24 +49,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.keyboard.KeyboardOptions
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.material3.icons.Icons
-import androidx.material3.icons.filled.Add
-import androidx.material3.icons.filled.Delete
-import androidx.material3.icons.filled.Edit
-import androidx.material3.icons.filled.FitnessCenter
-import androidx.material3.icons.filled.Search
-import androidx.navigation.compose.NavController
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -71,7 +78,8 @@ fun WorkoutListScreen(
     viewModel: WorkoutListViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
-    val plans by viewModel.filteredPlans.collectAsStateWithLifecycle()
+    val plans by viewModel.filteredPlans.collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = rememberCoroutineScope()
     var showSearch by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
 
@@ -87,7 +95,7 @@ fun WorkoutListScreen(
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions.Default,
                             singleLine = true,
-                            leadingIcon = { Icon(Search, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             trailingIcon = {
                                 if (searchText.isNotBlank()) {
                                     IconButton(onClick = { searchText = ""; viewModel.searchQuery = "" }) {
@@ -113,7 +121,7 @@ fun WorkoutListScreen(
                 actions = {
                     if (!showSearch) {
                         IconButton(onClick = { showSearch = true }) {
-                            Icon(Search, contentDescription = "Buscar")
+                            Icon(Icons.Default.Search, contentDescription = "Buscar")
                         }
                     }
                 },
@@ -126,7 +134,7 @@ fun WorkoutListScreen(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                Icon(Add, contentDescription = stringResource(R.string.new_workout))
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.new_workout))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -144,10 +152,10 @@ fun WorkoutListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontal,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 64.dp)
+                        Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
                         Text(
                             "Nenhum treino criado",
                             fontSize = 20.sp,
@@ -173,7 +181,7 @@ fun WorkoutListScreen(
                             onDuplicate = { viewModel.duplicatePlan(plan.id, "${plan.name} (Cópia)") },
                             onDelete = {
                                 viewModel.deletePlan(plan.id)
-                                snackbarHostState.showSnackbar("Treino excluído")
+                                scope.launch { snackbarHostState.showSnackbar("Treino excluído") }
                             }
                         )
                     }
@@ -220,22 +228,22 @@ fun WorkoutPlanCard(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 androidx.compose.foundation.layout.Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     IconButton(onClick = onEdit) {
-                        Icon(Edit, contentDescription = "Editar", tint = colors.primary)
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = colors.primary)
                     }
                     IconButton(onClick = onDuplicate) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Duplicar", tint = colors.primary)
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Delete, contentDescription = "Excluir", tint = colors.error)
+                        Icon(Icons.Default.Delete, contentDescription = "Excluir", tint = colors.error)
                     }
                 }
-            )
+            }
 
             // Meta
             Row(
@@ -248,7 +256,7 @@ fun WorkoutPlanCard(
                         fontSize = 14.sp,
                         color = colors.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
                 androidx.compose.foundation.layout.Box(
@@ -268,15 +276,14 @@ fun WorkoutPlanCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                StatChip(icon = FitnessCenter, label = "${plan.daysPerWeek} dias/semana", colors = colors)
+                StatChip(icon = Icons.Default.FitnessCenter, label = "${plan.daysPerWeek} dias/semana", colors = colors)
                 if (plan.isActive) {
                     androidx.compose.material3.Badge(
-                        badgeContent = { Text("ATIVO", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = androidx.material3.material3.BadgeDefaults.badgeColors(
-                            containerColor = colors.primaryContainer,
-                            contentColor = colors.onPrimaryContainer
-                        )
-                    )
+                        containerColor = colors.primaryContainer,
+                        contentColor = colors.onPrimaryContainer
+                    ) {
+                        Text("ATIVO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -285,7 +292,7 @@ fun WorkoutPlanCard(
 
 @Composable
 fun StatChip(
-    icon: androidx.compose.material.icons.filled.Icon,
+    icon: ImageVector,
     label: String,
     colors: androidx.compose.material3.ColorScheme
 ) {
@@ -293,7 +300,7 @@ fun StatChip(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = colors.onSurfaceVariant, size = 16.dp)
+        Icon(icon, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
         Text(label, fontSize = 12.sp, color = colors.onSurfaceVariant)
     }
 }
