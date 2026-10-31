@@ -39,16 +39,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          accept-android-sdk-licenses: true
+          accept-android-sdk-licenses: false
 
       - name: Accept Android SDK licenses
         run: |
-          export ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
-          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
-          if [ -n "$ANDROID_HOME" ]; then
-            find "$ANDROID_HOME/cmdline-tools" -name "sdkmanager" -type f 2>/dev/null | head -n1 | xargs -I{} sh -c 'yes | {} --licenses || true'
-          fi
-          yes | sdkmanager --licenses || true
+          export ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$ANDROID_HOME/cmdline-tools/bin:$PATH"
+          for m in $(find "$ANDROID_HOME" -name "sdkmanager" 2>/dev/null); do
+            yes | "$m" --licenses >/dev/null 2>&1 || true
+          done
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
       - name: Install required SDK packages
         run: |
