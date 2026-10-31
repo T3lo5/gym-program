@@ -113,10 +113,10 @@ class WorkoutRepository(
     // Exercises in plan
     suspend fun addExerciseToDay(
         dayId: Long,
-        exerciseId: Long,
+        exerciseId: String,
         sets: Int = 3,
         targetReps: String = "8-12",
-        targetRpe: Float? = null,
+        targetRpe: Double? = null,
         restSeconds: Int = 90,
         isSupersetWithPrevious: Boolean = false
     ): Long {
@@ -141,7 +141,7 @@ class WorkoutRepository(
     }
 
     suspend fun removeExerciseFromDay(planExerciseId: Long) {
-        val exercises = workoutDayDao.getExercisesByDayId(0)
+        // no-op for now
     }
 
     // Workout sessions
@@ -166,24 +166,24 @@ class WorkoutRepository(
         workoutSessionDao.update(
             session.copy(
                 endedAt = System.currentTimeMillis(),
-                status = "completed",
-                completed = true
+                status = "completed"
             )
         )
     }
 
     suspend fun logSet(
         sessionId: Long,
-        exerciseId: Long,
+        exerciseId: String,
         setNumber: Int,
-        weightKg: Float?,
+        weightKg: Double?,
         reps: Int?,
-        rpe: Float?
+        rpe: Double?
     ): Long {
         val log = SessionExerciseLog(
             sessionId = sessionId,
             exerciseId = exerciseId,
-            startedAt = System.currentTimeMillis()
+            exerciseOrder = setNumber,
+            plannedSets = 3
         )
         val logId = sessionExerciseLogDao.insert(log)
         val setLog = SetLog(
@@ -192,7 +192,7 @@ class WorkoutRepository(
             weightKg = weightKg,
             reps = reps,
             rpe = rpe,
-            completed = true,
+            isCompleted = true,
             completedAt = System.currentTimeMillis()
         )
         setLogDao.insert(setLog)
@@ -203,7 +203,7 @@ class WorkoutRepository(
         val setLog = setLogDao.getById(setLogId) ?: return
         setLogDao.update(
             setLog.copy(
-                completed = true,
+                isCompleted = true,
                 completedAt = System.currentTimeMillis()
             )
         )
