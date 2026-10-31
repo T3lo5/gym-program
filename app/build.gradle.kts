@@ -76,7 +76,6 @@ android {
 
 dependencies {
     // Project
-    implementation(project(":shared"))
     // Project
 
     // Android Core
