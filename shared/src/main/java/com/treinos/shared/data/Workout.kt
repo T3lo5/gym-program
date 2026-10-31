@@ -1,8 +1,5 @@
 package com.treinos.shared.data
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 data class WorkoutSession(
     val id: Long = 0,
     val planId: Long = 0,
@@ -14,7 +11,6 @@ data class WorkoutSession(
     val notes: String = ""
 )
 
-@Serializable
 data class SessionExerciseLog(
     val id: Long = 0,
     val sessionId: Long = 0,
@@ -26,7 +22,6 @@ data class SessionExerciseLog(
     val endedAt: Long? = null
 )
 
-@Serializable
 data class SetLog(
     val id: Long = 0,
     val exerciseLogId: Long = 0,
