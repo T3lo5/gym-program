@@ -1,11 +1,16 @@
 package com.treinos.app.ui
 
 import android.os.Bundle
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        val textView = TextView(this)
+        textView.text = "Treinos App"
+        textView.textSize = 24f
+        textView.gravity = android.view.Gravity.CENTER
+        setContentView(textView)
     }
 }
