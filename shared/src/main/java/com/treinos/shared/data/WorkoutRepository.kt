@@ -11,7 +11,6 @@ class WorkoutRepository(
     private val setLogDao: SetLogDao
 ) {
 
-    // Plans
     fun getAllPlans(): Flow<List<WorkoutPlan>> = workoutPlanDao.getAllPlans()
     fun getActivePlans(): Flow<List<WorkoutPlan>> = workoutPlanDao.getActivePlans()
 
@@ -23,7 +22,6 @@ class WorkoutRepository(
         return WorkoutPlanWithDetails(plan, daysWithExercises)
     }
 
-    @Suppress("UNUSED_PARAMETER")
     suspend fun createPlan(
         name: String,
         description: String = "",
@@ -88,17 +86,11 @@ class WorkoutRepository(
         return newPlanId
     }
 
-    // Days
     suspend fun addDay(planId: Long, name: String, isRestDay: Boolean = false): Long {
         val days = workoutPlanDao.getDaysWithExercises(planId)
         val maxOrder = if (days.isEmpty()) -1 else days.maxOf { it.day.dayOrder }
         return workoutDayDao.insert(
-            WorkoutDay(
-                planId = planId,
-                name = name,
-                dayOrder = maxOrder + 1,
-                isRestDay = isRestDay
-            )
+            WorkoutDay(planId = planId, name = name, dayOrder = maxOrder + 1, isRestDay = isRestDay)
         )
     }
 
@@ -110,7 +102,6 @@ class WorkoutRepository(
         workoutDayDao.deleteById(dayId)
     }
 
-    // Exercises in plan
     suspend fun addExerciseToDay(
         dayId: Long,
         exerciseId: String,
@@ -141,71 +132,33 @@ class WorkoutRepository(
     }
 
     suspend fun removeExerciseFromDay(planExerciseId: Long) {
-        // no-op for now
     }
 
-    // Workout sessions
     fun getSessionsForPlan(planId: Long): Flow<List<WorkoutSession>> = workoutSessionDao.getByPlanId(planId)
     fun getAllSessions(): Flow<List<WorkoutSession>> = workoutSessionDao.getRecentSessions(100)
-    fun getActiveSession(): Flow<WorkoutSession?> = kotlinx.coroutines.flow.flow {
-        emit(workoutSessionDao.getActiveSession())
-    }
+    fun getActiveSession(): Flow<WorkoutSession?> = kotlinx.coroutines.flow.flow { emit(workoutSessionDao.getActiveSession()) }
 
     suspend fun startSession(planId: Long, dayId: Long): Long {
-        val session = WorkoutSession(
-            planId = planId,
-            dayId = dayId,
-            startedAt = System.currentTimeMillis(),
-            status = "in_progress"
+        return workoutSessionDao.insert(
+            WorkoutSession(planId = planId, dayId = dayId, startedAt = System.currentTimeMillis(), status = "in_progress")
         )
-        return workoutSessionDao.insert(session)
     }
 
     suspend fun endSession(sessionId: Long) {
         val session = workoutSessionDao.getById(sessionId) ?: return
-        workoutSessionDao.update(
-            session.copy(
-                endedAt = System.currentTimeMillis(),
-                status = "completed"
-            )
-        )
+        workoutSessionDao.update(session.copy(endedAt = System.currentTimeMillis(), status = "completed"))
     }
 
-    suspend fun logSet(
-        sessionId: Long,
-        exerciseId: String,
-        setNumber: Int,
-        weightKg: Double?,
-        reps: Int?,
-        rpe: Double?
-    ): Long {
-        val log = SessionExerciseLog(
-            sessionId = sessionId,
-            exerciseId = exerciseId,
-            exerciseOrder = setNumber,
-            plannedSets = 3
-        )
+    suspend fun logSet(sessionId: Long, exerciseId: String, setNumber: Int, weightKg: Double?, reps: Int?, rpe: Double?): Long {
+        val log = SessionExerciseLog(sessionId = sessionId, exerciseId = exerciseId, exerciseOrder = setNumber, plannedSets = 3)
         val logId = sessionExerciseLogDao.insert(log)
-        val setLog = SetLog(
-            exerciseLogId = logId,
-            setNumber = setNumber,
-            weightKg = weightKg,
-            reps = reps,
-            rpe = rpe,
-            isCompleted = true,
-            completedAt = System.currentTimeMillis()
-        )
+        val setLog = SetLog(exerciseLogId = logId, setNumber = setNumber, weightKg = weightKg, reps = reps, rpe = rpe, isCompleted = true, completedAt = System.currentTimeMillis())
         setLogDao.insert(setLog)
         return logId
     }
 
     suspend fun completeSet(setLogId: Long) {
         val setLog = setLogDao.getById(setLogId) ?: return
-        setLogDao.update(
-            setLog.copy(
-                isCompleted = true,
-                completedAt = System.currentTimeMillis()
-            )
-        )
+        setLogDao.update(setLog.copy(isCompleted = true, completedAt = System.currentTimeMillis()))
     }
 }
