@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -93,14 +94,16 @@ class WorkoutRepository(
 
     // Days
     suspend fun addDay(planId: Long, name: String, isRestDay: Boolean = false): Long {
-        val days = workoutDayDao.getByPlanId(planId).firstOrNull() ?: emptyList()
-        val maxOrder = days.maxByOrNull { it.dayOrder }?.dayOrder ?: -1
-        return workoutDayDao.insert(WorkoutDay(
-            planId = planId,
-            name = name,
-            dayOrder = maxOrder + 1,
-            isRestDay = isRestDay
-        ))
+        val days = workoutDayDao.getByPlanId(planId).first()
+        val maxOrder = if (days.isEmpty()) -1 else days.maxOf { it.dayOrder }
+        return workoutDayDao.insert(
+            WorkoutDay(
+                planId = planId,
+                name = name,
+                dayOrder = maxOrder + 1,
+                isRestDay = isRestDay
+            )
+        )
     }
 
     suspend fun updateDay(day: WorkoutDay) {
@@ -111,71 +114,102 @@ class WorkoutRepository(
         workoutDayDao.deleteById(dayId)
     }
 
-    suspend fun reorderDays(planId: Long, dayOrders: List<Pair<Long, Int>>) {
-        dayOrders.forEach { (id, order) ->
-            val day = workoutDayDao.getById(id) ?: return@forEach
-            workoutDayDao.update(day.copy(dayOrder = order))
-        }
-    }
-
-    // Exercises in day
+    // Exercises in plan
     suspend fun addExerciseToDay(
         dayId: Long,
-        exerciseId: String,
-        sets: Int,
-        targetReps: String,
-        targetRpe: Double?,
-        restSeconds: Int,
-        notes: String = "",
-        isSuperset: Boolean = false
-    ) {
-        val exercises = workoutDayDao.getExercisesByDayId(dayId)
-        val maxOrder = exercises.maxByOrNull { it.exerciseOrder }?.exerciseOrder ?: -1
-        workoutDayDao.insertExercise(WorkoutPlanExercise(
-            dayId = dayId,
-            exerciseId = exerciseId,
-            exerciseOrder = maxOrder + 1,
-            sets = sets,
-            targetReps = targetReps,
-            targetRpe = targetRpe,
-            restSeconds = restSeconds,
-            notes = notes,
-            isSupersetWithPrevious = isSuperset
-        ))
+        exerciseId: Long,
+        sets: Int = 3,
+        targetReps: String = "8-12",
+        targetRpe: Float? = null,
+        restSeconds: Int = 90,
+        isSupersetWithPrevious: Boolean = false
+    ): Long {
+        val exercises = workoutDayDao.getExercisesByDayId(dayId).first()
+        val maxOrder = if (exercises.isEmpty()) -1 else exercises.maxOf { it.exerciseOrder }
+        return workoutDayDao.insertExercise(
+            WorkoutPlanExercise(
+                dayId = dayId,
+                exerciseId = exerciseId,
+                exerciseOrder = maxOrder + 1,
+                sets = sets,
+                targetReps = targetReps,
+                targetRpe = targetRpe,
+                restSeconds = restSeconds,
+                isSupersetWithPrevious = isSupersetWithPrevious
+            )
+        )
     }
 
     suspend fun updatePlanExercise(planExercise: WorkoutPlanExercise) {
         workoutDayDao.updateExercise(planExercise)
     }
 
-    suspend fun deleteExerciseFromDay(dayId: Long, exerciseId: String) {
-        workoutDayDao.deleteExerciseFromDay(dayId, exerciseId)
+    suspend fun removeExerciseFromDay(planExerciseId: Long) {
+        workoutDayDao.deleteExerciseById(planExerciseId)
     }
 
-    suspend fun reorderExercisesInDay(dayId: Long, exerciseOrders: List<Pair<String, Int>>) {
-        exerciseOrders.forEach { (exerciseId, order) ->
-            val planEx = workoutDayDao.getExerciseInDay(dayId, exerciseId) ?: return@forEach
-            workoutDayDao.updateExercise(planEx.copy(exerciseOrder = order))
-        }
+    // Workout sessions
+    fun getSessionsForPlan(planId: Long): Flow<List<WorkoutSession>> = workoutPlanDao.getSessionsForPlan(planId)
+    fun getAllSessions(): Flow<List<WorkoutSession>> = workoutPlanDao.getAllSessions()
+    fun getActiveSession(): Flow<WorkoutSession?> = workoutPlanDao.getActiveSession()
+
+    suspend fun startSession(planId: Long, dayId: Long): Long {
+        val session = WorkoutSession(
+            planId = planId,
+            dayId = dayId,
+            startedAt = System.currentTimeMillis()
+        )
+        return workoutPlanDao.insertSession(session)
     }
 
-    // Search exercises for picker
-    fun searchExercises(query: String): Flow<List<Exercise>> = exerciseDao.search(query)
+    suspend fun endSession(sessionId: Long, durationMinutes: Int?) {
+        val session = workoutPlanDao.getSessionById(sessionId) ?: return
+        workoutPlanDao.updateSession(
+            session.copy(
+                endedAt = System.currentTimeMillis(),
+                durationMinutes = durationMinutes,
+                completed = true
+            )
+        )
+    }
 
-    fun getExercisesByMuscle(muscle: String): Flow<List<Exercise>> = exerciseDao.getByPrimaryMuscle(muscle)
+    suspend fun logSet(
+        sessionId: Long,
+        exerciseId: Long,
+        setNumber: Int,
+        weightKg: Float?,
+        reps: Int?,
+        rpe: Float?,
+        completed: Boolean = true,
+        notes: String? = null
+    ): Long {
+        val log = SessionExerciseLog(
+            sessionId = sessionId,
+            exerciseId = exerciseId,
+            startedAt = System.currentTimeMillis()
+        )
+        val logId = workoutPlanDao.insertExerciseLog(log)
+        val setLog = SetLog(
+            exerciseLogId = logId,
+            setNumber = setNumber,
+            weightKg = weightKg,
+            reps = reps,
+            rpe = rpe,
+            completed = completed,
+            notes = notes,
+            completedAt = if (completed) System.currentTimeMillis() else null
+        )
+        workoutPlanDao.insertSetLog(setLog)
+        return logId
+    }
 
-    fun getExercisesByEquipment(equipment: String): Flow<List<Exercise>> = exerciseDao.getByEquipment(equipment)
-
-    fun getAllEquipments(): Flow<List<String>> = exerciseDao.getAllEquipments()
-
-    fun getAllMuscleGroups(): Flow<List<String>> = exerciseDao.getAllMuscleGroups()
-
-    suspend fun getExerciseById(id: String): Exercise? = exerciseDao.getById(id)
-
-    suspend fun getExercisesByIds(ids: List<String>): List<Exercise> = exerciseDao.getByIds(ids)
+    suspend fun completeSet(setLogId: Long) {
+        val setLog = workoutPlanDao.getSetLogById(setLogId) ?: return
+        workoutPlanDao.updateSetLog(
+            setLog.copy(
+                completed = true,
+                completedAt = System.currentTimeMillis()
+            )
+        )
+    }
 }
-
-data class WorkoutPlanWithDetails(
-    val plan: WorkoutPlan,
-    val days: List<WorkoutDayWithExercises>
-)
