@@ -141,7 +141,7 @@ class WorkoutRepository(
     }
 
     suspend fun removeExerciseFromDay(planExerciseId: Long) {
-        workoutDayDao.deleteExerciseById(planExerciseId)
+        val exercises = workoutDayDao.getExercisesByDayId(0)
     }
 
     // Workout sessions
@@ -161,12 +161,11 @@ class WorkoutRepository(
         return workoutSessionDao.insert(session)
     }
 
-    suspend fun endSession(sessionId: Long, durationMinutes: Int?) {
+    suspend fun endSession(sessionId: Long) {
         val session = workoutSessionDao.getById(sessionId) ?: return
         workoutSessionDao.update(
             session.copy(
                 endedAt = System.currentTimeMillis(),
-                durationMinutes = durationMinutes,
                 status = "completed",
                 completed = true
             )
@@ -179,8 +178,7 @@ class WorkoutRepository(
         setNumber: Int,
         weightKg: Float?,
         reps: Int?,
-        rpe: Float?,
-        completed: Boolean = true
+        rpe: Float?
     ): Long {
         val log = SessionExerciseLog(
             sessionId = sessionId,
@@ -194,8 +192,8 @@ class WorkoutRepository(
             weightKg = weightKg,
             reps = reps,
             rpe = rpe,
-            completed = completed,
-            completedAt = if (completed) System.currentTimeMillis() else null
+            completed = true,
+            completedAt = System.currentTimeMillis()
         )
         setLogDao.insert(setLog)
         return logId
