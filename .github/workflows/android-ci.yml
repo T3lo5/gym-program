@@ -20,6 +20,10 @@ jobs:
     name: Build APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      version_name: ${{ steps.version.outputs.name }}
+      version_code: ${{ steps.version.outputs.code }}
+      signed: ${{ steps.signing.outputs.enabled }}
 
     steps:
       - name: Checkout repository
@@ -35,15 +39,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: Install required SDK packages
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       # ------------------------------------------------------------------
-      # Signing material: only present on pushes/ manual runs where the
-      # repository secrets are configured. Pull requests never see them.
+      # Signing material
       # ------------------------------------------------------------------
       - name: Decode release keystore
         id: signing
@@ -53,7 +59,7 @@ jobs:
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Release signing skipped::RELEASE_KEYSTORE_BASE64 is not set. The APK will be unsigned and cannot be installed. See .github/RELEASE_SETUP.md."
+            echo "::warning title=Release signing skipped::RELEASE_KEYSTORE_BASE64 is not set. The APK will be unsigned and cannot be published as signed release."
             exit 0
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
@@ -89,16 +95,15 @@ jobs:
           -PversionName=${{ steps.version.outputs.name }}
 
       - name: Verify APK signature
-        if: ${{ steps.signing.outputs.enabled == 'true' }}
+        if: ${{ steps.signing.outputs.enabled == 'true' && github.event_name != 'pull_request' }}
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           APKSIGNER="$ANDROID_HOME/build-tools/34.0.0/apksigner"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee signature.txt
-          # A signed APK prints at least one "Verified using v2 scheme" line.
           grep -q "Verified using" signature.txt
 
       - name: Compute checksums
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true' }}
         run: |
           cd app/build/outputs/apk/release
           sha256sum app-release.apk > app-release.apk.sha256
@@ -113,7 +118,7 @@ jobs:
           retention-days: 7
 
       - name: Upload release APK
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ steps.version.outputs.name }}
@@ -131,21 +136,18 @@ jobs:
               [ -f "$f" ] || continue
               echo "- \`$f\` ($(du -h "$f" | cut -f1))"
             done
-            if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-              echo ""
-              echo "Signed: ${{ steps.signing.outputs.enabled == 'true' && 'yes' || 'no (see warning above)' }}"
-            fi
+            echo ""
+            echo "Signed: ${{ steps.signing.outputs.enabled == 'true' && 'yes' || 'no (RELEASE_KEYSTORE_BASE64 missing)' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Publish GitHub Release
     needs: build
-    # Only publish from the default branch (or a tag push), never from PRs,
-    # and only when the signing secrets produced a signed APK.
     if: >-
       github.event_name == 'push' &&
       github.ref_type == 'branch' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      needs.build.outputs.signed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -162,11 +164,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq apksigner > /dev/null 2>&1 || true
-          if ! command -v apksigner > /dev/null; then
-            echo "apksigner not available on runner; skipping local check."
-            exit 0
+          if command -v apksigner > /dev/null; then
+            apksigner verify --verbose dist/app-release.apk
+          else
+            echo "apksigner not found, relying on build verification"
           fi
-          apksigner verify --verbose dist/app-release.apk
 
       - name: Create or update rolling release
         env:
@@ -181,7 +183,7 @@ jobs:
 
           **Download direto:** https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/app-release.apk
 
-          O APK é assinado com a chave de release estável, então instala por cima de versões anteriores sem desinstalar.
+          O APK é assinado com a chave de release estável, pronto para atualização direta.
           EOF
           )
 
