@@ -1,7 +1,6 @@
 package com.treinos.shared.data
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 
 class WorkoutRepository(
     private val workoutPlanDao: WorkoutPlanDao,
@@ -121,7 +120,7 @@ class WorkoutRepository(
         restSeconds: Int = 90,
         isSupersetWithPrevious: Boolean = false
     ): Long {
-        val exercises = workoutDayDao.getExercisesByDayId(dayId).first()
+        val exercises = workoutDayDao.getExercisesByDayId(dayId)
         val maxOrder = if (exercises.isEmpty()) -1 else exercises.maxOf { it.exerciseOrder }
         return workoutDayDao.insertExercise(
             WorkoutPlanExercise(
@@ -181,8 +180,7 @@ class WorkoutRepository(
         weightKg: Float?,
         reps: Int?,
         rpe: Float?,
-        completed: Boolean = true,
-        notes: String? = null
+        completed: Boolean = true
     ): Long {
         val log = SessionExerciseLog(
             sessionId = sessionId,
