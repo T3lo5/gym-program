@@ -55,6 +55,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Clean Gradle cache
+        run: ./gradlew clean --no-daemon
+
       - name: Setup Gradle properties
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" >> gradle.properties
