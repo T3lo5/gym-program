@@ -92,12 +92,12 @@ jobs:
       # ------------------------------------------------------------------
       - name: Build debug APK (pull requests)
         if: ${{ github.event_name == 'pull_request' }}
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Build signed release APK
         if: ${{ github.event_name != 'pull_request' }}
         run: >-
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
           -PversionCode=${{ steps.version.outputs.code }}
           -PversionName=${{ steps.version.outputs.name }}
 
