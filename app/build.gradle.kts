@@ -5,16 +5,26 @@ plugins {
     id("com.google.dagger.hilt.android") version "2.48.1"
 }
 
+// Release signing is driven by environment variables (see .github/workflows/android-ci.yml).
+// When they are absent (e.g. a local debug build) release APKs stay unsigned.
+val releaseKeystorePath: String? = System.getenv("RELEASE_KEYSTORE_PATH")
+val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank() && file(releaseKeystorePath).exists()
+
 android {
     namespace = "com.treinos.app"
     compileSdk = 34
+
+    // CI passes -PversionCode=<run number> and -PversionName=<tag/version>.
+    // Local builds fall back to sane defaults.
+    val appVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+    val appVersionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
 
     defaultConfig {
         applicationId = "com.treinos.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -36,7 +46,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     packaging {
@@ -52,18 +62,30 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = file(releaseKeystorePath!!)
+                    storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                    keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                }
+            }
         }
     }
 }
 
 dependencies {
     // Project
-    implementation(project(":shared"))
 
     // Android Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-compose:1.8.2")
+
+    // Navigation + Hilt integration for Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Material Components (for XML themes)
     implementation("com.google.android.material:material:1.11.0")
@@ -81,6 +103,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.runtime:runtime-livedata")
     implementation("androidx.compose.runtime:runtime-rxjava2")
 
@@ -93,6 +116,11 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // Room (shared exposes Room entities; the app needs the runtime on its classpath)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
 
     // Coil (images)
     implementation("io.coil-kt:coil-compose:2.7.0")
