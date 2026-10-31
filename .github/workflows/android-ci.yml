@@ -1,4 +1,4 @@
-name: Android CI/CD
+name: Android Build & Release
 
 on:
   push:
@@ -7,70 +7,188 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Only one release at a time; never cancel a running release.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
-  build-android:
+  build:
+    name: Build APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: .
+    timeout-minutes: 45
 
     steps:
-      # ============================================================
-      # 1. Checkout e setup JDK
-      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-          cache: 'gradle'
+          cache: gradle
 
-      # ============================================================
-      # 2. Cache Gradle dependencies
-      # ============================================================
-      - name: Cache Gradle modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      # ============================================================
-      # 3. Build APKs
-      # ============================================================
+      - name: Install required SDK packages
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Assemble debug and release APKs
-        run: ./gradlew assembleDebug assembleRelease --no-daemon --info
+      # ------------------------------------------------------------------
+      # Signing material: only present on pushes/ manual runs where the
+      # repository secrets are configured. Pull requests never see them.
+      # ------------------------------------------------------------------
+      - name: Decode release keystore
+        id: signing
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Release signing skipped::RELEASE_KEYSTORE_BASE64 is not set. The APK will be unsigned and cannot be installed. See .github/RELEASE_SETUP.md."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "RELEASE_KEYSTORE_PASSWORD=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> "$GITHUB_ENV"
 
-      # ============================================================
-      # 4. Upload APKs as artifacts
-      # ============================================================
+      - name: Compute version
+        id: version
+        run: |
+          VERSION_NAME="1.0.${GITHUB_RUN_NUMBER}"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+          fi
+          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION_NAME (versionCode ${GITHUB_RUN_NUMBER})"
+
+      # ------------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------------
+      - name: Build debug APK (pull requests)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Build signed release APK
+        if: ${{ github.event_name != 'pull_request' }}
+        run: >-
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          -PversionCode=${{ steps.version.outputs.code }}
+          -PversionName=${{ steps.version.outputs.name }}
+
+      - name: Verify APK signature
+        if: ${{ steps.signing.outputs.enabled == 'true' }}
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee signature.txt
+          # A signed APK prints at least one "Verified using v2 scheme" line.
+          grep -q "Verified using" signature.txt
+
+      - name: Compute checksums
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          cd app/build/outputs/apk/release
+          sha256sum app-release.apk > app-release.apk.sha256
+          cat app-release.apk.sha256
+
       - name: Upload debug APK
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: app-debug-pr-${{ github.event.number }}
           path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
 
       - name: Upload release APK
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: app-release-${{ steps.version.outputs.name }}
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release.apk.sha256
+          retention-days: 30
 
-      # ============================================================
-      # 5. Build summary
-      # ============================================================
       - name: Build summary
         run: |
-          echo "=== Build Status ==="
-          echo "Debug APK: $(ls -la app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || echo 'Not found')"
-          echo "Release APK: $(ls -la app/build/outputs/apk/release/app-release.apk 2>/dev/null || echo 'Not found')"
+          {
+            echo "### Android build"
+            echo ""
+            for f in app/build/outputs/apk/*/*.apk; do
+              [ -f "$f" ] || continue
+              echo "- \`$f\` ($(du -h "$f" | cut -f1))"
+            done
+            if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+              echo ""
+              echo "Signed: ${{ steps.signing.outputs.enabled == 'true' && 'yes' || 'no (see warning above)' }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    # Only publish from the default branch (or a tag push), never from PRs,
+    # and only when the signing secrets produced a signed APK.
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'branch' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-${{ needs.build.outputs.version_name }}
+          path: dist
+
+      - name: Verify APK is signed before publishing
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apksigner > /dev/null 2>&1 || true
+          if ! command -v apksigner > /dev/null; then
+            echo "apksigner not available on runner; skipping local check."
+            exit 0
+          fi
+          apksigner verify --verbose dist/app-release.apk
+
+      - name: Create or update rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=latest
+          TITLE="Treinos — latest build"
+          NOTES=$(cat <<EOF
+          Release automático gerado a partir de \`${GITHUB_SHA::7}\`.
+
+          **Versão:** ${{ needs.build.outputs.version_name }} (versionCode ${{ needs.build.outputs.version_code }})
+
+          **Download direto:** https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/app-release.apk
+
+          O APK é assinado com a chave de release estável, então instala por cima de versões anteriores sem desinstalar.
+          EOF
+          )
+
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" \
+            dist/app-release.apk dist/app-release.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            --latest
