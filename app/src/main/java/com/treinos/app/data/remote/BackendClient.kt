@@ -34,6 +34,9 @@ class BackendClient(
     suspend fun sync(request: SyncRequestDto): SyncResponseDto =
         post("/v1/sync", json.encodeToString(SyncRequestDto.serializer(), request))
 
+    suspend fun syncDownload(deviceId: String): SyncDownloadDto =
+        get("/v1/sync/download?deviceId=$deviceId")
+
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(baseUrlProvider() + path)

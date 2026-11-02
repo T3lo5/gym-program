@@ -124,4 +124,32 @@ interface WorkoutDao {
 
     @Query("SELECT COALESCE(SUM(completedSets), 0) FROM session_exercises WHERE sessionId = :sessionId")
     suspend fun completedSetsForSession(sessionId: Long): Int
+
+    @Query("DELETE FROM set_logs")
+    suspend fun deleteSetLogs()
+
+    @Query("DELETE FROM session_exercises")
+    suspend fun deleteSessionExercises()
+
+    @Query("DELETE FROM workout_sessions")
+    suspend fun deleteSessions()
+
+    @Query("DELETE FROM workout_plan_exercises")
+    suspend fun deletePlanExercises()
+
+    @Query("DELETE FROM workout_days")
+    suspend fun deleteDays()
+
+    @Query("DELETE FROM workout_plans")
+    suspend fun deletePlans()
+
+    @Transaction
+    suspend fun deleteAllData() {
+        deleteSetLogs()
+        deleteSessionExercises()
+        deleteSessions()
+        deletePlanExercises()
+        deleteDays()
+        deletePlans()
+    }
 }

@@ -37,14 +37,17 @@ fun SettingsScreen(
     backendUrl: String,
     isTesting: Boolean,
     isSyncing: Boolean,
+    isDownloading: Boolean,
     connectionMessage: String?,
     syncMessage: String?,
+    downloadMessage: String?,
     lastSyncAt: String?,
     deviceId: String,
     onBack: () -> Unit,
     onSaveUrl: (String) -> Unit,
     onTest: () -> Unit,
     onSync: () -> Unit,
+    onDownload: () -> Unit,
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
 
@@ -174,6 +177,34 @@ fun SettingsScreen(
                         }
                     }
                     syncMessage?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    Button(
+                        onClick = onDownload,
+                        enabled = !isDownloading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (isDownloading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                                Text("Baixando…")
+                            } else {
+                                Text("Restaurar do backend")
+                            }
+                        }
+                    }
+                    downloadMessage?.let {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,

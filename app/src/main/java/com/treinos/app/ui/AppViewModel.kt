@@ -66,6 +66,12 @@ class AppViewModel(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
+    private val _isDownloading = MutableStateFlow(false)
+    val isDownloading: StateFlow<Boolean> = _isDownloading.asStateFlow()
+
+    private val _downloadMessage = MutableStateFlow<String?>(null)
+    val downloadMessage: StateFlow<String?> = _downloadMessage.asStateFlow()
+
     private val _isTesting = MutableStateFlow(false)
     val isTesting: StateFlow<Boolean> = _isTesting.asStateFlow()
 
@@ -291,6 +297,23 @@ class AppViewModel(
                     ?: "Não foi possível enviar ao backend."
             } finally {
                 _isSyncing.value = false
+            }
+        }
+    }
+
+    fun downloadNow() {
+        if (_isDownloading.value) return
+        viewModelScope.launch {
+            _isDownloading.value = true
+            try {
+                repository.downloadSync()
+                _lastSyncAt.value = preferences.lastSyncAt
+                _downloadMessage.value = "Dados restaurados do backend."
+            } catch (error: Exception) {
+                _downloadMessage.value = error.message
+                    ?: "Não foi possível baixar dados do backend."
+            } finally {
+                _isDownloading.value = false
             }
         }
     }

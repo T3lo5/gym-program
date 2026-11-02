@@ -30,10 +30,12 @@ fun TreinosApp(viewModel: AppViewModel) {
     val restTotal by viewModel.restTotal.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
     val isTesting by viewModel.isTesting.collectAsStateWithLifecycle()
     val backendUrl by viewModel.backendUrl.collectAsStateWithLifecycle()
     val connectionMessage by viewModel.connectionMessage.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val downloadMessage by viewModel.downloadMessage.collectAsStateWithLifecycle()
     val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -99,14 +101,17 @@ fun TreinosApp(viewModel: AppViewModel) {
                     backendUrl = backendUrl,
                     isTesting = isTesting,
                     isSyncing = isSyncing,
+                    isDownloading = isDownloading,
                     connectionMessage = connectionMessage,
                     syncMessage = syncMessage,
+                    downloadMessage = downloadMessage,
                     lastSyncAt = lastSyncAt,
                     deviceId = viewModel.deviceId,
                     onBack = viewModel::goHome,
                     onSaveUrl = viewModel::saveBackendUrl,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,
+                    onDownload = viewModel::downloadNow,
                 )
             }
         }

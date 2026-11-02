@@ -18,6 +18,13 @@ import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.remote.SyncDayDto
 import com.treinos.app.data.remote.SyncPlanDto
 import com.treinos.app.data.remote.SyncPlanExerciseDto
+import com.treinos.app.data.remote.SyncDownloadDto
+import com.treinos.app.data.remote.SyncDownloadDayDto
+import com.treinos.app.data.remote.SyncDownloadPlanDto
+import com.treinos.app.data.remote.SyncDownloadPlanExerciseDto
+import com.treinos.app.data.remote.SyncDownloadSetLogDto
+import com.treinos.app.data.remote.SyncDownloadSessionDto
+import com.treinos.app.data.remote.SyncDownloadSessionExerciseDto
 import com.treinos.app.data.remote.SyncRequestDto
 import com.treinos.app.data.remote.SyncResponseDto
 import com.treinos.app.data.remote.SyncSessionDto
@@ -213,6 +220,122 @@ class WorkoutRepository(
         val response = backendClient.sync(payload)
         preferences.lastSyncAt = response.syncedAt
         return response
+    }
+
+    suspend fun downloadSync(): SyncDownloadDto {
+        val data = backendClient.syncDownload(preferences.deviceId)
+        withContext(Dispatchers.IO) {
+            dao.deleteAllData()
+        }
+
+        // Restaura planos, dias e exercícios
+        for (planDto in data.plans) {
+            val planId = dao.insertPlan(
+                WorkoutPlanEntity(
+                    id = planDto.id,
+                    serverPlanId = null,
+                    name = planDto.name,
+                    description = planDto.description,
+                    goal = planDto.goal,
+                    daysPerWeek = planDto.daysPerWeek,
+                    isActive = planDto.isActive,
+                    generatedByAi = planDto.generatedByAi,
+                    createdAt = planDto.createdAt,
+                    updatedAt = planDto.updatedAt,
+                    nextReviewAt = planDto.nextReviewAt,
+                    reviewAfterWeeks = planDto.reviewAfterWeeks,
+                    source = planDto.source,
+                    version = planDto.version,
+                )
+            )
+            val dayDtos = data.days.filter { it.planId == planDto.id }
+            for (dayDto in dayDtos) {
+                val dayId = dao.insertDay(
+                    WorkoutDayEntity(
+                        id = dayDto.id,
+                        planId = planId,
+                        name = dayDto.name,
+                        dayOrder = dayDto.dayOrder,
+                        isRestDay = dayDto.isRestDay,
+                    )
+                )
+                val exDtos = data.planExercises.filter { it.dayId == dayDto.id }
+                dao.insertPlanExercises(
+                    exDtos.map { ex ->
+                        WorkoutPlanExerciseEntity(
+                            id = ex.id,
+                            dayId = dayId,
+                            exerciseId = ex.exerciseId,
+                            exerciseName = ex.exerciseName,
+                            primaryMuscles = ex.primaryMuscles,
+                            equipment = ex.equipment,
+                            exerciseOrder = ex.exerciseOrder,
+                            sets = ex.sets,
+                            targetReps = ex.targetReps,
+                            targetRpe = ex.targetRpe,
+                            restSeconds = ex.restSeconds,
+                            notes = ex.notes,
+                            isSupersetWithPrevious = ex.isSupersetWithPrevious,
+                        )
+                    }
+                )
+            }
+        }
+
+        // Restaura sessões, exercícios de sessão e set logs
+        for (sessionDto in data.sessions) {
+            val sessionId = dao.insertSession(
+                WorkoutSessionEntity(
+                    id = sessionDto.id,
+                    planId = sessionDto.planLocalId,
+                    dayId = sessionDto.dayLocalId,
+                    planName = sessionDto.planName,
+                    dayName = sessionDto.dayName,
+                    status = sessionDto.status,
+                    startedAt = sessionDto.startedAt,
+                    endedAt = sessionDto.endedAt,
+                    totalDurationSeconds = sessionDto.totalDurationSeconds,
+                )
+            )
+            val sessExDtos = data.sessionExercises.filter { it.sessionId == sessionDto.id }
+            val newExIds = dao.insertSessionExercises(
+                sessExDtos.map { ex ->
+                    SessionExerciseEntity(
+                        id = ex.id,
+                        sessionId = sessionId,
+                        exerciseId = ex.exerciseId,
+                        exerciseName = ex.exerciseName,
+                        exerciseOrder = ex.exerciseOrder,
+                        plannedSets = ex.plannedSets,
+                        completedSets = ex.completedSets,
+                        startedAt = ex.startedAt,
+                        endedAt = ex.endedAt,
+                    )
+                }
+            )
+            for ((exDto, newExId) in sessExDtos.zip(newExIds)) {
+                val setDtos = data.setLogs.filter { it.sessionExerciseId == exDto.id }
+                dao.insertSetLog(
+                    setDtos.map { set ->
+                        SetLogEntity(
+                            id = set.id,
+                            exerciseLogId = newExId,
+                            setNumber = set.setNumber,
+                            reps = set.reps,
+                            weightKg = set.weightKg,
+                            rpe = set.rpe,
+                            isCompleted = set.isCompleted,
+                            isWarmup = set.isWarmup,
+                            restTakenSeconds = set.restTakenSeconds,
+                            completedAt = set.completedAt,
+                        )
+                    }
+                )
+            }
+        }
+
+        preferences.lastSyncAt = Instant.now().toString()
+        return data
     }
 
     suspend fun testConnection() = withContext(Dispatchers.IO) {

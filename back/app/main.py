@@ -511,6 +511,13 @@ async def synced_plans(deviceId: str = "default"):
     return {"deviceId": deviceId, "plans": db.list_synced_plans(deviceId)}
 
 
+@app.get("/v1/sync/download")
+async def sync_download(deviceId: str = "default"):
+    """Baixa todos os dados sincronizados de um dispositivo (planos, dias, exercícios, sessões, séries).
+    Útil para restaurar dados após reinstalar o app."""
+    return db.get_sync_download_data(deviceId)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "3000")))

@@ -472,3 +472,108 @@ def list_synced_plans(device_id: str) -> List[Dict[str, Any]]:
             (device_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_sync_download_data(device_id: str) -> Dict[str, Any]:
+    """Retorna todos os dados sincronizados de um dispositivo para download/restauração."""
+    with get_connection() as conn:
+        plans = conn.execute(
+            """
+            SELECT local_id, name, description, goal, days_per_week, is_active,
+                   generated_by_ai, created_at, updated_at, version, next_review_at,
+                   review_after_weeks, source, synced_at
+            FROM synced_plans WHERE device_id = ?
+            """,
+            (device_id,),
+        ).fetchall()
+
+        plan_rows = [dict(r) for r in plans]
+        plan_ids = [str(r["local_id"]) for r in plan_rows]
+
+        days: List[Dict[str, Any]] = []
+        day_ids: List[str] = []
+        if plan_ids:
+            placeholders = ",".join("?" for _ in plan_ids)
+            day_rows = conn.execute(
+                f"""
+                SELECT id, plan_id, local_id, name, day_order, notes, is_rest_day
+                FROM synced_plan_days
+                WHERE plan_id IN ({placeholders})
+                """,
+                [int(pid) for pid in plan_ids],
+            ).fetchall()
+            days = [dict(r) for r in day_rows]
+            day_ids = [str(r["local_id"]) for r in days]
+
+        plan_exercises: List[Dict[str, Any]] = []
+        if day_ids:
+            placeholders = ",".join("?" for _ in day_ids)
+            day_row_ids = [str(d["id"]) for d in days]
+            ex_rows = conn.execute(
+                f"""
+                SELECT id, day_id, exercise_id, exercise_order, sets, target_reps,
+                       target_rpe, rest_seconds, notes, is_superset_with_previous,
+                       exercise_name, primary_muscles, equipment
+                FROM synced_plan_exercises
+                WHERE day_id IN ({placeholders})
+                ORDER BY day_id, exercise_order
+                """,
+                day_row_ids,
+            ).fetchall()
+            plan_exercises = [dict(r) for r in ex_rows]
+
+        sessions: List[Dict[str, Any]] = []
+        session_ids: List[str] = []
+        sess_rows = conn.execute(
+            """
+            SELECT id, device_id, local_id, plan_local_id, day_local_id, plan_name,
+                   day_name, status, started_at, ended_at, total_duration_seconds,
+                   notes, synced_at
+            FROM synced_sessions WHERE device_id = ?
+            """,
+            (device_id,),
+        ).fetchall()
+        sessions = [dict(r) for r in sess_rows]
+        session_ids = [str(r["local_id"]) for r in sessions]
+
+        session_exercises: List[Dict[str, Any]] = []
+        if session_ids:
+            placeholders = ",".join("?" for _ in session_ids)
+            sess_ex_rows = conn.execute(
+                f"""
+                SELECT id, session_id, local_id, exercise_id, exercise_name,
+                       exercise_order, planned_sets, completed_sets, started_at, ended_at
+                FROM synced_session_exercises
+                WHERE session_id IN ({placeholders})
+                ORDER BY session_id, exercise_order
+                """,
+                [str(r["id"]) for r in sessions],
+            ).fetchall()
+            session_exercises = [dict(r) for r in sess_ex_rows]
+
+        set_logs: List[Dict[str, Any]] = []
+        if session_exercises:
+            placeholders = ",".join("?" for _ in session_exercises)
+            se_ids = [str(r["id"]) for r in session_exercises]
+            set_rows = conn.execute(
+                f"""
+                SELECT id, session_exercise_id, local_id, set_number, reps, weight_kg,
+                       rpe, duration_seconds, distance_meters, is_completed,
+                       is_warmup, rest_taken_seconds, completed_at
+                FROM synced_set_logs
+                WHERE session_exercise_id IN ({placeholders})
+                ORDER BY session_exercise_id, local_id
+                """,
+                se_ids,
+            ).fetchall()
+            set_logs = [dict(r) for r in set_rows]
+
+    return {
+        "deviceId": device_id,
+        "plans": plan_rows,
+        "days": days,
+        "planExercises": plan_exercises,
+        "sessions": sessions,
+        "sessionExercises": session_exercises,
+        "setLogs": set_logs,
+    }
