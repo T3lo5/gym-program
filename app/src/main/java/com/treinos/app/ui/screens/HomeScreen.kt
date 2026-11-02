@@ -246,7 +246,7 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(
