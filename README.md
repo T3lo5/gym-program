@@ -90,6 +90,46 @@ adb connect <watch-ip>:5555
 
 ---
 
+## 📦 CI/CD — APK automático
+
+Toda vez que houver um push na `main`, o GitHub Actions:
+
+1. Compila o APK (`assembleDebug`).
+2. Verifica a assinatura do APK.
+3. Publica o arquivo na release **`latest`** do repositório.
+4. Também guarda o APK como artifact do workflow (14 dias).
+
+**Download direto (sempre a última versão):**
+
+```
+https://github.com/T3lo5/gym-program/releases/latest/download/treinos.apk
+```
+
+O checksum fica em `treinos.apk.sha256`, na mesma release.
+
+### Disparar manualmente
+
+Na aba **Actions** do GitHub, abra o workflow **Android APK** e clique em
+**Run workflow**. O APK será publicado na release `latest` ao final.
+
+### Pull requests
+
+PRs compilam o APK para validar o código, mas **não** publicam release.
+O APK fica disponível como artifact da execução.
+
+### Assinatura
+
+O CI usa a chave de debug do Android, que é mantida em cache entre as
+execuções. Isso permite instalar uma versão nova por cima da anterior sem
+desinstalar o app. Se o cache expirar, pode ser necessário desinstalar a
+versão antiga antes de instalar a nova.
+
+Para builds assinados com chave própria, configure os secrets
+`RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`
+e `RELEASE_KEY_PASSWORD` e troque o workflow para usar `assembleRelease`.
+
+---
+
 ## 🏗️ Arquitetura
 
 ### Módulo `shared` (Kotlin Multiplatform-ready)
