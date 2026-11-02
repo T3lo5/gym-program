@@ -39,7 +39,7 @@ out/
 **/generated-test-sources/
 
 # ============================================================
-# Keystore / Signing (IMPORTANT - NEVER COMMIT)
+# Keystore / Signing (IMPORTANT - NEVER COMMIT release keystores)
 # ============================================================
 *.keystore
 *.jks
@@ -47,6 +47,9 @@ out/
 *.pfx
 keystore.properties
 signing.properties
+# Except the fixed debug keystore, which must be committed so every build
+# (local and CI) signs with the same key and app updates install over each other.
+!app/debug.keystore
 
 # ============================================================
 # Environment / Secrets (IMPORTANT - NEVER COMMIT)
