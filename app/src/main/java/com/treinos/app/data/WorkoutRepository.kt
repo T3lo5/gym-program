@@ -232,7 +232,7 @@ class WorkoutRepository(
         for (planDto in data.plans) {
             val planId = dao.insertPlan(
                 WorkoutPlanEntity(
-                    id = planDto.id,
+                    id = planDto.localId,
                     serverPlanId = null,
                     name = planDto.name,
                     description = planDto.description,
@@ -248,7 +248,7 @@ class WorkoutRepository(
                     version = planDto.version,
                 )
             )
-            val dayDtos = data.days.filter { it.planId == planDto.id }
+            val dayDtos = data.days.filter { it.planId == planDto.localId }
             for (dayDto in dayDtos) {
                 val dayId = dao.insertDay(
                     WorkoutDayEntity(
@@ -315,8 +315,8 @@ class WorkoutRepository(
             )
             for ((exDto, newExId) in sessExDtos.zip(newExIds)) {
                 val setDtos = data.setLogs.filter { it.sessionExerciseId == exDto.id }
-                dao.insertSetLog(
-                    setDtos.map { set ->
+                for (set in setDtos) {
+                    dao.insertSetLog(
                         SetLogEntity(
                             id = set.id,
                             exerciseLogId = newExId,
@@ -329,8 +329,8 @@ class WorkoutRepository(
                             restTakenSeconds = set.restTakenSeconds,
                             completedAt = set.completedAt,
                         )
-                    }
-                )
+                    )
+                }
             }
         }
 
