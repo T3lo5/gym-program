@@ -42,6 +42,9 @@ interface WorkoutDao {
     @Query("UPDATE workout_plans SET isActive = 0")
     suspend fun deactivateAll()
 
+    @Query("UPDATE workout_plans SET isActive = 1 WHERE id = :planId")
+    suspend fun updatePlanActive(planId: Long)
+
     @Insert
     suspend fun insertPlan(plan: WorkoutPlanEntity): Long
 

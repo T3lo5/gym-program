@@ -228,9 +228,12 @@ class WorkoutRepository(
             dao.deleteAllData()
         }
 
+        // Mapeia localId do servidor -> novo ID do Room
+        val planIdMap = mutableMapOf<Long, Long>()
+
         // Restaura planos, dias e exercícios
         for (planDto in data.plans) {
-            val planId = dao.insertPlan(
+            val newPlanId = dao.insertPlan(
                 WorkoutPlanEntity(
                     id = planDto.localId,
                     serverPlanId = null,
@@ -248,12 +251,13 @@ class WorkoutRepository(
                     version = planDto.version,
                 )
             )
+            planIdMap[planDto.localId] = newPlanId
             val dayDtos = data.days.filter { it.planId == planDto.localId }
             for (dayDto in dayDtos) {
                 val dayId = dao.insertDay(
                     WorkoutDayEntity(
                         id = dayDto.id,
-                        planId = planId,
+                        planId = newPlanId,
                         name = dayDto.name,
                         dayOrder = dayDto.dayOrder,
                         isRestDay = dayDto.isRestDay,
@@ -282,12 +286,25 @@ class WorkoutRepository(
             }
         }
 
+        // Garante que exatamente um plano esteja ativo (o primeiro com isActive=true,
+        // senão o primeiro da lista)
+        val allPlans = dao.getAllPlanEntities()
+        if (allPlans.isNotEmpty()) {
+            dao.deactivateAll()
+            val activePlan = allPlans.firstOrNull { it.isActive } ?: allPlans[0]
+            dao.updatePlanActive(activePlan.id, true)
+        }
+
+        // Mapeia localId de sessão -> novo ID do Room
+        val sessionIdMap = mutableMapOf<Long, Long>()
+
         // Restaura sessões, exercícios de sessão e set logs
         for (sessionDto in data.sessions) {
-            val sessionId = dao.insertSession(
+            val planRoomId = planIdMap[sessionDto.planLocalId] ?: sessionDto.planLocalId
+            val newSessionId = dao.insertSession(
                 WorkoutSessionEntity(
                     id = sessionDto.id,
-                    planId = sessionDto.planLocalId,
+                    planId = planRoomId,
                     dayId = sessionDto.dayLocalId,
                     planName = sessionDto.planName,
                     dayName = sessionDto.dayName,
@@ -297,12 +314,13 @@ class WorkoutRepository(
                     totalDurationSeconds = sessionDto.totalDurationSeconds,
                 )
             )
-            val sessExDtos = data.sessionExercises.filter { it.sessionId == sessionDto.id }
+            sessionIdMap[sessionDto.localId] = newSessionId
+            val sessExDtos = data.sessionExercises.filter { it.sessionId == sessionDto.localId }
             val newExIds = dao.insertSessionExercises(
                 sessExDtos.map { ex ->
                     SessionExerciseEntity(
                         id = ex.id,
-                        sessionId = sessionId,
+                        sessionId = newSessionId,
                         exerciseId = ex.exerciseId,
                         exerciseName = ex.exerciseName,
                         exerciseOrder = ex.exerciseOrder,
@@ -313,6 +331,7 @@ class WorkoutRepository(
                     )
                 }
             )
+            val exIdMap = sessExDtos.zip(newExIds).toMap()
             for ((exDto, newExId) in sessExDtos.zip(newExIds)) {
                 val setDtos = data.setLogs.filter { it.sessionExerciseId == exDto.id }
                 for (set in setDtos) {
