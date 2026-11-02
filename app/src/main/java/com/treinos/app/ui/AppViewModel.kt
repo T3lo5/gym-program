@@ -288,7 +288,7 @@ class AppViewModel(
                     "e ${result.setLogs} série(s)."
             } catch (error: Exception) {
                 _syncMessage.value = error.message
-                    ?: "Não foi possível sincronizar com o backend."
+                    ?: "Não foi possível enviar ao backend."
             } finally {
                 _isSyncing.value = false
             }

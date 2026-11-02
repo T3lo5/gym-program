@@ -138,13 +138,14 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        text = "Sincronização manual",
+                        text = "Sincronização manual (apenas envio)",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
                         text = "Os treinos e as séries ficam somente no SQLite do aparelho. " +
                             "Ao tocar no botão abaixo, o app envia um snapshot completo " +
-                            "(planos, treinos e séries) para o banco do backend.",
+                            "(planos, treinos e séries) para o banco do backend. " +
+                            "Não é feito download de dados do servidor.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
@@ -168,7 +169,7 @@ fun SettingsScreen(
                                 )
                                 Text("Enviando…")
                             } else {
-                                Text("Sincronizar agora")
+                                Text("Enviar ao backend")
                             }
                         }
                     }
