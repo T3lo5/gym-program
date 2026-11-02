@@ -31,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -43,7 +43,7 @@ jobs:
       # Mantém a mesma chave de debug entre execuções. Assim um APK novo
       # instala por cima do anterior, sem precisar desinstalar.
       - name: Cache debug signing key
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.android/debug.keystore
           key: android-debug-keystore-v1
@@ -86,7 +86,7 @@ jobs:
           (cd dist && sha256sum treinos.apk > treinos.apk.sha256)
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: treinos-apk
           path: dist/
@@ -114,7 +114,7 @@ jobs:
 
     steps:
       - name: Download APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: treinos-apk
           path: dist
