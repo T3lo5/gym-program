@@ -47,6 +47,8 @@ out/
 *.pfx
 keystore.properties
 signing.properties
+# Scripts that generate keystores with passwords (do not commit)
+scripts/generate-keystore.sh
 # Except the fixed debug keystore, which must be committed so every build
 # (local and CI) signs with the same key and app updates install over each other.
 !app/debug.keystore
