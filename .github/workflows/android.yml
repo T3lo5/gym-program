@@ -7,10 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Uma execução por branch/PR. Em PR, cancela builds antigos.
+# Uma execução por branch/PR. Um commit novo cancela o build anterior.
 concurrency:
   group: android-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -140,11 +140,22 @@ jobs:
           Verifique o checksum com o arquivo \`treinos.apk.sha256\`.
           EOF
 
-          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$TAG" \
-            dist/treinos.apk dist/treinos.apk.sha256 \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$TITLE" \
-            --notes-file release-notes.md \
-            --latest
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              dist/treinos.apk dist/treinos.apk.sha256 \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --notes-file release-notes.md \
+              --latest
+          else
+            gh release create "$TAG" \
+              dist/treinos.apk dist/treinos.apk.sha256 \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file release-notes.md \
+              --latest
+          fi
