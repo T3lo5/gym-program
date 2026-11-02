@@ -54,8 +54,8 @@ android {
     }
 
     signingConfigs {
-        create("debug") {
-            if (debugKeystoreFile.exists()) {
+        if (debugKeystoreFile.exists()) {
+            signingConfigs.named("debug").configure {
                 storeFile = debugKeystoreFile
                 storePassword = debugKeystorePassword
                 keyAlias = debugKeyAlias
