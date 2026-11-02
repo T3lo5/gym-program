@@ -9,7 +9,13 @@ kapt {
     correctErrorTypes = true
 }
 
-// Release signing is driven by environment variables.
+// Signing configuration - same keystore for debug and release so app updates
+// install over each other without requiring uninstall.
+val debugKeystoreFile = file("app/debug.keystore")
+val debugKeystorePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: "treinos123"
+val debugKeyAlias = System.getenv("DEBUG_KEY_ALIAS") ?: "treinos-debug"
+val debugKeyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: "treinos123"
+
 val releaseKeystorePath: String? = System.getenv("RELEASE_KEYSTORE_PATH")
 val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank() && file(releaseKeystorePath).exists()
 
@@ -48,6 +54,14 @@ android {
     }
 
     signingConfigs {
+        create("debug") {
+            if (debugKeystoreFile.exists()) {
+                storeFile = debugKeystoreFile
+                storePassword = debugKeystorePassword
+                keyAlias = debugKeyAlias
+                keyPassword = debugKeyPassword
+            }
+        }
         create("release") {
             if (hasReleaseSigning) {
                 storeFile = file(releaseKeystorePath!!)
@@ -59,6 +73,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.named("debug").get()
+        }
         release {
             isMinifyEnabled = false
             if (hasReleaseSigning) {
