@@ -306,9 +306,12 @@ class AppViewModel(
         viewModelScope.launch {
             _isDownloading.value = true
             try {
-                repository.downloadSync()
+                val data = repository.downloadSync()
                 _lastSyncAt.value = preferences.lastSyncAt
-                _downloadMessage.value = "Dados restaurados do backend."
+                val planCount = data.plans.size
+                _downloadMessage.value =
+                    if (planCount > 0) "Restaurado: ${planCount} plano(s) do backend."
+                    else "Nenhum dado encontrado para este dispositivo (deviceId: ${preferences.deviceId}). Verifique se está usando o mesmo aparelho que gerou o treino."
             } catch (error: Exception) {
                 _downloadMessage.value = error.message
                     ?: "Não foi possível baixar dados do backend."
