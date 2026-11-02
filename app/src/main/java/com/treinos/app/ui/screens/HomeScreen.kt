@@ -19,7 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.icons.default.ArrowForward as ArrowForwardIcon
+import androidx.compose.material.icons.filled.ArrowForward as ArrowForwardIcon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -255,7 +255,7 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    modifier = Modifier.fillMaxWidth().requiredHeight(48.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(
