@@ -4,6 +4,11 @@ services:
       context: ./back
       dockerfile: Dockerfile
     container_name: treinos-backend
+    # Roda como root porque o bind mount ./back/data:/app/data fica com dono root
+    # neste host (sistema de arquivos compartilhado de VM não permite chown).
+    # Como appuser (UID 1000) não consegue gravar na pasta root-owned, o SQLite
+    # falharia com "unable to open database file".
+    user: "0:0"
     ports:
       - "3000:3000"
     env_file:

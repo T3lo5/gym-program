@@ -114,6 +114,7 @@ def resolve_plan_ids(
     """Tenta corrigir IDs devolvidos pela IA para IDs reais do catálogo."""
     by_id, lookup = catalog_index(catalog)
     unresolved: List[str] = []
+    lookup_keys = list(lookup.keys())
 
     for day in plan.get("days", []):
         for exercise in day.get("exercises", []):
@@ -121,13 +122,21 @@ def resolve_plan_ids(
             if raw in by_id:
                 continue
 
-            candidate = lookup.get(normalize(raw))
-            if not candidate and normalize(raw):
-                matches = get_close_matches(
-                    normalize(raw), list(lookup.keys()), n=1, cutoff=0.84
-                )
+            normalized = normalize(raw)
+            candidate = lookup.get(normalized) if normalized else None
+
+            if not candidate and normalized:
+                # 1) Fuzzy match com cutoff relaxado
+                matches = get_close_matches(normalized, lookup_keys, n=1, cutoff=0.72)
                 if matches:
                     candidate = lookup[matches[0]]
+
+            if not candidate and normalized:
+                # 2) Substring: o ID da IA está contido em algum ID/nome do catálogo (ou vice-versa)
+                for key in lookup_keys:
+                    if normalized in key or key in normalized:
+                        candidate = lookup[key]
+                        break
 
             if candidate:
                 exercise["exerciseId"] = candidate

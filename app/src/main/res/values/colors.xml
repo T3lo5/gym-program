@@ -1,24 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material 3 colors -->
-    <color name="purple_700">#6750A4</color>
-    <color name="purple_500">#9C7CF3</color>
-    <color name="teal_200">#00CDC2</color>
-    <color name="teal_700">#006E6B</color>
+    <!-- Brand colors -->
+    <color name="green_700">#2E7D32</color>
+    <color name="green_500">#4CAF50</color>
+    <color name="green_300">#81C784</color>
+    <color name="teal_700">#00695C</color>
     <color name="red_500">#B3261E</color>
     
     <!-- Light theme -->
-    <color name="background_light">#FFFBFE</color>
-    <color name="surface_light">#FFFBFE</color>
+    <color name="background_light">#FFFAFAFA</color>
+    <color name="surface_light">#FFFFFFFF</color>
     <color name="on_surface_light">#1C1B1F</color>
     
     <!-- Dark theme -->
-    <color name="background_dark">#1C1B1F</color>
-    <color name="surface_dark">#1C1B1F</color>
-    <color name="on_surface_dark">#E6E1E5</color>
+    <color name="background_dark">#FF121212</color>
+    <color name="surface_dark">#FF1E1E1E</color>
+    <color name="on_surface_dark">#FFE6E1E5</color>
     
     <!-- Standard -->
-    <color name="white">#FFFFFF</color>
-    <color name="black">#000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
     <color name="transparent">#00000000</color>
     
     <!-- Custom -->

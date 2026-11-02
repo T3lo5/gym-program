@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:name="group"
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Background circle -->
+        <path
+            android:name="bg"
+            android:fillColor="#2E7D32"
+            android:pathData="M54,2c28.8,0 52,23.2 52,52s-23.2,52 -52,52s-52,-23.2 -52,-52S25.2,2 54,2z" />
+        <!-- Dumbbell bar -->
+        <path
+            android:name="bar"
+            android:fillColor="#FFFFFF"
+            android:pathData="M22,54h64v4h-64z" />
+        <!-- Left weight -->
+        <path
+            android:name="weightLeft"
+            android:fillColor="#FFFFFF"
+            android:pathData="M16,44h6v20h-6z" />
+        <path
+            android:name="weightLeftEnd"
+            android:fillColor="#FFFFFF"
+            android:pathData="M10,42h18v24H10z" />
+        <!-- Right weight -->
+        <path
+            android:name="weightRight"
+            android:fillColor="#FFFFFF"
+            android:pathData="M86,44h6v20h-6z" />
+        <path
+            android:name="weightRightEnd"
+            android:fillColor="#FFFFFF"
+            android:pathData="M80,42h18v24H80z" />
+    </group>
+</vector>

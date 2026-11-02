@@ -1,0 +1,548 @@
+[
+  {
+    "titulo": "Q1 · Desenvolvimento de Software com IA",
+    "enunciado": "Em uma frase: o que mudou no fluxo de quem desenvolve com IA — e qual ponto virou o gargalo do trabalho?",
+    "gabarito": "Gerar código ficou barato; o gargalo virou especificar, revisar e confiar no que foi gerado. A responsabilidade pela correção continua humana.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q2 · Desenvolvimento de Software com IA",
+    "enunciado": "Cite três riscos concretos de desenvolver com IA e um controle prático para cada.",
+    "gabarito": "Três de: alucinação de API inexistente → testes/linters antes da revisão; secret vazado em prompt → .env fora do git e do contexto; prompt injection em conteúdo lido pelo agente → permissões e sandbox; código que ninguém entende → diffs pequenos e revisão humana a cada passo.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q3 · Prompt Engineering - fundamentos",
+    "enunciado": "Quais são as 4 partes de um prompt completo? Exemplifique as quatro para a tarefa \"resumir um e-mail\".",
+    "gabarito": "Papel (\"você é assessor executivo\"), tarefa (\"resuma o e-mail\"), contexto (\"leitura no celular, 30 segundos\"), formato (\"exatamente 3 bullets de até 12 palavras\").",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q4 · Prompt Engineering - fundamentos",
+    "enunciado": "Por que \"não seja prolixo\" é um prompt fraco? Reescreva-o.",
+    "gabarito": "Negação diz o que evitar, não o que fazer — o modelo fica sem ação-alvo. Reescrita: \"responda em exatamente 3 bullets, cada um com no máximo 12 palavras\".",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q5 · Spec-Driven Development",
+    "enunciado": "O que o SDD afirma — em uma frase — e qual artefato é a fonte de verdade?",
+    "gabarito": "A especificação é escrita, revisada e versionada antes do código, e o código é derivado dela. A spec (com critérios de aceite e fora de escopo) é o contrato.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q6 · Spec-Driven Development",
+    "enunciado": "A spec e a implementação divergiram. O que corrigir primeiro — e por quê?",
+    "gabarito": "A spec primeiro. Se a implementação \"venceu\", foi decisão e não acidente — registra-se a mudança na spec, no mesmo commit, senão o artefato vira mentira documentada e a próxima revisão perde o referencial.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q7 · Ambiente de Desenvolvimento com IA",
+    "enunciado": "Nomeie as 5 peças mínimas de um ambiente de IA e a função de cada.",
+    "gabarito": "Terminal/CLI (onde o agente vive), autenticação de modelo (quem paga a conta), cliente do agente (conversa e edita arquivos), repositório (rede de segurança — git desfaz), verificação (testes/lint/build — prova que está certo).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q8 · Ambiente de Desenvolvimento com IA",
+    "enunciado": "Por que o commit de segurança e a verificação de baseline vêm antes da primeira prompt? O que se perde sem isso?",
+    "gabarito": "Com baseline verde e ponto de retorno, qualquer vermelho novo é atribuível à mudança da IA. Sem isso não se distingue bug pré-existente de regressão — a revisão vira opinião em vez de verificação.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q9 · OpenCode",
+    "enunciado": "O que é o OpenCode e o que significa BYOK?",
+    "gabarito": "Agente de programação de código aberto que roda no terminal (lê, edita, executa comandos no projeto). BYOK — bring your own key: o software é aberto e grátis; a conta de modelo é do seu provedor (pago, tier grátis ou local).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q10 · OpenCode",
+    "enunciado": "Descreva o loop do agente (ler → agir → observar) e por que o primeiro pedido certo é pequeno e verificável.",
+    "gabarito": "Ele lê o contexto, escolhe uma ação, executa e observa o resultado, repetindo até a meta. Começar com tarefa pequena e verificável calibra permissões e confiança antes de dar ao agente algo grande para quebrar.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q11 · Agent Skills",
+    "enunciado": "O que é uma skill e como ela difere de um prompt?",
+    "gabarito": "Skill é pacote no filesystem (instruções + recursos) carregado sob demanda. Prompt é a conversa do momento; skill é conhecimento reutilizável, versionado no git e compartilhável com o tempo.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q12 · Agent Skills",
+    "enunciado": "Explique as 3 camadas da progressive disclosure e o que cada uma economiza.",
+    "gabarito": "Metadata (~100 tokens, sempre carregada), instruções do SKILL.md (<5k, só quando dispara), recursos/scripts (custo zero até serem referenciados; script roda por bash e só o output entra no contexto).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q13 · N8N",
+    "enunciado": "O que é o N8N? E qual a diferença de papel entre um workflow e um agente?",
+    "gabarito": "Automação de workflows como grafo de nós (fair-code, self-host grátis). Workflow orquestra etapas determinísticas (buscar → filtrar → gravar); agente decide com raciocínio e linguagem (o que fazer e com qual ferramenta).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q14 · N8N",
+    "enunciado": "No projeto, a Amazon bloqueou a requisição automatizada. Por que isso era previsível na spec — e o que faz o caminho de erro existir num workflow?",
+    "gabarito": "Todo caminho de dado externo assume falha e bloqueio: anti-bot/CAPTCHA entra como risco (e a solução — proxy de scraping — na spec, junto do fora de escopo). O caminho de erro é nó desenhado de antemão (retry, alerta): erro vira item com motivo, inspecionável — não afterthought.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q15 · Mastra",
+    "enunciado": "O que é o Mastra e quais suas 4 primitivas?",
+    "gabarito": "Framework TypeScript para construir agentes de IA. Primitivas: Agent (modelo + instruções + ferramentas), Tools (ações tipadas), Workflow (passos determinísticos), Memória/RAG (contexto entre turnos e conhecimento).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "Q16 · Mastra",
+    "enunciado": "Por que \"plain object tool definitions silently fail\" importa? O que o schema compra?",
+    "gabarito": "Tool mal declarada não levanta erro — silencia e simplesmente nunca roda; por isso createTool com id, description, inputSchema (zod) e execute é obrigatório. O schema fecha o domínio do argumento: entrada inválida mora na fronteira, antes do efeito colateral — alucinação de parâmetros vira erro de validação.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q1 · IA na Estratégia",
+    "enunciado": "Qual a diferença entre IA, machine learning e LLM? Dê um exemplo de cada um.",
+    "gabarito": "IA é o campo geral de sistemas que executam tarefas que exigiriam inteligência humana; machine learning é o subcampo que aprende padrões a partir de dados; LLM é um tipo de modelo treinado em grandes volumes de texto para gerar continuções plausíveis. Exemplo de IA: sistema de recomendação; de ML: detecção de fraude; de LLM: redação de e-mails.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q2 · IA na Estratégia",
+    "enunciado": "Por que todo sistema de IA em produção é descrito como \"de escopo estreito\"?",
+    "gabarito": "Porque sistemas de IA atuais resolvem uma tarefa específica e bem definida, não possuem inteligência geral, e seu desempenho cai fora do escopo para o qual foram treinados; escopo estreito reduz risco e torna o erro previsível.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q3 · IA na Estratégia",
+    "enunciado": "Classifique em \"software tradicional\" ou \"IA\": validação de CPF, recomendação de filme, redação de e-mail, contador.",
+    "gabarito": "Software tradicional: validação de CPF (regras fixas), contador (regras fixas). IA: recomendação de filme (aprende padrões de uso), redação de e-mail (LLM gera texto com base em padrões de linguagem).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q4 · IA na Estratégia",
+    "enunciado": "Por que um sistema determinístico é preferível quando o custo de um erro é alto?",
+    "gabarito": "Um sistema determinístico produz sempre a mesma saída para a mesma entrada, o que torna o comportamento previsível, auditável e reprodutível — essencial quando um erro tem custo alto e não pode ser deixado à variância estatística de um modelo.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q5 · IA na Estratégia",
+    "enunciado": "O que um LLM não é? Liste cinco coisas.",
+    "gabarito": "1. Banco de dados — não consulta, faz transição estatística aprendida. 2. Memória persistente — estado é pesos + janela de contexto. 3. Verificador de verdade — objetivo é plausibilidade, não veracidade. 4. Simulador de mundo — raciocínio é padrão aprendido, não mecanismo garantido. 5. Determinístico — decodificação é estocástica.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q6 · IA na Estratégia",
+    "enunciado": "Quais as quatro condições que um problema precisa ter para ser bom caso de uso de IA?",
+    "gabarito": "Volume alto, tarefa recorrente, entrada não estruturada e erro tolerável.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q7 · IA na Estratégia",
+    "enunciado": "Por que \"entrada não estruturada\" é o denominador comum dos casos de uso?",
+    "gabarito": "Porque é onde o software tradicional falha — regras fixas não lidam com variações de texto, imagem ou áudio — e é exatamente onde LLMs e modelos de ML brilham, ao extrair padrões de dados não estruturados.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q8 · IA na Estratégia",
+    "enunciado": "Um processo com 500 documentos por mês e resultado crítico — passa na triagem? Justifique.",
+    "gabarito": "Depende: volume (500/mês) pode ser baixo, recorrência é sim, entrada pode ser não estruturada, mas resultado crítico exige erro tolerável — se não houver erro tolerável, não passa na triagem sem controle humano forte.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q9 · IA na Estratégia",
+    "enunciado": "Cite um problema do seu trabalho que passa na triagem e um que não passa.",
+    "gabarito": "Resposta pessoal do usuário — depende do contexto de trabalho. Exemplo que passa: classificar e-mails de suporte por categoria. Exemplo que não passa: decidir liberação de crédito com base em documentos, se o erro for crítico e não houver revisão humana.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q10 · IA na Estratégia",
+    "enunciado": "Por que a família \"buscar e responder\" tem tolerância a erro bem menor que as outras?",
+    "gabarito": "Porque o usuário confia na resposta como fato e age sobre ela; um erro nessa família vira informação falsa entregue com autoridade, enquanto em outras famílias o erro é mais fácil de detectar e corrigir antes de causar dano.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q11 · IA na Estratégia",
+    "enunciado": "Quais são as seis razões para não usar IA? Cite duas com alternativa concreta.",
+    "gabarito": "As seis razões devem vir da nota de aula/referência. Duas com alternativa: custo alto → usar software tradicional/regras; erro intolerável → usar processo determinístico com revisão humana.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q12 · IA na Estratégia",
+    "enunciado": "O que é a \"regra das 90%\" e por que ela é uma boa diretriz?",
+    "gabarito": "Se uma solução simples resolve 90% do problema com custo baixo, não vale a pena usar IA complexa para os 10% restantes; direciona a escolha pelo custo-benefício real.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q13 · IA na Estratégia",
+    "enunciado": "Enumere as 8 perguntas do framework de decisão. Qual delas reprova mais projetos?",
+    "gabarito": "As 8 perguntas vêm do framework de decisão estratégica da disciplina. A que mais reprova costuma ser \"como medir o antes e o depois\" — sem linha de base, não há como provar valor.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q14 · IA na Estratégia",
+    "enunciado": "O que é o critério de abandono e por que ele impede o piloto eterno?",
+    "gabarito": "É o ponto pré-definido em que se para o piloto se os critérios de sucesso não forem atingidos. Impede o piloto eterno porque obriga a decidir entre escalar ou desistir, em vez de arrastar um projeto sem métrica clara de sucesso ou falha.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D1 Q15 · IA na Estratégia",
+    "enunciado": "Quando o erro é aceitável se há revisão humana antes de agir? E quando não é?",
+    "gabarito": "Aceitável quando o erro é reversível, de baixo impacto e a revisão humana consegue corrigir antes da ação. Não é aceitável quando o erro é crítico, irreversível, de alto impacto (jurídico, financeiro, saúde) ou quando a revisão humana vira formalidade sem poder de veto.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q1 · Modelos de Linguagem",
+    "enunciado": "Descreva o pipeline de um LLM em uma frase, do texto à resposta.",
+    "gabarito": "Texto → tokenizer → tokens → embeddings → blocos Transformer (atenção causal + MLP) → logits → truncagem/temperatura → softmax → amostragem → repetição até condição de parada → detokenizador → texto. Os passos de embedding e transformer são paralelos; o de amostragem é sequencial.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q2 · Modelos de Linguagem",
+    "enunciado": "Liste cinco coisas que um LLM não é, e explique por que cada uma.",
+    "gabarito": "1. Banco de dados — não há consulta; há transição estatística aprendida. 2. Memória persistente — estado = pesos + janela de contexto. 3. Verificador de verdade — o objetivo é plausibilidade, não veracidade. 4. Simulador de mundo — raciocínio é padrão aprendido, não mecanismo garantido. 5. Determinístico — a decodificação é estocástica.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q3 · Modelos de Linguagem",
+    "enunciado": "Por que o histórico da conversa é cobrado como input a cada turno, e qual o impacto disso num agente de N turnos?",
+    "gabarito": "Protocolos de chat reenviam todo o histórico — incluindo respostas anteriores do modelo — como input a cada chamada, e todo input é cobrado. Como o histórico cresce, o total de tokens de entrada em N turnos é ~N(N+1)/2, isto é, superlinear. Mitigações: prompt caching, resumo do histórico, memória externa.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q4 · Modelos de Linguagem",
+    "enunciado": "Um sistema precisa achar o contrato \"8842-A\" e responder paráfrases como \"termo de rescisão\". Qual método para cada caso, e por quê?",
+    "gabarito": "\"8842-A\": BM25. Identificadores alfanuméricos arbitrários são ruído semântico; embedding falha. \"termo de rescisão\": embedding. Paráfrase sem sobreposição é falha estrutural do BM25. Conclusão: os erros são estruturalmente opostos → busca híbrida.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q5 · Modelos de Linguagem",
+    "enunciado": "O que acontece com a loss de um decoder-only se a máscara causal for removida?",
+    "gabarito": "Cai para quase zero: o modelo passa a enxergar o token alvo ao prevê-lo, e o alvo vira cópia da entrada. O gradiente flui, mas nada é aprendido — o modelo degenera em copy das últimas posições. A máscara causal é o que torna o treino autoregressivo válido.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q6 · Modelos de Linguagem",
+    "enunciado": "Num contexto de 1M de tokens, GQA e FlashAttention resolvem o problema? Separe o que é complexidade e o que é constante.",
+    "gabarito": "Não. GQA reduz o número de cabeças K/V → encolhe o KV cache → melhora o decode (constante). FlashAttention faz tiling e é IO-aware, mantendo a atenção exata (constante). As duas compram fatores, e fatores se esgotam: a atenção continua O(n²). Só uma mudança de complexidade — sliding window, atenção linear ou Mamba (SSM seletivo, linear) — altera o regime.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q7 · Modelos de Linguagem",
+    "enunciado": "Você fixa temperature=0 e seed=7, envia o mesmo prompt duas vezes, e as respostas divergem na terceira frase. Cite duas causas tecnicamente distintas e diga o que observaria em system_fingerprint.",
+    "gabarito": "1. Paramétrica/configurativa — algum parâmetro efetivo mudou (truncamento, max_tokens, versão do modelo). 2. Numérica — pipeline não reprodutível bit a bit: batching mudou a ordem das reduções em ponto flutuante, ou kernels usam atomicAdd com ordem arbitrária. Como a soma não é associativa, logits variam em ~1e-7, o que basta para inverter o argmax num topo empatado. system_fingerprint igual + saídas diferentes ⇒ causa numérica. Diferente ⇒ o provedor mudou o backend.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q8 · Modelos de Linguagem",
+    "enunciado": "Top-k com k fixo e top-p: qual é a diferença estrutural e por que top-p virou o padrão?",
+    "gabarito": "Top-k mantém sempre exatamente k candidatos, independentemente da confiança do modelo — ruim quando a distribuição é plana (corta demais) ou afiada (mantém candidatos inúteis). Top-p mantém o menor conjunto cuja massa acumulada atinge p, então o tamanho adapta-se à confiança. Daí ser o padrão.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q9 · Modelos de Linguagem",
+    "enunciado": "Contexto 32k, resposta 500 tokens, prefill 3 s, decode 80 tokens/s. (a) O que domina a latência percebida? (b) E ao dobrar o batch?",
+    "gabarito": "(a) As duas, em regiões distintas: TTFT de 3 s vem do prefill (limitado por cálculo, atenção O(T²)); os 80 tok/s vêm do decode (limitado por banda de memória). Se a resposta for curta, prefill domina; se longa, decode. (b) TTFT tende a subir (mais sequências competem, mais padding), throughput agregado sobe bastante (o custo de memória por passo é compartilhado). Compromisso clássico latência × vazão.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q10 · Modelos de Linguagem",
+    "enunciado": "Structured output e \"responda em JSON\": qual garante validade, e por quê a diferença importa?",
+    "gabarito": "Structured output garante. A cada passo, os logits são mascarados para permitir apenas tokens válidos segundo o JSON Schema — o modelo nunca tem chance de emitir algo inválido. É garantia por construção, não disciplina. \"Responda em JSON\" é um pedido, com taxa de falha residual. Para pipelines que quebram com JSON malformado, a diferença é entre o sistema funcionar ou não.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q11 · Modelos de Linguagem",
+    "enunciado": "O que o KV cache armazena, e por que o decode é limitado por memória e não por FLOPs?",
+    "gabarito": "Armazena as projeções de chave e valor de todos os tokens anteriores, em cada camada. Tamanho ∝ 2·camadas·cabeçasKV·d_cabeça·T. No decode, cada passo gera um token, mas precisa ler todos os pesos do modelo (bilhões de parâmetros) e todo o KV cache. Como a quantidade de dados lidos é enorme e a aritmética é mínima, o gargalo é banda de memória — daí GQA e quantização do cache acelerarem tanto.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q12 · Modelos de Linguagem",
+    "enunciado": "Você monta um prompt de RAG com 20 passagens e a pergunta no final. Como reestruturar, e por que a pergunta no meio não é necessariamente melhor?",
+    "gabarito": "Coloque a evidência mais relevante no início ou no fim — nunca no meio. Isso explora primacy bias e recency bias e evita o lost in the middle, cuja curva em U mostra que a informação no meio pode performar abaixo do closed-book (sem documento nenhum). A pergunta no meio sofre do mesmo efeito, e quebrar o contexto em segmentos empurra as passagens para posições piores. Tudo isso é propriedade do modelo e do tamanho do contexto: meça.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q13 · Modelos de Linguagem",
+    "enunciado": "Um prompt novo melhorou em 8 de 10 casos de teste. O que você precisa checar antes de colocar em produção?",
+    "gabarito": "1. Os 2 casos que pioraram — e se um deles é um caso crítico? 2. Variância — 10 casos é pouco. Rodar de novo dá o mesmo resultado? 3. Generalização — os casos são representativos do tráfego real, ou foram escolhidos para o prompt? 4. Custo e latência — o prompt novo é maior? tokens e ms por chamada. 5. Reprodutibilidade — mesmo modelo, seed fixa, system_fingerprint registrado. 6. Regressão — o prompt antigo ainda está no git? Dá para reverter? 7. Segurança — a mudança abriu brecha de injeção?",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q14 · Modelos de Linguagem",
+    "enunciado": "Por que \"IMPORTANTE: siga as instruções do sistema\" no topo não resolve prompt injection?",
+    "gabarito": "Porque um aviso em linguagem natural é apenas mais um pedaço de texto competindo com o texto do atacante, no mesmo nível. A defesa estrutural é (1) hierarquia de privilégio — system/developer acima de user, conforme Instruction Hierarchy e Model Spec; (2) entrada externa marcada como dado (tags, canal de tool result), nunca como prompt; (3) validar a saída antes de executá-la; (4) privilégio mínimo. A validação de saída é a mais importante porque não depende de o modelo obedecer.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D2 Q15 · Modelos de Linguagem",
+    "enunciado": "Quando usar RAG, quando usar fine-tuning, e quando usar ferramentas? Justifique.",
+    "gabarito": "RAG — conhecimento factual novo/atualizado, que precisa ser citado e atualizado sem re-treinar. Custo: tokens de entrada por consulta. Fine-tuning — tom, formato e estrutura estáveis, ou tarefa nova com muitos exemplos rotulados. Não para ensinar fatos: é caro, desatualiza, e não dá citação. Ferramentas — capacidade nova: cálculo, acesso a rede, execução de código. Torna a resposta verificável. A regra: escolha pela natureza da necessidade (fato / formato / capacidade), não pela moda.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q1 · Seleção de Modelos",
+    "enunciado": "Em uma frase: o que a disciplina \"Seleção de Modelos\" decide — e por que ela começa pelo levantamento e não pelo catálogo de modelos?",
+    "gabarito": "Ela decide qual modelo entrega a performance que a aplicação precisa pelo custo que o orçamento permite. Começa pelo levantamento (tarefa, volume, orçamento, prazo de resposta, tolerância a erro) porque sem saber o que a aplicação exige, comparar modelos é comparar coisas sem critério — a escolha vira opinião.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q2 · Seleção de Modelos",
+    "enunciado": "Por que \"existe o melhor modelo\" é um mito? Três razões, com o que cada uma esconde.",
+    "gabarito": "1. Melhor é relativo ao contexto — para cada tarefa/volume/orçamento existe uma melhor escolha; não há vencedor absoluto. 2. Preço não é qualidade — precisão e qualidade não estão necessariamente atreladas ao custo: caro não garante adequação, barato não condena a solução. 3. Boa e barata ao mesmo tempo não é garantia — treinamento, qualidade e desenvolvimento custam caro; esperar o modelo ótimo no menor preço é parte do mito. Consequência: sempre sobra levantamento + trade-offs — decisão com análise, não resposta pronta.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q3 · Seleção de Modelos",
+    "enunciado": "Liste as três categorias de modelos e, para cada uma, onde roda e o custo que ela carrega.",
+    "gabarito": "1. Frontier — API do provedor; máximo de raciocínio e linguagem, tarefas complexas; custo alto por token (reflete treinamento e desenvolvimento). 2. Intermediário — API do provedor; custo por token é o fator crítico; cai em tarefas complexas, e fine-tuning pode aproximá-lo do frontier na tarefa alvo. 3. Open-weight (auto-hospedado) — sua infraestrutura; sem custo por chamada e controle total, mas com conta de infraestrutura, manutenção e observabilidade.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q4 · Seleção de Modelos",
+    "enunciado": "Por que um modelo open-weight não é \"de graça\"? Cite as três contas que continuam existindo, e explique por que open-weight ≠ open-source.",
+    "gabarito": "As três contas: infraestrutura (GPUs/serving — GPU ociosa é paga mesmo com pouca demanda), manutenção (atualizar modelo, patches, versões) e observabilidade (monitorar qualidade, latência e falhas sem o painel do provedor). Open-weight ≠ open-source: open-weight libera os pesos; open-source exige licença livre no sentido da OSI — e licenças de pesos podem proibir uso comercial.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q5 · Seleção de Modelos",
+    "enunciado": "Liste os 5 critérios de seleção e, para cada um, como você o mediria numa aplicação real (e a armadilha correspondente).",
+    "gabarito": "Qualidade → evals com casos seus, no seu domínio, mais de uma métrica (armadilha: seguir leaderboard alheio). Custo → preço in/out × volume real de chamadas (armadilha: olhar só o preço por token, esquecer volume e respostas longas). Latência → TTFT e p50/p99 medidos (armadilha: confundir streaming com latência total; medir só p50). Confiabilidade → taxa de falha de schema, variação entre execuções, SLA e versionamento (armadilha: assumir que o modelo de ontem é o de hoje). Risco → custo do erro por incidente (dado vazado, decisão errada) (armadilha: tratar risco como erram às vezes sem calcular impacto).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q6 · Seleção de Modelos",
+    "enunciado": "Aplicação crítica × alto volume: qual modelo em cada caso, e qual custo domina a decisão em cada um?",
+    "gabarito": "Aplicação crítica → modelo caro (frontier): o custo do erro domina a diferença de preço — o incidente custa mais que um ano de diferença de preço. Mesmo assim, revisão humana no fluxo. Alto volume → modelo barato (intermediário/open-weight): o custo unitário multiplicado pelo volume domina o total — 5× o preço por token é 5× o orçamento em 100k chamadas/dia.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q7 · Seleção de Modelos",
+    "enunciado": "Dois casos no mesmo dia: (a) resumir 500 contratos/mês para busca interna; (b) analisar risco em 20 contratos/mês para decisão judicial. Para cada um, escolha a categoria, justifique com números hipotéticos de custo e erro, e diga qual controle continua obrigatório junto com o modelo escolhido.",
+    "gabarito": "(a) Intermediário — tarefa direta, volume razoável, erro recuperável (revisão humana amostral). Ex.: intermediário 94% × frontier 97% a 10× o preço; a diferença se paga com fila de exceção. (b) Frontier — erro crítico, volume baixo: o preço do frontier some diante do custo de um parecer errado; controle obrigatório: revisão humana (e trilha de auditoria). Em ambos, vale medir no domínio real antes de decidir — sem eval próprio, é chute com verniz.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q8 · Seleção de Modelos",
+    "enunciado": "O líder da área diz: \"Todo mundo usa o modelo X agora, é o melhor, vamos migrar.\" Responda com análise — sem achismo, no formato da aula 25 (critérios + números + revisão).",
+    "gabarito": "Pedir o que sustenta \"melhor\": melhor para qual tarefa, em qual métrica, no nosso volume? Montar a linha de decisão: qualidade = eval no nosso domínio (X vs. atual); custo = R$/1M × nosso volume/mês; latência = p95 medido; risco = o que muda se errar. \"Todo mundo\" é anedota (leaderboard único e marketing são fontes do mito). Se os números do X ganharem, a decisão é dele — com data de revisão (preço muda, modelo novo aparece); se não ganharem, fica o atual, e a resposta é auditável.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q9 · Seleção de Modelos",
+    "enunciado": "Fine-tuning num intermediário × frontier sem ajuste: como decidir? Considere qualidade na tarefa, custo total (incluindo o que é fixo) e risco.",
+    "gabarito": "Comparar no mesmo eval da tarefa: se o intermediário + fine-tuning chega perto do frontier na tarefa alvo, ele vence — qualidade equivalente, custo por token muito menor, e o fine-tuning (ver LoRA) é custo único e barato. Frontier vence quando a tarefa é geral/ambígua (raciocínio longo), quando não há dados rotulados para treinar, ou quando o domínio muda rápido e o modelo especializado envelhece. Custo total do intermediário = tokens + fine-tuning amortizado; do frontier = só tokens, mas a 10×. Risco: fine-tuning sem eval = superotimização silenciosa — medir sempre.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q10 · Seleção de Modelos",
+    "enunciado": "O que é vendor lock-in em IA — e por que ele é uma decisão de arquitetura tomada no início do projeto?",
+    "gabarito": "É a dependência de um fornecedor cujo custo de troca ficou proibitivo: API proprietária, prompts calibrados num modelo, embeddings e fine-tuning presos nos pesos dele, dados no formato dele. É decisão de arquitetura e de início porque o custo de troca cresce com o uso — cada mês de dados, prompts e produto em volta do fornecedor soma trabalho de reescrita; projetar a troca depois custa muito mais do que permiti-la antes.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q11 · Seleção de Modelos",
+    "enunciado": "Por que um leaderboard público não decide a escolha — e qual benchmark decide?",
+    "gabarito": "O leaderboard mede média alheia em tarefas alheias, com riscos de contaminação (dado que vazou no treino) e saturação — serve para triagem, descartar fracos. Quem decide é o benchmark do seu domínio: mesmo dataset para todos os modelos, casos reais da produção, repetição das execuções (decodificação é estocástica) e métrica ligada à função real do produto. Benchmark ruim leva a escolha ruim: a escolha herda os defeitos do teste.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q12 · Seleção de Modelos",
+    "enunciado": "Cite quatro alavancas contra o lock-in e explique por que a abstração (camada de acesso) sozinha não basta.",
+    "gabarito": "1. Interface única (Adapter/Port) — o produto fala com uma interface; a camada conhece os provedores. 2. Anti-corruption layer — traduz a semântica do provedor para o modelo de domínio. 3. Formatos portáveis — prompts genéricos por tarefa, vetores e histórico exportáveis. 4. Evals de troca — suite que o substituto precisa passar. A abstração sozinha não basta porque os modelos não se comportam igual: a camada esconde o acoplamento, mas esconde a diferença de comportamento — sem evals de troca, trocar é suposição testada em produção.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q13 · Seleção de Modelos",
+    "enunciado": "Seu teste de 10 casos deu 90% (modelo A) e 80% (modelo B). Por que isso ainda não é uma comparação — e o que falta?",
+    "gabarito": "Falta estatística: 10 casos não separam 90% de 80% (a margem de erro engole a diferença); uma execução por caso mede sorte, porque a decodificação é estocástica; e os casos podem não refletir o uso real. O que falta: amostra maior e representativa do tráfego, repetição (várias execuções do mesmo caso), margem de erro explícita (intervalos que não se sobrepõem), métrica ligada à função real (formato, fidelidade, falhas) e os mesmos dados e versão de prompt para os dois modelos.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q14 · Seleção de Modelos",
+    "enunciado": "SaaS com 50k interações/dia (~90% FAQ, ~9% caso a caso, ~1% cobrança ou pedido formal). Desenhe a estratégia híbrida: o que define o gate, o que vai para o caro, e por que \"só caro\" quebra a margem enquanto \"só barato\" quebra a qualidade.",
+    "gabarito": "Gate com critério escrito: ação crítica por domínio (a lista explícita — cobrança/pedido formal), baixa confiança do barato ou falha no validador (schema), e custo do erro acima de N chamadas do caro (N é número). Fluxo: FAQ no barato; 9% com contexto ampliado no barato e escala se falhar; 1% no caro + revisão humana. Por que os extremos falham: só barato erra justamente nas ações onde erro vira reclamação/chargeback; só caro paga o teto de capacidade em 100% das consultas — na conta, ~10× o custo para ganhar qualidade que só 1% das interações paga. A híbrida entrega qualidade onde ela é paga e protege a margem onde ela não é notada.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D3 Q15 · Seleção de Modelos",
+    "enunciado": "Escreva a decisão final de um caso real seu, no formato completo: levantamento, modelos comparados, eval no domínio, conta no volume, plano de troca (lock-in) e data de revisão. Justifique com a conclusão da disciplina.",
+    "gabarito": "Formato esperado (com números do caso): Levantamento — tarefa, volume, orçamento, latência, tolerância a erro. Comparação — ≥2 candidatos no benchmark do domínio (dados reais, repetição, métrica da função real). Conta — custo/mês com preço in/out × volume real. Plano de troca — camada de acesso + evals que o substituto passa (sem isso, a escolha é lock-in). Revisão — data/gatilho (preço mudou, volume dobrou, modelo novo). A justificativa é a conclusão da disciplina: não se escolheu o melhor modelo; escolheu-se o certo para o contexto certo — com método (levantamento → critérios → trade-off), auditável, e com data de validade.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q1 · Riscos e Falhas",
+    "enunciado": "Por que em IA a falha é tratada como taxa e não como exceção? O que muda na forma de testar e de proteger o sistema?",
+    "gabarito": "Porque o modelo estima a continuação mais provável do texto, não a resposta verdadeira: o erro é esperado e mensurável, não um bug pontual. Muda o teste (entrada parecida → saída variável, cobertura por distribuição e cauda, não por caso fixo) e muda a proteção (camadas: fonte real, validação de saída, guardrails, humano no crítico e Evals contínuos). Testar mais não elimina o erro; mede e contém.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q2 · Riscos e Falhas",
+    "enunciado": "Defina alucinação em uma frase e explique por que o tom confiante da resposta não é evidência de que ela está correta.",
+    "gabarito": "Alucinação é a IA inventar informação e entregá-la com aparência de resposta correta (plausível, bem escrita, segura) — mas imprecisa ou falsa. O tom confiante é estilo de linguagem, não probabilidade calibrada: o modelo não tem sinal interno de dúvida confiável, porque foi treinado para gerar texto plausível, não para distinguir verdade de invenção.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q3 · Riscos e Falhas",
+    "enunciado": "Defina inconsistência e mostre por que ela não é o mesmo que alucinação. Dê um exemplo em que a resposta está factualmente correta e ainda assim é inconsistente.",
+    "gabarito": "Inconsistência é a mesma entrada (mesma pergunta, contexto e dado) produzir saídas diferentes entre execuções, ou uma saída que se contradiz internamente. Não é alucinação: o fato pode estar certo nas duas vezes. Exemplo: segunda-feira o relatório diz total: R$ 42.300 e terça, mesmo CSV, diz R$ 38.900 — o segundo número não é inventado, é outro critério de agregação. Causas: amostragem/Temperatura, contexto diferente, versão de modelo/prompt e Ambiguidade não resolvida.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q4 · Riscos e Falhas",
+    "enunciado": "Por que ambiguidade é descrita como \"geralmente causada por prompt ruim\"? E por que \"escrever um prompt mais longo\" não é a correção?",
+    "gabarito": "Porque o pedido não determina qual resposta é a correta: resumo das vendas pode ser total do mês, média por venda, comparação com o mês anterior ou texto executivo — todas leituras válidas. O modelo escolhe uma (a continuação mais provável) e segue. Prompt mais longo sem critério de correção só adiciona texto; o que corrige é definir contrato (objetivo, público, formato, o que não fazer), dar exemplo de saída, usar schema e mandar perguntar quando faltar dado crítico.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q5 · Riscos e Falhas",
+    "enunciado": "Explique os dois mecanismos de perda de contexto vistos no guia de alucinação e por que aumentar a janela não resolve o problema.",
+    "gabarito": "(1) Limite de janela: o contexto passa do máximo e o mais antigo é cortado. (2) Atenção no meio: a informação está dentro da janela, mas no meio de um contexto longo é menos usada que o começo e o fim. Aumentar a janela só resolve o primeiro; no segundo, mais texto significa mais ruído competindo com a evidência. A correção é arquitetura de contexto: reancorar instruções, posicionar o crítico no começo/fim, resumir, recuperar sob demanda e manter estado explícito.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q6 · Riscos e Falhas",
+    "enunciado": "Liste as cinco camadas de controle do guia de moderação e diga qual erro cada uma pega.",
+    "gabarito": "Grounding → alucinação factual — resposta sem lastro no dado real. Validação de saída → saída quebrada: schema, tipo, range, citação inexistente. Guardrails → conteúdo proibido, PII, Prompt Injection, tópico fora de escopo. Human-in-the-loop → residual caro que nenhuma regra pegou. Evals → regressão silenciosa — mede se as outras camadas seguram. A ordem importa: grounding → validação → humano → evals.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q7 · Riscos e Falhas",
+    "enunciado": "Classifique cada sintoma como alucinação, inconsistência, ambiguidade ou perda de contexto: a) o agente cita uma função sample_frac do pandas que não existe; b) a mesma consulta de preço retorna R$ 199 hoje e R$ 189 amanhã, com o mesmo dado; c) você pede média de vendas por mês e recebe o total do mês; d) você disse valores em centavos no início e o agente divide por 100 na mensagem 30.",
+    "gabarito": "a) Alucinação — fato/API inventado, plausível e falso. b) Inconsistência — mesma entrada, saída diferente (pode não haver erro factual). c) Ambiguidade — o pedido admitia mais de uma leitura; o modelo escolheu uma. d) Perda de contexto — a regra existia, mas deixou de ser usada (janela ou meio).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q8 · Riscos e Falhas",
+    "enunciado": "Um script gerado pela IA usa df.sample_frac(0.1). Como você descobre que é alucinação antes de produção, e quais dois controles teriam evitado o problema?",
+    "gabarito": "Descoberta: executar o código em ambiente de teste (o erro aparece como AttributeError em runtime) e conferir a API na documentação real — o método existe no dplyr (R), não no pandas. Controles: (1) usar documentação real como referência e validar imports/métodos contra ela; (2) validar a saída em código — rodar o script num pipeline de teste com dados de exemplo, não só revisar o texto. Bônus: pedir ao modelo que cite a fonte da API e recusar quando não houver.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q9 · Riscos e Falhas",
+    "enunciado": "Um relatório diário passa a mostrar totais diferentes para o mesmo CSV. Liste três controles, do mais barato ao mais caro, e diga o que cada um não resolve.",
+    "gabarito": "1. Fixar critério e versão (prompt + modelo + parâmetros documentados) — barato; não resolve entrada/contexto diferente nem modelo do provedor que muda por baixo. 2. Temperatura 0 + cache/idempotência — reduz variação e repete a mesma saída; não garante determinismo e não corrige critério ambíguo. 3. Eval com repetição + validação de saída — mede a variação e barra saída inválida; custa N execuções e não recupera um caso que ninguém pensou em testar. Antes dos três: garantir que total tem uma definição só (o problema pode ser Ambiguidade, não inferência).",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q10 · Riscos e Falhas",
+    "enunciado": "O agente ignora a regra valores em centavos depois de 30 mensagens. Proponha três medidas, ordene por custo e explique por que repetir a regra no chat é a pior delas.",
+    "gabarito": "1. Reancorar no ponto de uso (repetir a regra junto do pedido atual) — barato, mas ocupa contexto e depende de disciplina. 2. Bloco de estado explícito (regras/decisões fixas fora do histórico) — médio; exige desenho do prompt. 3. Resumir/compactar o histórico + recuperar sob demanda — mais caro; precisa de pipeline e teste de regressão. Repetir no chat é a pior porque aumenta o contexto, não garante posição e será novamente diluída — a regra volta a competir com todo o resto. O teste: mover/remover a regra e ver se a resposta muda.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q11 · Riscos e Falhas",
+    "enunciado": "Reescreva o pedido faça um resumo das vendas como um contrato de pelo menos quatro cláusulas, e diga qual falha cada cláusula fecha.",
+    "gabarito": "Exemplo: (1) objetivo — resumo executivo para a diretoria decidir o plano do próximo mês; (2) escopo — vendas de janeiro a setembro de 2026, arquivo X; (3) formato — 5 bullets, cada um com número e comparação com o mês anterior; (4) critério de correção — todo número deve citar a linha/tabela de origem; se faltar dado, escrever N/A; (5) o que não fazer — não projetar cenário, não arredondar. Cada cláusula fecha uma leitura possível (público, dados, forma, verdade e escopo) e reduz a Inconsistência entre execuções.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q12 · Riscos e Falhas",
+    "enunciado": "O que é revisar o plano proposto com o agente? Dê um checklist de quatro pontos e explique por que isso é diferente de revisar a resposta final.",
+    "gabarito": "É revisar com o agente, antes da execução, o plano que ele propôs — o que entendeu, os passos, os dados que vai usar e o resultado esperado. Checklist: (1) o objetivo do plano é o meu pedido? (2) os dados/fontes são os certos? (3) os passos são coerentes entre si (nada fora de ordem ou faltando)? (4) o resultado esperado corresponde ao que defini como correto? É diferente de revisar a resposta final porque pega o desvio antes de ele virar ação — quando o custo de corrigir ainda é baixo.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q13 · Riscos e Falhas",
+    "enunciado": "Por que a validação de saída deve viver em código, e não no prompt? Dê um exemplo de regra que o prompt não garante.",
+    "gabarito": "Porque prompt é pedido, código é garantia: a instrução pode ser ignorada, diluída em contexto longo ou sobrescrita por Prompt Injection. Em código, a saída inválida não vira resposta — vira erro, retry ou escalada. Exemplo: o total deve ser numérico e igual à soma das linhas — o modelo pode escrever a regra e violá-la na mesma resposta; um validador determinístico recalcula e rejeita. Outros: JSON Schema, range de datas, PII, citação que precisa existir na fonte.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q14 · Riscos e Falhas",
+    "enunciado": "Um cliente pede zero alucinação. Como você responde — tecnicamente e comercialmente — sem prometer o impossível?",
+    "gabarito": "Tecnicamente: alucinação é taxa, não exceção; o objetivo é reduzir e tornar o residual detectável e gerenciado com camadas — grounding com citação, validação de saída, guardrails, humano no crítico e Evals contínuos. Comercialmente: definir nível de serviço por tipo de erro (ex.: erro factual crítico → revisão humana; erro cosmético → amostragem), com métrica, painel e processo de incidente. Zero só existe se o modelo não responder sozinho — a decisão é quanto custa cada camada em tokens, latência e atrito, e quem absorve o residual.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q15 · Riscos e Falhas",
+    "enunciado": "Caso jurídico: um assistente resume contratos e aponta cláusulas de risco. Escolha três controles obrigatórios, justifique cada um pelo tipo de erro que pega e diga qual é o trade-off.",
+    "gabarito": "1. Grounding com citação obrigatória — cada afirmação aponta o trecho do contrato; pega alucinação factual. Trade-off: tokens/latência e necessidade de o texto estar no corpus. 2. Human-in-the-loop no que é crítico — parecer revisado por advogado antes de sair; pega o residual grave que nenhuma regra previu. Trade-off: fila e custo humano; revisão cansada exige checklist e amostragem de controle. 3. Guardrails + trilha de auditoria — bloqueia PII/vazamento e registra entrada, saída, versão do modelo e do prompt; pega política e permite post-mortem. Trade-off: latência e falsos positivos que precisam de escape. Fechando: Evals com casos reais do domínio medem se os três seguram — sem isso, é achismo com verniz.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q16 · Riscos e Falhas",
+    "enunciado": "O que faz uma falha ser inerente à arquitetura? Cite as três causas e explique por que aumentar o modelo não resolve.",
+    "gabarito": "É a falha que vem de como o modelo é construído, não de um bug ou prompt ruim. As três causas: (1) estimar probabilidade — gera continuação plausível, sem verificação de verdade; (2) contexto finito — janela limitada e atenção que perde o meio; (3) pedido ambíguo — a formulação do input admite mais de uma leitura. Modelo maior reduz a taxa, mas mantém a estrutura: continua sem fonte de verdade, com janela finita e operando sobre linguagem ambígua. O que resolve é o que está em volta: fonte, validação, contexto e contrato de pergunta.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q17 · Riscos e Falhas",
+    "enunciado": "A IA não tem pensamento em si. Explique o que isso significa e por que a fluência do texto não contradiz a afirmação.",
+    "gabarito": "Significa que não há intenção, crença nem verificação interna: existe cálculo de probabilidade sobre o próximo token. O texto fluente é o resultado esperado desse mecanismo — plausibilidade, não verdade. Cadeia de pensamento também é texto gerado, não deliberação interna; por isso o modelo pode explicar um erro com a mesma segurança com que explica um acerto. A verificação precisa ser externa: documento, schema, ferramenta, humano, Evals.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q18 · Riscos e Falhas",
+    "enunciado": "Mapeie cada falha (alucinação, inconsistência, ambiguidade, perda de contexto) à causa estrutural principal. Escolha uma e mostre por que ela tem mais de uma causa.",
+    "gabarito": "Alucinação → probabilidade (plausível ≠ verdadeiro). Inconsistência → amostragem + ausência de estado. Ambiguidade → formulação do pedido. Perda de contexto → janela finita + posição no contexto. Exemplo de causa múltipla: inconsistência vem da amostragem (Temperatura), mas também de Ambiguidade (cada execução escolhe uma leitura) e de contexto diferente (histórico/ordem dos documentos). Por isso o controle também é múltiplo: fixar critério, baixar temperatura, dar estado explícito e medir com repetição.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q19 · Riscos e Falhas",
+    "enunciado": "Um gerente propõe: vamos trocar para o maior modelo e aumentar a janela de contexto; isso resolve as alucinações e a perda de contexto. Responda com o conceito de erro inerente e proponha três controles que o upgrade não substitui.",
+    "gabarito": "O upgrade reduz taxa, não remove a natureza: o modelo continua estimando probabilidade (sem fonte de verdade) e a atenção continua perdendo o meio de contextos longos. Três controles que ele não substitui: (1) grounding com citação — sem documento real, o modelo maior continua inventando com mais fluência; (2) validação de saída em código — schema/regras pegam o que a amostragem deixou passar; (3) arquitetura de contexto — reancorar, posicionar e resumir, porque mais janela não garante uso da informação. Fechando com Evals para provar que a troca melhorou no seu domínio, não só no leaderboard.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q20 · Riscos e Falhas",
+    "enunciado": "Qual a diferença entre evitar falhas e projetar sistemas resilientes em IA? Por que em produção erros têm impacto maior que em ambiente controlado?",
+    "gabarito": "Evitar falhas busca eliminar o erro; projetar sistemas resilientes assume que falhas vão acontecer e foca em minimizar o impacto quando ocorrerem. Em ambiente controlado, o erro é interno e facilmente reversível. Em produção, há exposição real: impacto jurídico, financeiro e de reputação, além da dificuldade de reverter e da perda de confiança do cliente, que é difícil de recuperar.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q21 · Riscos e Falhas",
+    "enunciado": "Liste três estratégias para tornar um sistema com IA mais resiliente e explique o raciocínio fail-safe (negar com segurança).",
+    "gabarito": "Três estratégias: (1) Limitar escopo — restringir atuação ao domínio seguro; (2) Grounding + validação — ancorar em fontes confiáveis e validar com regras/código; (3) Guardrails + Human-in-the-loop — conter automaticamente e escalar casos críticos. O raciocínio fail-safe significa: caso não tenha certeza, não tenha fonte confiável ou esteja fora do escopo, é melhor recusar educadamente do que adivinhar e entregar uma resposta errada.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q22 · Riscos e Falhas",
+    "enunciado": "O que é grounding e por que ele é necessário, considerando a natureza probabilística dos LLMs?",
+    "gabarito": "Grounding é ancorar as respostas do modelo em dados verificáveis e reais (documentos, bases, APIs), ao invés de depender apenas da sua previsão probabilística. Como os LLMs estimam a continuação mais provável (plausível ≠ verdadeiro) e não possuem verificação interna de verdade, o grounding força o modelo a se basear em fontes externas confiáveis, reduzindo drasticamente o risco de alucinações.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q23 · Riscos e Falhas",
+    "enunciado": "Diferencie grounding, RAG e validação externa. Dê um exemplo prático para cada um.",
+    "gabarito": "Grounding: conceito geral de ancorar a resposta em fontes confiáveis. Ex: Forçar o modelo a responder apenas com base neste documento. RAG: técnica para implementar grounding. Busca trechos relevantes em uma base vetorial/documentos e passa como contexto. Ex: Buscar artigos do regulamento interno e enviar os trechos ao modelo. Validação externa: checagem fora do modelo, com regras/código. Ex: Verificar se a resposta cita um artigo válido do regulamento, ou conferir em um banco de dados se o ID existe.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q24 · Riscos e Falhas",
+    "enunciado": "Qual a diferença entre input guardrails e output guardrails? Dê um exemplo de cada.",
+    "gabarito": "Input guardrails: atuam antes de enviar ao modelo. Filtram, validam ou bloqueiam o que entra. Ex: Detectar e mascarar PII (CPF) ou bloquear pergunta fora de escopo. Output guardrails: atuam após a geração, antes de entregar ao usuário. Validam e filtram o que sai. Ex: Verificar se há citação válida, se segue schema JSON ou se contém dados sensíveis vazados.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q25 · Riscos e Falhas",
+    "enunciado": "Por que guardrails não resolvem sozinhos o problema de alucinações factuais? O que precisa ser combinado com eles?",
+    "gabarito": "Guardrails são portões (permitem/negam com base em regras), mas não criam fonte de verdade. Um modelo pode seguir todas as regras e ainda inventar um fato plausível se não estiver ancorado. Para respostas factuais, precisam ser combinados com grounding (fontes confiáveis), validação externa (checagem em código), e em casos críticos com Human-in-the-loop. Também é preciso medir com Evals para calibrar efetividade.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q26 · Riscos e Falhas",
+    "enunciado": "Explique o princípio IA como copiloto, humano como decisor. Em quais situações a revisão humana é indispensável?",
+    "gabarito": "Significa usar a IA para sugerir, resumir e fundamentar com base em fontes, mas deixar a decisão final com o humano. A revisão humana é indispensável em casos com alto impacto, baixa reversibilidade ou responsabilidade profissional/legal: pareceres jurídicos conclusivos, decisões financeiras, diagnósticos, aprovações críticas ou qualquer situação onde o erro tem consequências graves e não pode ser automatizado.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q27 · Riscos e Falhas",
+    "enunciado": "Como combinar grounding, guardrails e Human-in-the-loop para criar um fluxo eficiente (automatizar o seguro, escalar o crítico)?",
+    "gabarito": "Fluxo: (1) Input guardrails filtram escopo e PII; (2) Grounding busca em fontes confiáveis e passa contexto; (3) Geração com restrições; (4) Output guardrails validam citação, formato, regras; (5) Decisão: se dentro do escopo, com fonte válida, baixo impacto e validado → resposta direta. Se fora de escopo, sem fonte, ambíguo, decisão conclusiva ou alto impacto → escalar para Human-in-the-loop. O objetivo é reduzir carga humana, automatizando apenas o que é seguro.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q28 · Riscos e Falhas",
+    "enunciado": "O que são Evals e por que são chamados de camada de qualidade contínua? Por que testar uma vez não é suficiente?",
+    "gabarito": "Evals são avaliações sistemáticas e mensuráveis para testar a qualidade, confiabilidade e segurança de um sistema com IA. São camada de qualidade contínua porque devem ser executados ao longo de todo o ciclo (não só antes do lançamento). Testar uma vez não é suficiente porque: mudanças de prompt/modelo/documentos podem causar regressões, o comportamento é probabilístico, novos casos aparecem em produção e falhas sutis só aparecem com monitoramento contínuo.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q29 · Riscos e Falhas",
+    "enunciado": "Diferencie Evals determinísticos, LLM-as-a-judge e Evals humanos. Quando usar cada um?",
+    "gabarito": "Determinísticos: regras objetivas (JSON válido, contém citação, regex). Quando usar: validações binárias/estruturadas, em toda execução (rápido, barato, confiável). LLM-as-a-judge: outro modelo avalia critérios subjetivos com rubrica. Quando usar: relevância, aderência ao escopo, fundamentação nas fontes, tom adequado. Ótimo para escalar, mas precisa calibrar. Evals humanos: especialista revisa amostra. Quando usar: casos críticos, calibração do LLM-as-a-judge, validação de fronteira e quando há risco legal/ético alto.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  },
+  {
+    "titulo": "D4 Q30 · Riscos e Falhas",
+    "enunciado": "Não buscamos perfeição, buscamos controle. Explique essa frase no contexto de Evals, guardrails, grounding e Human-in-the-loop. Como decidir se um sistema está pronto para produção?",
+    "gabarito": "Como falhas são inerentes à arquitetura, eliminar 100% é impossível. Gerenciamos o impacto: grounding reduz alucinações, guardrails contêm o que sai/entra, Human-in-the-loop protege casos críticos, e Evals medem se essas camadas funcionam. Um sistema está pronto quando: (1) tem suíte de Evals cobrindo casos críticos com taxa aceitável; (2) casos que falham nos Evals são contidos por guardrails ou escalados por HITL; (3) há monitoramento em produção; (4) o residual (falhas não contidas) é inaceitavelmente pequeno e não causa dano grave. Não zero erros, mas erros gerenciáveis e contidos.",
+    "rubrica": ["Definiu a ideia central sem usar o próprio nome do conceito?","Identificou o mecanismo subjacente (o \"como funciona\")?","Incluiu um exemplo prático ou numérico?","Mencionou explicitamente o que esse conceito não é?"]
+  }
+]

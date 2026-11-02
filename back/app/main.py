@@ -389,7 +389,7 @@ Retorne APENAS o JSON válido."""
 
     if SENSENOVA_API_KEY:
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
                     f"{SENSENOVA_BASE_URL}/chat/completions",
                     headers={
@@ -513,4 +513,4 @@ async def synced_plans(deviceId: str = "default"):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "3000")))

@@ -12,11 +12,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.icons.default.ArrowForward
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -178,6 +181,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                 text = entity.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
             )
             Text(
                 text = "${goalLabel(entity.goal)} • ${entity.daysPerWeek}x por semana",
@@ -210,23 +214,37 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = day.day.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "${day.exercises.size} exercícios",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = day.day.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = androidx.compose.material3.icons.default.ArrowForward,
+                        contentDescription = "Detalhes do dia",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             if (day.day.isRestDay) {
@@ -236,17 +254,37 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                Text(
-                    text = day.exercises
-                        .sortedBy { it.exerciseOrder }
-                        .take(5)
-                        .joinToString(" • ") { it.exerciseName },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(
+                        items = day.exercises.sortedBy { it.exerciseOrder }.take(6),
+                        key = { it.exerciseId + it.exerciseOrder.toString() },
+                    ) { exercise ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = exercise.exerciseName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
                 Button(
                     onClick = onStart,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 ) {
                     Text("Iniciar treino")
                 }
