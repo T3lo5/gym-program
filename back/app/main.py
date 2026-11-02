@@ -13,8 +13,17 @@ from datetime import datetime
 from dotenv import load_dotenv
 from zeroconf import ServiceInfo, Zeroconf
 
-# Load back/.env automatically when running locally (Docker injects the vars).
+# Carrega back/.env antes de importar módulos que leem variáveis de ambiente
+# (no Docker as variáveis já vêm injetadas).
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from . import database as db
+from .plan_builder import (
+    build_local_plan,
+    enrich_plan,
+    resolve_plan_ids,
+    review_date,
+)
 
 # Config
 SENSENOVA_API_KEY = os.getenv("SENSENOVA_API_KEY")
@@ -151,9 +160,11 @@ mdns_service = MDNSService()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    db.init_db()
     print("Treinos Backend started")
     print(f"Model: {MODEL_ID}")
     print(f"Catalog loaded: {len(EXERCISE_CATALOG)} exercises")
+    print(f"SQLite: {db.DB_PATH}")
     if MDNS_ENABLED:
         # Não bloqueia a subida do servidor se a rede não permitir multicast.
         threading.Thread(target=mdns_service.start, name="mdns-register", daemon=True).start()
@@ -185,6 +196,7 @@ app.add_middleware(
 
 # Schemas
 class GenerateRequest(BaseModel):
+    deviceId: str = "default"
     goal: Literal["hypertrophy", "strength", "endurance", "power", "fat_loss", "general"] = "hypertrophy"
     daysPerWeek: int = Field(ge=2, le=6, default=4)
     availableEquipment: List[str] = Field(default_factory=list)  # e.g., ["dumbbell", "barbell", "body only"]
@@ -193,6 +205,7 @@ class GenerateRequest(BaseModel):
     currentLevel: Literal["beginner", "intermediate", "advanced"] = "intermediate"
     sessionDurationMinutes: int = Field(ge=30, le=120, default=60)
     preferredSplit: Optional[Literal["full_body", "upper_lower", "push_pull_legs", "bro_split"]] = None
+    reviewAfterWeeks: int = Field(ge=1, le=12, default=4)
 
 
 class ExerciseDTO(BaseModel):
@@ -204,6 +217,9 @@ class ExerciseDTO(BaseModel):
     restSeconds: int = Field(ge=30, le=300, default=90)
     notes: str = ""
     isSupersetWithPrevious: bool = False
+    exerciseName: str = ""
+    primaryMuscles: List[str] = Field(default_factory=list)
+    equipment: str = ""
 
 
 class DayDTO(BaseModel):
@@ -225,6 +241,107 @@ class GenerateResponse(BaseModel):
     workout: WorkoutPlanDTO
     generationTimeMs: int
     modelUsed: str
+    planId: int = 0
+    nextReviewAt: str
+    reviewAfterWeeks: int = 4
+    source: str = "local"
+
+
+# ----- Modelos de sincronização app -> backend -----
+
+class SyncSetLog(BaseModel):
+    localId: int
+    setNumber: int
+    reps: Optional[int] = None
+    weightKg: Optional[float] = None
+    rpe: Optional[float] = None
+    durationSeconds: Optional[int] = None
+    distanceMeters: Optional[float] = None
+    isCompleted: bool = False
+    isWarmup: bool = False
+    restTakenSeconds: Optional[int] = None
+    completedAt: Optional[int] = None
+
+
+class SyncSessionExercise(BaseModel):
+    localId: int
+    exerciseId: str
+    exerciseName: str = ""
+    exerciseOrder: int = 0
+    plannedSets: int = 0
+    completedSets: int = 0
+    startedAt: int = 0
+    endedAt: Optional[int] = None
+    sets: List[SyncSetLog] = Field(default_factory=list)
+
+
+class SyncSession(BaseModel):
+    localId: int
+    planLocalId: int = 0
+    dayLocalId: int = 0
+    planName: str = ""
+    dayName: str = ""
+    status: str = ""
+    startedAt: int = 0
+    endedAt: Optional[int] = None
+    totalDurationSeconds: int = 0
+    notes: str = ""
+    exercises: List[SyncSessionExercise] = Field(default_factory=list)
+
+
+class SyncPlanExercise(BaseModel):
+    exerciseId: str
+    exerciseOrder: int = 0
+    sets: int = 3
+    targetReps: str = ""
+    targetRpe: Optional[float] = None
+    restSeconds: int = 90
+    notes: str = ""
+    isSupersetWithPrevious: bool = False
+    exerciseName: str = ""
+    primaryMuscles: List[str] = Field(default_factory=list)
+    equipment: str = ""
+
+
+class SyncDay(BaseModel):
+    localId: int
+    name: str = ""
+    dayOrder: int = 0
+    notes: str = ""
+    isRestDay: bool = False
+    exercises: List[SyncPlanExercise] = Field(default_factory=list)
+
+
+class SyncPlan(BaseModel):
+    localId: int
+    name: str = ""
+    description: str = ""
+    goal: str = ""
+    daysPerWeek: int = 0
+    isActive: bool = False
+    generatedByAi: bool = False
+    createdAt: int = 0
+    updatedAt: int = 0
+    version: int = 1
+    nextReviewAt: Optional[str] = None
+    reviewAfterWeeks: int = 4
+    source: str = "local"
+    days: List[SyncDay] = Field(default_factory=list)
+
+
+class SyncRequest(BaseModel):
+    deviceId: str
+    syncedAt: Optional[str] = None
+    plans: List[SyncPlan] = Field(default_factory=list)
+    sessions: List[SyncSession] = Field(default_factory=list)
+
+
+class SyncResponse(BaseModel):
+    ok: bool
+    plans: int
+    sessions: int
+    setLogs: int
+    syncedAt: str
 
 
 # Routes
@@ -234,22 +351,30 @@ async def health():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "model": MODEL_ID,
-        "catalogSize": len(EXERCISE_CATALOG)
+        "catalogSize": len(EXERCISE_CATALOG),
+        "database": str(db.DB_PATH),
     }
 
 
 @app.post("/v1/generate-workout", response_model=GenerateResponse)
 async def generate_workout(request: GenerateRequest):
-    if not SENSENOVA_API_KEY:
-        raise HTTPException(500, "API key not configured on server")
-    
+    """Gera um plano sob demanda.
+
+    Tenta a IA primeiro. Se a IA falhar, demorar, não tiver chave ou devolver
+    IDs inválidos, monta um plano local válido com o catálogo. A resposta
+    sempre informa a origem (`ai` ou `local`) e a data de revisão.
+    """
     if not EXERCISE_CATALOG:
         raise HTTPException(500, "Exercise catalog not loaded")
-    
-    # Build user context for prompt
+
+    start_time = datetime.utcnow()
+    workout_data = None
+    source = "local"
+    model_used = "local-fallback"
+
     equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
     muscles_str = ", ".join(request.targetMuscles) if request.targetMuscles else "corpo todo"
-    
+
     user_prompt = f"""Gere um treino de {request.goal} com as seguintes restrições:
 - Dias por semana: {request.daysPerWeek}
 - Equipamentos disponíveis: {equipment_str}
@@ -261,64 +386,81 @@ async def generate_workout(request: GenerateRequest):
 
 O treino deve ser progressivo, balanceado e usar apenas exercícios do catálogo fornecido.
 Retorne APENAS o JSON válido."""
-    
-    start_time = datetime.utcnow()
-    
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{SENSENOVA_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {SENSENOVA_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": MODEL_ID,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "max_tokens": 8192,
-                    "temperature": 0.3,
-                    "reasoning": {"effort": "none"}  # Disable reasoning for JSON mode
-                }
-            )
-            
+
+    if SENSENOVA_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{SENSENOVA_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {SENSENOVA_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": MODEL_ID,
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "response_format": {"type": "json_object"},
+                        "max_tokens": 8192,
+                        "temperature": 0.3,
+                        "reasoning": {"effort": "none"},  # JSON mode
+                    },
+                )
+
             if response.status_code != 200:
-                error_detail = response.text
-                raise HTTPException(502, f"SenseNova API error: {response.status_code} - {error_detail}")
-            
-            data = response.json()
-            content = data["choices"][0]["message"]["content"]
-            
-            # Parse and validate
-            workout_data = json.loads(content)
-            workout = WorkoutPlanDTO(**workout_data)
-            
-            # Validate all exercise IDs exist in catalog
-            catalog_ids = {ex["id"] for ex in EXERCISE_CATALOG}
-            for day in workout.days:
-                for ex in day.exercises:
-                    if ex.exerciseId not in catalog_ids:
-                        raise HTTPException(500, f"Invalid exercise ID returned by AI: {ex.exerciseId}")
-            
-            generation_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-            
-            return GenerateResponse(
-                workout=workout,
-                generationTimeMs=generation_time,
-                modelUsed=MODEL_ID
-            )
-            
-    except httpx.TimeoutException:
-        raise HTTPException(504, "Timeout calling SenseNova API")
-    except json.JSONDecodeError as e:
-        raise HTTPException(500, f"AI returned invalid JSON: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Generation failed: {str(e)}")
+                raise RuntimeError(
+                    f"SenseNova API error: {response.status_code} - {response.text}"
+                )
+
+            content = response.json()["choices"][0]["message"]["content"]
+            raw_plan = json.loads(content)
+            raw_plan, unresolved = resolve_plan_ids(raw_plan, EXERCISE_CATALOG)
+            if unresolved:
+                raise ValueError(
+                    "IDs retornados pela IA não existem no catálogo: "
+                    + ", ".join(unresolved[:5])
+                )
+
+            workout = WorkoutPlanDTO(**raw_plan)
+            workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
+            source = "ai"
+            model_used = MODEL_ID
+        except Exception as exc:
+            print(f"AI generation failed; using local fallback: {exc}")
+    else:
+        print("SENSENOVA_API_KEY not set; using local fallback")
+
+    if workout_data is None:
+        workout_data = build_local_plan(request, EXERCISE_CATALOG)
+
+    next_review = review_date(request.reviewAfterWeeks)
+    plan_id = 0
+    try:
+        plan_id = db.save_generation(
+            device_id=request.deviceId,
+            request_payload=request.model_dump(),
+            plan_payload=workout_data,
+            model_used=model_used,
+            source=source,
+            next_review_at=next_review,
+            review_after_weeks=request.reviewAfterWeeks,
+        )
+    except Exception as exc:
+        print(f"Failed to persist generated plan: {exc}")
+
+    generation_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+
+    return GenerateResponse(
+        workout=WorkoutPlanDTO(**workout_data),
+        generationTimeMs=generation_time,
+        modelUsed=model_used,
+        planId=plan_id,
+        nextReviewAt=next_review,
+        reviewAfterWeeks=request.reviewAfterWeeks,
+        source=source,
+    )
 
 
 @app.get("/v1/catalog")
@@ -330,12 +472,43 @@ async def get_catalog():
 @app.get("/v1/catalog/summary")
 async def get_catalog_summary():
     """Return catalog summary for prompt building"""
+    by_equipment: dict = {}
+    by_muscle: dict = {}
+    by_level: dict = {}
+    for exercise in EXERCISE_CATALOG:
+        equipment = exercise.get("equipment") or "body only"
+        by_equipment[equipment] = by_equipment.get(equipment, 0) + 1
+        level = exercise.get("level") or "unknown"
+        by_level[level] = by_level.get(level, 0) + 1
+        for muscle in exercise.get("primaryMuscles", []):
+            by_muscle[muscle] = by_muscle.get(muscle, 0) + 1
     return {
         "total": len(EXERCISE_CATALOG),
-        "byEquipment": {},
-        "byMuscle": {},
-        "byLevel": {}
+        "byEquipment": by_equipment,
+        "byMuscle": by_muscle,
+        "byLevel": by_level,
     }
+
+
+@app.post("/v1/sync", response_model=SyncResponse)
+async def sync_data(request: SyncRequest):
+    """Recebe o snapshot local do app e popula o banco do backend.
+
+    Chamado apenas quando o usuário toca em "Sincronizar" no app.
+    """
+    payload = request.model_dump()
+    result = db.sync_snapshot(payload)
+    return SyncResponse(**result)
+
+
+@app.get("/v1/sync/status")
+async def sync_status(deviceId: str = "default"):
+    return db.sync_status(deviceId)
+
+
+@app.get("/v1/sync/plans")
+async def synced_plans(deviceId: str = "default"):
+    return {"deviceId": deviceId, "plans": db.list_synced_plans(deviceId)}
 
 
 if __name__ == "__main__":

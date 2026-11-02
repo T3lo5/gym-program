@@ -91,6 +91,7 @@ logs/
 # Backend specific
 # ============================================================
 back/.env
+back/data/
 __pycache__/
 *.py[cod]
 back/venv/

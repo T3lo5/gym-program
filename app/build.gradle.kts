@@ -1,6 +1,12 @@
 plugins {
     id("com.android.application") version "8.5.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
+    id("org.jetbrains.kotlin.kapt") version "1.9.24"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 // Release signing is driven by environment variables.
@@ -60,10 +66,20 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-ktx:1.8.2")
     implementation(platform("androidx.compose:compose-bom:2024.04.01"))
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
     implementation("com.google.android.material:material:1.11.0")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }

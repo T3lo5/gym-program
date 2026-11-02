@@ -10,6 +10,7 @@ services:
       - ./back/.env
     environment:
       - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/treinos.db
       # O Docker bridge não consegue anunciar mDNS na rede local.
       # Use a execução nativa (sem Docker) se precisar de descoberta automática.
       - MDNS_ENABLED=false
@@ -22,6 +23,8 @@ services:
     volumes:
       # Reflete alterações no código após reiniciar o container.
       - ./back/app:/app/app
+      # Persiste o SQLite do backend no computador.
+      - ./back/data:/app/data
     restart: unless-stopped
     networks:
       - treinos-network

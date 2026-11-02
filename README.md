@@ -2,11 +2,11 @@
 
 App Android + Wear OS para musculação, 100% offline, com geração de treinos via IA sob demanda (backend no PC/Codespaces/Oracle Free Tier).
 
-**Stack:** Kotlin + Jetpack Compose + Room + Hilt + Retrofit + Compose for Wear OS + FastAPI (Python) + SenseNova API
+**Stack:** Kotlin + Jetpack Compose + Room + OkHttp + kotlinx.serialization + Compose for Wear OS + FastAPI (Python) + SenseNova API
 
 > 📖 **Manual completo de utilização:** [docs/MANUAL.md](docs/MANUAL.md) — instalação do APK, execução do backend (Docker ou Python), testes, rede local e solução de problemas.
 >
-> ⚠️ **Estado atual:** o APK publicado é uma build de validação. Ele instala e abre na tela inicial "Treinos App"; as telas de treino e a integração com o backend ainda não estão nesta versão. O backend já pode ser executado e testado separadamente.
+> ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**.
 
 ---
 
@@ -14,13 +14,14 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 | Feature | Status |
 |---|---|
-| 📱 App Android (celular) | ✅ Estrutura completa |
-| ⌚ App Wear OS (Galaxy Watch FE) | ✅ Estrutura base |
-| 💾 Banco local (Room) — 876 exercícios | ✅ Pronto |
-| 🏋️ CRUD de treinos offline | ✅ ViewModels + Screens |
-| 🤖 Geração de treino via IA | ✅ Backend + integração |
-| 🔗 Descoberta LAN (mDNS) | 📋 Sprint 3 |
-| ⏱ Timer de descanso no relógio | 📋 Sprint 4 |
+| 📱 App Android (celular) | ✅ Telas de plano, execução, histórico e ajustes |
+| ⌚ App Wear OS (Galaxy Watch FE) | 🚧 Estrutura antiga, fora do APK atual |
+| 💾 Banco local (Room/SQLite) | ✅ Planos, sessões e séries gravados na hora |
+| 🏋️ Treino offline | ✅ Execução com registro de séries e descanso |
+| 🤖 Geração de treino sob demanda | ✅ IA + fallback local + data de revisão |
+| 🔄 Sincronização manual app → backend | ✅ Snapshot de planos, treinos e séries |
+| 🔗 Descoberta LAN (mDNS) | 📋 No backend; app usa URL configurável |
+| ⏱ Timer de descanso no relógio | 📋 Sprint futura |
 | ☁️ Backend grátis (Codespaces/Oracle) | ✅ Docker Compose |
 
 ---

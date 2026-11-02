@@ -1,6 +1,6 @@
 # Manual de Utilização — Treinos App
 
-**Versão do manual:** 1.0 — 02/11/2026  
+**Versão do manual:** 1.1 — 02/11/2026  
 **Público:** qualquer pessoa que queira instalar o app ou rodar o backend localmente.
 
 Este manual explica, passo a passo:
@@ -22,17 +22,20 @@ já funciona nesta versão:
 | Parte | Situação atual |
 |---|---|
 | Instalação do APK | ✅ Funciona |
-| Abertura do app | ✅ Funciona (tela inicial "Treinos App") |
+| Abertura do app | ✅ Funciona |
 | Atualização do APK | ✅ Funciona (com a mesma assinatura) |
 | Backend: saúde, catálogo e documentação | ✅ Funciona |
-| Backend: geração de treino por IA | ⚠️ Em validação (depende da API SenseNova) |
-| Telas de treino, catálogo e histórico no app | 🚧 Ainda não estão neste APK |
-| Integração automática app ↔ backend | 🚧 Ainda não está neste APK |
+| Backend: geração de treino sob demanda | ✅ Funciona com IA ou com plano local de reserva |
+| Telas de plano, execução, histórico e ajustes no app | ✅ Funciona |
+| Registro de séries no SQLite do aparelho | ✅ Funciona |
+| Sincronização manual app → backend | ✅ Funciona pelo botão **Sincronizar agora** |
 | Módulo Wear OS | 🚧 Não incluído no APK atual |
 
-> **Resumo:** o APK atual serve para validar instalação, atualização e o
-> ambiente de desenvolvimento. O backend já pode ser iniciado e testado
-> separadamente. Este manual será atualizado conforme as telas forem liberadas.
+> **Resumo:** o app já cria treinos, executa o treino, registra as séries no
+> SQLite do aparelho e mostra o histórico. O backend é chamado **somente**
+> quando você gera um treino novo ou toca em **Sincronizar**. A geração
+> devolve o plano e a data em que ele deve ser revisto; se a IA não estiver
+> disponível, o backend monta um plano válido com o catálogo local.
 
 ---
 
@@ -98,7 +101,9 @@ O projeto tem duas partes:
    navegador ou gerenciador de arquivos.
 5. Toque em **Instalar** e depois em **Abrir**.
 
-Pronto. O app abrirá na tela inicial "Treinos App".
+Pronto. O app abre na tela **Treinos**. Na primeira vez não há plano: toque em
+**Gerar meu primeiro treino** e siga o formulário. Detalhes em
+[Primeiro uso](#33-primeiro-uso).
 
 > Detalhes e solução de problemas: [Parte A](#parte-a--app-android-front).
 
@@ -235,19 +240,114 @@ sempre o mesmo.
 
 ### 3.3 Primeiro uso
 
-Ao abrir o app, você verá uma tela simples com o texto **"Treinos App"**.
-Isso é esperado nesta versão de validação.
-
+Ao abrir o app pela primeira vez, a tela **Treinos** aparece sem nenhum plano.
 O app:
 
 - não pede login;
 - não pede cadastro;
 - não mostra anúncios;
 - não acessa sua localização;
-- ainda não salva treinos nesta versão.
+- salva tudo no próprio aparelho.
 
-As próximas versões trarão as telas de treinos, catálogo, execução e histórico.
-Quando isso acontecer, este manual será atualizado.
+#### 3.3.1 Gerar um treino (backend sob demanda)
+
+1. Na tela inicial, toque em **Gerar meu primeiro treino**.
+2. Escolha:
+   - **Objetivo** (hipertrofia, força, resistência, potência, perda de gordura
+     ou condicionamento);
+   - **Dias por semana** (2 a 6);
+   - **Seu nível** (iniciante, intermediário ou avançado);
+   - **Equipamentos disponíveis** (pode marcar vários);
+   - **Foco muscular** (opcional);
+   - **Duração da sessão**;
+   - **Revisar o plano em** (2, 4, 6 ou 8 semanas).
+3. Toque em **Gerar treino**.
+
+O app chama o backend naquele momento. O backend devolve:
+
+- o plano completo (dias e exercícios);
+- a origem do plano: **com IA** ou **gerado localmente** (quando a IA não está
+  disponível);
+- a data de revisão (`nextReviewAt`), calculada a partir das semanas escolhidas.
+
+O plano é salvo no SQLite do aparelho e a tela inicial passa a mostrar:
+
+- o nome do plano ativo;
+- o objetivo e quantos dias por semana;
+- a **próxima revisão** (em vermelho se a data já passou);
+- um cartão por dia de treino, com o botão **Iniciar treino**.
+
+> **Importante:** gerar um treino novo substitui o plano ativo no aparelho.
+> O plano anterior continua no banco local e será enviado na próxima
+> sincronização se você optar por enviar tudo.
+
+#### 3.3.2 Fazer o treino e registrar as séries
+
+1. Toque em **Iniciar treino** no dia escolhido.
+2. Cada exercício mostra as séries planejadas e o descanso sugerido.
+3. Toque em **Registrar série**.
+4. Preencha:
+   - **Repetições** (obrigatório para a série ficar completa);
+   - **Carga (kg)**;
+   - **RPE** (opcional).
+5. Toque em **Salvar série**.
+
+A série é gravada **imediatamente** no SQLite do aparelho. Depois de salvar:
+
+- o app inicia um **contador de descanso** com o tempo do exercício;
+- você pode tocar em **Pular descanso** a qualquer momento;
+- a série aparece na lista do exercício com reps, carga e RPE.
+
+Se precisar sair no meio do treino, toque na seta de voltar. O treino continua
+**em andamento** e aparece na tela inicial com o botão **Retomar treino**.
+
+Para encerrar, toque em **Finalizar treino**. O app grava o horário de término
+e a duração total no aparelho.
+
+#### 3.3.3 Histórico
+
+Na tela inicial, toque em **Histórico**.
+
+- Cada cartão mostra o dia, o plano, a data de início, a duração e o total de
+  séries.
+- Toque no cartão para expandir e ver cada exercício e cada série registrada.
+- Treinos ainda não finalizados aparecem como **Em andamento**.
+
+#### 3.3.4 Ajustes e sincronização manual
+
+Na tela inicial, toque em **Ajustes**.
+
+**Backend:**
+
+1. Confira a **URL do backend**.
+   - Emulador: `http://10.0.2.2:3000`.
+   - Celular físico: `http://IP_DO_COMPUTADOR:3000`
+     (ex.: `http://192.168.0.10:3000`).
+2. Toque em **Salvar**.
+3. Toque em **Testar conexão**. O app mostra o modelo e o tamanho do catálogo.
+
+**Sincronizar agora:**
+
+- O app monta um snapshot com **todos os planos, treinos e séries** locais.
+- Envia para `POST /v1/sync` no backend.
+- O backend grava tudo no SQLite dele (`back/data/treinos.db`).
+- A resposta mostra quantos planos, treinos e séries foram recebidos.
+- A data do último envio aparece na tela.
+
+O envio **nunca é automático**: enquanto você não tocar em **Sincronizar
+agora**, o banco do backend não recebe nenhum dado do app.
+
+#### 3.3.5 Funcionamento sem internet
+
+Sem backend ou sem rede, o app continua:
+
+- abrindo;
+- mostrando o plano já salvo;
+- permitindo executar o treino;
+- gravando séries no SQLite;
+- mostrando o histórico.
+
+Ficam indisponíveis apenas **gerar um treino novo** e **sincronizar**.
 
 ### 3.4 Atualizar o app
 
@@ -371,7 +471,9 @@ configuradas. Para testes, use o APK de debug publicado pelo CI.
 | Play Protect bloqueia | APK fora da Play Store | **Mais detalhes → Instalar mesmo assim** |
 | Não abre a opção de instalar | Permissão de fontes desconhecidas desativada | Ative para o navegador/gerenciador de arquivos |
 | App abre e fecha | Versão incompatível ou APK corrompido | Confira Android 8.0+, reinstale e envie o log se persistir |
-| Tela mostra só "Treinos App" | Comportamento esperado nesta versão | Aguarde as próximas builds |
+| "Não foi possível falar com o backend" | Backend desligado ou URL errada | Confira `curl http://localhost:3000/health`, o IP e a mesma rede Wi-Fi |
+| Treino gerado não aparece | Resposta do backend falhou antes de salvar | Toque em **Testar conexão** em Ajustes e gere de novo |
+| Sincronizou, mas o backend parece vazio | URL aponta para outro banco ou outro dispositivo | Confira `GET /v1/sync/status?deviceId=...` e o arquivo `back/data/treinos.db` |
 | Não atualiza | Assinatura diferente | Desinstale e instale de novo (apaga dados) |
 
 ---
@@ -385,7 +487,11 @@ O backend é uma API feita em **FastAPI** (Python). Ele:
 - carrega o catálogo local com 876 exercícios;
 - responde a testes de saúde;
 - entrega o catálogo para o app;
-- monta o pedido para a IA e valida a resposta;
+- monta o pedido para a IA, valida a resposta e corrige IDs de exercícios;
+- se a IA falhar, não estiver configurada ou devolver um ID inválido, monta um
+  **plano local de reserva** com o catálogo (o app sempre recebe um treino);
+- devolve o plano com a **data de revisão** (`nextReviewAt`);
+- guarda cada geração e cada snapshot sincronizado em SQLite;
 - registra um serviço de descoberta na rede local (mDNS), quando habilitado.
 
 **Endpoints disponíveis:**
@@ -395,11 +501,25 @@ O backend é uma API feita em **FastAPI** (Python). Ele:
 | GET | `/health` | Verificar se o backend está no ar |
 | GET | `/v1/catalog` | Baixar o catálogo completo (876 exercícios) |
 | GET | `/v1/catalog/summary` | Resumo do catálogo |
-| POST | `/v1/generate-workout` | Gerar um treino com IA |
+| POST | `/v1/generate-workout` | Gerar um treino sob demanda (IA ou fallback local) |
+| POST | `/v1/sync` | Receber o snapshot manual enviado pelo app |
+| GET | `/v1/sync/status?deviceId=...` | Contar planos, treinos e séries sincronizados |
+| GET | `/v1/sync/plans?deviceId=...` | Listar os planos sincronizados do aparelho |
 | GET | `/docs` | Documentação interativa (Swagger UI) |
 | GET | `/redoc` | Documentação alternativa |
 
 **Porta padrão:** `3000`.
+
+**Banco do backend:** SQLite em `back/data/treinos.db` (no Docker, o diretório
+`./back/data` é montado em `/app/data`). Ele guarda:
+
+- `plan_generations` — histórico de planos gerados;
+- `devices` — aparelhos que já sincronizaram;
+- `synced_plans`, `synced_plan_days`, `synced_plan_exercises`;
+- `synced_sessions`, `synced_session_exercises`, `synced_set_logs`.
+
+> O banco do backend só é populado com dados do app quando o usuário toca em
+> **Sincronizar agora**. Gerar um treino grava apenas o registro da geração.
 
 ### 4.1 Requisitos do backend
 
@@ -419,11 +539,11 @@ Escolha **uma** das formas de execução:
 
 **Chave da SenseNova:**
 
-- Necessária apenas para o endpoint de geração de treino (`/v1/generate-workout`).
+- Opcional. Com a chave, a geração tenta usar a IA.
 - Obtenha em: https://platform.sensenova.ai/console/keys
-- Sem a chave, o backend sobe normalmente e os endpoints de saúde, catálogo e
-  documentação continuam funcionando. A geração retorna erro 500 com a
-  mensagem `API key not configured on server`.
+- Sem a chave, o backend sobe normalmente e a geração usa o **plano local de
+  reserva** montado com o catálogo. Saúde, catálogo, documentação e
+  sincronização continuam funcionando.
 
 ### 4.2 Opção 1 — Subir com Docker (recomendado)
 
@@ -722,6 +842,7 @@ Você verá todos os endpoints. Para testar a geração de treino:
 curl -X POST http://localhost:3000/v1/generate-workout \
   -H "Content-Type: application/json" \
   -d '{
+    "deviceId": "meu-aparelho",
     "goal": "hypertrophy",
     "daysPerWeek": 3,
     "availableEquipment": ["dumbbell", "body only"],
@@ -729,7 +850,8 @@ curl -X POST http://localhost:3000/v1/generate-workout \
     "injuriesOrLimitations": "",
     "currentLevel": "beginner",
     "sessionDurationMinutes": 45,
-    "preferredSplit": "full_body"
+    "preferredSplit": "full_body",
+    "reviewAfterWeeks": 4
   }'
 ```
 
@@ -745,13 +867,15 @@ curl -X POST http://localhost:3000/v1/generate-workout \
 | `currentLevel` | `beginner`, `intermediate`, `advanced` | Não (padrão: `intermediate`) |
 | `sessionDurationMinutes` | 30 a 120 | Não (padrão: 60) |
 | `preferredSplit` | `full_body`, `upper_lower`, `push_pull_legs`, `bro_split` ou `null` | Não |
+| `deviceId` | Identificador do aparelho (o app envia um UUID) | Não (padrão: `default`) |
+| `reviewAfterWeeks` | 1 a 12 | Não (padrão: 4) |
 
 **Resposta de sucesso (resumida):**
 
 ```json
 {
   "workout": {
-    "name": "Treino Full Body Iniciante",
+    "name": "Plano de Hipertrofia — 3x/semana",
     "description": "...",
     "goal": "hypertrophy",
     "daysPerWeek": 3,
@@ -768,27 +892,92 @@ curl -X POST http://localhost:3000/v1/generate-workout \
             "targetRpe": 8.0,
             "restSeconds": 90,
             "notes": "",
-            "isSupersetWithPrevious": false
+            "isSupersetWithPrevious": false,
+            "exerciseName": "Dumbbell Bicep Curl",
+            "primaryMuscles": ["biceps"],
+            "equipment": "dumbbell"
           }
         ]
       }
     ]
   },
   "generationTimeMs": 12345,
-  "modelUsed": "sensenova-6.8-flash-lite"
+  "modelUsed": "sensenova-6.8-flash-lite",
+  "planId": 1,
+  "nextReviewAt": "2026-11-30",
+  "reviewAfterWeeks": 4,
+  "source": "ai"
 }
 ```
 
-**Limitação conhecida:** a IA pode devolver um ID de exercício que não existe
-no catálogo. Nesse caso o backend responde:
+**Campos importantes da resposta:**
 
-```json
-{"detail":"Invalid exercise ID returned by AI: Nome_Do_Exercicio"}
+| Campo | Significado |
+|---|---|
+| `source` | `ai` quando a IA respondeu; `local` quando foi usado o plano de reserva |
+| `nextReviewAt` | Data (ISO `AAAA-MM-DD`) em que o plano deve ser revisto/trocado |
+| `reviewAfterWeeks` | Quantas semanas foram usadas no cálculo |
+| `planId` | ID da geração registrada em `plan_generations` |
+| `exerciseName` | Nome legível do exercício, já enriquecido pelo backend |
+| `primaryMuscles` | Músculos principais, para exibição no app |
+| `equipment` | Equipamento do exercício |
+
+**Se a IA devolver IDs inválidos:** o backend tenta normalizar e aproximar o ID
+do catálogo (por exemplo, `Push-Up` vira `Pushups`). Se ainda assim não
+resolver, cai automaticamente no plano local de reserva. A resposta sempre
+traz um treino válido.
+
+#### Sincronizar dados de teste por comando
+
+O app envia esse mesmo formato ao tocar em **Sincronizar agora**:
+
+```bash
+curl -X POST http://localhost:3000/v1/sync \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceId": "meu-aparelho",
+    "plans": [
+      {
+        "localId": 1,
+        "name": "Meu plano",
+        "goal": "hypertrophy",
+        "daysPerWeek": 1,
+        "isActive": true,
+        "days": [
+          {
+            "localId": 2,
+            "name": "Treino A",
+            "dayOrder": 0,
+            "exercises": [
+              {
+                "exerciseId": "Pushups",
+                "exerciseOrder": 0,
+                "sets": 3,
+                "targetReps": "8-12",
+                "exerciseName": "Pushups",
+                "primaryMuscles": ["chest"],
+                "equipment": "body only"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "sessions": []
+  }'
 ```
 
-Isso é uma proteção para não salvar treino inválido. Tente novamente, reduza a
-quantidade de músculos/equipamentos ou use o catálogo em `/v1/catalog` como
-referência. A normalização automática desses IDs está em desenvolvimento.
+Resposta:
+
+```json
+{"ok": true, "plans": 1, "sessions": 0, "setLogs": 0, "syncedAt": "..."}
+```
+
+Depois confira:
+
+```bash
+curl "http://localhost:3000/v1/sync/status?deviceId=meu-aparelho"
+```
 
 ### 4.5 Parar, reiniciar e limpar
 
@@ -975,8 +1164,23 @@ docker compose up -d --build
 - O catálogo (`back/app/exercise_catalog.json`) está versionado no Git.
 - O arquivo `back/.env` contém sua chave e **não** vai para o Git. Guarde uma
   cópia segura se precisar.
-- Nesta versão o app ainda não salva treinos, então não há dados de usuário
-  para fazer backup.
+- **Dados do app:** ficam no SQLite interno do aparelho (`treinos.db` do Room).
+  Desinstalar o app apaga esses dados. Ainda não há exportação manual; use o
+  backup do Android ou mantenha o app instalado.
+- **Dados do backend:** ficam em `back/data/treinos.db`. Para backup, copie
+  esse arquivo com o backend parado:
+
+  ```bash
+  docker compose stop
+  cp back/data/treinos.db back/data/treinos-backup-$(date +%F).db
+  docker compose start
+  ```
+
+  No modo Python, o arquivo fica no mesmo caminho padrão (ou no caminho
+  definido em `DATABASE_PATH`).
+
+> A sincronização é um snapshot: o backend guarda a última versão enviada de
+> cada plano/treino/série, identificada pelo ID local do aparelho.
 
 ### 6.5 Reset total
 
@@ -1176,8 +1380,9 @@ O app e o backend são gratuitos. A SenseNova pode ter plano gratuito com
 limites; consulte o site oficial.
 
 **Preciso de internet para usar o app?**
-Para baixar e atualizar, sim. Para usar a geração por IA, sim. Os recursos
-offline serão liberados nas próximas versões.
+Só para gerar um treino novo e para sincronizar. Executar treinos, registrar
+séries e ver o histórico funcionam offline, porque tudo fica no SQLite do
+aparelho.
 
 **Funciona no iPhone?**
 Não. O projeto é Android (e Wear OS no futuro).
@@ -1186,15 +1391,27 @@ Não. O projeto é Android (e Wear OS no futuro).
 O módulo Wear OS existe no repositório, mas não está incluído no APK atual.
 
 **Onde ficam meus dados?**
-Nesta versão, o app ainda não salva treinos. Quando o banco local for
-liberado, os dados ficarão no próprio celular (Room/SQLite).
+No celular: banco Room/SQLite interno do app, preenchido na hora em que você
+salva cada série. No computador: `back/data/treinos.db`, preenchido apenas
+quando você toca em **Sincronizar agora**.
+
+**A sincronização é automática?**
+Não. O app só envia dados ao backend quando você toca no botão. Gerar um treino
+também chama o backend, mas isso apenas registra a geração; não envia suas
+séries.
+
+**O que é a data de revisão?**
+É a data devolvida pelo backend (`nextReviewAt`) indicando quando o plano deve
+ser revisto ou trocado. Ela aparece na tela inicial; se passar, o app mostra
+"Revisão atrasada" e você pode gerar um treino novo.
 
 **Posso usar sem backend?**
-O app abre, mas os recursos de IA dependem do backend.
+Sim, para treinar com um plano que já esteja salvo. Sem backend você não
+consegue gerar um plano novo nem sincronizar.
 
 **Posso usar o backend sem a chave da SenseNova?**
-Sim, para testar `/health`, `/v1/catalog` e `/docs`. A geração de treino
-não funciona sem a chave.
+Sim. A geração usa o plano local de reserva montado com o catálogo. Com a
+chave, o backend tenta primeiro a IA.
 
 **O APK é seguro?**
 Ele é gerado pelo GitHub Actions a partir deste repositório. Ainda assim, é

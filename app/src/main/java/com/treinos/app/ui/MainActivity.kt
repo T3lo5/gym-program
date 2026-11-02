@@ -1,16 +1,27 @@
 package com.treinos.app.ui
 
 import android.os.Bundle
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.treinos.app.TreinosApplication
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val textView = TextView(this)
-        textView.text = "Treinos App"
-        textView.textSize = 24f
-        textView.gravity = android.view.Gravity.CENTER
-        setContentView(textView)
+        val container = (application as TreinosApplication).container
+
+        setContent {
+            TreinosTheme {
+                val viewModel: AppViewModel = viewModel(
+                    factory = AppViewModel.factory(
+                        repository = container.repository,
+                        preferences = container.preferences,
+                    )
+                )
+                TreinosApp(viewModel)
+            }
+        }
     }
 }
