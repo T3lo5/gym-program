@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   treinos-backend:
     build:
@@ -8,11 +6,13 @@ services:
     container_name: treinos-backend
     ports:
       - "3000:3000"
+    env_file:
+      - ./back/.env
     environment:
-      - SENSENOVA_API_KEY=${SENSENOVA_API_KEY}
-      - SENSENOVA_BASE_URL=https://token.sensenova.ai/v1
-      - MODEL_ID=sensenova-6.8-flash-lite
       - PYTHONUNBUFFERED=1
+      # O Docker bridge não consegue anunciar mDNS na rede local.
+      # Use a execução nativa (sem Docker) se precisar de descoberta automática.
+      - MDNS_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s
@@ -20,7 +20,8 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - ./back/app:/app/app  # hot reload for dev
+      # Reflete alterações no código após reiniciar o container.
+      - ./back/app:/app/app
     restart: unless-stopped
     networks:
       - treinos-network

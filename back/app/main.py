@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -9,12 +10,17 @@ import json
 import socket
 import threading
 from datetime import datetime
+from dotenv import load_dotenv
 from zeroconf import ServiceInfo, Zeroconf
+
+# Load back/.env automatically when running locally (Docker injects the vars).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Config
 SENSENOVA_API_KEY = os.getenv("SENSENOVA_API_KEY")
 SENSENOVA_BASE_URL = os.getenv("SENSENOVA_BASE_URL", "https://token.sensenova.ai/v1")
 MODEL_ID = os.getenv("MODEL_ID", "sensenova-6.8-flash-lite")
+MDNS_ENABLED = os.getenv("MDNS_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
 
 if not SENSENOVA_API_KEY:
     print("WARNING: SENSENOVA_API_KEY not set!")
@@ -148,10 +154,15 @@ async def lifespan(app: FastAPI):
     print("Treinos Backend started")
     print(f"Model: {MODEL_ID}")
     print(f"Catalog loaded: {len(EXERCISE_CATALOG)} exercises")
-    mdns_service.start()
+    if MDNS_ENABLED:
+        # Não bloqueia a subida do servidor se a rede não permitir multicast.
+        threading.Thread(target=mdns_service.start, name="mdns-register", daemon=True).start()
+    else:
+        print("mDNS disabled (MDNS_ENABLED=false)")
     yield
     # Shutdown
-    mdns_service.stop()
+    if MDNS_ENABLED:
+        mdns_service.stop()
     print("Treinos Backend shutting down")
 
 

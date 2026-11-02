@@ -4,6 +4,10 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 **Stack:** Kotlin + Jetpack Compose + Room + Hilt + Retrofit + Compose for Wear OS + FastAPI (Python) + SenseNova API
 
+> 📖 **Manual completo de utilização:** [docs/MANUAL.md](docs/MANUAL.md) — instalação do APK, execução do backend (Docker ou Python), testes, rede local e solução de problemas.
+>
+> ⚠️ **Estado atual:** o APK publicado é uma build de validação. Ele instala e abre na tela inicial "Treinos App"; as telas de treino e a integração com o backend ainda não estão nesta versão. O backend já pode ser executado e testado separadamente.
+
 ---
 
 ## 🎯 Características
@@ -54,9 +58,9 @@ TreinosApp/
 
 ### 1. Backend (no seu PC)
 ```bash
-cd back
-cp .env.example .env
-# Edite .env e coloque sua SENSENOVA_API_KEY
+# Na raiz do projeto (onde está o docker-compose.yml)
+cp back/.env.example back/.env
+# Edite back/.env e coloque sua SENSENOVA_API_KEY
 
 docker compose up -d --build
 # Teste:
@@ -64,13 +68,16 @@ curl http://localhost:3000/health
 # {"status":"healthy","catalogSize":876,"model":"sensenova-6.8-flash-lite"}
 ```
 
+> Passo a passo completo, incluindo modo sem Docker e solução de problemas:
+> [docs/MANUAL.md](docs/MANUAL.md).
+
 ### 2. App Android
 ```bash
 # No Android Studio:
 # 1. Open project → selecione a pasta raiz
 # 2. Wait for Gradle sync
 # 3. Run 'app' no emulador (API 34) ou device físico
-# 4. Run 'wear' no emulador Wear OS ou Galaxy Watch FE real
+# (O módulo wear ainda não está incluído no settings.gradle.kts atual)
 ```
 
 ### 3. Conexão Celular ↔ PC (LAN)
