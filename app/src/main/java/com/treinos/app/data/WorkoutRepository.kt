@@ -292,7 +292,7 @@ class WorkoutRepository(
         if (allPlans.isNotEmpty()) {
             dao.deactivateAll()
             val activePlan = allPlans.firstOrNull { it.isActive } ?: allPlans[0]
-            dao.updatePlanActive(activePlan.id, true)
+            dao.updatePlanActive(activePlan.id)
         }
 
         // Mapeia localId de sessão -> novo ID do Room
