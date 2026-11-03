@@ -1,0 +1,36 @@
+{
+  "workout": {
+    "name": "Full Body A",
+    "description": "Plano de contrato",
+    "goal": "hypertrophy",
+    "daysPerWeek": 2,
+    "days": [
+      {
+        "name": "Treino A",
+        "dayOrder": 0,
+        "isRestDay": false,
+        "exercises": [
+          {
+            "exerciseId": "Barbell_Bench_Press",
+            "exerciseOrder": 0,
+            "sets": 3,
+            "targetReps": "8-12",
+            "targetRpe": 8.0,
+            "restSeconds": 90,
+            "notes": "",
+            "isSupersetWithPrevious": false,
+            "exerciseName": "Supino reto",
+            "primaryMuscles": ["chest"],
+            "equipment": "barbell"
+          }
+        ]
+      }
+    ]
+  },
+  "generationTimeMs": 1200,
+  "modelUsed": "contrato",
+  "planId": 42,
+  "nextReviewAt": "2026-12-01",
+  "reviewAfterWeeks": 4,
+  "source": "local"
+}
