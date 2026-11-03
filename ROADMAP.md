@@ -64,7 +64,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-1 | Recuperação por `deviceId` | `SettingsScreen` exibe o ID; `AppViewModel.restoreByDeviceId` restaura do backend |
 | H1-2 | Execução por séries (não circuito) | `WorkoutScreen` registra série, `AppViewModel.logSet`, `ExerciseProgress` + testes |
 | H1-4 | Exportar/importar backup JSON (manual) | `BackupDtos`, `BackupMapper`, `BackupValidator`; `WorkoutDao.replaceAllData`; `WorkoutRepository.exportBackup/importBackup`; `AppViewModel` estados/ações; `SettingsScreen` UI + file pickers; testes JVM em `app/src/test/.../data/backup/` |
-| H1-5 | Peso e altura na geração de treino | `AppPreferences.bodyWeightKg/heightCm`; `GeneratePlanRequest.bodyWeightKg/heightCm`; `ProfileValidator`; `GenerateScreen` campos + resumo; `AppViewModel` valida/persiste/monta request; `TreinosApp` repassa parâmetros; backend `GenerateRequest` + `build_user_prompt`; `plan_builder.profile_adjustments`/`suggest_initial_load`; testes JVM em `app/src/test/.../ui/ProfileValidatorTest.kt`; testes backend em `back/tests/test_profile_adjustments.py` |
+| H1-3 | Imagens dos exercícios | `ExerciseMediaRepository`, `ExerciseImage`, `ExerciseDetailSheet`, miniaturas em `WorkoutScreen`/`HistoryScreen`, botão “Atualizar catálogo” em `SettingsScreen`, `CatalogResponseDto`, Coil + cache 7 dias + testes |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend" |
 | H3-1 | Testes + CI (parcial) | 7 testes JVM, Android Lint, Ruff/Pytest e `./scripts/verify.sh` no CI |
 
@@ -72,7 +72,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | [H1-3](docs/specs/H1-3-exercise-media.md) |
+| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | [H1-3](docs/specs/H1-3-exercise-media.md) ✓ |
 
 ### Horizon 2 — Próximo (1-2 meses): conectividade e relógio
 

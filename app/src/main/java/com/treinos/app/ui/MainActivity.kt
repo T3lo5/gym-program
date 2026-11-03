@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
                     factory = AppViewModel.factory(
                         repository = container.repository,
                         preferences = container.preferences,
+                        exerciseMediaRepository = container.exerciseMediaRepository,
                     )
                 )
                 TreinosApp(viewModel)

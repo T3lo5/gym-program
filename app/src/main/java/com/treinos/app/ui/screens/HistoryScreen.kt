@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatDateTime
@@ -38,6 +42,8 @@ import com.treinos.app.ui.formatDuration
 fun HistoryScreen(
     sessions: List<SessionWithExercises>,
     onBack: () -> Unit,
+    exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
+    onOpenExerciseDetail: (String) -> Unit = {},
 ) {
     Scaffold(
         topBar = { ScreenTopBar(title = "Histórico", onBack = onBack) },
@@ -60,7 +66,11 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(sessions, key = { it.session.id }) { session ->
-                    SessionCard(session)
+                    SessionCard(
+                        session = session,
+                        exerciseMedia = exerciseMedia,
+                        onOpenExerciseDetail = onOpenExerciseDetail,
+                    )
                 }
             }
         }
@@ -68,7 +78,11 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun SessionCard(session: SessionWithExercises) {
+private fun SessionCard(
+    session: SessionWithExercises,
+    exerciseMedia: Map<String, ExerciseMedia>,
+    onOpenExerciseDetail: (String) -> Unit,
+) {
     var expanded by remember(session.session.id) { mutableStateOf(false) }
     val totalSets = session.exercises.sumOf { it.sets.size }
     val completed = session.session.status == "completed"
@@ -121,36 +135,51 @@ private fun SessionCard(session: SessionWithExercises) {
 
             if (expanded) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                session.exercises
-                    .sortedBy { it.exercise.exerciseOrder }
-                    .forEach { exercise ->
-                        Text(
-                            text = exercise.exercise.exerciseName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        if (exercise.sets.isEmpty()) {
-                            Text(
-                                text = "Sem séries registradas",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            exercise.sets.sortedBy { it.setNumber }.forEach { set ->
-                                Text(
-                                    text = buildString {
-                                        append("Série ${set.setNumber}")
-                                        set.reps?.let { append(" • $it reps") }
-                                        set.weightKg?.let { append(" • ${trimNumber(it)} kg") }
-                                        set.rpe?.let { append(" • RPE ${trimNumber(it)}") }
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        session.exercises
+                            .sortedBy { it.exercise.exerciseOrder }
+                            .forEach { exercise ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenExerciseDetail(exercise.exercise.exerciseId) },
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    ExerciseImage(
+                                        imageUrl = exerciseMedia[exercise.exercise.exerciseId]?.imageUrl,
+                                        exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                                        size = 48.dp,
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                        if (exercise.sets.isEmpty()) {
+                                            Text(
+                                                text = "Sem séries registradas",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        } else {
+                                            exercise.sets.sortedBy { it.setNumber }.forEach { set ->
+                                                Text(
+                                                    text = buildString {
+                                                        append("Série ${set.setNumber}")
+                                                        set.reps?.let { append(" • $it reps") }
+                                                        set.weightKg?.let { append(" • ${trimNumber(it)} kg") }
+                                                        set.rpe?.let { append(" • RPE ${trimNumber(it)}") }
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                             }
-                        }
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    }
             }
         }
     }

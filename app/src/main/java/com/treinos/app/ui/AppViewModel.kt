@@ -7,6 +7,8 @@ import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
+import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.backup.BackupFile
@@ -46,6 +48,7 @@ enum class Screen {
 class AppViewModel(
     private val repository: WorkoutRepository,
     private val preferences: AppPreferences,
+    private val exerciseMediaRepository: ExerciseMediaRepository? = null,
 ) : ViewModel() {
 
     private val _screen = MutableStateFlow(Screen.Home)
@@ -136,6 +139,24 @@ class AppViewModel(
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
 
+    private val _exerciseMedia = MutableStateFlow<Map<String, ExerciseMedia>>(emptyMap())
+    val exerciseMedia: StateFlow<Map<String, ExerciseMedia>> = _exerciseMedia.asStateFlow()
+
+    private val _selectedExerciseId = MutableStateFlow<String?>(null)
+    val selectedExerciseId: StateFlow<String?> = _selectedExerciseId.asStateFlow()
+
+    private val _isUpdatingCatalog = MutableStateFlow(false)
+    val isUpdatingCatalog: StateFlow<Boolean> = _isUpdatingCatalog.asStateFlow()
+
+    private val _catalogMessage = MutableStateFlow<String?>(null)
+    val catalogMessage: StateFlow<String?> = _catalogMessage.asStateFlow()
+
+    private val _restRemaining = MutableStateFlow<Int?>(null)
+    val restRemaining: StateFlow<Int?> = _restRemaining.asStateFlow()
+
+    private val _restTotal = MutableStateFlow<Int?>(null)
+    val restTotal: StateFlow<Int?> = _restTotal.asStateFlow()
+
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
 
@@ -153,11 +174,57 @@ class AppViewModel(
 
     private var pendingBackupPayload: BackupFile? = null
 
-    private val _restRemaining = MutableStateFlow<Int?>(null)
-    val restRemaining: StateFlow<Int?> = _restRemaining.asStateFlow()
+    init {
+        viewModelScope.launch {
+            loadExerciseMedia(false)
+        }
+    }
 
-    private val _restTotal = MutableStateFlow<Int?>(null)
-    val restTotal: StateFlow<Int?> = _restTotal.asStateFlow()
+    fun loadExerciseMedia(forceRefresh: Boolean) {
+        val repo = exerciseMediaRepository ?: return
+        if (forceRefresh && _isUpdatingCatalog.value) return
+        viewModelScope.launch {
+            if (forceRefresh) {
+                _isUpdatingCatalog.value = true
+            }
+            try {
+                val map = repo.load(forceRefresh)
+                _exerciseMedia.value = map
+                if (forceRefresh) {
+                    val now = java.text.SimpleDateFormat(
+                        "dd/MM/yyyy HH:mm",
+                        java.util.Locale.getDefault(),
+                    ).format(java.util.Date())
+                    _catalogMessage.value = "Catálogo atualizado em $now"
+                }
+            } catch (error: Exception) {
+                if (forceRefresh) {
+                    _catalogMessage.value = error.message ?: "Não foi possível atualizar o catálogo."
+                }
+            } finally {
+                if (forceRefresh) {
+                    _isUpdatingCatalog.value = false
+                }
+            }
+        }
+    }
+
+    fun updateCatalog() {
+        loadExerciseMedia(true)
+    }
+
+    fun clearCatalogMessage() {
+        _catalogMessage.value = null
+    }
+
+    fun openExerciseDetail(exerciseId: String?) {
+        if (exerciseId.isNullOrBlank()) return
+        _selectedExerciseId.value = exerciseId
+    }
+
+    fun closeExerciseDetail() {
+        _selectedExerciseId.value = null
+    }
 
     private var restJob: Job? = null
 
@@ -553,10 +620,11 @@ class AppViewModel(
         fun factory(
             repository: WorkoutRepository,
             preferences: AppPreferences,
+            exerciseMediaRepository: ExerciseMediaRepository? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppViewModel(repository, preferences) as T
+                return AppViewModel(repository, preferences, exerciseMediaRepository) as T
             }
         }
     }

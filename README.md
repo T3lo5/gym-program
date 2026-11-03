@@ -4,7 +4,7 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 **Stack:** Kotlin + Jetpack Compose + Room + OkHttp + kotlinx.serialization + Compose for Wear OS + FastAPI (Python) + SenseNova API
 
-> 📖 **Manual completo de utilização:** [docs/MANUAL.md](docs/MANUAL.md) — instalação do APK, execução do backend (Docker ou Python), testes, rede local e solução de problemas.
+> Imagens dos exercícios: [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense).
 >
 > 🗺️ **Roadmap e specs:** [ROADMAP.md](ROADMAP.md) (o que fazer) e
 > [docs/specs/](docs/specs/) (como cada item deve ser feito). O plano antigo em

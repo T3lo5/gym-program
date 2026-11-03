@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.LinearProgressIndicator
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.components.ScreenTopBar
@@ -66,6 +67,10 @@ fun SettingsScreen(
     onConfirmImport: () -> Unit,
     onCancelImport: () -> Unit,
     onClearBackupMessage: () -> Unit,
+    isUpdatingCatalog: Boolean = false,
+    catalogMessage: String? = null,
+    onUpdateCatalog: () -> Unit = {},
+    onClearCatalogMessage: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
 
@@ -232,25 +237,44 @@ fun SettingsScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Como os dados funcionam",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "• O treino é gravado no aparelho imediatamente.\n" +
-                            "• O backend só é chamado ao gerar um treino novo ou sincronizar.\n" +
-                            "• A data de revisão vem do backend e aparece na tela inicial.\n" +
-                            "• Sem internet, você continua treinando e registrando as séries.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = "Catálogo de exercícios",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = "Imagens e instruções via catálogo do backend (free-exercise-db).",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        if (isUpdatingCatalog) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        catalogMessage?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = onUpdateCatalog,
+                                enabled = !isUpdatingCatalog,
+                            ) {
+                                Text(if (isUpdatingCatalog) "Atualizando..." else "Atualizar catálogo")
+                            }
+                            TextButton(onClick = onClearCatalogMessage) {
+                                Text("Limpar")
+                            }
+                        }
+                    }
                 }
-            }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -368,4 +392,6 @@ fun SettingsScreen(
             }
         }
     }
+}
+
 }

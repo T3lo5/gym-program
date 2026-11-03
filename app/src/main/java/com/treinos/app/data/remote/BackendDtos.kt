@@ -278,4 +278,21 @@ data class SyncDownloadSetLogDto(
 )
 
 @Serializable
+data class CatalogExerciseDto(
+    val id: String,
+    val name: String = "",
+    val primaryMuscles: List<String> = emptyList(),
+    val secondaryMuscles: List<String> = emptyList(),
+    val equipment: String = "",
+    val level: String = "",
+    val instructions: List<String> = emptyList(),
+    val images: List<String> = emptyList(),
+)
+
+@Serializable
+data class CatalogResponseDto(
+    val exercises: List<CatalogExerciseDto> = emptyList(),
+)
+
+@Serializable
 data class ApiErrorDto(val detail: String = "Erro desconhecido")

@@ -43,6 +43,12 @@ import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatDateTime
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.components.ExerciseImage
+
 @Composable
 fun WorkoutScreen(
     session: SessionWithExercises?,
@@ -53,6 +59,8 @@ fun WorkoutScreen(
     onSkipRest: () -> Unit,
     onFinish: () -> Unit,
     hasInProgressSession: Boolean,
+    exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
+    onOpenExerciseDetail: (String) -> Unit = {},
 ) {
     var exerciseToLog by remember { mutableStateOf<SessionExerciseWithSets?>(null) }
 
@@ -157,7 +165,9 @@ fun WorkoutScreen(
                 items(current.exercises.sortedBy { it.exercise.exerciseOrder }, key = { it.exercise.id }) { exercise ->
                     ExerciseCard(
                         exercise = exercise,
+                        media = exerciseMedia[exercise.exercise.exerciseId],
                         onLogSet = { exerciseToLog = exercise },
+                        onOpenDetail = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
                     )
                 }
 
@@ -223,24 +233,41 @@ private fun RestCard(remaining: Int, total: Int, onSkip: () -> Unit) {
 @Composable
 private fun ExerciseCard(
     exercise: SessionExerciseWithSets,
+    media: ExerciseMedia?,
     onLogSet: () -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
-                    "${exercise.exercise.restSeconds}s",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDetail() },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ExerciseImage(
+                    imageUrl = media?.imageUrl,
+                    exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                    size = 72.dp,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
+                            "${exercise.exercise.restSeconds}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             val sets = exercise.sets.sortedBy { it.setNumber }
             if (sets.isEmpty()) {

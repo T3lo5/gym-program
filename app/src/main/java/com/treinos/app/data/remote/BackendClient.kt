@@ -37,6 +37,8 @@ class BackendClient(
     suspend fun syncDownload(deviceId: String): SyncDownloadDto =
         get("/v1/sync/download?deviceId=$deviceId")
 
+    suspend fun catalog(): CatalogResponseDto = get("/v1/catalog")
+
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(baseUrlProvider() + path)

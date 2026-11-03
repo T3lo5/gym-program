@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.AppDatabase
+import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 
@@ -27,6 +28,11 @@ class AppContainer(context: Context) {
         dao = database.workoutDao(),
         backendClient = backendClient,
         preferences = preferences,
+    )
+
+    val exerciseMediaRepository: ExerciseMediaRepository = ExerciseMediaRepository(
+        context = context,
+        backendClient = backendClient,
     )
 }
 
