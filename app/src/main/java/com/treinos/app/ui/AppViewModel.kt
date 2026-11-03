@@ -4,11 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
-import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.GeneratePlanRequest
+import com.treinos.app.ui.ExerciseSessionData
+import com.treinos.app.ui.SetRecord
+import com.treinos.app.ui.calculateProgress
+import com.treinos.app.ui.nextIncompleteExercise
+import com.treinos.app.ui.progressText
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -57,6 +62,37 @@ class AppViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    private val _exerciseIndex = MutableStateFlow(0)
+    val exerciseIndex: StateFlow<Int> = _exerciseIndex.asStateFlow()
+
+    private val _exercises: StateFlow<List<ExerciseSessionData>> = repository.observeSessions()
+        .map { sessions ->
+            val inProgress = sessions.firstOrNull { it.session.status == "in_progress" }
+            inProgress?.exercises?.map { ex ->
+                ExerciseSessionData(
+                    sessionExerciseId = ex.exercise.id,
+                    exerciseId = ex.exercise.exerciseId,
+                    exerciseName = ex.exercise.exerciseName.ifBlank { ex.exercise.exerciseId },
+                    plannedSets = ex.exercise.plannedSets,
+                    completedSets = ex.exercise.completedSets,
+                    sets = ex.sets.map { SetRecord(it.setNumber, it.reps, it.weightKg, it.rpe) },
+                    restSeconds = ex.exercise.restSeconds,
+                )
+            } ?: emptyList()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val currentExercise: StateFlow<ExerciseSessionData?> = combine(
+        _exerciseIndex,
+        _exercises,
+    ) { index, exercises ->
+        exercises.getOrNull(index)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val totalExercises: StateFlow<Int> = _exercises
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
@@ -68,6 +104,15 @@ class AppViewModel(
 
     private val _isDownloading = MutableStateFlow(false)
     val isDownloading: StateFlow<Boolean> = _isDownloading.asStateFlow()
+
+    private val _isRestoring = MutableStateFlow(false)
+    val isRestoring: StateFlow<Boolean> = _isRestoring.asStateFlow()
+
+    private val _restoreMessage = MutableStateFlow<String?>(null)
+    val restoreMessage: StateFlow<String?> = _restoreMessage.asStateFlow()
+
+    private val _restoreDeviceId = MutableStateFlow("")
+    val restoreDeviceId: StateFlow<String> = _restoreDeviceId.asStateFlow()
 
     private val _downloadMessage = MutableStateFlow<String?>(null)
     val downloadMessage: StateFlow<String?> = _downloadMessage.asStateFlow()
@@ -175,6 +220,7 @@ class AppViewModel(
             try {
                 val sessionId = repository.startSession(plan.plan.id, dayId)
                 _activeSessionId.value = sessionId
+                _exerciseIndex.value = 0
                 _screen.value = Screen.Workout
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível iniciar o treino."
@@ -197,7 +243,7 @@ class AppViewModel(
     }
 
     fun logSet(
-        exercise: SessionExerciseEntity,
+        exercise: ExerciseSessionData,
         reps: Int?,
         weightKg: Double?,
         rpe: Double?,
@@ -205,7 +251,7 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 repository.logSet(
-                    exerciseLogId = exercise.id,
+                    exerciseLogId = exercise.sessionExerciseId,
                     reps = reps,
                     weightKg = weightKg,
                     rpe = rpe,
@@ -254,6 +300,69 @@ class AppViewModel(
         restJob = null
         _restRemaining.value = null
         _restTotal.value = null
+    }
+
+    // ---------------- Navegacao por exercicio (fluxo nao-circuito) ----------------
+
+    fun nextExercise() {
+        val exercises = _exercises.value
+        val next = nextIncompleteExercise(exercises)
+        if (next == null) return
+        _exerciseIndex.value = exercises.indexOf(next)
+        skipRest()
+    }
+
+    fun isCurrentExerciseCompleted(): Boolean {
+        val current = currentExercise.value ?: return true
+        val progress = calculateProgress(
+            plannedSets = current.plannedSets,
+            completedSets = current.completedSets,
+            sets = current.sets,
+        )
+        return progress.isCompleted
+    }
+
+    fun currentExerciseProgressText(): String {
+        val current = currentExercise.value ?: return ""
+        val progress = calculateProgress(
+            plannedSets = current.plannedSets,
+            completedSets = current.completedSets,
+            sets = current.sets,
+        )
+        return progressText(progress)
+    }
+
+    // ---------------- Restauracao por deviceId ----------------
+
+    fun restoreByDeviceId(deviceId: String) {
+        if (_isRestoring.value) return
+        if (deviceId.isBlank()) {
+            _restoreMessage.value = "Informe um ID de aparelho válido."
+            return
+        }
+        viewModelScope.launch {
+            _isRestoring.value = true
+            try {
+                preferences.deviceId = deviceId
+                val data = repository.downloadSync()
+                _lastSyncAt.value = preferences.lastSyncAt
+                val planCount = data.plans.size
+                _restoreMessage.value =
+                    if (planCount > 0) "Restaurado: ${planCount} plano(s) do backup do dispositivo $deviceId."
+                    else "Nenhum dado encontrado para o dispositivo $deviceId."
+                _restoreDeviceId.value = ""
+            } catch (error: Exception) {
+                _restoreMessage.value = error.message
+                    ?: "Não foi possível restaurar o backup do dispositivo $deviceId."
+            } finally {
+                _isRestoring.value = false
+            }
+        }
+    }
+
+    fun onRestoreDeviceIdChanged(text: String) {
+        _restoreDeviceId.value = text
+        _restoreMessage.value = null
     }
 
     // ---------------- Configurações / sincronização ----------------
