@@ -14,6 +14,8 @@ data class GeneratePlanRequest(
     val sessionDurationMinutes: Int = 60,
     val preferredSplit: String? = null,
     val reviewAfterWeeks: Int = 4,
+    val bodyWeightKg: Double? = null,
+    val heightCm: Int? = null,
 )
 
 @Serializable

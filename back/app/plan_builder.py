@@ -94,6 +94,87 @@ SETS_BY_GOAL = {
     "general": 3,
 }
 
+UPPER_BODY_MUSCLES = {"chest", "shoulders", "biceps", "triceps", "lats", "middle back", "traps"}
+LOWER_BODY_MUSCLES = {"quadriceps", "hamstrings", "glutes", "calves"}
+LOAD_EQUIPMENT = {"barbell", "dumbbell", "machine", "cable"}
+
+
+def profile_adjustments(
+    plan: Dict[str, Any],
+    body_weight_kg: Optional[float],
+    height_cm: Optional[int],
+) -> Dict[str, Any]:
+    """Aplica ajustes determinísticos de IMC ao plano local.
+
+    Regras:
+    - IMC < 18.5: descanso +15s, RPE -0.5 (mín. 5.0)
+    - 18.5 <= IMC < 25.0: sem mudança
+    - 25.0 <= IMC < 30.0: descanso +15s
+    - IMC >= 30.0: descanso +30s, -1 série (mín. 2)
+    """
+    if body_weight_kg is None or height_cm is None:
+        return plan
+
+    height_m = height_cm / 100.0
+    bmi = body_weight_kg / (height_m * height_m)
+
+    rest_adjustment = 0
+    rpe_adjustment = 0.0
+    sets_adjustment = 0
+
+    if bmi < 18.5:
+        rest_adjustment = 15
+        rpe_adjustment = -0.5
+    elif bmi >= 30.0:
+        rest_adjustment = 30
+        sets_adjustment = -1
+    elif bmi >= 25.0:
+        rest_adjustment = 15
+
+    for day in plan.get("days", []):
+        for exercise in day.get("exercises", []):
+            exercise["restSeconds"] = exercise.get("restSeconds", 90) + rest_adjustment
+            if rpe_adjustment != 0:
+                current_rpe = exercise.get("targetRpe", 8.0)
+                exercise["targetRpe"] = max(5.0, current_rpe + rpe_adjustment)
+            if sets_adjustment != 0:
+                current_sets = exercise.get("sets", 3)
+                exercise["sets"] = max(2, current_sets + sets_adjustment)
+
+    return plan
+
+
+def suggest_initial_load(
+    plan: Dict[str, Any],
+    body_weight_kg: Optional[float],
+) -> Dict[str, Any]:
+    """Acrescenta sugestão de carga inicial nos notes dos exercícios compatíveis."""
+    if body_weight_kg is None:
+        return plan
+
+    for day in plan.get("days", []):
+        for exercise in day.get("exercises", []):
+            equipment = (exercise.get("equipment") or "").strip().lower()
+            if equipment not in LOAD_EQUIPMENT:
+                continue
+
+            muscles = [str(m).lower() for m in exercise.get("primaryMuscles", [])]
+            multiplier: Optional[float] = None
+            if any(m in UPPER_BODY_MUSCLES for m in muscles):
+                multiplier = 0.25
+            elif any(m in LOWER_BODY_MUSCLES for m in muscles):
+                multiplier = 0.5
+
+            if multiplier is None:
+                continue
+
+            load_kg = max(2.5, round(body_weight_kg * multiplier / 2.5) * 2.5)
+            suggestion = f"Carga inicial sugerida: {load_kg} kg (ajuste conforme percepção)."
+            existing = exercise.get("notes", "")
+            exercise["notes"] = f"{existing} {suggestion}".strip() if existing else suggestion
+
+    return plan
+
 
 def normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (value or "").lower())
@@ -314,4 +395,12 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
         "daysPerWeek": days_per_week,
         "days": days,
     }
-    return enrich_plan(plan, catalog)
+    plan = enrich_plan(plan, catalog)
+
+    body_weight_kg = getattr(request, "bodyWeightKg", None)
+    height_cm = getattr(request, "heightCm", None)
+    if body_weight_kg is not None or height_cm is not None:
+        plan = profile_adjustments(plan, body_weight_kg, height_cm)
+        plan = suggest_initial_load(plan, body_weight_kg)
+
+    return plan

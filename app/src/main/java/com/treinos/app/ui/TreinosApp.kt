@@ -47,6 +47,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     val backupImportState by viewModel.backupImportState.collectAsStateWithLifecycle()
     val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
+    val bodyWeightKg by viewModel.bodyWeightKg.collectAsStateWithLifecycle()
+    val heightCm by viewModel.heightCm.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -92,6 +94,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                 Screen.Generate -> GenerateScreen(
                     isGenerating = isGenerating,
                     onBack = viewModel::goHome,
+                    savedBodyWeightKg = bodyWeightKg,
+                    savedHeightCm = heightCm,
                     onGenerate = viewModel::generatePlan,
                 )
 

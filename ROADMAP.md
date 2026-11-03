@@ -64,6 +64,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-1 | Recuperação por `deviceId` | `SettingsScreen` exibe o ID; `AppViewModel.restoreByDeviceId` restaura do backend |
 | H1-2 | Execução por séries (não circuito) | `WorkoutScreen` registra série, `AppViewModel.logSet`, `ExerciseProgress` + testes |
 | H1-4 | Exportar/importar backup JSON (manual) | `BackupDtos`, `BackupMapper`, `BackupValidator`; `WorkoutDao.replaceAllData`; `WorkoutRepository.exportBackup/importBackup`; `AppViewModel` estados/ações; `SettingsScreen` UI + file pickers; testes JVM em `app/src/test/.../data/backup/` |
+| H1-5 | Peso e altura na geração de treino | `AppPreferences.bodyWeightKg/heightCm`; `GeneratePlanRequest.bodyWeightKg/heightCm`; `ProfileValidator`; `GenerateScreen` campos + resumo; `AppViewModel` valida/persiste/monta request; `TreinosApp` repassa parâmetros; backend `GenerateRequest` + `build_user_prompt`; `plan_builder.profile_adjustments`/`suggest_initial_load`; testes JVM em `app/src/test/.../ui/ProfileValidatorTest.kt`; testes backend em `back/tests/test_profile_adjustments.py` |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend" |
 | H3-1 | Testes + CI (parcial) | 7 testes JVM, Android Lint, Ruff/Pytest e `./scripts/verify.sh` no CI |
 
@@ -71,7 +72,6 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H1-5 | Peso e altura na geração de treino | **S** | A IA não sabe peso/altura, então não calibra cargas, RPE e descanso. | App: campos Peso/Altura em `AppPreferences`, enviados em `GeneratePlanRequest`. Backend: incluir no prompt e no `build_local_plan` com faixas validadas. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | [H1-5](docs/specs/H1-5-profile.md) |
 | H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | [H1-3](docs/specs/H1-3-exercise-media.md) |
 
 ### Horizon 2 — Próximo (1-2 meses): conectividade e relógio
@@ -98,11 +98,10 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
-| Backup JSON (H1-4) | Peso/altura na geração (H1-5) | Histórico com calendário (H2-4) | Backend na nuvem (H3-4) |
-| | Mídia dos exercícios (H1-3) | Polimento + animações (H3-2) | Progressão automática de carga (H3-5) |
-| | Testes de UI/instrumentados (H3-1) | Acessibilidade (H3-3) | Export CSV/Sheets |
-| | Descoberta LAN (H2-1) | | Widget/complicação do relógio |
-| | Wear OS MVP (H2-2) | | |
+| Backup JSON (H1-4) | Mídia dos exercícios (H1-3) | Histórico com calendário (H2-4) | Backend na nuvem (H3-4) |
+| Peso/altura na geração (H1-5) ✅ | Testes de UI/instrumentados (H3-1) | Polimento + animações (H3-2) | Progressão automática de carga (H3-5) |
+| | Descoberta LAN (H2-1) | Acessibilidade (H3-3) | Export CSV/Sheets |
+| | Wear OS MVP (H2-2) | | Widget/complicação do relógio |
 
 ---
 

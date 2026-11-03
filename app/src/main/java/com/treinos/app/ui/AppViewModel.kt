@@ -13,6 +13,7 @@ import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.ui.ExerciseSessionData
+import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.nextIncompleteExercise
@@ -144,6 +145,12 @@ class AppViewModel(
     private val _backupMessage = MutableStateFlow<String?>(null)
     val backupMessage: StateFlow<String?> = _backupMessage.asStateFlow()
 
+    private val _bodyWeightKg = MutableStateFlow(preferences.bodyWeightKg)
+    val bodyWeightKg: StateFlow<Double?> = _bodyWeightKg.asStateFlow()
+
+    private val _heightCm = MutableStateFlow(preferences.heightCm)
+    val heightCm: StateFlow<Int?> = _heightCm.asStateFlow()
+
     private var pendingBackupPayload: BackupFile? = null
 
     private val _restRemaining = MutableStateFlow<Int?>(null)
@@ -188,11 +195,27 @@ class AppViewModel(
         muscles: List<String>,
         sessionDuration: Int,
         reviewWeeks: Int,
+        bodyWeightKgText: String,
+        heightCmText: String,
     ) {
         if (_isGenerating.value) return
         viewModelScope.launch {
             _isGenerating.value = true
             try {
+                val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText)
+                if (!validation.valid) {
+                    _message.value = validation.error ?: "Perfil inválido."
+                    return@launch
+                }
+                // Persist profile quando pelo menos um campo estiver preenchido.
+                if (validation.bodyWeightKg != null) {
+                    preferences.bodyWeightKg = validation.bodyWeightKg
+                    _bodyWeightKg.value = preferences.bodyWeightKg
+                }
+                if (validation.heightCm != null) {
+                    preferences.heightCm = validation.heightCm
+                    _heightCm.value = preferences.heightCm
+                }
                 val response = repository.generatePlan(
                     GeneratePlanRequest(
                         deviceId = preferences.deviceId,
@@ -203,6 +226,8 @@ class AppViewModel(
                         currentLevel = level,
                         sessionDurationMinutes = sessionDuration,
                         reviewAfterWeeks = reviewWeeks,
+                        bodyWeightKg = validation.bodyWeightKg,
+                        heightCm = validation.heightCm,
                     )
                 )
                 _screen.value = Screen.Home

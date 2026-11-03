@@ -23,6 +23,8 @@ from .plan_builder import (
     enrich_plan,
     resolve_plan_ids,
     review_date,
+    profile_adjustments,
+    suggest_initial_load,
 )
 
 # Config
@@ -206,6 +208,8 @@ class GenerateRequest(BaseModel):
     sessionDurationMinutes: int = Field(ge=30, le=120, default=60)
     preferredSplit: Optional[Literal["full_body", "upper_lower", "push_pull_legs", "bro_split"]] = None
     reviewAfterWeeks: int = Field(ge=1, le=12, default=4)
+    bodyWeightKg: Optional[float] = Field(default=None, ge=30.0, le=300.0)
+    heightCm: Optional[int] = Field(default=None, ge=120, le=250)
 
 
 class ExerciseDTO(BaseModel):
@@ -356,6 +360,36 @@ async def health():
     }
 
 
+def build_user_prompt(request: GenerateRequest) -> str:
+    """Monta o prompt do usuário para a IA, incluindo perfil quando disponível."""
+    equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
+    muscles_str = ", ".join(request.targetMuscles) if request.targetMuscles else "corpo todo"
+
+    prompt = f"""Gere um treino de {request.goal} com as seguintes restrições:
+- Dias por semana: {request.daysPerWeek}
+- Equipamentos disponíveis: {equipment_str}
+- Foco muscular: {muscles_str}
+- Nível: {request.currentLevel}
+- Duração por sessão: ~{request.sessionDurationMinutes} min
+- Split preferido: {request.preferredSplit or 'livre'}
+- Lesões/limitações: {request.injuriesOrLimitations or 'nenhuma'}
+
+O treino deve ser progressivo, balanceado e usar apenas exercícios do catálogo fornecido.
+Retorne APENAS o JSON válido."""
+
+    if request.bodyWeightKg is not None and request.heightCm is not None:
+        bmi = request.bodyWeightKg / ((request.heightCm / 100.0) ** 2)
+        prompt += f"""
+
+- Peso corporal: {request.bodyWeightKg} kg
+- Altura: {request.heightCm} cm
+- IMC: {bmi:.1f}
+- Use o perfil para calibrar descanso, RPE, volume e cargas iniciais.
+  Sugestões de carga são ponto de partida, não prescrição médica."""
+
+    return prompt
+
+
 @app.post("/v1/generate-workout", response_model=GenerateResponse)
 async def generate_workout(request: GenerateRequest):
     """Gera um plano sob demanda.
@@ -372,20 +406,7 @@ async def generate_workout(request: GenerateRequest):
     source = "local"
     model_used = "local-fallback"
 
-    equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
-    muscles_str = ", ".join(request.targetMuscles) if request.targetMuscles else "corpo todo"
-
-    user_prompt = f"""Gere um treino de {request.goal} com as seguintes restrições:
-- Dias por semana: {request.daysPerWeek}
-- Equipamentos disponíveis: {equipment_str}
-- Foco muscular: {muscles_str}
-- Nível: {request.currentLevel}
-- Duração por sessão: ~{request.sessionDurationMinutes} min
-- Split preferido: {request.preferredSplit or 'livre'}
-- Lesões/limitações: {request.injuriesOrLimitations or 'nenhuma'}
-
-O treino deve ser progressivo, balanceado e usar apenas exercícios do catálogo fornecido.
-Retorne APENAS o JSON válido."""
+    user_prompt = build_user_prompt(request)
 
     if SENSENOVA_API_KEY:
         try:

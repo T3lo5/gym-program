@@ -43,6 +43,26 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_LAST_SYNC_AT, value).apply()
         }
 
+    var bodyWeightKg: Double?
+        get() = if (prefs.contains(KEY_BODY_WEIGHT_KG)) prefs.getFloat(KEY_BODY_WEIGHT_KG, 0f).toDouble() else null
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_BODY_WEIGHT_KG).apply()
+            } else {
+                prefs.edit().putFloat(KEY_BODY_WEIGHT_KG, value.toFloat()).apply()
+            }
+        }
+
+    var heightCm: Int?
+        get() = if (prefs.contains(KEY_HEIGHT_CM)) prefs.getInt(KEY_HEIGHT_CM, 0) else null
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_HEIGHT_CM).apply()
+            } else {
+                prefs.edit().putInt(KEY_HEIGHT_CM, value).apply()
+            }
+        }
+
     companion object {
         /** Emulador Android acessa o host em 10.0.2.2. */
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000"
@@ -50,5 +70,7 @@ class AppPreferences private constructor(
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"
+        private const val KEY_HEIGHT_CM = "height_cm"
     }
 }
