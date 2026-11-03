@@ -2,6 +2,12 @@
 
 App pessoal de musculação Android + Wear OS, **local-first + IA sob demanda**, custo alvo R$ 0/mês.
 
+> **Fonte de verdade do produto.** O [SPRINT-PLAN.md](docs/SPRINT-PLAN.md) é histórico
+> (pré-implementação) e não deve ser usado para decidir o próximo passo.
+>
+> Itens do roadmap só começam com uma spec em [docs/specs/](docs/specs/). Sem spec,
+> o agente deve pedir antes de implementar.
+
 ---
 
 ## 1. Visão do produto
@@ -15,20 +21,25 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 
 ---
 
-## 2. Onde estamos hoje (estado atual)
+## 2. Onde estamos hoje (atualizado em 2026-11-03)
 
-| Área | Status |
-|------|--------|
-| Banco local (Room) | ✅ Planos, dias, exercícios, sessões, séries |
-| Execução de treino | ✅ Timer de descanso, séries, RPE, carga, histórico |
-| Geração via IA | ✅ Backend + SenseNova + fallback local |
-| Sincronização | ✅ Snapshot manual app → backend |
-| Descoberta LAN | 📋 mDNS no backend; app usa URL configurável |
-| Wear OS | 🚧 Módulo existe, não no APK atual |
-| Backup/restore do usuário | ❌ Não há exportação manual de dados |
-| Imagem/vídeo de exercício | ❌ Catálogo sem mídia |
-| Execução por séries (não circuito) | ❌ Fluxo obriga circuito sequencial |
-| Recuperação de deviceId | ❌ Desinstalar = dados órfãos no backend |
+| Área | Status | Evidência |
+|------|--------|-----------|
+| Banco local (Room) | ✅ | Planos, dias, exercícios, sessões, séries |
+| Execução de treino | ✅ | Timer de descanso, séries, RPE, carga, histórico |
+| Geração via IA | ✅ | Backend + SenseNova + fallback local |
+| Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
+| Restauração por `deviceId` | ✅ | `AppViewModel.restoreByDeviceId` + botão em Ajustes |
+| Download do backend | ✅ | `WorkoutRepository.downloadSync` + botão em Ajustes |
+| Testes + CI | 🟡 | 7 testes JVM + gate (`./scripts/verify.sh`); falta UI/instrumentado |
+| Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
+| Wear OS | 🚧 | Módulo existe, fora do build/APK atual |
+| Backup/restore do usuário | ❌ | Sem exportação/importação de arquivo |
+| Imagem/vídeo de exercício | ❌ | Catálogo sem mídia |
+| Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
+
+> A tabela envelhece rápido. Ao entregar um item, mova-o para §4.1 e atualize esta
+> tabela no mesmo commit.
 
 ---
 
@@ -44,36 +55,42 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 
 ## 4. Roadmap por horizonte
 
-Use este quadro para decidir o que entra em cada sprint. Tudo abaixo está priorizado com MoSCoW (M = Must, S = Should, C = Could, W = Won't now).
+Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't now.
 
-### Horizon 1 — Agora (Próximas 2-4 semanas): estabilizar o core
+### 4.1 Concluído
 
-| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | UI/UX |
-|----|------|--------|----------|------------------|---------|------------|-------|
-| H1-1 | Recuperação de backup / login por deviceId | **M** | Desinstalar/reinstalar gera novo `deviceId`; treinos no backend ficam órfãos. | Exibir `deviceId` nos Ajustes (copiar); permitir informar `deviceId` antigo ou login por e-mail para associar aparelho aos dados sincronizados. | 3 dias | `AppPreferences`, `WorkoutRepository.downloadSync`, `SettingsScreen` | Tela de Ajustes com campo visível, botão "Copiar deviceId", formulário "Restaurar por deviceId/e-mail" com feedback de sucesso/erro. |
-| H1-2 | Acompanhamento por séries (não circuito) | **M** | Hoje obriga circuito sequencial; não dá marcar "série 1 de 4", descansar, ir para série 2 do mesmo exercício. | Nova tela de execução por exercício: controle de séries/reps ("1/4 séries", "8-12 reps"), temporizador de descanso entre séries, navega para próximo exercício só após concluir todas as séries do atual. | 5 dias | `WorkoutScreen` (nova), `WorkoutDao` (progresso por série), `WorkoutRepository` (sessão por exercício) | Timer grande e visível, botão "Próxima série" destacado, indicador visual de série atual/total, marcação de série concluída com check. |
-| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome (ex: "Bent-Arm Dumbbell Pullover"). | Campo `imageUrl` e `videoUrl` na entidade do exercício; exibir no detalhe do exercício e durante a execução. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), backend catálogo com mídia | Miniatura redonda no picker, imagem em tela cheia no detalhe, ícone de play sobre vídeo, carregamento progressivo com placeholder. |
-| H1-4 | Exportar/importar backup JSON (manual) | **S** | Não há como o usuário salvar seus próprios dados fora do app. | Botão "Exportar backup" nos Ajustes → salva JSON local; "Importar backup" → lê arquivo e restaura no Room. | 3 dias | `WorkoutRepository`, `SettingsScreen` | Seletor de arquivo do sistema, confirmação antes de sobrescrever, toast de sucesso com contagem de itens restaurados. |
-| H1-5 | Peso e altura na geração de treino | **S** | A IA gera o treino "no pelo": não sabe peso nem altura do usuário, então não consegue calibrar cargas iniciais, RPE, séries ou descanso de forma personalizada. | App: campos **Peso** e **Altura** na tela de geração (salvos em `AppPreferences`, enviados em `GeneratePlanRequest`). Backend: incluir peso/altura no `user_prompt` e no `SYSTEM_PROMPT`, e usá-los no `build_local_plan` para sugerir cargas/descanso baseados no perfil. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | Campos de número com unidades (kg, cm) na tela de geração, resumo do perfil exibido antes de gerar, validação de valores realistas. |
+| ID | Item | Evidência |
+|----|------|-----------|
+| H1-1 | Recuperação por `deviceId` | `SettingsScreen` exibe o ID; `AppViewModel.restoreByDeviceId` restaura do backend |
+| H1-2 | Execução por séries (não circuito) | `WorkoutScreen` registra série, `AppViewModel.logSet`, `ExerciseProgress` + testes |
+| H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend" |
+| H3-1 | Testes + CI (parcial) | 7 testes JVM, Android Lint, Ruff/Pytest e `./scripts/verify.sh` no CI |
+
+### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
+
+| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
+|----|------|--------|----------|------------------|---------|------------|------|
+| H1-4 | Exportar/importar backup JSON (manual) | **M** | Não há como o usuário salvar os próprios dados fora do app. | Botão "Exportar backup" nos Ajustes → salva JSON versionado; "Importar backup" → valida, confirma e restaura no Room em transação. | 3 dias | `WorkoutRepository`, `WorkoutDao`, `SettingsScreen` | [H1-4](docs/specs/H1-4-backup-json.md) |
+| H1-5 | Peso e altura na geração de treino | **S** | A IA não sabe peso/altura, então não calibra cargas, RPE e descanso. | App: campos Peso/Altura em `AppPreferences`, enviados em `GeneratePlanRequest`. Backend: incluir no prompt e no `build_local_plan` com faixas validadas. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | — |
+| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | — |
 
 ### Horizon 2 — Próximo (1-2 meses): conectividade e relógio
 
-| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | UI/UX |
-|----|------|--------|----------|------------------|---------|------------|-------|
-| H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend no celular. | Backend anuncia `_treinos._tcp.local`; app lista instâncias encontradas e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração de backend | Lista de backends encontrados na rede com "Conectar", estado de carregamento, aviso quando nenhum é encontrado. |
-| H2-2 | Wear OS MVP (Data Layer) | **S** | Relógio não está no APK; usuário precisa do celular para ver o treino. | Módulo Wear incluído no APK; Data Layer envia sessão (exercício atual, série, próxima, timer descanso); tela do relógio com exercício atual, timer de descanso grande, próximo exercício. | 5 dias | `wear` module, Compose for Wear OS, Data Layer API | Alvos ≥48dp, timer grande, vibração no fim do descanso, cores de alto contraste para luz solar. |
-| H2-3 | Sincronização bidirecional completa (download/restauração) | **S** | Hoje só envia app → backend; não restaura do backend para o app. | Endpoint de download no backend; app restaura planos/séries do backend após login por deviceId. | 3 dias | H1-1, `WorkoutRepository.downloadSync` | Tela de sincronização com progresso, "Última sincronização", botão "Restaurar do backup na nuvem". |
-| H2-4 | Histórico com calendário e métricas | **C** | Histórico é uma lista simples; não dá ver evolução. | Visualização por calendário, cards de treinos passados, total de séries, duração, volume por músculo. | 4 dias | `HistoryScreen`, Room queries | Calendário com dias treinados destacados, cards expansíveis, gráfico simples de volume semanal. |
+| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
+|----|------|--------|----------|------------------|---------|------------|------|
+| H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend. | Backend anuncia `_treinos._tcp.local`; app lista instâncias e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração | — |
+| H2-2 | Wear OS MVP (Data Layer) | **S** | Relógio não está no APK. | Incluir `wear` no build; Data Layer envia sessão (exercício, série, timer); tela com timer e próximo exercício. | 5 dias | `wear` module, Compose for Wear OS, Data Layer API | — |
+| H2-4 | Histórico com calendário e métricas | **C** | Histórico é lista simples. | Calendário, cards de treinos, total de séries, duração, volume por músculo. | 4 dias | `HistoryScreen`, Room queries | — |
 
 ### Horizon 3 — Depois (2-4 meses): evolução e qualidade
 
-| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | UI/UX |
-|----|------|--------|----------|------------------|---------|------------|-------|
-| H3-1 | Testes (unit + UI + instrumented) + CI | **M** | Sem testes automatizados; regressões passam despercebidas. | Testes de ViewModel/UseCase, Compose UI testing, testes Room instrumentados; GitHub Actions: lint + test + build APK + Wear APK. | 5 dias | Módulos `app` e `wear` estáveis | Nenhuma UI nova; qualidade percebida via estabilidade. |
-| H3-2 | Polimento visual e animações | **C** | Telas funcionais mas sem identidade visual refinada. | Animações Compose (SharedElement, AnimatedVisibility), transições entre telas, tema verde consistente, estados de loading e empty states. | 4 dias | `Theme.kt`, telas existentes | Micro-animações ao concluir série, transições suaves entre dias/exercícios, empty states ilustrados. |
-| H3-3 | Acessibilidade (A11y) | **C** | Sem contentDescription, scaling de fonte, TalkBack nas telas principais. | contentDescription em todos os botões/ícones, suporte a escala de fonte do sistema, navegação TalkBack nas 4 tabs principais. | 3 dias | Telas existentes | App usável por leitores de tela, texto redimensionável sem quebrar layout. |
-| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local; não acessa de fora da LAN. | Deploy em Oracle Always Free ou Codespaces + Cloudflare Tunnel; toggle "Usar back remoto" + URL armazenada com segurança. | 2 dias | Backend Docker, `.env` seguro | Toggle nos Ajustes, campo de URL remota, aviso de segurança para uso fora da LAN. |
-| H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não há evolução automática de carga/séries. | Mesociclos, sugestão de aumento de carga com base em RPE/séries concluídas, data de revisão do plano. | 5 dias | Histórico completo, H2-4 | Tela de "Progressão" com sugestões de próxima carga, alerta "Chegou a hora de revisar o plano". |
+| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
+|----|------|--------|----------|------------------|---------|------------|------|
+| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. | Compose UI testing, Robolectric/instrumented para Room, testes de contrato app↔backend; manter Wear coberto quando entrar no build. | 5 dias | Módulos estáveis | — |
+| H3-2 | Polimento visual e animações | **C** | Telas funcionais, sem identidade refinada. | Animações Compose, transições, tema consistente, loading/empty states. | 4 dias | `Theme.kt`, telas existentes | — |
+| H3-3 | Acessibilidade (A11y) | **C** | Sem `contentDescription`, escala de fonte e TalkBack nas telas principais. | `contentDescription`, fonte escalável, navegação TalkBack nas 4 tabs. | 3 dias | Telas existentes | — |
+| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | — |
+| H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não evolui carga/séries. | Mesociclos, sugestão de carga por RPE/séries, alerta de revisão. | 5 dias | Histórico completo, H2-4 | — |
 
 ---
 
@@ -81,39 +98,38 @@ Use este quadro para decidir o que entra em cada sprint. Tudo abaixo está prior
 
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
-| Recuperação deviceId / login | Descoberta LAN mDNS | Testes + CI | Backend na nuvem |
-| Execução por séries (não circuito) | Wear OS MVP | Polimento + animações | Periodização automática |
-| Imagens/vídeos dos exercícios | Sync bidirecional (download) | Acessibilidade (A11y) | Gráficos avançados |
-| Exportar/importar backup JSON | Histórico com calendário | | Export CSV/Sheets |
-| Peso e altura na geração | | | Widget/complicação do relógio |
+| Backup JSON (H1-4) | Peso/altura na geração (H1-5) | Histórico com calendário (H2-4) | Backend na nuvem (H3-4) |
+| | Mídia dos exercícios (H1-3) | Polimento + animações (H3-2) | Periodização automática (H3-5) |
+| | Testes de UI/instrumentados (H3-1) | Acessibilidade (H3-3) | Export CSV/Sheets |
+| | Descoberta LAN (H2-1) | | Widget/complicação do relógio |
+| | Wear OS MVP (H2-2) | | |
 
 ---
 
 ## 6. Esforço e caminho crítico
 
 ```
-Semana 1-2: H1-1 (deviceId) → desbloqueia tudo de sincronização/backup
-Semana 2-3: H1-2 (séries)    → core de execução usável no dia a dia
-Semana 3-4: H1-3 (mídia)     → UX de reconhecimento de exercício
-Semana 3-4: H1-4 (backup JSON) → segurança de dados do usuário
-Semana 3-4: H1-5 (peso/altura) → IA calibra plano ao perfil físico
-Mês 2:      H2-1 (LAN) + H2-2 (Wear) → conectividade + relógio
-Mês 2-3:    H2-3 (sync bidirecional) → restauração real na nuvem
-Mês 3+:     H3-1 (testes/CI) + H3-2 (polimento) + H3-3 (A11y)
+Agora:      H1-4 backup JSON        → proteção dos dados do usuário
+Semana 2:   H1-5 peso/altura        → IA calibra o plano ao perfil
+Semana 3:   H1-3 mídia              → reconhecimento do exercício
+Mês 2:      H2-1 LAN + H2-2 Wear    → conectividade + relógio
+Mês 2-3:    H2-4 histórico          → evolução visível
+Mês 3+:     H3-1 UI/instrumentados  → cobertura além do gate atual
 ```
 
-**Caminho crítico:** H1-1 → H1-2 → H2-1 → H2-2 → H3-1.  
-Não comece polimento (H3-2) antes de ter testes (H3-1), senão regressões mascaram o progresso.
+**Caminho crítico:** H1-4 → H1-5 → H1-3 → H2-1 → H2-2.  
+O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda não vê (UI, Room, contrato).
 
 ---
 
 ## 7. Critérios de aceite gerais (Definição de Pronto)
 
-- [ ] Código no `main` via PR aprovado, sem `// TODO` bloqueante
-- [ ] `./gradlew :app:lintDebug :app:test :app:connectedAndroidTest` verde
-- [ ] APK instalado no device físico + Wear APK no relógio (quando aplicar)
-- [ ] Smoke test manual da funcionalidade entregue
-- [ ] README/MANUAL/ROADMAP atualizados com o novo estado
+- [ ] Spec em `docs/specs/<ID>.md` aprovada (obrigatória para itens do roadmap)
+- [ ] `./scripts/verify.sh` verde (build + testes + lint + assinatura + backend)
+- [ ] Testes JVM novos para toda lógica pura; teste de backend quando `back/` mudar
+- [ ] Smoke test manual no device físico quando houver UI nova
+- [ ] `README.md`, `docs/MANUAL.md`, `ROADMAP.md` e a spec atualizados
+- [ ] Nenhum código novo nos diretórios legados (`shared/`, `wear/`, `com.treinos.shared`)
 
 ---
 
@@ -121,16 +137,30 @@ Não comece polimento (H3-2) antes de ter testes (H3-1), senão regressões masc
 
 | Risco | Prob. | Impacto | Mitigação |
 |-------|-------|---------|-----------|
+| `deviceId` não é autenticação | Média | Alto | Tratar como backup pessoal; não expor backend público sem token (H3-4) |
 | SenseNova muda API/limite | Baixa | Médio | Backend agnóstico (OpenAI-compatible); fallback local em 1 commit |
 | BT instável celular ↔ relógio | Média | Médio | Relógio opera autônomo com fila local; reconcilia ao reconectar |
 | Android 15+ restringe LAN | Baixa | Alto | Manter fallback manual de IP; testar em preview |
-| Desinstalar app apaga dados locais | Alta | Alto | H1-4 (backup JSON manual) + H1-1 (recuperação deviceId) |
+| Desinstalar app apaga dados locais | Alta | Alto | H1-4 (backup JSON) + H1-1 (restore por deviceId) |
 | Catálogo sem mídia | Média | Baixo | Imagens via URL do free-exercise-db; vídeo opcional |
 
 ---
 
 ## 9. Próximo passo imediato
 
-Iniciar **H1-1 (Recuperação de backup / login por deviceId)** — é o item de maior prioridade porque desbloqueia backup, sincronização e restore seguro sem perder os dados do usuário quando ele reinstala o app.
+Implementar **H1-4 (backup JSON)** seguindo [docs/specs/H1-4-backup-json.md](docs/specs/H1-4-backup-json.md).
+É o item Must de maior risco (perda de dados) e já tem contrato, casos de borda e
+testes definidos.
 
-Quer que eu detalhe o plano de execução de um item específico (arquivos, tarefas, critérios de aceite) ou abra as issues no repositório para cada item do Horizon 1?
+Depois: H1-5 (peso/altura) → H1-3 (mídia). Para iniciar qualquer um, crie a spec
+a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md).
+
+---
+
+## 10. Especificações
+
+- [_TEMPLATE.md](docs/specs/_TEMPLATE.md) — formato obrigatório
+- [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — pronta para implementar
+
+Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
+mais simples de "compilar verde e entregar a coisa errada".

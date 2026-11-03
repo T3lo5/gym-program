@@ -1,5 +1,11 @@
 # Plano de Sprints — App Pessoal de Treinos (Local-first + Back Opcional)
 
+> ⚠️ **DOCUMENTO HISTÓRICO — SUPERADO.**
+> Este arquivo descreve o plano original (pré-implementação) e **não reflete o
+> estado atual**. A fonte de verdade é [ROADMAP.md](../ROADMAP.md); as regras de
+> execução e verificação estão em [AGENTS.md](../AGENTS.md). Mantido apenas como
+> registro. Não use os IDs `S0-*`/`S5-*` para decidir o próximo passo.
+
 **Objetivo:** App Android + Wear OS que roda 100% offline, com geração de treinos via IA sob demanda (back no PC / Codespaces / Oracle).
 **Custo alvo:** R$ 0/mês
 **Stack:** Kotlin + Jetpack Compose + Room + Retrofit/Ktor + Compose for Wear OS + Node.js/FastAPI back (Docker)

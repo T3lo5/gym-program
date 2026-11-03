@@ -58,6 +58,18 @@ não substitui o gate.
 Docker local chama esse mesmo script. Ao mudar um passo de build, mude o
 script — não duplique comandos Gradle no YAML.
 
+### Item do roadmap exige spec
+
+`ROADMAP.md` define o que fazer; `docs/specs/<ID>-*.md` define **como** e
+**quando está pronto**. Antes de implementar um item:
+
+1. Leia a spec em `docs/specs/`.
+2. Se não existir, crie a partir de `docs/specs/_TEMPLATE.md` e peça aprovação.
+3. Implemente exatamente o escopo da spec, incluindo os testes listados.
+4. Atualize a spec (status) e mova o item para §4.1 do `ROADMAP.md`.
+
+`docs/SPRINT-PLAN.md` é histórico e está superado; não use os IDs `S*` dele.
+
 O gate é uma trava, não um obstáculo: **não** enfraqueça lint/teste para ficar
 verde (remover teste, `@Ignore`, `-x lint`, `--no-verify`, baixar `minSdk` ou
 comentar código). Corrija a causa.
@@ -65,6 +77,7 @@ comentar código). Corrija a causa.
 ## Definition of Done
 
 - [ ] `./scripts/verify.sh` verde (saída colada na resposta)
+- [ ] Spec do item em `docs/specs/` implementada e com status atualizado
 - [ ] Mudança de lógica acompanhada do teste correspondente
 - [ ] Diff pequeno e focado; sem arquivos gerados, `dist/`, `app/build/` ou segredos
 - [ ] Backend, quando tocado, com Ruff + Pytest verdes
@@ -84,7 +97,11 @@ comentar código). Corrija a causa.
 
 - `app/` — app Android (módulo incluído em `settings.gradle.kts`)
 - `back/` — FastAPI + SQLite (`back/app`, testes em `back/tests`)
-- `shared/`, `wear/` — módulos legados, fora do build atual
+- `ROADMAP.md` — fonte de verdade do produto (o que fazer)
+- `docs/specs/` — specs por item; `_TEMPLATE.md` é o formato obrigatório
+- `docs/SPRINT-PLAN.md` — histórico superado (não usar)
+- `shared/`, `wear/` — **legados**, fora do build (ver `LEGACY.md` em cada um)
+- `app/src/main/java/com/treinos/shared/` — **legado**, não referenciado (ver `LEGACY.md`)
 - `scripts/ci-android.sh` — CI Android (fonte única)
 - `scripts/ci-backend.sh` — CI backend
 - `scripts/verify.sh` — gate local completo

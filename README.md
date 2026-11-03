@@ -6,6 +6,10 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 > 📖 **Manual completo de utilização:** [docs/MANUAL.md](docs/MANUAL.md) — instalação do APK, execução do backend (Docker ou Python), testes, rede local e solução de problemas.
 >
+> 🗺️ **Roadmap e specs:** [ROADMAP.md](ROADMAP.md) (o que fazer) e
+> [docs/specs/](docs/specs/) (como cada item deve ser feito). O plano antigo em
+> [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) é histórico.
+>
 > ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**.
 
 ---
@@ -20,6 +24,8 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 | 🏋️ Treino offline | ✅ Execução com registro de séries e descanso |
 | 🤖 Geração de treino sob demanda | ✅ IA + fallback local + data de revisão |
 | 🔄 Sincronização manual app → backend | ✅ Snapshot de planos, treinos e séries |
+| ♻️ Restauração por `deviceId` | ✅ Botão "Restaurar do backend" nos Ajustes |
+| 💾 Backup JSON manual | 📋 H1-4 — [spec](docs/specs/H1-4-backup-json.md) |
 | 🔗 Descoberta LAN (mDNS) | 📋 No backend; app usa URL configurável |
 | ⏱ Timer de descanso no relógio | 📋 Sprint futura |
 | ☁️ Backend grátis (Codespaces/Oracle) | ✅ Docker Compose |
@@ -30,22 +36,26 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 ```
 TreinosApp/
-├── settings.gradle.kts          # Multi-module: app, wear, shared
+├── settings.gradle.kts          # Build atual: somente :app
 ├── build.gradle.kts             # Versões centralizadas
 ├── gradle.properties
 ├── docker-compose.yml           # Backend + rede
-├── scripts/import-exercises.js  # free-exercise-db → ExerciseCatalog.kt
-├── shared/                      # Módulo comum (Room, models, DAOs, repos)
-├── app/                         # App Android (celular)
-│   ├── ui/workoutlist/          # Lista de treinos
-│   ├── ui/workouteditor/        # Editor de treinos
-│   ├── ui/exercisepicker/       # Seletor de exercícios
-│   ├── ui/workoutexecution/     # Execução do treino (timer, sets)
-│   └── ui/navigation/           # NavHost + rotas
-├── wear/                        # App Wear OS
+├── ROADMAP.md                   # Fonte de verdade do produto
+├── docs/specs/                  # Specs por item (template + H1-4)
+├── scripts/                     # Gate de CI (verify.sh, ci-android.sh, ci-backend.sh)
+├── app/                         # App Android (único módulo no APK)
+│   └── src/main/java/com/treinos/app/
+│       ├── data/local/          # Room: entities, DAO, database
+│       ├── data/remote/         # BackendClient + DTOs
+│       ├── data/prefs/          # AppPreferences
+│       ├── data/WorkoutRepository.kt
+│       └── ui/                  # ViewModel + screens Compose
+├── shared/                      # ⚠️ legado, fora do build (ver LEGACY.md)
+├── wear/                        # ⚠️ legado, fora do build (ver LEGACY.md)
 └── back/                        # Backend FastAPI (Python)
-    ├── main.py                  # /health, /v1/generate-workout, /v1/catalog
-    └── exercise_catalog.json    # 876 exercícios
+    ├── app/main.py              # /health, /v1/generate-workout, /v1/catalog
+    ├── app/exercise_catalog.json
+    └── tests/                   # Pytest
 ```
 
 ---
@@ -167,35 +177,33 @@ e `RELEASE_KEY_PASSWORD` e troque o workflow para usar `assembleRelease`.
 
 ## 🏗️ Arquitetura
 
-### Módulo `shared` (Kotlin Multiplatform-ready)
-- **Room Database:** `Exercise`, `WorkoutPlan`, `WorkoutDay`, `WorkoutSession`, `SetLog`
-- **DAOs:** Flows reativos + suspend functions
-- **Repositories:** `ExerciseRepository`, `WorkoutRepository`, `BackendRepository`
-- **Models:** Serializáveis com kotlinx-serialization
+> O código ativo está em `app/src/main/java/com/treinos/app/`. Os diretórios
+> `shared/`, `wear/` e `app/src/main/java/com/treinos/shared/` são **legados** e
+> não entram no build/APK atual (ver `LEGACY.md` em cada um).
 
 ### App Android (`app`)
-- **Hilt DI:** DatabaseModule, NetworkModule
-- **Navigation:** Compose Navigation + Bottom Bar (4 tabs)
-- **Telas:**
-  - `WorkoutListScreen` — Lista, busca, duplicar, excluir
-  - `WorkoutEditorScreen` — Editor arrastável (dias + exercícios)
-  - `ExercisePickerScreen` — Filtros por músculo/equipamento/nível
-  - `WorkoutExecutionScreen` — Timer sessão, timer descanso, sets, RPE, navegação
-  - `HistoryScreen`, `SettingsScreen` — Placeholders
-
-### Wear OS (`wear`)
-- **Compose for Wear OS** + Material3
-- **Data Layer API** para sync celular↔relógio
-- Tela de execução: exercício atual, timer descanso, próximas séries
+- **Room:** `WorkoutPlanEntity`, `WorkoutDayEntity`, `WorkoutPlanExerciseEntity`,
+  `WorkoutSessionEntity`, `SessionExerciseEntity`, `SetLogEntity` em
+  `data/local/Entities.kt`
+- **DAO:** `WorkoutDao` com Flows reativos + `suspend functions`
+- **Repositório:** `WorkoutRepository` (fonte única de dados)
+- **Rede:** OkHttp + kotlinx.serialization (`BackendClient`, `BackendDtos`)
+- **Preferências:** `AppPreferences` (deviceId, URL do backend, último sync)
+- **Estado/UI:** `AppViewModel` + Compose; navegação por `enum Screen`
+- **Telas:** `HomeScreen`, `GenerateScreen`, `WorkoutScreen`, `HistoryScreen`,
+  `SettingsScreen`
 
 ### Backend (`back`)
 - **FastAPI** + Uvicorn em Docker
-- **Endpoints:**
-  - `GET /health` — Health check + catálogo size
-  - `GET /v1/catalog` — Lista completa (para sync inicial)
-  - `POST /v1/generate-workout` — Gera treino JSON validado
-- **Prompt Engineering:** Catálogo resumido injetado no system prompt
-- **Validação:** IDs de exercício conferidos contra catálogo local
+- **Endpoints principais:**
+  - `GET /health` — health check + tamanho do catálogo
+  - `GET /v1/catalog` — catálogo completo
+  - `POST /v1/generate-workout` — gera treino validado (IA + fallback local)
+  - `GET /v1/sync/download` — restaura snapshot por `deviceId`
+  - `POST /v1/sync` — recebe o snapshot do app
+- **Prompt Engineering:** catálogo resumido injetado no system prompt
+- **Validação:** IDs de exercício conferidos contra o catálogo local
+- **Testes:** `back/tests/` (Ruff + Pytest no gate)
 
 ---
 
