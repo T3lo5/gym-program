@@ -5,6 +5,7 @@ import android.content.Context
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.AppDatabase
 import com.treinos.app.data.media.ExerciseMediaRepository
+import com.treinos.app.data.discovery.BackendDiscoveryManager
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 
@@ -30,10 +31,13 @@ class AppContainer(context: Context) {
         preferences = preferences,
     )
 
+    val discoveryManager: BackendDiscoveryManager = BackendDiscoveryManager(context)
+
     val exerciseMediaRepository: ExerciseMediaRepository = ExerciseMediaRepository(
         context = context,
         backendClient = backendClient,
     )
+
 }
 
 class TreinosApplication : Application() {

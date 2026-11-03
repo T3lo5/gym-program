@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
                         repository = container.repository,
                         preferences = container.preferences,
                         exerciseMediaRepository = container.exerciseMediaRepository,
+                        discoveryManager = container.discoveryManager,
                     )
                 )
                 TreinosApp(viewModel)

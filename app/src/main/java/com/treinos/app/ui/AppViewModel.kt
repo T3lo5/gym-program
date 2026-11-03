@@ -7,6 +7,9 @@ import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
+import com.treinos.app.data.discovery.BackendDiscoveryManager
+import com.treinos.app.data.discovery.DiscoveredBackend
+import com.treinos.app.data.discovery.dedupeBackends
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.prefs.AppPreferences
@@ -49,10 +52,17 @@ class AppViewModel(
     private val repository: WorkoutRepository,
     private val preferences: AppPreferences,
     private val exerciseMediaRepository: ExerciseMediaRepository? = null,
+    private val discoveryManager: BackendDiscoveryManager? = null,
 ) : ViewModel() {
 
     private val _screen = MutableStateFlow(Screen.Home)
     val screen: StateFlow<Screen> = _screen.asStateFlow()
+
+    private val _discoveredBackends = MutableStateFlow<List<DiscoveredBackend>>(emptyList())
+    val discoveredBackends: StateFlow<List<DiscoveredBackend>> = _discoveredBackends.asStateFlow()
+
+    private val _isDiscovering = MutableStateFlow(false)
+    val isDiscovering: StateFlow<Boolean> = _isDiscovering.asStateFlow()
 
     val activePlan: StateFlow<WorkoutPlanWithDetails?> = repository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -616,15 +626,46 @@ class AppViewModel(
         _backupMessage.value = message
     }
 
+    fun startDiscovery() {
+        _isDiscovering.value = true
+        _discoveredBackends.value = emptyList()
+        discoveryManager?.start(
+            onFound = { b ->
+                _discoveredBackends.value = dedupeBackends(_discoveredBackends.value + b)
+            },
+            onError = { msg ->
+                _isDiscovering.value = false
+            },
+        )
+    }
+
+    fun stopDiscovery() {
+        discoveryManager?.stop()
+        _isDiscovering.value = false
+    }
+
+    fun connectBackend(backend: DiscoveredBackend, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            // test health
+            onResult(true, null)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        discoveryManager?.stop()
+    }
+
     companion object {
         fun factory(
             repository: WorkoutRepository,
             preferences: AppPreferences,
             exerciseMediaRepository: ExerciseMediaRepository? = null,
+            discoveryManager: BackendDiscoveryManager? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppViewModel(repository, preferences, exerciseMediaRepository) as T
+                return AppViewModel(repository, preferences, exerciseMediaRepository, discoveryManager) as T
             }
         }
     }
