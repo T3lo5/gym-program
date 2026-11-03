@@ -76,7 +76,7 @@ class AppViewModel(
                     exerciseName = ex.exercise.exerciseName.ifBlank { ex.exercise.exerciseId },
                     plannedSets = ex.exercise.plannedSets,
                     completedSets = ex.exercise.completedSets,
-                    sets = ex.sets.map { SetRecord(it.setNumber, it.reps, it.weightKg, it.rpe) },
+                    sets = ex.sets.map { SetRecord(it.setNumber, it.reps ?: 0, (it.weightKg ?: 0.0).toFloat()) },
                     restSeconds = ex.exercise.restSeconds,
                 )
             } ?: emptyList()
