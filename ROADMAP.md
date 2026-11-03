@@ -71,26 +71,26 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H1-5 | Peso e altura na geração de treino | **S** | A IA não sabe peso/altura, então não calibra cargas, RPE e descanso. | App: campos Peso/Altura em `AppPreferences`, enviados em `GeneratePlanRequest`. Backend: incluir no prompt e no `build_local_plan` com faixas validadas. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | — |
-| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | — |
+| H1-5 | Peso e altura na geração de treino | **S** | A IA não sabe peso/altura, então não calibra cargas, RPE e descanso. | App: campos Peso/Altura em `AppPreferences`, enviados em `GeneratePlanRequest`. Backend: incluir no prompt e no `build_local_plan` com faixas validadas. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | [H1-5](docs/specs/H1-5-profile.md) |
+| H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | [H1-3](docs/specs/H1-3-exercise-media.md) |
 
 ### Horizon 2 — Próximo (1-2 meses): conectividade e relógio
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend. | Backend anuncia `_treinos._tcp.local`; app lista instâncias e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração | — |
-| H2-2 | Wear OS MVP (Data Layer) | **S** | Relógio não está no APK. | Incluir `wear` no build; Data Layer envia sessão (exercício, série, timer); tela com timer e próximo exercício. | 5 dias | `wear` module, Compose for Wear OS, Data Layer API | — |
-| H2-4 | Histórico com calendário e métricas | **C** | Histórico é lista simples. | Calendário, cards de treinos, total de séries, duração, volume por músculo. | 4 dias | `HistoryScreen`, Room queries | — |
+| H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend. | Backend anuncia `_treinos._tcp.local`; app lista instâncias e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração | [H2-1](docs/specs/H2-1-lan-discovery.md) |
+| H2-2 | Wear OS MVP (Data Layer) | **S** | Relógio não está no APK. | Incluir `wear` no build; Data Layer envia sessão (exercício, série, timer); tela com timer e próximo exercício. | 5 dias | `wear` module, Compose for Wear OS, Data Layer API | [H2-2](docs/specs/H2-2-wear-os.md) |
+| H2-4 | Histórico com calendário e métricas | **C** | Histórico é lista simples. | Calendário, cards de treinos, total de séries, duração, volume por músculo. | 4 dias | `HistoryScreen`, Room queries | [H2-4](docs/specs/H2-4-history-calendar.md) |
 
 ### Horizon 3 — Depois (2-4 meses): evolução e qualidade
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. | Compose UI testing, Robolectric/instrumented para Room, testes de contrato app↔backend; manter Wear coberto quando entrar no build. | 5 dias | Módulos estáveis | — |
-| H3-2 | Polimento visual e animações | **C** | Telas funcionais, sem identidade refinada. | Animações Compose, transições, tema consistente, loading/empty states. | 4 dias | `Theme.kt`, telas existentes | — |
-| H3-3 | Acessibilidade (A11y) | **C** | Sem `contentDescription`, escala de fonte e TalkBack nas telas principais. | `contentDescription`, fonte escalável, navegação TalkBack nas 4 tabs. | 3 dias | Telas existentes | — |
-| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | — |
-| H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não evolui carga/séries. | Mesociclos, sugestão de carga por RPE/séries, alerta de revisão. | 5 dias | Histórico completo, H2-4 | — |
+| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. | Compose UI testing, Robolectric/instrumented para Room, testes de contrato app↔backend; manter Wear coberto quando entrar no build. | 5 dias | Módulos estáveis | [H3-1](docs/specs/H3-1-ui-instrumented-tests.md) |
+| H3-2 | Polimento visual e animações | **C** | Telas funcionais, sem identidade refinada. | Animações Compose, transições, tema consistente, loading/empty states. | 4 dias | `Theme.kt`, telas existentes | [H3-2](docs/specs/H3-2-visual-polish.md) |
+| H3-3 | Acessibilidade (A11y) | **C** | Sem `contentDescription`, escala de fonte e TalkBack nas telas principais. | `contentDescription`, fonte escalável, navegação TalkBack nas 4 tabs. | 3 dias | Telas existentes | [H3-3](docs/specs/H3-3-accessibility.md) |
+| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | [H3-4](docs/specs/H3-4-cloud-backend.md) |
+| H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não evolui carga/séries. | Mesociclos, sugestão de carga por RPE/séries, alerta de revisão. | 5 dias | Histórico completo, H2-4 | [H3-5](docs/specs/H3-5-progression.md) |
 
 ---
 
@@ -99,7 +99,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
 | Backup JSON (H1-4) | Peso/altura na geração (H1-5) | Histórico com calendário (H2-4) | Backend na nuvem (H3-4) |
-| | Mídia dos exercícios (H1-3) | Polimento + animações (H3-2) | Periodização automática (H3-5) |
+| | Mídia dos exercícios (H1-3) | Polimento + animações (H3-2) | Progressão automática de carga (H3-5) |
 | | Testes de UI/instrumentados (H3-1) | Acessibilidade (H3-3) | Export CSV/Sheets |
 | | Descoberta LAN (H2-1) | | Widget/complicação do relógio |
 | | Wear OS MVP (H2-2) | | |
@@ -109,16 +109,17 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 ## 6. Esforço e caminho crítico
 
 ```
-Agora:      H1-4 backup JSON        → proteção dos dados do usuário
-Semana 2:   H1-5 peso/altura        → IA calibra o plano ao perfil
-Semana 3:   H1-3 mídia              → reconhecimento do exercício
-Mês 2:      H2-1 LAN + H2-2 Wear    → conectividade + relógio
-Mês 2-3:    H2-4 histórico          → evolução visível
-Mês 3+:     H3-1 UI/instrumentados  → cobertura além do gate atual
+Concluído:  H1-4 backup JSON         → proteção dos dados do usuário
+Agora:      H1-5 peso/altura         → IA calibra o plano ao perfil
+Semana 2:   H1-3 mídia               → reconhecimento do exercício
+Mês 2:      H2-1 LAN + H2-2 Wear     → conectividade + relógio
+Mês 2-3:    H2-4 histórico           → evolução visível
+Mês 3+:     H3-1 UI/instrumentados   → cobertura além do gate atual
 ```
 
-**Caminho crítico:** H1-4 → H1-5 → H1-3 → H2-1 → H2-2.  
-O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda não vê (UI, Room, contrato).
+**Caminho crítico:** H1-5 → H1-3 → H2-1 → H2-2.
+O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda
+não vê (UI, Room, contrato).
 
 ---
 
@@ -148,15 +149,30 @@ O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda n
 
 ## 9. Próximo passo imediato
 
-Implementar **H1-5 (peso/altura na geração de treino)**. Para iniciar, crie a spec
-a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md).
+Implementar **H1-5 (peso/altura na geração de treino)** seguindo
+[docs/specs/H1-5-profile.md](docs/specs/H1-5-profile.md). A spec já define
+contrato, regras de IMC, prompt e testes.
+
+Depois: H1-3 (mídia) → H2-1 (LAN) → H2-2 (Wear). Para iniciar qualquer item,
+leia a spec correspondente em [docs/specs/](docs/specs/); se não existir, crie a
+partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md).
 
 ---
 
 ## 10. Especificações
 
 - [_TEMPLATE.md](docs/specs/_TEMPLATE.md) — formato obrigatório
-- [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — pronta para implementar
+- [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — concluída
+- [H1-5 — Peso e altura](docs/specs/H1-5-profile.md) — pronta para implementar
+- [H1-3 — Imagens dos exercícios](docs/specs/H1-3-exercise-media.md) — pronta para implementar
+- [H2-1 — Descoberta LAN](docs/specs/H2-1-lan-discovery.md) — pronta para implementar
+- [H2-2 — Wear OS MVP](docs/specs/H2-2-wear-os.md) — pronta para implementar
+- [H2-4 — Histórico com calendário](docs/specs/H2-4-history-calendar.md) — pronta para implementar
+- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — pronta para implementar
+- [H3-2 — Polimento visual](docs/specs/H3-2-visual-polish.md) — pronta para implementar
+- [H3-3 — Acessibilidade](docs/specs/H3-3-accessibility.md) — pronta para implementar
+- [H3-4 — Backend na nuvem com token](docs/specs/H3-4-cloud-backend.md) — pronta para implementar
+- [H3-5 — Progressão de carga](docs/specs/H3-5-progression.md) — pronta para implementar
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
