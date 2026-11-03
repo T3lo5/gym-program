@@ -48,7 +48,7 @@ fun calculateProgress(
     val completed = completedSets.coerceIn(0, planned)
     val currentSet = (sets.size + 1).coerceAtLeast(1).coerceAtMost(planned)
     val isCompleted = completed >= planned
-    val nextSetNumber = sets.maxByOrNull { it.setNumber }?.let { it + 1 } ?: 1
+    val nextSetNumber = (sets.maxOfOrNull { it.setNumber } ?: 0) + 1
     return ExerciseProgress(
         currentSet = currentSet,
         plannedSets = planned,
