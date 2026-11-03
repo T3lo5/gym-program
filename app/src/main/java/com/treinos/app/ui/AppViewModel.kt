@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
+import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.prefs.AppPreferences
@@ -240,6 +241,27 @@ class AppViewModel(
         }
         _activeSessionId.value = session.session.id
         _screen.value = Screen.Workout
+    }
+
+    fun logSet(
+        exercise: SessionExerciseEntity,
+        reps: Int?,
+        weightKg: Double?,
+        rpe: Double?,
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.logSet(
+                    exerciseLogId = exercise.id,
+                    reps = reps,
+                    weightKg = weightKg,
+                    rpe = rpe,
+                )
+                startRest(exercise.restSeconds)
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível salvar a série."
+            }
+        }
     }
 
     fun logSet(
