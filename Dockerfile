@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ANDROID_HOME=/opt/android-sdk
-ENV JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Instala Android SDK Command Line Tools
 RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
     cd $ANDROID_HOME/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip && \
+    wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip && \
     unzip -q cmdline-tools.zip && \
     mv cmdline-tools latest && \
     rm cmdline-tools.zip
@@ -52,7 +52,9 @@ COPY app ./app
 COPY shared ./shared
 COPY wear ./wear
 COPY back ./back
+COPY scripts ./scripts
 
-RUN chmod +x gradlew
+RUN chmod +x gradlew scripts/*.sh
 
-CMD ["./gradlew", ":app:assembleDebug"]
+# Rodar a imagem executa o MESMO gate do CI (build + testes + lint + assinatura).
+CMD ["./scripts/ci-android.sh"]

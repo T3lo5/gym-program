@@ -1,0 +1,15 @@
+# Contexto de build enxuto para o CI local
+.git
+.gitignore
+.gradle
+.gradle-docker
+**/build
+**/.kotlin
+dist
+back/data
+back/.env
+back/**/__pycache__
+**/*.pyc
+*.log
+.idea
+.DS_Store

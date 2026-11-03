@@ -102,10 +102,37 @@ adb connect <watch-ip>:5555
 
 Toda vez que houver um push na `main`, o GitHub Actions:
 
-1. Compila o APK (`assembleDebug`).
-2. Verifica a assinatura do APK.
-3. Publica o arquivo na release **`latest`** do repositório.
-4. Também guarda o APK como artifact do workflow (14 dias).
+1. Compila o APK com `clean` (`assembleDebug`).
+2. Roda os testes unitários (`testDebugUnitTest`).
+3. Roda o Android Lint (`lintDebug`).
+4. Verifica a assinatura do APK.
+5. Publica o arquivo na release **`latest`** do repositório.
+6. Também guarda o APK como artifact do workflow (14 dias).
+
+O job `Backend checks` roda Ruff, import do FastAPI e Pytest em paralelo; a
+release só é publicada se os dois jobs passarem.
+
+> 🤖 **Agentes de código:** leia [AGENTS.md](AGENTS.md). A regra é única:
+> `./scripts/verify.sh` verde antes de qualquer commit/PR.
+
+### Verificar localmente (mesmo gate do CI)
+
+```bash
+./scripts/verify.sh
+```
+
+O comando constrói a imagem Docker (`Dockerfile`), roda dentro dela o mesmo
+script que o CI usa (`scripts/ci-android.sh`) e depois valida o backend
+(`scripts/ci-backend.sh`). Ele usa `clean`, então build/cache antigo do host
+não esconde erro de compilação. Saídas: `dist/treinos.apk`,
+`dist/treinos.apk.sha256`, relatórios de teste e lint em `app/build/reports/`.
+
+Atalhos:
+
+```bash
+SKIP_BACKEND=1 ./scripts/verify.sh   # só Android
+./scripts/ci-backend.sh              # só backend
+```
 
 **Download direto (sempre a última versão):**
 

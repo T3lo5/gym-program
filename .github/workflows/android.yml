@@ -48,8 +48,10 @@ jobs:
           path: ~/.android/debug.keystore
           key: android-debug-keystore-v1
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Make scripts executable
+        run: |
+          chmod +x ./gradlew
+          chmod +x ./scripts/*.sh
 
       - name: Compute version
         id: version
@@ -65,25 +67,14 @@ jobs:
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Build debug APK
-        run: >-
-          ./gradlew :app:assembleDebug
-          --no-daemon
-          --stacktrace
-          -PversionCode=${{ steps.version.outputs.code }}
-          -PversionName=${{ steps.version.outputs.name }}
-
-      - name: Verify APK signature
-        run: |
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          BUILD_TOOLS="$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1)"
-          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/treinos.apk
-          (cd dist && sha256sum treinos.apk > treinos.apk.sha256)
+      # Mesmo script que os agentes rodam dentro do Docker local
+      # (./scripts/verify.sh). Build + testes unitários + Android Lint +
+      # verificação de assinatura + artifact com checksum.
+      - name: Verify APK (build, tests, lint, signature)
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: ./scripts/ci-android.sh
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
@@ -102,9 +93,25 @@ jobs:
             echo "- APK: \`dist/treinos.apk\` ($(du -h dist/treinos.apk | cut -f1))"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Make scripts executable
+        run: chmod +x ./scripts/*.sh
+
+      # Mesmo comando local: ./scripts/verify.sh (etapa backend).
+      - name: Verify backend (lint, import, tests)
+        run: ./scripts/ci-backend.sh
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, backend]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
