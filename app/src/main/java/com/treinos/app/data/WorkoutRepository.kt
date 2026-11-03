@@ -15,6 +15,10 @@ import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
+import com.treinos.app.data.backup.BackupApp
+import com.treinos.app.data.backup.BackupFile
+import com.treinos.app.data.backup.BackupMapper
+import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.data.remote.SyncDayDto
 import com.treinos.app.data.remote.SyncPlanDto
 import com.treinos.app.data.remote.SyncPlanExerciseDto
@@ -35,6 +39,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 /**
@@ -355,6 +361,100 @@ class WorkoutRepository(
 
         preferences.lastSyncAt = Instant.now().toString()
         return data
+    }
+
+    // ---------------- Backup JSON manual ----------------
+
+    suspend fun exportBackup(appVersionName: String, appVersionCode: Long): String = withContext(Dispatchers.IO) {
+        val plans = dao.getAllPlanEntities()
+        val days = dao.getAllDayEntities()
+        val planExercises = dao.getAllPlanExercises()
+        val sessions = dao.getAllSessionEntities()
+        val sessionExercises = dao.getAllSessionExercises()
+        val setLogs = dao.getAllSetLogs()
+
+        val daysByPlan = days.groupBy { it.planId }
+        val exercisesByDay = planExercises.groupBy { it.dayId }
+        val sessionExercisesBySession = sessionExercises.groupBy { it.sessionId }
+        val setLogsByExercise = setLogs.groupBy { it.exerciseLogId }
+
+        val backupDays = days.map { day ->
+            BackupMapper.toDto(
+                day = day,
+                exercises = (exercisesByDay[day.id]?.map { ex ->
+                    BackupMapper.toDto(exercise = ex, dayId = day.id)
+                } ?: emptyList()),
+            )
+        }
+
+        val backupPlans = plans.map { plan ->
+            BackupMapper.toDto(
+                plan = plan,
+                days = backupDays.filter { it.planId == plan.id },
+            )
+        }
+
+        val backupSessionExercises = sessionExercises.flatMap { ex ->
+            val sets = (setLogsByExercise[ex.id]?.map { setLog ->
+                BackupMapper.toDto(setLog = setLog, exerciseLogId = ex.id)
+            } ?: emptyList())
+            listOf(BackupMapper.toDto(exercise = ex, sessionId = ex.sessionId, sets = sets))
+        }
+
+        val backupSessions = sessions.map { session ->
+            BackupMapper.toDto(
+                session = session,
+                exercises = backupSessionExercises.filter { it.sessionId == session.id },
+            )
+        }
+
+        val file = BackupFile(
+            schemaVersion = 1,
+            exportedAt = Instant.now().toString(),
+            app = BackupApp(
+                packageName = "com.treinos.app",
+                versionName = appVersionName,
+                versionCode = appVersionCode,
+            ),
+            deviceId = preferences.deviceId,
+            plans = backupPlans,
+            sessions = backupSessions,
+        )
+
+        Json.encodeToString(BackupFile.serializer(), file)
+    }
+
+    suspend fun importBackup(payload: BackupFile) = withContext(Dispatchers.IO) {
+        val validation = BackupValidator.validate(payload)
+        require(validation.valid) { validation.message ?: "Backup inválido" }
+
+        val plans = payload.plans.map { BackupMapper.toEntity(it) }
+        val days = payload.plans.flatMap { plan ->
+            plan.days.map { BackupMapper.toEntity(it, planId = plan.id) }
+        }
+        val planExercises = payload.plans.flatMap { plan ->
+            plan.days.flatMap { day ->
+                day.exercises.map { BackupMapper.toEntity(it, dayId = day.id) }
+            }
+        }
+        val sessions = payload.sessions.map { BackupMapper.toEntity(it, planId = it.planId) }
+        val sessionExercises = payload.sessions.flatMap { session ->
+            session.exercises.map { BackupMapper.toEntity(it, sessionId = session.id) }
+        }
+        val setLogs = payload.sessions.flatMap { session ->
+            session.exercises.flatMap { exercise ->
+                exercise.sets.map { BackupMapper.toEntity(it, exerciseLogId = exercise.id) }
+            }
+        }
+
+        dao.replaceAllData(
+            plans = plans,
+            days = days,
+            planExercises = planExercises,
+            sessions = sessions,
+            sessionExercises = sessionExercises,
+            setLogs = setLogs,
+        )
     }
 
     suspend fun testConnection() = withContext(Dispatchers.IO) {

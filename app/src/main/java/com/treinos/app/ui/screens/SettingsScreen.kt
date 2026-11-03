@@ -10,15 +10,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,9 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
+import com.treinos.app.data.backup.BackupPreview
+import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatIsoDateTime
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     backendUrl: String,
@@ -43,11 +53,19 @@ fun SettingsScreen(
     downloadMessage: String?,
     lastSyncAt: String?,
     deviceId: String,
+    backupImportState: BackupImportState,
+    backupMessage: String?,
     onBack: () -> Unit,
     onSaveUrl: (String) -> Unit,
     onTest: () -> Unit,
     onSync: () -> Unit,
     onDownload: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportFileSelected: () -> Unit,
+    onPrepareImport: (String) -> Unit,
+    onConfirmImport: () -> Unit,
+    onCancelImport: () -> Unit,
+    onClearBackupMessage: () -> Unit,
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
 
@@ -231,6 +249,121 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Backup e restauração (JSON)",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    Text(
+                        text = "Exporte todos os seus planos, treinos e séries para um arquivo JSON " +
+                            "no aparelho. Restaure depois, mesmo após desinstalar o app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(
+                            onClick = onExportBackup,
+                            enabled = backupImportState !is BackupImportState.Importing,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (backupImportState is BackupImportState.Importing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            } else {
+                                Text("Exportar backup")
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onImportFileSelected,
+                            enabled = backupImportState !is BackupImportState.Importing,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (backupImportState is BackupImportState.Importing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            } else {
+                                Text("Importar backup")
+                            }
+                        }
+                    }
+
+                    when (val state = backupImportState) {
+                        is BackupImportState.Ready -> {
+                            Text(
+                                text = "Pré-visualização: ${state.preview.plans} plano(s), " +
+                                    "${state.preview.days} dia(s), " +
+                                    "${state.preview.planExercises} exercício(s) de plano, " +
+                                    "${state.preview.sessions} sessão(ões), " +
+                                    "${state.preview.sessionExercises} exercício(s) de sessão, " +
+                                    "${state.preview.setLogs} série(s).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Button(
+                                    onClick = onConfirmImport,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Substituir tudo")
+                                }
+                                OutlinedButton(
+                                    onClick = onCancelImport,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Cancelar")
+                                }
+                            }
+                        }
+                        is BackupImportState.Error -> {
+                            Text(
+                                text = state.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            OutlinedButton(
+                                onClick = onClearBackupMessage,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Dispensar")
+                            }
+                        }
+                        else -> { }
+                    }
+
+                    backupMessage?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }

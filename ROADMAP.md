@@ -34,7 +34,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Testes + CI | 🟡 | 7 testes JVM + gate (`./scripts/verify.sh`); falta UI/instrumentado |
 | Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
 | Wear OS | 🚧 | Módulo existe, fora do build/APK atual |
-| Backup/restore do usuário | ❌ | Sem exportação/importação de arquivo |
+| Backup/restore do usuário | ✅ | Exportação/importação JSON manual (H1-4) |
 | Imagem/vídeo de exercício | ❌ | Catálogo sem mídia |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
 
@@ -63,6 +63,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 |----|------|-----------|
 | H1-1 | Recuperação por `deviceId` | `SettingsScreen` exibe o ID; `AppViewModel.restoreByDeviceId` restaura do backend |
 | H1-2 | Execução por séries (não circuito) | `WorkoutScreen` registra série, `AppViewModel.logSet`, `ExerciseProgress` + testes |
+| H1-4 | Exportar/importar backup JSON (manual) | `BackupDtos`, `BackupMapper`, `BackupValidator`; `WorkoutDao.replaceAllData`; `WorkoutRepository.exportBackup/importBackup`; `AppViewModel` estados/ações; `SettingsScreen` UI + file pickers; testes JVM em `app/src/test/.../data/backup/` |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend" |
 | H3-1 | Testes + CI (parcial) | 7 testes JVM, Android Lint, Ruff/Pytest e `./scripts/verify.sh` no CI |
 
@@ -70,7 +71,6 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H1-4 | Exportar/importar backup JSON (manual) | **M** | Não há como o usuário salvar os próprios dados fora do app. | Botão "Exportar backup" nos Ajustes → salva JSON versionado; "Importar backup" → valida, confirma e restaura no Room em transação. | 3 dias | `WorkoutRepository`, `WorkoutDao`, `SettingsScreen` | [H1-4](docs/specs/H1-4-backup-json.md) |
 | H1-5 | Peso e altura na geração de treino | **S** | A IA não sabe peso/altura, então não calibra cargas, RPE e descanso. | App: campos Peso/Altura em `AppPreferences`, enviados em `GeneratePlanRequest`. Backend: incluir no prompt e no `build_local_plan` com faixas validadas. | 3 dias | `GenerateScreen`, `GeneratePlanRequest`, `AppPreferences`, `back/app/main.py`, `back/app/plan_builder.py` | — |
 | H1-3 | Imagens e/ou vídeos dos exercícios | **S** | Usuário não reconhece o exercício pelo nome. | Campo `imageUrl`/`videoUrl`, exibição no detalhe e na execução, cache offline e fallback. | 4 dias | `WorkoutPlanExerciseEntity`, `ExerciseDetailScreen` (nova), catálogo | — |
 
@@ -148,11 +148,7 @@ O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda n
 
 ## 9. Próximo passo imediato
 
-Implementar **H1-4 (backup JSON)** seguindo [docs/specs/H1-4-backup-json.md](docs/specs/H1-4-backup-json.md).
-É o item Must de maior risco (perda de dados) e já tem contrato, casos de borda e
-testes definidos.
-
-Depois: H1-5 (peso/altura) → H1-3 (mídia). Para iniciar qualquer um, crie a spec
+Implementar **H1-5 (peso/altura na geração de treino)**. Para iniciar, crie a spec
 a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md).
 
 ---

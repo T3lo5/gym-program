@@ -7,7 +7,7 @@
 | Item do roadmap | `H1-4` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
 
 ## Objetivo
 

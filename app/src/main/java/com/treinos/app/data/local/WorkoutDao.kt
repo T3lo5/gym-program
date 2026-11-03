@@ -49,10 +49,19 @@ interface WorkoutDao {
     suspend fun insertPlan(plan: WorkoutPlanEntity): Long
 
     @Insert
+    suspend fun insertPlans(plans: List<WorkoutPlanEntity>): List<Long>
+
+    @Insert
     suspend fun insertDay(day: WorkoutDayEntity): Long
 
     @Insert
+    suspend fun insertDays(days: List<WorkoutDayEntity>): List<Long>
+
+    @Insert
     suspend fun insertPlanExercises(exercises: List<WorkoutPlanExerciseEntity>)
+
+    @Insert
+    suspend fun insertPlanExercisesBatch(exercises: List<WorkoutPlanExerciseEntity>)
 
     /**
      * Desativa o plano anterior e grava plano, dias e exercícios em uma única
@@ -104,6 +113,9 @@ interface WorkoutDao {
     @Insert
     suspend fun insertSession(session: WorkoutSessionEntity): Long
 
+    @Insert
+    suspend fun insertSessions(sessions: List<WorkoutSessionEntity>): List<Long>
+
     @Update
     suspend fun updateSession(session: WorkoutSessionEntity)
 
@@ -124,6 +136,9 @@ interface WorkoutDao {
 
     @Insert
     suspend fun insertSetLog(setLog: SetLogEntity): Long
+
+    @Insert
+    suspend fun insertSetLogs(setLogs: List<SetLogEntity>): List<Long>
 
     @Query("SELECT COALESCE(SUM(completedSets), 0) FROM session_exercises WHERE sessionId = :sessionId")
     suspend fun completedSetsForSession(sessionId: Long): Int
@@ -154,5 +169,29 @@ interface WorkoutDao {
         deletePlanExercises()
         deleteDays()
         deletePlans()
+    }
+
+    /**
+     * Limpa todos os dados e reinsere o payload do backup em uma única transação,
+     * preservando os IDs originais (Room grava id = 0 como auto-incremento e
+     * id > 0 como valor explícito). Ordem de pai para filho:
+     * plans → days → plan_exercises → sessions → session_exercises → set_logs.
+     */
+    @Transaction
+    suspend fun replaceAllData(
+        plans: List<WorkoutPlanEntity>,
+        days: List<WorkoutDayEntity>,
+        planExercises: List<WorkoutPlanExerciseEntity>,
+        sessions: List<WorkoutSessionEntity>,
+        sessionExercises: List<SessionExerciseEntity>,
+        setLogs: List<SetLogEntity>,
+    ) {
+        deleteAllData()
+        if (plans.isNotEmpty()) insertPlans(plans)
+        if (days.isNotEmpty()) insertDays(days)
+        if (planExercises.isNotEmpty()) insertPlanExercisesBatch(planExercises)
+        if (sessions.isNotEmpty()) insertSessions(sessions)
+        if (sessionExercises.isNotEmpty()) insertSessionExercises(sessionExercises)
+        if (setLogs.isNotEmpty()) insertSetLogs(setLogs)
     }
 }

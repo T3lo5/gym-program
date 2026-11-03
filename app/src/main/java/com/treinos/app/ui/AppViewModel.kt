@@ -9,6 +9,9 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.GeneratePlanRequest
+import com.treinos.app.data.backup.BackupFile
+import com.treinos.app.data.backup.BackupPreview
+import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.ui.ExerciseSessionData
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
@@ -27,6 +30,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 enum class Screen {
     Home,
@@ -132,6 +137,14 @@ class AppViewModel(
 
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
+
+    private val _backupImportState = MutableStateFlow<BackupImportState>(BackupImportState.Idle)
+    val backupImportState: StateFlow<BackupImportState> = _backupImportState.asStateFlow()
+
+    private val _backupMessage = MutableStateFlow<String?>(null)
+    val backupMessage: StateFlow<String?> = _backupMessage.asStateFlow()
+
+    private var pendingBackupPayload: BackupFile? = null
 
     private val _restRemaining = MutableStateFlow<Int?>(null)
     val restRemaining: StateFlow<Int?> = _restRemaining.asStateFlow()
@@ -452,6 +465,65 @@ class AppViewModel(
         }
     }
 
+    // ---------------- Backup JSON ----------------
+
+    suspend fun exportBackupJson(appVersionName: String, appVersionCode: Long): String =
+        repository.exportBackup(appVersionName, appVersionCode)
+
+    fun prepareImport(json: String) {
+        if (_backupImportState.value is BackupImportState.Importing) return
+        _backupMessage.value = null
+        viewModelScope.launch {
+            _backupImportState.value = BackupImportState.Reading
+            try {
+                val file = Json.decodeFromString(BackupFile.serializer(), json)
+                val result = BackupValidator.validate(file)
+                if (!result.valid) {
+                    _backupImportState.value = BackupImportState.Error(result.message ?: "Backup inválido")
+                    pendingBackupPayload = null
+                    return@launch
+                }
+                val preview = result.preview
+                    ?: BackupPreview(0, 0, 0, 0, 0, 0)
+                pendingBackupPayload = file
+                _backupImportState.value = BackupImportState.Ready(preview = preview, payload = file)
+            } catch (e: Exception) {
+                _backupImportState.value = BackupImportState.Error("Arquivo de backup inválido")
+                pendingBackupPayload = null
+            }
+        }
+    }
+
+    fun confirmImport() {
+        val payload = pendingBackupPayload ?: return
+        if (_backupImportState.value is BackupImportState.Importing) return
+        viewModelScope.launch {
+            _backupImportState.value = BackupImportState.Importing
+            try {
+                repository.importBackup(payload)
+                _backupMessage.value = "Backup importado com sucesso."
+                _backupImportState.value = BackupImportState.Idle
+                pendingBackupPayload = null
+            } catch (error: Exception) {
+                _backupImportState.value = BackupImportState.Error(error.message ?: "Não foi possível importar o backup.")
+            }
+        }
+    }
+
+    fun cancelImport() {
+        _backupImportState.value = BackupImportState.Idle
+        pendingBackupPayload = null
+        _backupMessage.value = null
+    }
+
+    fun clearBackupMessage() {
+        _backupMessage.value = null
+    }
+
+    fun setBackupMessage(message: String?) {
+        _backupMessage.value = message
+    }
+
     companion object {
         fun factory(
             repository: WorkoutRepository,
@@ -463,4 +535,12 @@ class AppViewModel(
             }
         }
     }
+}
+
+sealed interface BackupImportState {
+    object Idle : BackupImportState
+    object Reading : BackupImportState
+    data class Ready(val preview: BackupPreview, val payload: BackupFile) : BackupImportState
+    object Importing : BackupImportState
+    data class Error(val message: String) : BackupImportState
 }
