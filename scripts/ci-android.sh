@@ -69,6 +69,10 @@ rm -rf "$DIST"
 mkdir -p "$DIST"
 cp "$APP_APK" "$DIST/treinos.apk"
 cp "$WEAR_APK" "$DIST/wear.apk"
+# Checksums individuais (compatível com o workflow de release)
+(cd "$DIST" && sha256sum treinos.apk > treinos.apk.sha256)
+(cd "$DIST" && sha256sum wear.apk > wear.apk.sha256)
+# Checksum combinado de todos os artefatos
 (cd "$DIST" && sha256sum treinos.apk wear.apk > dist.sha256)
 
 echo "==> [5/5] Resumo"
