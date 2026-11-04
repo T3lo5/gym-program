@@ -6,6 +6,9 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/** `source` de uma sessão registrada avulsa, sem plano nem dia (H2-5). */
+const val MANUAL_SESSION_SOURCE = "manual"
+
 @Entity(tableName = "workout_plans")
 data class WorkoutPlanEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

@@ -42,6 +42,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onStartDay: (Long) -> Unit,
     onResume: () -> Unit,
+    onLogActivity: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -111,6 +112,25 @@ fun HomeScreen(
                         Text("Gerar novo treino")
                     }
                 }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = onLogActivity,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                ) {
+                    Text("Registrar atividade")
+                }
+            }
+
+            item {
+                Text(
+                    text = "Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             item {

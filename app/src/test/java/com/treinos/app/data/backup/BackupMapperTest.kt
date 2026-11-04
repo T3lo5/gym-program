@@ -206,6 +206,38 @@ class BackupMapperTest {
     }
 
     @Test
+    fun sessao_manual_round_trip() {
+        val session = WorkoutSessionEntity(
+            id = 50,
+            planId = 0,
+            dayId = 0,
+            planName = "",
+            dayName = "Natação",
+            status = "completed",
+            startedAt = 1_760_000_000_000L,
+            endedAt = 1_760_002_700_000L,
+            totalDurationSeconds = 2_700L,
+            notes = "8 x 100 m",
+            modality = "swim",
+            source = "manual",
+            title = "Natação",
+            totalDistanceMeters = 1_500.0,
+            poolLengthMeters = 25,
+            stroke = "crawl",
+            sessionRpe = 7.0,
+        )
+
+        val dto = BackupMapper.toDto(session, exercises = emptyList())
+        val volta = BackupMapper.toEntity(dto, planId = dto.planId)
+
+        assertEquals(session, volta)
+        assertEquals(0L, volta.planId)
+        assertEquals(0L, volta.dayId)
+        assertEquals("manual", volta.source)
+        assertEquals(emptyList<Any>(), dto.exercises)
+    }
+
+    @Test
     fun sessao_com_piscina_e_stroke() {
         val dto = BackupSession(
             id = 50,

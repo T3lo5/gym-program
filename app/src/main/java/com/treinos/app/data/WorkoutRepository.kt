@@ -1,5 +1,6 @@
 package com.treinos.app.data
 
+import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
@@ -218,6 +219,41 @@ class WorkoutRepository(
             )
         )
     }
+
+    // ---------------- Sessão avulsa (registro manual) ----------------
+
+    /**
+     * Grava um registro que não veio de plano: nasce `completed`, com
+     * `planId = dayId = 0` e nenhum exercício (a sessão manual tem zero filhos).
+     */
+    suspend fun logActivity(session: WorkoutSessionEntity): Long = withContext(Dispatchers.IO) {
+        dao.insertSession(session)
+    }
+
+    /** Atualiza o mesmo `id`: editar não cria uma linha nova. */
+    suspend fun updateActivity(session: WorkoutSessionEntity) = withContext(Dispatchers.IO) {
+        val existing = dao.getSession(session.id)
+            ?: error("Registro não encontrado no aparelho.")
+        require(existing.source == MANUAL_SESSION_SOURCE) {
+            "Só é possível editar um registro manual."
+        }
+        dao.updateSession(session)
+    }
+
+    suspend fun deleteActivity(sessionId: Long) = withContext(Dispatchers.IO) {
+        val existing = dao.getSession(sessionId) ?: return@withContext
+        require(existing.source == MANUAL_SESSION_SOURCE) {
+            "Só é possível excluir um registro manual."
+        }
+        dao.deleteSession(sessionId)
+    }
+
+    suspend fun lastManualSession(modality: String): WorkoutSessionEntity? =
+        withContext(Dispatchers.IO) {
+            dao.getAllSessionEntities().firstOrNull {
+                it.source == MANUAL_SESSION_SOURCE && it.modality == modality
+            }
+        }
 
     // ---------------- Sincronização manual ----------------
 

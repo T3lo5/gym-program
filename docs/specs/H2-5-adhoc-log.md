@@ -7,7 +7,7 @@
 | Item do roadmap | `H2-5` |
 | MoSCoW | `S` |
 | Spec aprovada em | `2026-11-04` |
-| Implementação | `pendente` |
+| Implementação | `concluída em 2026-11-04` (gate `./scripts/verify.sh` verde) |
 | Depende de | `H1-6` (campos `modality`, `source`, `title`, `totalDistanceMeters`, `poolLengthMeters`, `stroke`, `sessionRpe` e backup/sync v2) e `H1-7` (round-trip de backup/restauração confiável) |
 
 ## Objetivo

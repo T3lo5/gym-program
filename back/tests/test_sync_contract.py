@@ -320,6 +320,67 @@ def test_download_dias_com_local_id_diferente_do_id():
     assert exercise["metricType"] == "reps_weight"
 
 
+def test_sessao_manual_round_trip():
+    """Registro avulso (H2-5) viaja sem plano nem dia: planLocalId = dayLocalId = 0."""
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = {
+        "deviceId": "d5",
+        "syncedAt": "2026-11-04T12:00:00Z",
+        "plans": [],
+        "sessions": [
+            {
+                "localId": 70,
+                "planLocalId": 0,
+                "dayLocalId": 0,
+                "planName": "",
+                "dayName": "Natação",
+                "status": "completed",
+                "startedAt": 1760000000000,
+                "endedAt": 1760002700000,
+                "totalDurationSeconds": 2700,
+                "notes": "8 x 100 m",
+                "modality": "swim",
+                "source": "manual",
+                "title": "Natação",
+                "totalDistanceMeters": 1500.0,
+                "poolLengthMeters": 25,
+                "stroke": "crawl",
+                "sessionRpe": 7.0,
+                "exercises": [],
+            }
+        ],
+    }
+
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+    assert r.json()["plans"] == 0
+    assert r.json()["sessions"] == 1
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d5"})
+    assert d.status_code == 200
+    data = d.json()
+    assert data["plans"] == []
+    assert len(data["sessions"]) == 1
+
+    session = data["sessions"][0]
+    assert session["localId"] == 70
+    assert session["planLocalId"] == 0
+    assert session["dayLocalId"] == 0
+    assert session["modality"] == "swim"
+    assert session["source"] == "manual"
+    assert session["title"] == "Natação"
+    assert session["dayName"] == "Natação"
+    assert session["totalDistanceMeters"] == 1500.0
+    assert session["poolLengthMeters"] == 25
+    assert session["stroke"] == "crawl"
+    assert session["sessionRpe"] == 7.0
+    assert session["totalDurationSeconds"] == 2700
+    assert session["notes"] == "8 x 100 m"
+    assert data["sessionExercises"] == []
+    assert data["setLogs"] == []
+
+
 def test_migracao_aditiva_preserva_dados():
     setup_test_db()
     import sqlite3

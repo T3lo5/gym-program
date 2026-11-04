@@ -51,6 +51,7 @@ enum class Screen {
     Workout,
     History,
     Settings,
+    LogActivity,
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -191,6 +192,21 @@ class AppViewModel(
 
     private val _wearState = MutableStateFlow<WearWorkoutState?>(null)
     val wearState: StateFlow<WearWorkoutState?> = _wearState.asStateFlow()
+
+    private val _activityPrefill = MutableStateFlow<ActivityLogInput?>(null)
+    val activityPrefill: StateFlow<ActivityLogInput?> = _activityPrefill.asStateFlow()
+
+    private val _activityEditingId = MutableStateFlow<Long?>(null)
+    val activityEditingId: StateFlow<Long?> = _activityEditingId.asStateFlow()
+
+    private val _activityErrors = MutableStateFlow<Map<ActivityLogField, String>>(emptyMap())
+    val activityErrors: StateFlow<Map<ActivityLogField, String>> = _activityErrors.asStateFlow()
+
+    private val _isSavingActivity = MutableStateFlow(false)
+    val isSavingActivity: StateFlow<Boolean> = _isSavingActivity.asStateFlow()
+
+    private val _canCopyLastActivity = MutableStateFlow(false)
+    val canCopyLastActivity: StateFlow<Boolean> = _canCopyLastActivity.asStateFlow()
 
     private var pendingBackupPayload: BackupFile? = null
 
@@ -493,6 +509,90 @@ class AppViewModel(
                 _message.value = "Treino finalizado e salvo no aparelho."
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível finalizar o treino."
+            }
+        }
+    }
+
+    // ---------------- Registro avulso ----------------
+
+    fun openLogActivity() {
+        _activityEditingId.value = null
+        _activityPrefill.value = null
+        _activityErrors.value = emptyMap()
+        _screen.value = Screen.LogActivity
+        refreshCanCopyLastActivity(ActivityModality.SWIM)
+    }
+
+    fun editLogActivity(sessionId: Long) {
+        val session = sessions.value.firstOrNull { it.session.id == sessionId } ?: return
+        if (!session.session.isManualActivity()) {
+            _message.value = "Só um registro manual pode ser editado."
+            return
+        }
+        _activityEditingId.value = sessionId
+        _activityPrefill.value = session.session.toActivityLogInput()
+        _activityErrors.value = emptyMap()
+        _screen.value = Screen.LogActivity
+        refreshCanCopyLastActivity(_activityPrefill.value?.modality ?: ActivityModality.SWIM)
+    }
+
+    fun onActivityModalityChanged(modality: ActivityModality) {
+        refreshCanCopyLastActivity(modality)
+    }
+
+    /** Preenche o formulário com a última sessão manual da mesma modalidade (regra 16). */
+    fun copyLastActivity(modality: ActivityModality) {
+        viewModelScope.launch {
+            val last = repository.lastManualSession(modality.storageValue) ?: return@launch
+            _activityPrefill.value = last.toActivityLogInput().copy(startedAt = System.currentTimeMillis())
+        }
+    }
+
+    private fun refreshCanCopyLastActivity(modality: ActivityModality) {
+        viewModelScope.launch {
+            _canCopyLastActivity.value = repository.lastManualSession(modality.storageValue) != null
+        }
+    }
+
+    fun saveActivity(draft: ActivityLogDraft) {
+        if (_isSavingActivity.value) return
+        val validation = validateActivityDraft(draft)
+        _activityErrors.value = validation.errors
+        val input = validation.input ?: return
+        val editingId = _activityEditingId.value
+        viewModelScope.launch {
+            _isSavingActivity.value = true
+            try {
+                if (editingId != null) {
+                    repository.updateActivity(input.toManualSession(id = editingId))
+                    _message.value = "Registro atualizado no aparelho."
+                } else {
+                    repository.logActivity(input.toManualSession())
+                    _message.value = "Atividade registrada e salva no aparelho."
+                }
+                _activityEditingId.value = null
+                _activityPrefill.value = null
+                _screen.value = Screen.Home
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível salvar a atividade."
+            } finally {
+                _isSavingActivity.value = false
+            }
+        }
+    }
+
+    fun deleteLogActivity(sessionId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deleteActivity(sessionId)
+                if (_activityEditingId.value == sessionId) {
+                    _activityEditingId.value = null
+                    _activityPrefill.value = null
+                    _screen.value = Screen.History
+                }
+                _message.value = "Registro manual excluído."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível excluir o registro."
             }
         }
     }

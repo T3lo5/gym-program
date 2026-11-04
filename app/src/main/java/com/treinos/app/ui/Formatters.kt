@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import kotlin.math.roundToLong
 
 private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -98,6 +99,27 @@ fun muscleLabel(muscle: String): String = when (muscle) {
 
 fun isToday(millis: Long): Boolean =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate() == LocalDate.now()
+
+fun formatDistanceMeters(meters: Double?): String? {
+    val value = meters?.takeIf { it > 0.0 && it.isFinite() } ?: return null
+    return groupThousands(value.roundToLong()) + " m"
+}
+
+/** Pace de natação em `mm:ss/100m`; null quando não há distância registrada. */
+fun formatPacePer100m(durationSeconds: Long, distanceMeters: Double?): String? =
+    paceSecondsPer100m(durationSeconds, distanceMeters)?.let { "${formatMinuteSecond(it)}/100m" }
+
+/** Pace de corrida em `mm:ss/km`; null quando não há distância registrada. */
+fun formatPacePerKm(durationSeconds: Long, distanceMeters: Double?): String? =
+    paceSecondsPerKm(durationSeconds, distanceMeters)?.let { "${formatMinuteSecond(it)}/km" }
+
+private fun formatMinuteSecond(totalSeconds: Long): String =
+    "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
+
+// Agrupamento fixo em ponto: o histórico é exibido em pt-BR independente do
+// locale do aparelho, que usaria vírgula ou espaço.
+private fun groupThousands(value: Long): String =
+    value.toString().reversed().chunked(3).joinToString(".").reversed()
 
 @Suppress("unused")
 fun safeParseDate(isoDate: String?): LocalDate? = try {

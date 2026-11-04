@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
 import com.treinos.app.ui.screens.HomeScreen
+import com.treinos.app.ui.screens.LogActivityScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.ExerciseDetailSheet
@@ -65,6 +66,11 @@ fun TreinosApp(viewModel: AppViewModel) {
     val selectedExerciseId by viewModel.selectedExerciseId.collectAsStateWithLifecycle()
     val isUpdatingCatalog by viewModel.isUpdatingCatalog.collectAsStateWithLifecycle()
     val catalogMessage by viewModel.catalogMessage.collectAsStateWithLifecycle()
+    val activityPrefill by viewModel.activityPrefill.collectAsStateWithLifecycle()
+    val activityEditingId by viewModel.activityEditingId.collectAsStateWithLifecycle()
+    val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
+    val isSavingActivity by viewModel.isSavingActivity.collectAsStateWithLifecycle()
+    val canCopyLastActivity by viewModel.canCopyLastActivity.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -145,6 +151,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onSettings = viewModel::openSettings,
                     onStartDay = viewModel::startWorkout,
                     onResume = viewModel::resumeWorkout,
+                    onLogActivity = viewModel::openLogActivity,
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -175,6 +182,21 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onBack = viewModel::goHome,
                     exerciseMedia = exerciseMedia,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
+                    onEditActivity = viewModel::editLogActivity,
+                    onDeleteActivity = viewModel::deleteLogActivity,
+                )
+
+                Screen.LogActivity -> LogActivityScreen(
+                    prefill = activityPrefill,
+                    editingSessionId = activityEditingId,
+                    isSaving = isSavingActivity,
+                    errors = activityErrors,
+                    canCopyLast = canCopyLastActivity,
+                    onBack = viewModel::goHome,
+                    onModalityChanged = viewModel::onActivityModalityChanged,
+                    onCopyLast = viewModel::copyLastActivity,
+                    onSave = viewModel::saveActivity,
+                    onDelete = { activityEditingId?.let(viewModel::deleteLogActivity) },
                 )
 
                 Screen.Settings -> SettingsScreen(
