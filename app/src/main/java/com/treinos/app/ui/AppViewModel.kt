@@ -7,8 +7,12 @@ import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
+import com.treinos.app.data.discovery.BackendConnector
 import com.treinos.app.data.discovery.BackendDiscoveryManager
+import com.treinos.app.data.discovery.BackendHealthChecker
+import com.treinos.app.data.discovery.ConnectOutcome
 import com.treinos.app.data.discovery.DiscoveredBackend
+import com.treinos.app.data.discovery.HttpBackendHealthChecker
 import com.treinos.app.data.discovery.dedupeBackends
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.ExerciseMediaRepository
@@ -60,8 +64,11 @@ class AppViewModel(
     private val preferences: AppPreferences,
     private val exerciseMediaRepository: ExerciseMediaRepository? = null,
     private val discoveryManager: BackendDiscoveryManager? = null,
+    private val healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
     private val wearSyncRepository: WearSyncRepository? = null,
 ) : ViewModel() {
+
+    private val backendConnector = BackendConnector(healthChecker, preferences)
 
     private val _screen = MutableStateFlow(Screen.Home)
     val screen: StateFlow<Screen> = _screen.asStateFlow()
@@ -71,6 +78,12 @@ class AppViewModel(
 
     private val _isDiscovering = MutableStateFlow(false)
     val isDiscovering: StateFlow<Boolean> = _isDiscovering.asStateFlow()
+
+    private val _isConnectingBackend = MutableStateFlow(false)
+    val isConnectingBackend: StateFlow<Boolean> = _isConnectingBackend.asStateFlow()
+
+    private val _discoveryMessage = MutableStateFlow<String?>(null)
+    val discoveryMessage: StateFlow<String?> = _discoveryMessage.asStateFlow()
 
     val activePlan: StateFlow<WorkoutPlanWithDetails?> = repository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -816,14 +829,22 @@ class AppViewModel(
     }
 
     fun startDiscovery() {
-        _isDiscovering.value = true
+        if (_isDiscovering.value) return
+        val manager = discoveryManager
+        if (manager == null) {
+            _discoveryMessage.value = "Descoberta de rede indisponível neste aparelho. Use o endereço manual."
+            return
+        }
         _discoveredBackends.value = emptyList()
-        discoveryManager?.start(
-            onFound = { b ->
-                _discoveredBackends.value = dedupeBackends(_discoveredBackends.value + b)
+        _discoveryMessage.value = null
+        _isDiscovering.value = true
+        manager.start(
+            onFound = { backend ->
+                _discoveredBackends.value = dedupeBackends(_discoveredBackends.value + backend)
             },
-            onError = { msg ->
+            onError = { message ->
                 _isDiscovering.value = false
+                _discoveryMessage.value = message
             },
         )
     }
@@ -833,10 +854,39 @@ class AppViewModel(
         _isDiscovering.value = false
     }
 
-    fun connectBackend(backend: DiscoveredBackend, onResult: (Boolean, String?) -> Unit) {
+    fun clearDiscoveryMessage() {
+        _discoveryMessage.value = null
+    }
+
+    /**
+     * Conectar é a única forma de trocar a URL sem digitar: nada é salvo antes
+     * de o backend responder `GET /health`.
+     */
+    fun connectDiscoveredBackend(backend: DiscoveredBackend) {
+        if (_isConnectingBackend.value) return
         viewModelScope.launch {
-            // test health
-            onResult(true, null)
+            _isConnectingBackend.value = true
+            _discoveryMessage.value = null
+            try {
+                when (val outcome = backendConnector(backend)) {
+                    is ConnectOutcome.Connected -> {
+                        _backendUrl.value = preferences.backendUrl
+                        _connectionMessage.value = null
+                        _syncMessage.value = null
+                        _discoveryMessage.value =
+                            "Conectado a ${outcome.backend.name} (${outcome.backend.endpoint}). " +
+                            "Modelo: ${outcome.model.ifBlank { "—" }} • " +
+                            "Catálogo: ${outcome.catalogSize} exercícios."
+                        stopDiscovery()
+                    }
+
+                    is ConnectOutcome.Refused -> {
+                        _discoveryMessage.value = outcome.message
+                    }
+                }
+            } finally {
+                _isConnectingBackend.value = false
+            }
         }
     }
 
@@ -851,6 +901,7 @@ class AppViewModel(
             preferences: AppPreferences,
             exerciseMediaRepository: ExerciseMediaRepository? = null,
             discoveryManager: BackendDiscoveryManager? = null,
+            healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
             wearSyncRepository: WearSyncRepository? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -860,6 +911,7 @@ class AppViewModel(
                     preferences,
                     exerciseMediaRepository,
                     discoveryManager,
+                    healthChecker,
                     wearSyncRepository,
                 ) as T
             }

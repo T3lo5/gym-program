@@ -35,8 +35,8 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
 | Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
 | Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
-| Testes + CI | 🟡 | 19 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
-| Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
+| Testes + CI | 🟡 | 20 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
+| Descoberta LAN | ✅ | Ajustes → "Buscar backends" (`NsdManager` em `_treinos._tcp.`); "Conectar" sonda `GET /health` e só salva a URL em 200; IP manual continua como fallback (H2-1) |
 | Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
 | Backup/restore do usuário | ✅ | Exportar/importar ligados aos file pickers (SAF), pré-visualização + confirmação e `deviceId` do arquivo aplicado só após importação válida (H1-7) |
 | Imagem/vídeo de exercício | ✅/❌ | Imagens via catálogo (H1-3); vídeo não |
@@ -79,20 +79,20 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend"; [spec](docs/specs/H2-3-backend-download.md) |
 | H1-6 | Fundação de dados: migração, backup v2 e sync | `AppDatabase.MIGRATION_1_2` sem `fallbackToDestructiveMigration`; schema `2.json` versionado e usado pelo `MigrationTest`; backup v2 (importa v1) com enums validados; sync com campos aditivos e download por `id` interno; migração aditiva no SQLite do backend; testes `MigrationTest`, `BackupSerializationTest`, `BackupValidatorTest`, `BackupMapperTest`, `back/tests/test_sync_contract.py`; [spec](docs/specs/H1-6-data-foundation.md) |
 | H1-7 | Correções de restauração, backup e Ajustes | `WorkoutRepository.downloadSync` valida o snapshot (`mapSnapshot`) antes de escrever e usa a transação única `dao.replaceAllData`; snapshot vazio devolve `SyncDownloadResult.Empty` e mantém os dados locais; `RestoreByDeviceId` persiste o `deviceId` só após sucesso; `importBackup` aplica o `deviceId` do arquivo; file pickers (SAF) ligados em `TreinosApp.kt` com confirmação nas duas pontas; texto de Ajustes corrigido + card "Restaurar de outro aparelho"; testes `RestoreDownloadTest`, `BackupImportTest`, `RestoreDeviceIdTest`; [spec](docs/specs/H1-7-restore-backup-fixes.md) |
+| H2-1 | Descoberta LAN automática (mDNS/NSD) | `BackendDiscoveryManager` (`NsdManager` em `_treinos._tcp.`, resolve com timeout de 5 s, TXT `version`, `stop()` ao sair da tela), `DiscoveredBackend` com `url`/`endpoint`/`isVersionKnown`, `BackendConnector` que sonda `GET /health` e só salva `AppPreferences.backendUrl` em 200 (falha mantém a URL anterior), `HttpBackendHealthChecker`, seção "Backend na rede local" em `SettingsScreen` com "Buscar backends"/"Parar"/"Conectar" e aviso de versão desconhecida, `ACCESS_LOCAL_NETWORK` no manifest; testes `DiscoveredBackendTest` e `BackendConnectorTest`; [spec](docs/specs/H2-1-lan-discovery.md) |
 | H2-5 | Registro avulso genérico (natação primeiro) | `ActivityLog.kt` com `ActivityModality`, `ActivityLogInput`/`ActivityLogDraft`, `validateActivityLog` e pace; `WorkoutRepository.logActivity/updateActivity/deleteActivity/lastManualSession` sobre `WorkoutSessionEntity` com `source = "manual"`, `planId = dayId = 0` e zero exercícios; `LogActivityScreen` na rota `Screen.LogActivity`, botão "Registrar atividade" na Home, card de atividade + filtro por modalidade + exclusão com confirmação no histórico; `formatDistanceMeters`/`formatPacePer100m`/`formatPacePerKm`; testes `ActivityLogTest`, `ActivityFormatTest`, `ManualSessionDaoTest`, `BackupMapperTest.sessao_manual_round_trip` e `back/tests/test_sync_contract.py::test_sessao_manual_round_trip`; [spec](docs/specs/H2-5-adhoc-log.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
 Nada pendente: H1-1..H1-7 estão concluídos e listados em §4.1. O Horizon 1
 fechou com H1-7 (restauração/backup não apagam mais dados e a UI está ligada);
-H2-5 também já está em §4.1, então a fila continua em H2-1 e H2-4.
+H2-5 e H2-1 também já estão em §4.1, então a fila continua em H2-4.
 
 ### Horizon 2 — Próximo (1-2 meses): multimodal, conectividade e histórico
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
 | H2-6 | Plano híbrido e revisão por IA | **S** | Semana real mistura academia, corrida e natação; o app só planeja musculação. | Semana com modalidades e `weekday`, geração de corrida com templates, revisão por IA com histórico e fallback local. | 6-8 dias | H1-6, H2-5 (H2-7 opcional) | [H2-6](docs/specs/H2-6-hybrid-plan.md) (proposta) |
-| H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend. | Backend anuncia `_treinos._tcp.local`; app lista instâncias e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração | [H2-1](docs/specs/H2-1-lan-discovery.md) |
 | H2-4 | Histórico com calendário e métricas | **C** | Histórico é lista simples. | Calendário, cards de treinos, total de séries, duração, volume por músculo e métricas por modalidade. | 4 dias | `HistoryScreen`, Room queries | [H2-4](docs/specs/H2-4-history-calendar.md) |
 | H2-7 | Mobilidade e alongamento | **C** | Usuário quer rotina curta para costas/quadril, mas o app não oferece. | Rotinas curadas de 5-15 min com timer, aviso de segurança e registro no histórico. | 3-4 dias | H1-6 | [H2-7](docs/specs/H2-7-mobility.md) (proposta) |
 
@@ -114,7 +114,7 @@ H2-5 também já está em §4.1, então a fila continua em H2-1 e H2-4.
 |-------------------|-----------------------|---------------------|-----------|
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) | Backend na nuvem (H3-4) |
 | Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) | Histórico com calendário (H2-4) | Progressão automática de carga (H3-5) |
-| Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) | Polimento + animações (H3-2) | Export CSV/Sheets |
+| Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Polimento + animações (H3-2) | Export CSV/Sheets |
 | Testes de UI/Room (H3-1) | Wear OS MVP (H2-2) ✅ | Acessibilidade (H3-3) | Widget/complicação do relógio |
 | Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | |
 
@@ -124,14 +124,14 @@ H2-5 também já está em §4.1, então a fila continua em H2-1 e H2-4.
 
 ```
 Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-2 Wear
-            + H2-3 download + H2-5 registro avulso (natação/aula no histórico)
-Agora:      H2-1 descoberta LAN      → conectar sem digitar IP:porta
+            + H2-3 download + H2-5 registro avulso + H2-1 descoberta LAN
+Agora:      H2-4 histórico/calendário → ver evolução sem rolar lista
 Próximo:    H2-6 plano híbrido       → semana com academia + corrida + revisão
-Depois:     H2-4 histórico, H2-7 mobilidade
+Depois:     H2-7 mobilidade
 Qualidade:  H3-1..H3-5
 ```
 
-**Caminho crítico:** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-6 (proposta, exige aprovação).
+**Caminho crítico:** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 (proposta, exige aprovação).
 O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda
 não vê (UI, Room, migração e contrato).
 
@@ -167,10 +167,16 @@ não vê (UI, Room, migração e contrato).
 
 ## 9. Próximo passo imediato
 
-Implementar **H2-1 (descoberta LAN automática, mDNS)** —
-[docs/specs/H2-1-lan-discovery.md](docs/specs/H2-1-lan-discovery.md): o backend
-anuncia `_treinos._tcp.local` e o app lista instâncias, mantendo o IP manual como
-fallback. **H2-4 (histórico com calendário)** também está pronta para implementar.
+Implementar **H2-4 (histórico com calendário e métricas)** —
+[docs/specs/H2-4-history-calendar.md](docs/specs/H2-4-history-calendar.md): o
+histórico hoje é uma lista; a spec pede calendário, total de séries, duração,
+volume por músculo e métricas por modalidade.
+
+H2-1 (descoberta LAN) está concluída: Ajustes → "Buscar backends" usa
+`NsdManager` em `_treinos._tcp.`, "Conectar" sonda `GET /health` e **só** salva a
+URL se o health responder, mantendo o campo manual como fallback. A descoberta só
+roda sob demanda e para ao sair da tela. **Não funciona no Docker bridge**
+(`MDNS_ENABLED=false`): exige backend nativo na mesma Wi-Fi — ver §Riscos.
 
 H2-5 (registro avulso genérico, natação primeiro) está concluída: a sessão avulsa
 é gravada como `WorkoutSessionEntity` com `source = "manual"`, `planId = dayId = 0`
@@ -198,7 +204,7 @@ Para iniciar qualquer item, leia a spec correspondente em
 - [H1-5 — Peso e altura](docs/specs/H1-5-profile.md) — concluída
 - [H1-6 — Fundação de dados](docs/specs/H1-6-data-foundation.md) — concluída
 - [H1-7 — Correções de restauração, backup e Ajustes](docs/specs/H1-7-restore-backup-fixes.md) — concluída
-- [H2-1 — Descoberta LAN](docs/specs/H2-1-lan-discovery.md) — pronta para implementar
+- [H2-1 — Descoberta LAN](docs/specs/H2-1-lan-discovery.md) — concluída
 - [H2-2 — Wear OS MVP](docs/specs/H2-2-wear-os.md) — concluída
 - [H2-3 — Download do backend](docs/specs/H2-3-backend-download.md) — concluída (retroativa)
 - [H2-4 — Histórico com calendário](docs/specs/H2-4-history-calendar.md) — pronta para implementar

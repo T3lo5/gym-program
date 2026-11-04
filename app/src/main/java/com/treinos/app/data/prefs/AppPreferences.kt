@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.util.UUID
 import com.treinos.app.data.DeviceIdStore
+import com.treinos.app.data.discovery.BackendUrlStore
 import com.treinos.app.data.wear.CommandDedupe
 
 /**
@@ -14,13 +15,13 @@ import com.treinos.app.data.wear.CommandDedupe
  */
 class AppPreferences private constructor(
     private val prefs: SharedPreferences,
-) : DeviceIdStore {
+) : DeviceIdStore, BackendUrlStore {
 
     constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences("treinos_prefs", Context.MODE_PRIVATE)
     )
 
-    var backendUrl: String
+    override var backendUrl: String
         get() = prefs.getString(KEY_BACKEND_URL, null)?.takeIf { it.isNotBlank() }
             ?: DEFAULT_BACKEND_URL
         set(value) {

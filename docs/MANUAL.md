@@ -1127,11 +1127,21 @@ Se o celular não conseguir acessar:
 
 ### 5.5 Descoberta automática (mDNS)
 
-O backend tenta anunciar o serviço `_treinos._tcp.local.` na rede local.
+O backend tenta anunciar o serviço `_treinos._tcp.local.` na rede local e o app
+do celular procura esse serviço em **Ajustes → Backend na rede local →
+"Buscar backends"**. A busca só começa quando você toca no botão (nada roda em
+segundo plano) e para sozinha ao sair da tela.
 
-- Funciona melhor no modo **Python nativo**.
+- Cada resultado mostra o nome, o `host:porta` e, quando o anúncio traz o TXT
+  `version`, a versão. Sem esse campo aparece o aviso "versão não informada".
+- **Conectar** faz um `GET /health` no endereço descoberto e **só substitui** a
+  URL salva se o health responder. Se não responder, a URL anterior continua
+  exatamente como estava.
+- Funciona melhor no modo **Python nativo** (`uvicorn`), com `MDNS_ENABLED=true`.
 - No **Docker**, o mDNS fica desativado por padrão, porque a rede bridge do
-  Docker não repassa multicast. O acesso por IP continua funcionando.
+  Docker não repassa multicast. Nesse cenário o anúncio não chega ao celular:
+  use o campo de URL manual (ex.: `http://192.168.0.10:3000`). O acesso por IP
+  continua funcionando normalmente.
 - Para ativar no Docker, seria necessário usar `network_mode: host` (Linux) ou
   configurar multicast manualmente; isso não é necessário para o uso normal.
 

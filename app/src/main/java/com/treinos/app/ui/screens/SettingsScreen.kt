@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.LinearProgressIndicator
 import com.treinos.app.data.backup.BackupPreview
+import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatIsoDateTime
@@ -76,10 +77,19 @@ fun SettingsScreen(
     catalogMessage: String? = null,
     onUpdateCatalog: () -> Unit = {},
     onClearCatalogMessage: () -> Unit = {},
+    discoveredBackends: List<DiscoveredBackend> = emptyList(),
+    isDiscovering: Boolean = false,
+    isConnectingBackend: Boolean = false,
+    discoveryMessage: String? = null,
+    onSearchBackends: () -> Unit = {},
+    onStopSearch: () -> Unit = {},
+    onConnectBackend: (DiscoveredBackend) -> Unit = {},
+    onClearDiscoveryMessage: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
     var showRestoreConfirm by remember { mutableStateOf(false) }
+    var hasSearched by remember { mutableStateOf(false) }
 
     if (showDownloadConfirm) {
         AlertDialog(
@@ -215,6 +225,118 @@ fun SettingsScreen(
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "Backend na rede local",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "O app procura o serviço _treinos._tcp na mesma Wi-Fi e conecta " +
+                            "com um toque. No Docker (rede bridge) o mDNS não atravessa: " +
+                            "nesse caso use o endereço manual acima.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            if (isDiscovering) {
+                                onStopSearch()
+                            } else {
+                                hasSearched = true
+                                onClearDiscoveryMessage()
+                                onSearchBackends()
+                            }
+                        },
+                        enabled = !isConnectingBackend,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (isDiscovering) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Text("Procurando… (toque para parar)")
+                            } else {
+                                Text("Buscar backends")
+                            }
+                        }
+                    }
+
+                    if (discoveredBackends.isEmpty() && hasSearched && !isDiscovering) {
+                        Text(
+                            text = "Nenhum backend encontrado. Ligue o servidor no computador " +
+                                "e confirme que o celular está na mesma Wi-Fi.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    discoveredBackends.forEach { backend ->
+                        val isConnected = backendUrl == backend.url
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(backend.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    text = backend.endpoint,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (!backend.isVersionKnown) {
+                                    Text(
+                                        text = "versão não informada",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                    )
+                                }
+                            }
+                            if (isConnected) {
+                                Text(
+                                    text = "Conectado",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            } else {
+                                Button(
+                                    onClick = { onConnectBackend(backend) },
+                                    enabled = !isConnectingBackend && !isDiscovering,
+                                ) {
+                                    if (isConnectingBackend) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                        )
+                                    } else {
+                                        Text("Conectar")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    discoveryMessage?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
 

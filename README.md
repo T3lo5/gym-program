@@ -24,11 +24,11 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 | 🏋️ Treino offline | ✅ Execução com registro de séries e descanso |
 | 🤖 Geração de treino sob demanda | ✅ IA + fallback local + data de revisão |
 | 🔄 Sincronização manual app → backend | ✅ Snapshot de planos, treinos e séries |
-| ♻️ Restauração por `deviceId` | 🟡 Download local funciona; restaurar outro ID e atomicidade em H1-7 |
-| 💾 Backup JSON manual | 🟡 Lógica pronta (H1-4); botões de exportar/importar em H1-7 |
-| 🔗 Descoberta LAN (mDNS) | 📋 No backend; app usa URL configurável |
+| ♻️ Restauração por `deviceId` | ✅ Confirmação, validação antes de escrever e `deviceId` só após sucesso (H1-7) |
+| 💾 Backup JSON manual | ✅ Exportar/importar ligados aos file pickers, com pré-visualização (H1-4 + H1-7) |
+| 🔗 Descoberta LAN (mDNS) | ✅ Ajustes → "Buscar backends" conecta com 1 toque; IP manual segue como fallback (H2-1) |
 | ⏱ Timer de descanso no relógio | ✅ MVP junto com H2-2 |
-| 🏃 Corrida, natação e mobilidade | 📋 H2-5 a H2-7 (specs no roadmap) |
+| 🏃 Corrida, natação e mobilidade | 🟡 Registro avulso de natação/corrida pronto (H2-5); plano híbrido e mobilidade em H2-6/H2-7 |
 | ☁️ Backend grátis (Codespaces/Oracle) | ✅ Docker Compose |
 
 ---

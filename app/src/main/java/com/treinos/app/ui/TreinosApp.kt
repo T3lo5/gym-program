@@ -71,6 +71,10 @@ fun TreinosApp(viewModel: AppViewModel) {
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
     val isSavingActivity by viewModel.isSavingActivity.collectAsStateWithLifecycle()
     val canCopyLastActivity by viewModel.canCopyLastActivity.collectAsStateWithLifecycle()
+    val discoveredBackends by viewModel.discoveredBackends.collectAsStateWithLifecycle()
+    val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
+    val isConnectingBackend by viewModel.isConnectingBackend.collectAsStateWithLifecycle()
+    val discoveryMessage by viewModel.discoveryMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -125,6 +129,11 @@ fun TreinosApp(viewModel: AppViewModel) {
         val text = catalogMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(text)
         viewModel.clearCatalogMessage()
+    }
+
+    // A descoberta é cara para a bateria: ao sair de Ajustes ela é interrompida.
+    LaunchedEffect(screen) {
+        if (screen != Screen.Settings) viewModel.stopDiscovery()
     }
 
     BackHandler(enabled = screen != Screen.Home) {
@@ -235,6 +244,14 @@ fun TreinosApp(viewModel: AppViewModel) {
                     catalogMessage = catalogMessage,
                     onUpdateCatalog = viewModel::updateCatalog,
                     onClearCatalogMessage = viewModel::clearCatalogMessage,
+                    discoveredBackends = discoveredBackends,
+                    isDiscovering = isDiscovering,
+                    isConnectingBackend = isConnectingBackend,
+                    discoveryMessage = discoveryMessage,
+                    onSearchBackends = viewModel::startDiscovery,
+                    onStopSearch = viewModel::stopDiscovery,
+                    onConnectBackend = viewModel::connectDiscoveredBackend,
+                    onClearDiscoveryMessage = viewModel::clearDiscoveryMessage,
                 )
             }
         }

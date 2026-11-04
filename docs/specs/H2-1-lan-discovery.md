@@ -7,7 +7,7 @@
 | Item do roadmap | `H2-1` |
 | MoSCoW | `S` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída em 2026-11-04` (gate `./scripts/verify.sh` verde; verificação NSD em device pendente) |
 | Depende de | backend mDNS (já existe) |
 
 ## Objetivo
@@ -27,14 +27,18 @@ precisar digitar IP:porta. O campo manual continua como fallback.
 
 | Arquivo | Mudança |
 |---|---|
-| `app/src/main/AndroidManifest.xml` | `networkSecurityConfig` e permissão de rede local quando aplicável |
-| `app/src/main/java/com/treinos/app/data/discovery/BackendDiscoveryManager.kt` | **Novo.** `NsdManager` + resolve |
-| `app/src/main/java/com/treinos/app/data/discovery/DiscoveredBackend.kt` | **Novo.** modelo `name`, `host`, `port`, `url` |
-| `app/src/main/java/com/treinos/app/TreinosApplication.kt` | Construir o manager no `AppContainer` |
-| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | Estados de descoberta e conexão |
-| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | Passar estados/callbacks |
-| `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | Lista de backends + “Conectar” + estados |
-| `app/src/test/java/com/treinos/app/data/discovery/DiscoveredBackendTest.kt` | **Novo.** URL, dedupe, validação |
+| `app/src/main/AndroidManifest.xml` | `ACCESS_LOCAL_NETWORK` declarado (obrigatório a partir do Android 15; `targetSdk` segue 34); `@xml/network_security_config` já estava ligado no `<application>` |
+| `app/src/main/java/com/treinos/app/data/discovery/BackendDiscoveryManager.kt` | `NsdManager` + resolve com timeout de 5 s, leitura do TXT `version`, erros legíveis, limpeza em `stop()` |
+| `app/src/main/java/com/treinos/app/data/discovery/DiscoveredBackend.kt` | modelo `name`, `host`, `port`, `url`, `version`, `endpoint`, `isVersionKnown` |
+| `app/src/main/java/com/treinos/app/data/discovery/BackendConnector.kt` | **Novo.** lógica pura da conexão: sonda `/health` e **só** salva a URL em 200 (falha mantém a anterior) |
+| `app/src/main/java/com/treinos/app/data/discovery/HttpBackendHealthChecker.kt` | **Novo.** sonda real com OkHttp e timeout de 5 s |
+| `app/src/main/java/com/treinos/app/data/prefs/AppPreferences.kt` | passa a implementar `BackendUrlStore` (costura para a lógica pura) |
+| `app/src/main/java/com/treinos/app/TreinosApplication.kt` | manager construído no `AppContainer` |
+| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | estados de descoberta/conexão e `connectDiscoveredBackend` real |
+| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | passa estados/callbacks e para a busca ao sair de Ajustes |
+| `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | seção "Backend na rede local": lista, "Conectar", estados e avisos |
+| `app/src/test/java/com/treinos/app/data/discovery/DiscoveredBackendTest.kt` | URL, dedupe, validação, versão desconhecida |
+| `app/src/test/java/com/treinos/app/data/discovery/BackendConnectorTest.kt` | **Novo.** salvar/não salvar conforme o `/health` |
 
 Não edite `shared/` nem `com.treinos.shared/` (legado).
 
@@ -119,11 +123,16 @@ Regras:
 
 | Arquivo | Testes |
 |---|---|
-| `app/src/test/java/com/treinos/app/data/discovery/DiscoveredBackendTest.kt` | `monta_url_http`, `ignora_porta_invalida`, `ignora_host_vazio`, `deduplica_por_host_e_porta`, `aceita_ipv4_e_ipv6_entre_colchetes` |
+| `app/src/test/java/com/treinos/app/data/discovery/DiscoveredBackendTest.kt` | `monta_url_http`, `ignora_porta_invalida`, `ignora_host_vazio`, `deduplica_por_host_e_porta`, `aceita_ipv4_e_ipv6_entre_colchetes`, `sem_txt_de_versao_marca_desconhecida`, `deduplica_preservando_versao_e_nome` |
+| `app/src/test/java/com/treinos/app/data/discovery/BackendConnectorTest.kt` | `salva_url_quando_health_responde`, `nao_salva_quando_health_nao_responde`, `mantem_url_anterior_quando_a_sonda_falha`, `recusa_endereco_invalido_sem_sondar_a_rede`, `normaliza_host_com_colchetes_antes_de_salvar` |
 
 Testes de `NsdManager` exigem device/emulador; a verificação é manual.
 
 ## Verificação manual
+
+> **Status (2026-11-04):** o gate passou, mas os passos abaixo exigem celular +
+> backend nativo na mesma Wi-Fi e **não** foram executados. A entrega está
+> verificada por código/teste, não por smoke test em device.
 
 1. Rode o backend sem Docker: `cd back && uvicorn app.main:app --host 0.0.0.0 --port 3000` com `MDNS_ENABLED=true`.
 2. No celular, mesma Wi-Fi, abra Ajustes → “Buscar backends”.
