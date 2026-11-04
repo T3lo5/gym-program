@@ -18,21 +18,26 @@ cd "$ROOT"
 
 VERSION_CODE="${VERSION_CODE:-1}"
 VERSION_NAME="${VERSION_NAME:-0.0.0-local}"
-APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+APP_APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+WEAR_APK="$ROOT/wear/build/outputs/apk/debug/wear-debug.apk"
 DIST="$ROOT/dist"
 
 export GRADLE_OPTS="${GRADLE_OPTS:--Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Dorg.gradle.daemon=false}"
 
 TASKS=(clean)
 if [[ "${SKIP_TESTS:-0}" != "1" ]]; then
+  TASKS+=(":protocol:test")
   TASKS+=(":app:testDebugUnitTest")
+  TASKS+=(":wear:testDebugUnitTest")
 fi
 if [[ "${SKIP_LINT:-0}" != "1" ]]; then
   TASKS+=(":app:lintDebug")
+  TASKS+=(":wear:lintDebug")
 fi
 TASKS+=(":app:assembleDebug")
+TASKS+=(":wear:assembleDebug")
 
-echo "==> [1/4] Gradle: ${TASKS[*]}"
+echo "==> [1/5] Gradle: ${TASKS[*]}"
 echo "    versionCode=$VERSION_CODE versionName=$VERSION_NAME"
 ./gradlew "${TASKS[@]}" \
   --no-daemon \
@@ -41,7 +46,7 @@ echo "    versionCode=$VERSION_CODE versionName=$VERSION_NAME"
   "-PversionCode=$VERSION_CODE" \
   "-PversionName=$VERSION_NAME"
 
-echo "==> [2/4] Verificando assinatura do APK"
+echo "==> [2/5] Verificando assinatura do APK do app"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [[ -z "$SDK" ]]; then
   echo "ERRO: ANDROID_HOME/ANDROID_SDK_ROOT não definido." >&2
@@ -52,30 +57,38 @@ if [[ -z "$BUILD_TOOLS" || ! -x "$BUILD_TOOLS/apksigner" ]]; then
   echo "ERRO: apksigner não encontrado em $SDK/build-tools." >&2
   exit 1
 fi
-"$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+"$BUILD_TOOLS/apksigner" verify --verbose "$APP_APK"
+echo "    app APK assinado OK"
 
-echo "==> [3/4] Preparando artefato (dist/)"
+echo "==> [3/5] Verificando assinatura do APK do wear"
+"$BUILD_TOOLS/apksigner" verify --verbose "$WEAR_APK"
+echo "    wear APK assinado OK"
+
+echo "==> [4/5] Preparando artefatos (dist/)"
 rm -rf "$DIST"
 mkdir -p "$DIST"
-cp "$APK" "$DIST/treinos.apk"
-(cd "$DIST" && sha256sum treinos.apk > treinos.apk.sha256)
+cp "$APP_APK" "$DIST/treinos.apk"
+cp "$WEAR_APK" "$DIST/wear.apk"
+(cd "$DIST" && sha256sum treinos.apk wear.apk > dist.sha256)
 
-echo "==> [4/4] Resumo"
-APK_SIZE="$(du -h "$DIST/treinos.apk" | cut -f1)"
-CHECKSUM="$(cut -d' ' -f1 "$DIST/treinos.apk.sha256")"
-echo "    APK:      dist/treinos.apk ($APK_SIZE)"
-echo "    SHA-256:  $CHECKSUM"
-echo "    Testes:   app/build/reports/tests/testDebugUnitTest/index.html"
-echo "    Lint:     app/build/reports/lint-results-debug.html"
+echo "==> [5/5] Resumo"
+APP_SIZE="$(du -h "$DIST/treinos.apk" | cut -f1)"
+WEAR_SIZE="$(du -h "$DIST/wear.apk" | cut -f1)"
+echo "    App APK:   dist/treinos.apk ($APP_SIZE)"
+echo "    Wear APK:  dist/wear.apk ($WEAR_SIZE)"
+echo "    SHA-256:   dist/dist.sha256"
+echo "    Testes:    app/build/reports/tests/testDebugUnitTest/index.html"
+echo "    Lint:      app/build/reports/lint-results-debug.html / wear/build/reports/lint-results-debug.html"
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   {
     echo "### Android verificado"
     echo ""
     echo "- Versão: \`$VERSION_NAME\` (versionCode $VERSION_CODE)"
-    echo "- APK: \`dist/treinos.apk\` ($APK_SIZE)"
-    echo "- SHA-256: \`$CHECKSUM\`"
-    echo "- Testes unitários: executados"
-    echo "- Android Lint: executado"
+    echo "- App APK: \`dist/treinos.apk\` ($APP_SIZE)"
+    echo "- Wear APK: \`dist/wear.apk\` ($WEAR_SIZE)"
+    echo "- SHA-256: \`dist/dist.sha256\`"
+    echo "- Testes unitários: executados (:protocol, :app, :wear)"
+    echo "- Android Lint: executado (:app, :wear)"
   } >> "$GITHUB_STEP_SUMMARY"
 fi

@@ -8,6 +8,8 @@ import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.discovery.BackendDiscoveryManager
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
+import com.treinos.app.data.wear.WearCommandListenerService
+import com.treinos.app.data.wear.WearSyncRepository
 
 /**
  * Container manual de dependências (sem Hilt).
@@ -38,6 +40,14 @@ class AppContainer(context: Context) {
         backendClient = backendClient,
     )
 
+    val wearSyncRepository: WearSyncRepository = WearSyncRepository(
+        context = context,
+        preferences = preferences,
+    )
+
+    init {
+        WearCommandListenerService.WearSyncRepositoryHolder.instance = wearSyncRepository
+    }
 }
 
 class TreinosApplication : Application() {

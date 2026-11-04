@@ -33,7 +33,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Download do backend | ✅ | `WorkoutRepository.downloadSync` + botão em Ajustes |
 | Testes + CI | 🟡 | 7 testes JVM + gate (`./scripts/verify.sh`); falta UI/instrumentado |
 | Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
-| Wear OS | 🚧 | Módulo existe, fora do build/APK atual |
+| Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
 | Backup/restore do usuário | ✅ | Exportação/importação JSON manual (H1-4) |
 | Imagem/vídeo de exercício | ❌ | Catálogo sem mídia |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
@@ -67,6 +67,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-3 | Imagens dos exercícios | `ExerciseMediaRepository`, `ExerciseImage`, `ExerciseDetailSheet`, miniaturas em `WorkoutScreen`/`HistoryScreen`, botão “Atualizar catálogo” em `SettingsScreen`, `CatalogResponseDto`, Coil + cache 7 dias + testes |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend" |
 | H3-1 | Testes + CI (parcial) | 7 testes JVM, Android Lint, Ruff/Pytest e `./scripts/verify.sh` no CI |
+| H2-2 | Wear OS MVP (Data Layer) | Módulo `:wear` no build; Data Layer envia sessão para o relógio; tela com timer e próximo exercício; dois APKs no gate |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -79,7 +80,6 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
 | H2-1 | Descoberta LAN automática (mDNS) | **S** | Usuário precisa digitar IP:porta do backend. | Backend anuncia `_treinos._tcp.local`; app lista instâncias e conecta com 1 toque. Fallback mantém IP manual. | 3 dias | `BackendDiscoveryManager`, `BackendClient`, tela de configuração | [H2-1](docs/specs/H2-1-lan-discovery.md) |
-| H2-2 | Wear OS MVP (Data Layer) | **S** | Relógio não está no APK. | Incluir `wear` no build; Data Layer envia sessão (exercício, série, timer); tela com timer e próximo exercício. | 5 dias | `wear` module, Compose for Wear OS, Data Layer API | [H2-2](docs/specs/H2-2-wear-os.md) |
 | H2-4 | Histórico com calendário e métricas | **C** | Histórico é lista simples. | Calendário, cards de treinos, total de séries, duração, volume por músculo. | 4 dias | `HistoryScreen`, Room queries | [H2-4](docs/specs/H2-4-history-calendar.md) |
 
 ### Horizon 3 — Depois (2-4 meses): evolução e qualidade

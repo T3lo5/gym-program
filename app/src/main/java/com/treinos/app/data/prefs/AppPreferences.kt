@@ -3,6 +3,7 @@ package com.treinos.app.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import java.util.UUID
+import com.treinos.app.data.wear.CommandDedupe
 
 /**
  * Preferências locais do app.
@@ -63,6 +64,17 @@ class AppPreferences private constructor(
             }
         }
 
+    fun isRecentCommand(commandId: String): Boolean {
+        val ids = prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()
+        return CommandDedupe.isRecent(ids, commandId)
+    }
+
+    fun addRecentCommand(commandId: String) {
+        val ids = (prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()).toMutableSet()
+        CommandDedupe.addRecent(ids, commandId)
+        prefs.edit().putStringSet(KEY_WEAR_RECENT_COMMANDS, ids).apply()
+    }
+
     companion object {
         /** Emulador Android acessa o host em 10.0.2.2. */
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000"
@@ -72,5 +84,6 @@ class AppPreferences private constructor(
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
         private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"
         private const val KEY_HEIGHT_CM = "height_cm"
+        private const val KEY_WEAR_RECENT_COMMANDS = "wear_recent_commands"
     }
 }

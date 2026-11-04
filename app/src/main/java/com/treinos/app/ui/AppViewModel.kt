@@ -17,6 +17,8 @@ import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
+import com.treinos.app.data.wear.WearSessionMapper
+import com.treinos.app.data.wear.WearSyncRepository
 import com.treinos.app.ui.ExerciseSessionData
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.SetRecord
@@ -38,6 +40,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import com.treinos.protocol.WearCommand
+import com.treinos.protocol.WearCommandKind
+import com.treinos.protocol.WearWorkoutState
 
 enum class Screen {
     Home,
@@ -53,6 +58,7 @@ class AppViewModel(
     private val preferences: AppPreferences,
     private val exerciseMediaRepository: ExerciseMediaRepository? = null,
     private val discoveryManager: BackendDiscoveryManager? = null,
+    private val wearSyncRepository: WearSyncRepository? = null,
 ) : ViewModel() {
 
     private val _screen = MutableStateFlow(Screen.Home)
@@ -182,11 +188,77 @@ class AppViewModel(
     private val _heightCm = MutableStateFlow(preferences.heightCm)
     val heightCm: StateFlow<Int?> = _heightCm.asStateFlow()
 
+    private val _wearState = MutableStateFlow<WearWorkoutState?>(null)
+    val wearState: StateFlow<WearWorkoutState?> = _wearState.asStateFlow()
+
     private var pendingBackupPayload: BackupFile? = null
 
     init {
         viewModelScope.launch {
             loadExerciseMedia(false)
+        }
+        if (wearSyncRepository != null) {
+            viewModelScope.launch {
+                wearSyncRepository!!.commands.collect { command ->
+                    handleWearCommand(command)
+                }
+            }
+            viewModelScope.launch {
+                combine(inProgressSession, _exerciseIndex) { session, index ->
+                    session to index
+                }.collect { (session, index) ->
+                    if (session != null) {
+                        publishWearState(session, index)
+                    } else {
+                        _wearState.value = null
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleWearCommand(command: WearCommand) {
+        if (command.protocolVersion != 1) return
+        val activeSession = inProgressSession.value
+        if (activeSession == null) return
+        if (command.sessionId != activeSession.session.id && command.kind != WearCommandKind.REQUEST_STATE) {
+            // Comando de sessão diferente: reenviar estado atual
+            publishWearState(activeSession, _exerciseIndex.value)
+            return
+        }
+        when (command.kind) {
+            WearCommandKind.REQUEST_STATE -> publishWearState(activeSession, _exerciseIndex.value)
+            WearCommandKind.LOG_SET -> {
+                val exercicio = activeSession.exercises
+                    .firstOrNull { it.exercise.id == _exercises.value.getOrNull(_exerciseIndex.value)?.sessionExerciseId }
+                    ?: activeSession.exercises.firstOrNull()
+                if (exercicio != null) {
+                    val ultimoSet = exercicio.sets.lastOrNull()
+                    logSet(
+                        exercise = exercicio.exercise,
+                        reps = command.reps ?: ultimoSet?.reps,
+                        weightKg = command.weightKg ?: ultimoSet?.weightKg,
+                        rpe = command.rpe,
+                    )
+                }
+            }
+            WearCommandKind.SKIP_REST -> skipRest()
+            WearCommandKind.FINISH_WORKOUT -> finishWorkout()
+        }
+    }
+
+    private fun publishWearState(session: com.treinos.app.data.local.SessionWithExercises, exerciseIndex: Int) {
+        val rest = _restRemaining.value
+        _wearState.value = WearSessionMapper.toWearState(session, exerciseIndex, rest)
+    }
+
+    private fun syncWearState() {
+        if (wearSyncRepository == null) return
+        val session = inProgressSession.value
+        if (session != null) {
+            publishWearState(session, _exerciseIndex.value)
+        } else {
+            _wearState.value = null
         }
     }
 
@@ -338,6 +410,7 @@ class AppViewModel(
                 _activeSessionId.value = sessionId
                 _exerciseIndex.value = 0
                 _screen.value = Screen.Workout
+                syncWearState()
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível iniciar o treino."
             }
@@ -373,6 +446,7 @@ class AppViewModel(
                     rpe = rpe,
                 )
                 startRest(exercise.restSeconds)
+                syncWearState()
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível salvar a série."
             }
@@ -394,6 +468,7 @@ class AppViewModel(
                     rpe = rpe,
                 )
                 startRest(exercise.restSeconds)
+                syncWearState()
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível salvar a série."
             }
@@ -662,10 +737,17 @@ class AppViewModel(
             preferences: AppPreferences,
             exerciseMediaRepository: ExerciseMediaRepository? = null,
             discoveryManager: BackendDiscoveryManager? = null,
+            wearSyncRepository: WearSyncRepository? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppViewModel(repository, preferences, exerciseMediaRepository, discoveryManager) as T
+                return AppViewModel(
+                    repository,
+                    preferences,
+                    exerciseMediaRepository,
+                    discoveryManager,
+                    wearSyncRepository,
+                ) as T
             }
         }
     }

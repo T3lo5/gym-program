@@ -7,7 +7,7 @@
 | Item do roadmap | `H2-2` |
 | MoSCoW | `S` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
 | Depende de | H1-2 (execução por séries), H3-1 (testes de contrato) |
 
 ## Objetivo

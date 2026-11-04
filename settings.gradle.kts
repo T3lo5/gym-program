@@ -29,4 +29,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "TreinosApp"
 include(":app")
+include(":protocol")
+include(":wear")
 // include(":shared")

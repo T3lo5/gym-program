@@ -114,6 +114,10 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Wear OS Data Layer (comunicação celular ↔ relógio)
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation(project(":protocol"))
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")

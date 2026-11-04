@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
                         preferences = container.preferences,
                         exerciseMediaRepository = container.exerciseMediaRepository,
                         discoveryManager = container.discoveryManager,
+                        wearSyncRepository = container.wearSyncRepository,
                     )
                 )
                 TreinosApp(viewModel)

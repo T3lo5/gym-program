@@ -1,7 +1,7 @@
 plugins {
-    id("com.android.library") version "8.5.0"
+    id("com.android.application") version "8.5.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
-    id("org.jetbrains.kotlin.kapt") version "1.9.24"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
 }
 
 android {
@@ -9,8 +9,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        applicationId = "com.treinos.wear"
         minSdk = 30
         targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     compileOptions {
@@ -40,34 +43,36 @@ android {
 
 dependencies {
     // Project
-    implementation(project(":shared"))
+    implementation(project(":protocol"))
 
-    // Wear OS Core (correct artifact coordinates)
+    // Wear OS Core
     implementation("androidx.wear.compose:compose-material:1.3.1")
     implementation("androidx.wear.compose:compose-foundation:1.3.1")
-    implementation("androidx.wear.tiles:tiles:1.2.0")
-    implementation("androidx.wear.watchface:watchface:1.2.1")
-    implementation("androidx.wear.watchface:watchface-complications-rendering:1.2.1")
-    implementation("androidx.wear.watchface:watchface-data:1.2.1")
 
-    // Material Components (for Theme.MaterialComponents)
-    implementation("com.google.android.material:material:1.11.0")
+    // Compose
+    implementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Wear Data Layer
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
+
+    // Material Components (tema do wear)
+    implementation("com.google.android.material:material:1.11.0")
+
+    // Serialização (estado do Data Layer)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Compose BOM (2024.04.01 = Compose 1.6.8, compatible with Kotlin 1.9.24)
     implementation(platform("androidx.compose:compose-bom:2024.04.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.runtime:runtime-livedata")
-
-    // Lifecycle
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-
-    // Coil for Wear
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

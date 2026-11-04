@@ -49,6 +49,7 @@ WORKDIR /app
 COPY gradle ./gradle
 COPY gradlew gradlew.bat gradle.properties settings.gradle.kts build.gradle.kts ./
 COPY app ./app
+COPY protocol ./protocol
 COPY shared ./shared
 COPY wear ./wear
 COPY back ./back
