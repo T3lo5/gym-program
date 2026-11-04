@@ -90,7 +90,8 @@ jobs:
             echo ""
             echo "- Versão: \`${{ steps.version.outputs.name }}\` (versionCode ${{ steps.version.outputs.code }})"
             echo "- Commit: \`${{ steps.version.outputs.short-sha }}\`"
-            echo "- APK: \`dist/treinos.apk\` ($(du -h dist/treinos.apk | cut -f1))"
+            echo "- App APK: \`dist/treinos.apk\` ($(du -h dist/treinos.apk | cut -f1))"
+            echo "- Wear APK: \`dist/wear.apk\` ($(du -h dist/wear.apk | cut -f1))"
           } >> "$GITHUB_STEP_SUMMARY"
 
   backend:
@@ -133,23 +134,26 @@ jobs:
           TAG="latest"
           TITLE="Treinos — build ${{ needs.build.outputs.version-name }}"
           DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/treinos.apk"
+          WEAR_DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wear.apk"
 
           cat > release-notes.md <<EOF
           Build automático do commit \`${{ needs.build.outputs.short-sha }}\`.
 
           - **Versão:** ${{ needs.build.outputs.version-name }} (versionCode ${{ needs.build.outputs.version-code }})
-          - **Download direto:** ${DOWNLOAD_URL}
-          - **APK:** debug (pronto para testes)
+          - **App APK:** ${DOWNLOAD_URL}
+          - **Wear APK:** ${WEAR_DOWNLOAD_URL}
+          - **APKs:** debug (prontos para testes)
 
-          Para instalar: baixe o \`treinos.apk\` e abra no celular.
+          Para instalar: baixe o \`treinos.apk\` (celular) e/ou o \`wear.apk\` (relógio) e abra no dispositivo.
           Se o Android pedir permissão, autorize a instalação de fontes desconhecidas.
 
-          Verifique o checksum com o arquivo \`treinos.apk.sha256\`.
+          Verifique o checksum com os arquivos \`treinos.apk.sha256\` e \`wear.apk.sha256\`.
           EOF
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               dist/treinos.apk dist/treinos.apk.sha256 \
+              dist/wear.apk dist/wear.apk.sha256 \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
             gh release edit "$TAG" \
@@ -160,6 +164,7 @@ jobs:
           else
             gh release create "$TAG" \
               dist/treinos.apk dist/treinos.apk.sha256 \
+              dist/wear.apk dist/wear.apk.sha256 \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$TITLE" \
