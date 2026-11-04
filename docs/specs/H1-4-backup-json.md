@@ -7,7 +7,7 @@
 | Item do roadmap | `H1-4` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `concluída` |
+| Implementação | `concluída` (lógica); a ligação dos botões/file pickers é concluída em H1-7 |
 
 ## Objetivo
 
@@ -21,7 +21,7 @@ desinstalar/reinstalar o app — sem depender do backend.
 - Criptografia, senha ou compactação do arquivo.
 - Backup automático/agendado ou para nuvem.
 - Exportar `backendUrl`, `lastSyncAt` ou qualquer segredo.
-- Sincronizar o `deviceId` automaticamente (isso é H1-1).
+- Sincronizar o `deviceId` automaticamente na importação (isso é H1-7).
 - Mídia de exercícios, dados do Wear OS ou preferências de UI.
 - Migração de schema Room (o schema do banco **não muda**).
 
@@ -35,8 +35,8 @@ desinstalar/reinstalar o app — sem depender do backend.
 | `app/src/main/java/com/treinos/app/data/local/WorkoutDao.kt` | Inserções em lote e `replaceAllData(...)` transacional |
 | `app/src/main/java/com/treinos/app/data/WorkoutRepository.kt` | `exportBackup(...)` e `importBackup(...)` |
 | `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | Estados e ações de export/import |
-| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | Passar estados/callbacks para `SettingsScreen` |
-| `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | Cards, file pickers, confirmação e mensagens |
+| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | Passar estados/callbacks para `SettingsScreen`; os file pickers são ligados em H1-7 |
+| `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | Cards, confirmação e mensagens; a ligação dos file pickers é concluída em H1-7 |
 | `app/src/test/java/com/treinos/app/data/backup/*Test.kt` | **Novos.** Serialização, mapper e validação |
 
 Não altere `app/src/main/java/com/treinos/shared/` (legado) nem os módulos raiz

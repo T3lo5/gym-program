@@ -41,7 +41,7 @@ depender de IA.
 | `app/src/test/java/com/treinos/app/ui/progression/ProgressionEngineTest.kt` | **Novo.** Regras de carga |
 | `app/src/test/java/com/treinos/app/ui/progression/ReviewScheduleTest.kt` | **Novo.** Adiamento e ciclo |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

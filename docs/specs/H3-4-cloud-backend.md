@@ -47,7 +47,7 @@ autenticação nem expor os dados a quem descobrir a URL.
 | `app/src/test/java/com/treinos/app/data/remote/BackendClientAuthTest.kt` | **Novo.** Header real com MockWebServer |
 | `app/src/test/java/com/treinos/app/data/prefs/BackendSelectionTest.kt` | **Novo.** URL efetiva (puro) |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

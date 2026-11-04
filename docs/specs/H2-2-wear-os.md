@@ -8,7 +8,7 @@
 | MoSCoW | `S` |
 | Spec aprovada em | `2026-11-03` |
 | Implementação | `concluída` |
-| Depende de | H1-2 (execução por séries), H3-1 (testes de contrato) |
+| Depende de | H1-2 (execução por séries); os testes de protocolo estão em `protocol/` e H3-1 amplia a cobertura |
 
 ## Objetivo
 

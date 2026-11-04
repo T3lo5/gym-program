@@ -40,7 +40,7 @@ telas e estados de carregamento/vazio/erro que não pareçam “tela quebrada”
 | `app/src/main/res/values/themes.xml` | Janela e barras do sistema coerentes |
 | `app/src/test/java/com/treinos/app/ui/MotionTest.kt` | **Novo.** Regras de transição |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

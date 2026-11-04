@@ -10,7 +10,7 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 > [docs/specs/](docs/specs/) (como cada item deve ser feito). O plano antigo em
 > [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) é histórico.
 >
-> ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**.
+> ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**; o botão **Restaurar do backend** traz o snapshot de volta. O backup JSON está implementado na lógica (H1-4); a ligação dos botões de exportar/importar e a restauração atômica são o H1-7.
 
 ---
 
@@ -19,15 +19,16 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 | Feature | Status |
 |---|---|
 | 📱 App Android (celular) | ✅ Telas de plano, execução, histórico e ajustes |
-| ⌚ App Wear OS (Galaxy Watch FE) | 🚧 Estrutura antiga, fora do APK atual |
+| ⌚ App Wear OS (Galaxy Watch FE) | ✅ MVP (H2-2), APK separado `dist/wear.apk` |
 | 💾 Banco local (Room/SQLite) | ✅ Planos, sessões e séries gravados na hora |
 | 🏋️ Treino offline | ✅ Execução com registro de séries e descanso |
 | 🤖 Geração de treino sob demanda | ✅ IA + fallback local + data de revisão |
 | 🔄 Sincronização manual app → backend | ✅ Snapshot de planos, treinos e séries |
-| ♻️ Restauração por `deviceId` | ✅ Botão "Restaurar do backend" nos Ajustes |
-| 💾 Backup JSON manual | 📋 H1-4 — [spec](docs/specs/H1-4-backup-json.md) |
+| ♻️ Restauração por `deviceId` | 🟡 Download local funciona; restaurar outro ID e atomicidade em H1-7 |
+| 💾 Backup JSON manual | 🟡 Lógica pronta (H1-4); botões de exportar/importar em H1-7 |
 | 🔗 Descoberta LAN (mDNS) | 📋 No backend; app usa URL configurável |
-| ⏱ Timer de descanso no relógio | 📋 Sprint futura |
+| ⏱ Timer de descanso no relógio | ✅ MVP junto com H2-2 |
+| 🏃 Corrida, natação e mobilidade | 📋 H2-5 a H2-7 (specs no roadmap) |
 | ☁️ Backend grátis (Codespaces/Oracle) | ✅ Docker Compose |
 
 ---
@@ -36,24 +37,25 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 
 ```
 TreinosApp/
-├── settings.gradle.kts          # Build atual: somente :app
+├── settings.gradle.kts          # Build: :app, :protocol e :wear
 ├── build.gradle.kts             # Versões centralizadas
 ├── gradle.properties
 ├── docker-compose.yml           # Backend + rede
 ├── ROADMAP.md                   # Fonte de verdade do produto
-├── docs/specs/                  # Specs por item (template + H1-4)
+├── docs/specs/                  # Specs por item (template + H1..H3)
 ├── scripts/                     # Gate de CI (verify.sh, ci-android.sh, ci-backend.sh)
-├── app/                         # App Android (único módulo no APK)
+├── app/                         # App Android do celular (módulo :app)
 │   └── src/main/java/com/treinos/app/
 │       ├── data/local/          # Room: entities, DAO, database
 │       ├── data/remote/         # BackendClient + DTOs
 │       ├── data/prefs/          # AppPreferences
 │       ├── data/WorkoutRepository.kt
 │       └── ui/                  # ViewModel + screens Compose
+├── protocol/                    # Contrato Kotlin/JVM celular ↔ relógio
+├── wear/                        # App Wear OS (módulo :wear, ativo)
 ├── shared/                      # ⚠️ legado, fora do build (ver LEGACY.md)
-├── wear/                        # ⚠️ legado, fora do build (ver LEGACY.md)
 └── back/                        # Backend FastAPI (Python)
-    ├── app/main.py              # /health, /v1/generate-workout, /v1/catalog
+    ├── app/main.py              # /health, /v1/generate-workout, /v1/catalog, /v1/sync
     ├── app/exercise_catalog.json
     └── tests/                   # Pytest
 ```
@@ -88,7 +90,6 @@ curl http://localhost:3000/health
 # 1. Open project → selecione a pasta raiz
 # 2. Wait for Gradle sync
 # 3. Run 'app' no emulador (API 34) ou device físico
-# (O módulo wear ainda não está incluído no settings.gradle.kts atual)
 ```
 
 ### 3. Conexão Celular ↔ PC (LAN)
@@ -104,6 +105,7 @@ curl http://localhost:3000/health
 adb pair <watch-ip>:<port>
 adb connect <watch-ip>:5555
 # No Android Studio: Run 'wear' module
+# O gate também gera dist/wear.apk junto com dist/treinos.apk
 ```
 
 ---
@@ -135,7 +137,8 @@ O comando constrói a imagem Docker (`Dockerfile`), roda dentro dela o mesmo
 script que o CI usa (`scripts/ci-android.sh`) e depois valida o backend
 (`scripts/ci-backend.sh`). Ele usa `clean`, então build/cache antigo do host
 não esconde erro de compilação. Saídas: `dist/treinos.apk`,
-`dist/treinos.apk.sha256`, relatórios de teste e lint em `app/build/reports/`.
+`dist/wear.apk`, `dist/dist.sha256`, relatórios de teste e lint em
+`app/build/reports/` e `wear/build/reports/`.
 
 Atalhos:
 
@@ -148,9 +151,10 @@ SKIP_BACKEND=1 ./scripts/verify.sh   # só Android
 
 ```
 https://github.com/T3lo5/gym-program/releases/latest/download/treinos.apk
+https://github.com/T3lo5/gym-program/releases/latest/download/wear.apk
 ```
 
-O checksum fica em `treinos.apk.sha256`, na mesma release.
+Os checksums ficam em `treinos.apk.sha256` e `wear.apk.sha256`, na mesma release.
 
 ### Disparar manualmente
 
@@ -177,9 +181,9 @@ e `RELEASE_KEY_PASSWORD` e troque o workflow para usar `assembleRelease`.
 
 ## 🏗️ Arquitetura
 
-> O código ativo está em `app/src/main/java/com/treinos/app/`. Os diretórios
-> `shared/`, `wear/` e `app/src/main/java/com/treinos/shared/` são **legados** e
-> não entram no build/APK atual (ver `LEGACY.md` em cada um).
+> O código ativo está em `app/src/main/java/com/treinos/app/`, `wear/` e
+> `protocol/`. Os diretórios `shared/` e `app/src/main/java/com/treinos/shared/`
+> são **legados** e não entram no build (ver `LEGACY.md` em cada um).
 
 ### App Android (`app`)
 - **Room:** `WorkoutPlanEntity`, `WorkoutDayEntity`, `WorkoutPlanExerciseEntity`,
@@ -201,6 +205,7 @@ e `RELEASE_KEY_PASSWORD` e troque o workflow para usar `assembleRelease`.
   - `POST /v1/generate-workout` — gera treino validado (IA + fallback local)
   - `GET /v1/sync/download` — restaura snapshot por `deviceId`
   - `POST /v1/sync` — recebe o snapshot do app
+  - `GET /v1/sync/status` e `GET /v1/sync/plans` — inspecionam o snapshot
 - **Prompt Engineering:** catálogo resumido injetado no system prompt
 - **Validação:** IDs de exercício conferidos contra o catálogo local
 - **Testes:** `back/tests/` (Ruff + Pytest no gate)
@@ -209,10 +214,11 @@ e `RELEASE_KEY_PASSWORD` e troque o workflow para usar `assembleRelease`.
 
 ## 📊 Banco de Exercícios (free-exercise-db)
 
-- **Fonte:** https://github.com/yuhonas/free-exercise-domínio público (Unlicense)
+- **Fonte:** https://github.com/yuhonas/free-exercise-db (Unlicense)
 - **876 exercícios** com: id, nome, força, nível, mecânica, equipamento, músculos primários/secundários, instruções, categoria, imagens
-- **Embutido no APK** via `ExerciseCatalog.kt` (auto-gerado por `scripts/import-exercises.js`)
-- **Imagens:** Servidas via `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/<id>/0.jpg`
+- **Onde vive:** `back/app/exercise_catalog.json`; o backend usa o catálogo para gerar e validar planos
+- **No app:** o catálogo é baixado de `GET /v1/catalog` sob demanda e cacheado localmente (H1-3); não é mais embutido no APK
+- **Imagens:** servidas via `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/<id>/0.jpg` e cacheadas por 7 dias
 
 ---
 
@@ -246,35 +252,44 @@ MODEL_ID=sensenova-6.8-flash-lite
 
 ---
 
-## 📝 Sprints
+## 🗺️ Roadmap
 
-| Sprint | Entregável |
+O [ROADMAP.md](ROADMAP.md) é a fonte de verdade do produto; cada item tem uma
+spec em [docs/specs/](docs/specs/) definindo como ele deve ser feito.
+
+| Horizonte | Foco |
 |---|---|
-| **S0** (feito) | Fundação: Room, catálogo 876 exercícios, Docker backend, navegação base |
-| **S1** (em andamento) | CRUD treinos offline completo (editor, execução, histórico) |
-| **S2** | Integração "Gerar com IA" + validação |
-| **S3** | Descoberta LAN automática (mDNS) + fallback manual |
-| **S4** | Wear OS MVP: timer descanso, próximo exercício, sync Data Layer |
-| **S5** | Polimento: animações, A11y, testes, CI |
-| **S6** (opcional) | Backend na nuvem grátis (Codespaces/Oracle) |
+| Concluído | H1-1 a H1-5, H2-2 (Wear OS) e H2-3 (download do backend) |
+| Agora | H1-6 fundação de dados e H1-7 correções de restauração/backup |
+| Próximo | H2-5 registro avulso (natação), H2-6 plano híbrido, H2-1 LAN |
+| Depois | H2-7 mobilidade, H2-4 histórico com calendário, H3-1 a H3-5 |
+
+> `docs/SPRINT-PLAN.md` é histórico e **não** deve ser usado para decidir o
+> próximo passo.
 
 ---
 
 ## 🛠️ Desenvolvimento
 
 ```bash
-# Gerar catálogo atualizado (se free-exercise-db mudar)
-node scripts/import-exercises.js back/app/exercise_catalog.json shared/src/main/java/com/treinos/shared/data/
-
-# Build backend
-cd back && docker build -t treinos-backend .
-
-# Logs backend
+# Backend local
+docker compose up -d --build
 docker logs -f treinos-backend
+
+# Build dos módulos ativos
+./gradlew :app:assembleDebug
+./gradlew :wear:assembleDebug
+
+# Gate completo (build + testes + lint + assinatura + backend)
+./scripts/verify.sh
 
 # ADB reverse (dev no emulador)
 adb reverse tcp:3000 tcp:3000
 ```
+
+> O catálogo fica versionado em `back/app/exercise_catalog.json`; o app baixa
+> via `GET /v1/catalog` e mantém cache local. Não há mais catálogo Kotlin
+> embutido no APK.
 
 ---
 

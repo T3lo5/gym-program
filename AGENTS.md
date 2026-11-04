@@ -18,11 +18,13 @@ commit, não abra PR e não diga “pronto”.
 `./scripts/verify.sh` constrói a imagem Docker do CI local e roda, contra o
 working tree, com `clean`:
 
-- `:app:testDebugUnitTest` — testes unitários JVM;
-- `:app:lintDebug` — Android Lint;
-- `:app:assembleDebug` — compilação limpa;
-- `apksigner verify` — assinatura do APK;
-- pacote `dist/treinos.apk` + SHA-256;
+- `:protocol:test` — contrato compartilhado entre celular e relógio;
+- `:app:testDebugUnitTest` — testes unitários JVM do celular;
+- `:wear:testDebugUnitTest` — testes unitários JVM do relógio;
+- `:app:lintDebug` e `:wear:lintDebug` — Android Lint;
+- `:app:assembleDebug` e `:wear:assembleDebug` — compilação limpa;
+- `apksigner verify` — assinatura dos APKs do celular e do relógio;
+- pacotes `dist/treinos.apk` e `dist/wear.apk` + SHA-256;
 - backend: Ruff, import do FastAPI e Pytest em container limpo.
 
 O `clean` é essencial: `app/build` e cache do host mascaram erros de
@@ -88,19 +90,22 @@ comentar código). Corrija a causa.
 
 - Pré-requisito: Docker com daemon acessível. O primeiro `verify.sh` baixa o
   Android SDK e pode demorar; os seguintes usam `.gradle-docker/`.
-- Saídas: `dist/treinos.apk`, `dist/treinos.apk.sha256`,
-  `app/build/reports/tests/...`, `app/build/reports/lint-results-debug.html`.
+- Saídas: `dist/treinos.apk`, `dist/wear.apk`, `dist/dist.sha256`,
+  `app/build/reports/tests/...`, `app/build/reports/lint-results-debug.html`,
+  `wear/build/reports/lint-results-debug.html`.
 - Se o gate passa e o GitHub Actions falha, trate como bug de paridade: veja o
   log com `gh run view <id> --log-failed` e alinhe `scripts/ci-android.sh`.
 
 ## Mapa rápido
 
-- `app/` — app Android (módulo incluído em `settings.gradle.kts`)
+- `app/` — app Android do celular (módulo `:app` em `settings.gradle.kts`)
+- `wear/` — app Wear OS (módulo `:wear`, ativo; H2-2)
+- `protocol/` — contrato Kotlin/JVM compartilhado entre celular e relógio
 - `back/` — FastAPI + SQLite (`back/app`, testes em `back/tests`)
 - `ROADMAP.md` — fonte de verdade do produto (o que fazer)
 - `docs/specs/` — specs por item; `_TEMPLATE.md` é o formato obrigatório
 - `docs/SPRINT-PLAN.md` — histórico superado (não usar)
-- `shared/`, `wear/` — **legados**, fora do build (ver `LEGACY.md` em cada um)
+- `shared/` — **legado**, fora do build (ver `LEGACY.md`)
 - `app/src/main/java/com/treinos/shared/` — **legado**, não referenciado (ver `LEGACY.md`)
 - `scripts/ci-android.sh` — CI Android (fonte única)
 - `scripts/ci-backend.sh` — CI backend

@@ -38,7 +38,7 @@ tanto na IA quanto no fallback local.
 | `back/tests/test_profile_adjustments.py` | **Novo.** Testes das regras |
 | `app/src/test/java/com/treinos/app/ui/ProfileValidatorTest.kt` | **Novo.** Validação pura dos campos |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

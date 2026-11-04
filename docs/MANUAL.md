@@ -1,6 +1,6 @@
 # Manual de Utilização — Treinos App
 
-**Versão do manual:** 1.1 — 02/11/2026  
+**Versão do manual:** 1.2 — 04/11/2026<br>
 **Público:** qualquer pessoa que queira instalar o app ou rodar o backend localmente.
 
 Este manual explica, passo a passo:
@@ -29,13 +29,17 @@ já funciona nesta versão:
 | Telas de plano, execução, histórico e ajustes no app | ✅ Funciona |
 | Registro de séries no SQLite do aparelho | ✅ Funciona |
 | Sincronização manual app → backend | ✅ Funciona pelo botão **Sincronizar agora** |
-| Módulo Wear OS | 🚧 Não incluído no APK atual |
+| Restauração do backend por `deviceId` | ✅ Funciona pelo botão **Restaurar do backend** |
+| Backup JSON manual | 🟡 Lógica pronta; botões de exportar/importar em correção (H1-7) |
+| Módulo Wear OS | ✅ MVP (H2-2), APK separado `wear.apk` |
 
 > **Resumo:** o app já cria treinos, executa o treino, registra as séries no
 > SQLite do aparelho e mostra o histórico. O backend é chamado **somente**
 > quando você gera um treino novo ou toca em **Sincronizar**. A geração
 > devolve o plano e a data em que ele deve ser revisto; se a IA não estiver
-> disponível, o backend monta um plano válido com o catálogo local.
+> disponível, o backend monta um plano válido com o catálogo local. A lógica de
+> backup JSON existe; a ligação dos botões de exportar/importar é concluída em
+> H1-7.
 
 ---
 
@@ -105,6 +109,9 @@ Pronto. O app abre na tela **Treinos**. Na primeira vez não há plano: toque em
 **Gerar meu primeiro treino** e siga o formulário. Detalhes em
 [Primeiro uso](#33-primeiro-uso).
 
+> Para o relógio Wear OS, baixe também o `wear.apk` no mesmo link de release
+> (`.../releases/latest/download/wear.apk`) e instale no relógio.
+
 > Detalhes e solução de problemas: [Parte A](#parte-a--app-android-front).
 
 ### 2.2 Quero subir o backend
@@ -158,7 +165,7 @@ Checklist mínimo:
 |---|---|---|
 | Sistema | Android 8.0 (API 26) | Android 10 ou superior |
 | Espaço livre | ~30 MB | ~100 MB |
-| Internet | Para baixar e atualizar | Para usar IA no futuro |
+| Internet | Para baixar e atualizar | Para gerar treino com IA e sincronizar/restaurar |
 | Conta | Não precisa | — |
 | Root | Não precisa | — |
 
@@ -188,6 +195,8 @@ Actions. Ele não vem da Play Store e é assinado com uma chave de teste.
 
 2. Baixe `treinos.apk`.
 3. Transfira para o celular por cabo USB, Google Drive, Telegram ou e-mail.
+
+> Para o relógio, baixe `wear.apk` na mesma página de releases.
 
 **Conferir o checksum (opcional, mas recomendado):**
 
@@ -336,6 +345,19 @@ Na tela inicial, toque em **Ajustes**.
 
 O envio **nunca é automático**: enquanto você não tocar em **Sincronizar
 agora**, o banco do backend não recebe nenhum dado do app.
+
+**Restaurar do backend e backup JSON:**
+
+- **Restaurar do backend** baixa o snapshot do `deviceId` exibido em Ajustes e
+  **substitui** o banco local. Use antes de limpar os dados ou reinstalar.
+- **Exportar backup** gera um arquivo JSON com planos, sessões e séries.
+- **Importar backup** lê o arquivo e substitui os dados locais.
+- O backup JSON é o caminho mais seguro: ele não depende de o backend estar no
+  ar nem de o `deviceId` ter sido sincronizado antes.
+
+> **Versão atual:** a lógica de backup existe, mas os botões de exportar/importar
+> ainda não abrem o seletor de arquivo. A correção está no item H1-7. Até lá,
+> use o backup do Android ou mantenha o app instalado.
 
 #### 3.3.5 Funcionamento sem internet
 
@@ -503,6 +525,7 @@ O backend é uma API feita em **FastAPI** (Python). Ele:
 | GET | `/v1/catalog/summary` | Resumo do catálogo |
 | POST | `/v1/generate-workout` | Gerar um treino sob demanda (IA ou fallback local) |
 | POST | `/v1/sync` | Receber o snapshot manual enviado pelo app |
+| GET | `/v1/sync/download?deviceId=...` | Baixar o snapshot para restaurar no app |
 | GET | `/v1/sync/status?deviceId=...` | Contar planos, treinos e séries sincronizados |
 | GET | `/v1/sync/plans?deviceId=...` | Listar os planos sincronizados do aparelho |
 | GET | `/docs` | Documentação interativa (Swagger UI) |
@@ -1019,9 +1042,9 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 
 ## 5. Conectar o celular ao backend
 
-> **Atenção:** o APK atual ainda não tem tela de configuração de backend.
-> Esta seção deixa o ambiente pronto para as próximas versões e serve para
-> testar a API por outros meios.
+> **Onde configurar:** no app, abra **Ajustes**, informe a URL do backend e
+> toque em **Salvar** e **Testar conexão**. O restante desta seção explica como
+> descobrir o endereço correto e testar a API por fora do app.
 
 ### 5.1 Mesma rede Wi-Fi
 
@@ -1165,8 +1188,10 @@ docker compose up -d --build
 - O arquivo `back/.env` contém sua chave e **não** vai para o Git. Guarde uma
   cópia segura se precisar.
 - **Dados do app:** ficam no SQLite interno do aparelho (`treinos.db` do Room).
-  Desinstalar o app apaga esses dados. Ainda não há exportação manual; use o
-  backup do Android ou mantenha o app instalado.
+  Desinstalar o app apaga esses dados. A lógica de **Exportar backup** e
+  **Importar backup** existe, mas a ligação dos botões está em correção (H1-7).
+  Também é possível usar **Restaurar do backend**, desde que você já tenha
+  sincronizado o `deviceId`.
 - **Dados do backend:** ficam em `back/data/treinos.db`. Para backup, copie
   esse arquivo com o backend parado:
 
@@ -1180,7 +1205,9 @@ docker compose up -d --build
   definido em `DATABASE_PATH`).
 
 > A sincronização é um snapshot: o backend guarda a última versão enviada de
-> cada plano/treino/série, identificada pelo ID local do aparelho.
+> cada plano/treino/série, identificada pelo ID local do aparelho. Restaurar do
+> backend substitui o banco local pelo snapshot — exporte um JSON antes se
+> quiser um caminho de volta garantido.
 
 ### 6.5 Reset total
 
@@ -1385,10 +1412,11 @@ séries e ver o histórico funcionam offline, porque tudo fica no SQLite do
 aparelho.
 
 **Funciona no iPhone?**
-Não. O projeto é Android (e Wear OS no futuro).
+Não. O projeto é Android, com um app separado para Wear OS.
 
 **Funciona no meu relógio?**
-O módulo Wear OS existe no repositório, mas não está incluído no APK atual.
+Sim, no Galaxy Watch FE: o app do relógio é o `wear.apk`, distribuído junto com
+o `treinos.apk` (H2-2).
 
 **Onde ficam meus dados?**
 No celular: banco Room/SQLite interno do app, preenchido na hora em que você

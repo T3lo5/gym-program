@@ -41,7 +41,7 @@ que o usuário reconheça o movimento sem depender só do nome em inglês.
 | `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | Botão “Atualizar catálogo” + status |
 | `app/src/test/java/com/treinos/app/data/media/ExerciseMediaTest.kt` | **Novo.** URL, parse e cache |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

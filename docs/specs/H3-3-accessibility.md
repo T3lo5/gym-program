@@ -39,7 +39,7 @@ perder informação nem ações — inclusive durante o treino.
 | `app/src/test/java/com/treinos/app/ui/A11yTest.kt` | **Novo.** Descrições e anúncios |
 | `app/src/test/java/com/treinos/app/ui/ContrastTest.kt` | **Novo.** Contraste do tema |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

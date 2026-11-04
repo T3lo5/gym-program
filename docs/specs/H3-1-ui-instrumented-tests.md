@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-1` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `em andamento` (12 arquivos JVM + gate; falta UI/Room/contrato) |
 | Depende de | H1-4 (fluxo de backup) e H2-4 (histórico) para os testes de UI |
 
 ## Objetivo
@@ -44,7 +44,7 @@ contrato JSON entre app e backend — sem exigir emulador no `./scripts/verify.s
 | `.github/workflows/android.yml` | Subir o relatório de cobertura como artifact |
 | `docs/MANUAL.md` | Como rodar `connectedDebugAndroidTest` localmente |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 

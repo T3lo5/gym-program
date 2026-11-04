@@ -36,7 +36,7 @@ precisar digitar IP:porta. O campo manual continua como fallback.
 | `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | Lista de backends + “Conectar” + estados |
 | `app/src/test/java/com/treinos/app/data/discovery/DiscoveredBackendTest.kt` | **Novo.** URL, dedupe, validação |
 
-Não edite `shared/`, `wear/` nem `com.treinos.shared/`.
+Não edite `shared/` nem `com.treinos.shared/` (legado).
 
 ## Modelo de dados / contrato
 
