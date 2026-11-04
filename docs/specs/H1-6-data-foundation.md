@@ -7,7 +7,8 @@
 | Item do roadmap | `H1-6` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-04` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
+| Verificação | `./scripts/verify.sh` verde em 2026-11-04: 70 testes JVM do `:app` (inclui os 3 do `MigrationTest`), `:protocol`, `:wear`, lint dos dois módulos, `assembleDebug`, `apksigner verify`, Ruff + 22 testes do backend |
 | Depende de | nada para o código; o teste de migração usa Robolectric + `room-testing`, já presentes |
 
 ## Objetivo
@@ -40,7 +41,7 @@ e sincronização continuem compatíveis, criando os campos que o registro avuls
 | `app/src/main/java/com/treinos/app/data/remote/BackendDtos.kt` | Campos novos em `SyncDayDto`, `SyncPlanExerciseDto`, `SyncSessionDto` e nos equivalentes `SyncDownload*` |
 | `back/app/main.py` | Campos novos nos modelos Pydantic de sync (com defaults) |
 | `back/app/database.py` | Colunas novas no `SCHEMA`; migração aditiva em `init_db()`; corrigir a query de dias em `get_sync_download_data` |
-| `app/build.gradle.kts` | Incluir `app/schemas` também no source set de testes (`test`) para o `MigrationTestHelper` |
+| `app/build.gradle.kts` | Publicar `app/schemas` nos assets do **variante `debug`** (não no source set `test`): para unit tests o AGP resolve os assets pelo merge do variante, `assets/debug/mergeDebugAssets` |
 | `app/schemas/com.treinos.app.data.local.AppDatabase/2.json` | **Gerado** pelo build e versionado, como o `1.json` |
 | `app/src/test/java/com/treinos/app/data/local/MigrationTest.kt` | **Novo.** Migração 1 → 2 preservando linhas |
 | `app/src/test/java/com/treinos/app/data/backup/BackupSerializationTest.kt` | v1 e v2 |

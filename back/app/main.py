@@ -291,6 +291,13 @@ class SyncSession(BaseModel):
     totalDurationSeconds: int = 0
     notes: str = ""
     exercises: List[SyncSessionExercise] = Field(default_factory=list)
+    modality: str = "strength"
+    source: str = "plan"
+    title: str = ""
+    totalDistanceMeters: Optional[float] = None
+    poolLengthMeters: Optional[int] = None
+    stroke: Optional[str] = None
+    sessionRpe: Optional[float] = None
 
 
 class SyncPlanExercise(BaseModel):
@@ -305,6 +312,11 @@ class SyncPlanExercise(BaseModel):
     exerciseName: str = ""
     primaryMuscles: List[str] = Field(default_factory=list)
     equipment: str = ""
+    metricType: str = "reps_weight"
+    targetDurationSeconds: Optional[int] = None
+    targetDistanceMeters: Optional[float] = None
+    targetPaceSecondsPerKm: Optional[int] = None
+    targetHrZone: Optional[str] = None
 
 
 class SyncDay(BaseModel):
@@ -314,6 +326,8 @@ class SyncDay(BaseModel):
     notes: str = ""
     isRestDay: bool = False
     exercises: List[SyncPlanExercise] = Field(default_factory=list)
+    modality: str = "strength"
+    weekday: Optional[int] = None
 
 
 class SyncPlan(BaseModel):

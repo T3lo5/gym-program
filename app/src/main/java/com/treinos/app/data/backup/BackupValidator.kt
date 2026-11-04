@@ -8,9 +8,14 @@ data class BackupValidationResult(
 
 object BackupValidator {
 
-    private const val EXPECTED_SCHEMA_VERSION = 1
     private const val EXPECTED_PACKAGE_NAME = "com.treinos.app"
     private const val MAX_FILE_BYTES = 25L * 1024 * 1024
+    private val SUPPORTED_VERSIONS = setOf(1, 2)
+    private val MODALITIES = setOf("strength", "run", "swim", "mobility", "other")
+    private val SOURCES = setOf("plan", "manual")
+    private val METRIC_TYPES = setOf("reps_weight", "duration", "distance_duration")
+    private val POOL_LENGTHS = setOf(25, 50)
+    private val STROKES = setOf("crawl", "costas", "peito", "borboleta", "misto", "outro")
 
     fun validateSize(fileSizeBytes: Long): BackupValidationResult =
         if (fileSizeBytes > MAX_FILE_BYTES) {
@@ -24,10 +29,10 @@ object BackupValidator {
         }
 
     fun validate(file: BackupFile): BackupValidationResult {
-        if (file.schemaVersion != EXPECTED_SCHEMA_VERSION) {
+        if (file.schemaVersion !in SUPPORTED_VERSIONS) {
             return BackupValidationResult(
                 valid = false,
-                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada $EXPECTED_SCHEMA_VERSION).",
+                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada 1 ou 2).",
                 preview = null,
             )
         }
@@ -57,7 +62,7 @@ object BackupValidator {
                 )
             }
 
-                val dayIds = mutableSetOf<Long>()
+            val dayIds = mutableSetOf<Long>()
             for (day in plan.days) {
                 if (!dayIds.add(day.id)) {
                     return BackupValidationResult(
@@ -70,6 +75,13 @@ object BackupValidator {
                     return BackupValidationResult(
                         valid = false,
                         message = "Dia '${day.name}' não pertence ao plano '${plan.name}' (planId órfão).",
+                        preview = null,
+                    )
+                }
+                if (day.modality !in MODALITIES) {
+                    return BackupValidationResult(
+                        valid = false,
+                        message = "modality inválida no dia '${day.name}'.",
                         preview = null,
                     )
                 }
@@ -104,16 +116,51 @@ object BackupValidator {
                             preview = null,
                         )
                     }
+                    if (exercise.metricType !in METRIC_TYPES) {
+                        return BackupValidationResult(
+                            valid = false,
+                            message = "metricType inválido no exercício '${exercise.exerciseName}'.",
+                            preview = null,
+                        )
+                    }
                 }
             }
         }
 
-            val sessionIds = mutableSetOf<Long>()
+        val sessionIds = mutableSetOf<Long>()
         for (session in file.sessions) {
             if (!sessionIds.add(session.id)) {
                 return BackupValidationResult(
                     valid = false,
                     message = "IDs de sessão duplicados no backup.",
+                    preview = null,
+                )
+            }
+            if (session.modality !in MODALITIES) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "modality inválida na sessão ${session.id}.",
+                    preview = null,
+                )
+            }
+            if (session.source !in SOURCES) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "source inválido na sessão ${session.id}.",
+                    preview = null,
+                )
+            }
+            if (session.poolLengthMeters != null && session.poolLengthMeters !in POOL_LENGTHS) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "poolLengthMeters inválido na sessão ${session.id}.",
+                    preview = null,
+                )
+            }
+            if (session.stroke != null && session.stroke !in STROKES) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "stroke inválido na sessão ${session.id}.",
                     preview = null,
                 )
             }

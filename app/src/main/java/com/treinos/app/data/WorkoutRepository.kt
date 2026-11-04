@@ -236,6 +236,7 @@ class WorkoutRepository(
 
         // Mapeia localId do servidor -> novo ID do Room
         val planIdMap = mutableMapOf<Long, Long>()
+        val dayIdMap = mutableMapOf<Long, Long>()
 
         // Restaura planos, dias e exercícios
         for (planDto in data.plans) {
@@ -266,9 +267,13 @@ class WorkoutRepository(
                         planId = newPlanId,
                         name = dayDto.name,
                         dayOrder = dayDto.dayOrder,
+                        notes = dayDto.notes,
                         isRestDay = dayDto.isRestDay,
+                        modality = dayDto.modality,
+                        weekday = dayDto.weekday,
                     )
                 )
+                dayIdMap[dayDto.localId] = dayId
                 val exDtos = data.planExercises.filter { it.dayId == dayDto.id }
                 dao.insertPlanExercises(
                     exDtos.map { ex ->
@@ -286,6 +291,11 @@ class WorkoutRepository(
                             restSeconds = ex.restSeconds,
                             notes = ex.notes,
                             isSupersetWithPrevious = ex.isSupersetWithPrevious,
+                            metricType = ex.metricType,
+                            targetDurationSeconds = ex.targetDurationSeconds,
+                            targetDistanceMeters = ex.targetDistanceMeters,
+                            targetPaceSecondsPerKm = ex.targetPaceSecondsPerKm,
+                            targetHrZone = ex.targetHrZone,
                         )
                     }
                 )
@@ -307,17 +317,26 @@ class WorkoutRepository(
         // Restaura sessões, exercícios de sessão e set logs
         for (sessionDto in data.sessions) {
             val planRoomId = planIdMap[sessionDto.planLocalId] ?: sessionDto.planLocalId
+            val dayRoomId = dayIdMap[sessionDto.dayLocalId] ?: sessionDto.dayLocalId
             val newSessionId = dao.insertSession(
                 WorkoutSessionEntity(
                     id = sessionDto.id,
                     planId = planRoomId,
-                    dayId = sessionDto.dayLocalId,
+                    dayId = dayRoomId,
                     planName = sessionDto.planName,
                     dayName = sessionDto.dayName,
                     status = sessionDto.status,
                     startedAt = sessionDto.startedAt,
                     endedAt = sessionDto.endedAt,
                     totalDurationSeconds = sessionDto.totalDurationSeconds,
+                    notes = sessionDto.notes,
+                    modality = sessionDto.modality,
+                    source = sessionDto.source,
+                    title = sessionDto.title,
+                    totalDistanceMeters = sessionDto.totalDistanceMeters,
+                    poolLengthMeters = sessionDto.poolLengthMeters,
+                    stroke = sessionDto.stroke,
+                    sessionRpe = sessionDto.sessionRpe,
                 )
             )
             sessionIdMap[sessionDto.localId] = newSessionId
@@ -332,6 +351,7 @@ class WorkoutRepository(
                         exerciseOrder = ex.exerciseOrder,
                         plannedSets = ex.plannedSets,
                         completedSets = ex.completedSets,
+                        restSeconds = 90,
                         startedAt = ex.startedAt,
                         endedAt = ex.endedAt,
                     )
@@ -349,6 +369,8 @@ class WorkoutRepository(
                             reps = set.reps,
                             weightKg = set.weightKg,
                             rpe = set.rpe,
+                            durationSeconds = set.durationSeconds,
+                            distanceMeters = set.distanceMeters,
                             isCompleted = set.isCompleted,
                             isWarmup = set.isWarmup,
                             restTakenSeconds = set.restTakenSeconds,
@@ -409,7 +431,7 @@ class WorkoutRepository(
         }
 
         val file = BackupFile(
-            schemaVersion = 1,
+            schemaVersion = 2,
             exportedAt = Instant.now().toString(),
             app = BackupApp(
                 packageName = "com.treinos.app",
@@ -421,7 +443,7 @@ class WorkoutRepository(
             sessions = backupSessions,
         )
 
-        Json.encodeToString(BackupFile.serializer(), file)
+        Json { encodeDefaults = true }.encodeToString(BackupFile.serializer(), file)
     }
 
     suspend fun importBackup(payload: BackupFile) = withContext(Dispatchers.IO) {
@@ -549,6 +571,8 @@ class WorkoutRepository(
         dayOrder = day.dayOrder,
         notes = day.notes,
         isRestDay = day.isRestDay,
+        modality = day.modality,
+        weekday = day.weekday,
         exercises = exercises
             .sortedBy { it.exerciseOrder }
             .map { exercise ->
@@ -567,6 +591,11 @@ class WorkoutRepository(
                         .map { it.trim() }
                         .filter { it.isNotEmpty() },
                     equipment = exercise.equipment,
+                    metricType = exercise.metricType,
+                    targetDurationSeconds = exercise.targetDurationSeconds,
+                    targetDistanceMeters = exercise.targetDistanceMeters,
+                    targetPaceSecondsPerKm = exercise.targetPaceSecondsPerKm,
+                    targetHrZone = exercise.targetHrZone,
                 )
             },
     )
@@ -582,6 +611,13 @@ class WorkoutRepository(
         endedAt = session.endedAt,
         totalDurationSeconds = session.totalDurationSeconds,
         notes = session.notes,
+        modality = session.modality,
+        source = session.source,
+        title = session.title,
+        totalDistanceMeters = session.totalDistanceMeters,
+        poolLengthMeters = session.poolLengthMeters,
+        stroke = session.stroke,
+        sessionRpe = session.sessionRpe,
         exercises = exercises
             .sortedBy { it.exercise.exerciseOrder }
             .map { exercise ->

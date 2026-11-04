@@ -228,4 +228,96 @@ class BackupValidatorTest {
         val result = BackupValidator.validate(validFile(sessions = listOf(sessaoSemPlano)))
         assertTrue(result.valid)
     }
+
+    @Test
+    fun aceita_v1() {
+        assertTrue(BackupValidator.validate(validFile(schemaVersion = 1)).valid)
+    }
+
+    @Test
+    fun aceita_v2() {
+        assertTrue(BackupValidator.validate(validFile(schemaVersion = 2)).valid)
+    }
+
+    @Test
+    fun rejeita_v3() {
+        val result = BackupValidator.validate(validFile(schemaVersion = 3))
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("3") == true)
+    }
+
+    @Test
+    fun rejeita_modality_invalida() {
+        val dia = validDay(id = 10, planId = 1).copy(modality = "danca")
+        val plano = validPlan(id = 1, days = listOf(dia))
+
+        val result = BackupValidator.validate(
+            validFile(plans = listOf(plano), schemaVersion = 2)
+        )
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("modality") == true)
+    }
+
+    @Test
+    fun rejeita_source_invalido() {
+        val sessao = validSession(id = 50).copy(source = "importado")
+
+        val result = BackupValidator.validate(
+            validFile(sessions = listOf(sessao), schemaVersion = 2)
+        )
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("source") == true)
+    }
+
+    @Test
+    fun rejeita_metric_type_invalido() {
+        val exercicio = backupExercise(id = 100, dayId = 10).copy(metricType = "tempo")
+        val dia = validDay(id = 10, planId = 1, exercises = listOf(exercicio))
+        val plano = validPlan(id = 1, days = listOf(dia))
+
+        val result = BackupValidator.validate(
+            validFile(plans = listOf(plano), schemaVersion = 2)
+        )
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("metricType") == true)
+    }
+
+    @Test
+    fun rejeita_piscina_invalida() {
+        val sessao = validSession(id = 50).copy(poolLengthMeters = 30)
+
+        val result = BackupValidator.validate(
+            validFile(sessions = listOf(sessao), schemaVersion = 2)
+        )
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("poolLengthMeters") == true)
+    }
+
+    @Test
+    fun rejeita_stroke_invalido() {
+        val sessao = validSession(id = 50).copy(stroke = "peito_invertido")
+
+        val result = BackupValidator.validate(
+            validFile(sessions = listOf(sessao), schemaVersion = 2)
+        )
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("stroke") == true)
+    }
+
+    private fun backupExercise(id: Long, dayId: Long): BackupPlanExercise =
+        BackupPlanExercise(
+            id = id,
+            exerciseId = "EX",
+            exerciseName = "Ex",
+            primaryMuscles = "",
+            equipment = "",
+            exerciseOrder = 0,
+            sets = 3,
+            targetReps = "8-12",
+            targetRpe = null,
+            restSeconds = 90,
+            notes = "",
+            isSupersetWithPrevious = false,
+            dayId = dayId,
+        )
 }

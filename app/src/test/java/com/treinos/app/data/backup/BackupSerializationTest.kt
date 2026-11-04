@@ -5,6 +5,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackupSerializationTest {
@@ -178,5 +179,120 @@ class BackupSerializationTest {
         val encoded = json.encodeToString(BackupFile.serializer(), file)
         val decoded = json.decodeFromString(BackupFile.serializer(), encoded)
         assertEquals(2, decoded.schemaVersion)
+    }
+
+    private val jsonV2 = Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        explicitNulls = true
+    }
+
+    @Test
+    fun exporta_v2_com_campos_novos() {
+        val encoded = jsonV2.encodeToString(
+            BackupFile.serializer(),
+            sampleFile().copy(schemaVersion = 2),
+        )
+
+        assertTrue(encoded.contains("\"schemaVersion\":2"))
+        assertTrue(encoded.contains("\"modality\""))
+        assertTrue(encoded.contains("\"weekday\""))
+        assertTrue(encoded.contains("\"metricType\""))
+        assertTrue(encoded.contains("\"targetDurationSeconds\""))
+        assertTrue(encoded.contains("\"sessionRpe\""))
+    }
+
+    @Test
+    fun importa_v1_com_defaults() {
+        val v1 = """
+            {
+              "schemaVersion": 1,
+              "exportedAt": "2026-01-01T00:00:00Z",
+              "app": {"packageName": "com.treinos.app", "versionName": "1.0", "versionCode": 1},
+              "deviceId": "d1",
+              "plans": [{
+                "id": 1, "serverPlanId": null, "name": "P", "description": "d",
+                "goal": "hypertrophy", "daysPerWeek": 4, "isActive": true,
+                "generatedByAi": false, "createdAt": 1, "updatedAt": 2, "version": 1,
+                "nextReviewAt": null, "reviewAfterWeeks": 4, "source": "local",
+                "days": [{
+                  "id": 10, "planId": 1, "name": "A", "dayOrder": 0, "notes": "",
+                  "isRestDay": false,
+                  "exercises": [{
+                    "id": 100, "exerciseId": "e", "exerciseName": "Ex",
+                    "primaryMuscles": "", "equipment": "", "exerciseOrder": 0,
+                    "sets": 3, "targetReps": "8-12", "targetRpe": null,
+                    "restSeconds": 90, "notes": "", "isSupersetWithPrevious": false,
+                    "dayId": 10
+                  }]
+                }]
+              }],
+              "sessions": []
+            }
+        """.trimIndent()
+
+        val file = json.decodeFromString(BackupFile.serializer(), v1)
+
+        assertEquals(1, file.schemaVersion)
+        assertEquals("strength", file.plans[0].days[0].modality)
+        assertEquals(null, file.plans[0].days[0].weekday)
+        assertEquals("reps_weight", file.plans[0].days[0].exercises[0].metricType)
+        assertEquals(null, file.plans[0].days[0].exercises[0].targetDurationSeconds)
+    }
+
+    @Test
+    fun round_trip_v2() {
+        val file = sampleFile().copy(
+            schemaVersion = 2,
+            plans = sampleFile().plans.map { plan ->
+                plan.copy(
+                    days = plan.days.map { day ->
+                        day.copy(
+                            modality = "run",
+                            weekday = 3,
+                            exercises = day.exercises.map { exercise ->
+                                exercise.copy(
+                                    metricType = "duration",
+                                    targetDurationSeconds = 1800,
+                                    targetPaceSecondsPerKm = 330,
+                                    targetHrZone = "Z2",
+                                )
+                            },
+                        )
+                    },
+                )
+            },
+            sessions = sampleFile().sessions.map { session ->
+                session.copy(
+                    planId = 0,
+                    dayId = 0,
+                    modality = "swim",
+                    source = "manual",
+                    title = "Natação",
+                    totalDistanceMeters = 1500.0,
+                    poolLengthMeters = 25,
+                    stroke = "crawl",
+                    sessionRpe = 7.0,
+                    exercises = emptyList(),
+                )
+            },
+        )
+
+        val decoded = json.decodeFromString(
+            BackupFile.serializer(),
+            jsonV2.encodeToString(BackupFile.serializer(), file),
+        )
+
+        assertEquals("run", decoded.plans[0].days[0].modality)
+        assertEquals(3, decoded.plans[0].days[0].weekday!!)
+        assertEquals("duration", decoded.plans[0].days[0].exercises[0].metricType)
+        assertEquals(1800, decoded.plans[0].days[0].exercises[0].targetDurationSeconds!!)
+        assertEquals("swim", decoded.sessions[0].modality)
+        assertEquals("manual", decoded.sessions[0].source)
+        assertEquals("Natação", decoded.sessions[0].title)
+        assertEquals(1500.0, decoded.sessions[0].totalDistanceMeters!!, 0.0)
+        assertEquals(25, decoded.sessions[0].poolLengthMeters!!)
+        assertEquals("crawl", decoded.sessions[0].stroke)
+        assertEquals(7.0, decoded.sessions[0].sessionRpe!!, 0.0)
     }
 }

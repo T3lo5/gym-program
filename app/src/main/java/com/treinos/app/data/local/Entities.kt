@@ -1,5 +1,6 @@
 package com.treinos.app.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -42,6 +43,9 @@ data class WorkoutDayEntity(
     val dayOrder: Int = 0,
     val notes: String = "",
     val isRestDay: Boolean = false,
+    @ColumnInfo(defaultValue = "strength")
+    val modality: String = "strength",
+    val weekday: Int? = null,
 )
 
 @Entity(
@@ -70,6 +74,12 @@ data class WorkoutPlanExerciseEntity(
     val restSeconds: Int = 90,
     val notes: String = "",
     val isSupersetWithPrevious: Boolean = false,
+    @ColumnInfo(defaultValue = "reps_weight")
+    val metricType: String = "reps_weight",
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceMeters: Double? = null,
+    val targetPaceSecondsPerKm: Int? = null,
+    val targetHrZone: String? = null,
 )
 
 @Entity(tableName = "workout_sessions", indices = [Index("startedAt")])
@@ -84,6 +94,16 @@ data class WorkoutSessionEntity(
     val endedAt: Long? = null,
     val totalDurationSeconds: Long = 0,
     val notes: String = "",
+    @ColumnInfo(defaultValue = "strength")
+    val modality: String = "strength",
+    @ColumnInfo(defaultValue = "plan")
+    val source: String = "plan",
+    @ColumnInfo(defaultValue = "")
+    val title: String = "",
+    val totalDistanceMeters: Double? = null,
+    val poolLengthMeters: Int? = null,
+    val stroke: String? = null,
+    val sessionRpe: Double? = null,
 )
 
 @Entity(

@@ -103,6 +103,8 @@ data class SyncDayDto(
     val notes: String = "",
     val isRestDay: Boolean = false,
     val exercises: List<SyncPlanExerciseDto> = emptyList(),
+    val modality: String = "strength",
+    val weekday: Int? = null,
 )
 
 @Serializable
@@ -118,6 +120,11 @@ data class SyncPlanExerciseDto(
     val exerciseName: String = "",
     val primaryMuscles: List<String> = emptyList(),
     val equipment: String = "",
+    val metricType: String = "reps_weight",
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceMeters: Double? = null,
+    val targetPaceSecondsPerKm: Int? = null,
+    val targetHrZone: String? = null,
 )
 
 @Serializable
@@ -133,6 +140,13 @@ data class SyncSessionDto(
     val totalDurationSeconds: Long = 0,
     val notes: String = "",
     val exercises: List<SyncSessionExerciseDto> = emptyList(),
+    val modality: String = "strength",
+    val source: String = "plan",
+    val title: String = "",
+    val totalDistanceMeters: Double? = null,
+    val poolLengthMeters: Int? = null,
+    val stroke: String? = null,
+    val sessionRpe: Double? = null,
 )
 
 @Serializable
@@ -210,6 +224,8 @@ data class SyncDownloadDayDto(
     val dayOrder: Int,
     val notes: String = "",
     val isRestDay: Boolean = false,
+    val modality: String = "strength",
+    val weekday: Int? = null,
 )
 
 @Serializable
@@ -227,6 +243,11 @@ data class SyncDownloadPlanExerciseDto(
     val exerciseName: String = "",
     val primaryMuscles: String = "",
     val equipment: String = "",
+    val metricType: String = "reps_weight",
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceMeters: Double? = null,
+    val targetPaceSecondsPerKm: Int? = null,
+    val targetHrZone: String? = null,
 )
 
 @Serializable
@@ -244,6 +265,13 @@ data class SyncDownloadSessionDto(
     val totalDurationSeconds: Long = 0,
     val notes: String = "",
     val syncedAt: String? = null,
+    val modality: String = "strength",
+    val source: String = "plan",
+    val title: String = "",
+    val totalDistanceMeters: Double? = null,
+    val poolLengthMeters: Int? = null,
+    val stroke: String? = null,
+    val sessionRpe: Double? = null,
 )
 
 @Serializable

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -14,7 +16,7 @@ import androidx.room.RoomDatabase
         SessionExerciseEntity::class,
         SetLogEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +26,27 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_days ADD COLUMN modality TEXT NOT NULL DEFAULT 'strength'")
+                db.execSQL("ALTER TABLE workout_days ADD COLUMN weekday INTEGER")
+
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN metricType TEXT NOT NULL DEFAULT 'reps_weight'")
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN targetDurationSeconds INTEGER")
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN targetDistanceMeters REAL")
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN targetPaceSecondsPerKm INTEGER")
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN targetHrZone TEXT")
+
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN modality TEXT NOT NULL DEFAULT 'strength'")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'plan'")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN totalDistanceMeters REAL")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN poolLengthMeters INTEGER")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN stroke TEXT")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN sessionRpe REAL")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -31,7 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "treinos.db",
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { instance = it }
             }

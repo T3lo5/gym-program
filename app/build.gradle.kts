@@ -50,11 +50,24 @@ android {
         compose = true
     }
 
-    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    // O MigrationTestHelper lê os schemas exportados do Room pelos assets. Para os
+    // unit tests (Robolectric) o AGP usa o merge de assets do variante debug, então
+    // é ali que `app/schemas` — fonte única, versionada — precisa aparecer.
+    sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
 
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric baixa o android-all para o Maven local em user.home.
+            // Em containers com uid sem entrada no /etc/passwd, user.home vira
+            // "?" e o teste falha antes de rodar. Usa um diretório gravável.
+            val home = System.getProperty("user.home").orEmpty()
+            val writableHome = home.takeIf { it.isNotBlank() && File(it).canWrite() }
+                ?: System.getenv("ROBOLECTRIC_USER_HOME")
+                ?: System.getProperty("java.io.tmpdir")
+            it.systemProperty("user.home", writableHome)
+        }
     }
 
     composeOptions {

@@ -46,6 +46,8 @@ data class BackupDay(
     val dayOrder: Int,
     val notes: String,
     val isRestDay: Boolean,
+    val modality: String = "strength",
+    val weekday: Int? = null,
     val exercises: List<BackupPlanExercise>,
 )
 
@@ -64,6 +66,11 @@ data class BackupPlanExercise(
     val notes: String,
     val isSupersetWithPrevious: Boolean,
     val dayId: Long,
+    val metricType: String = "reps_weight",
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceMeters: Double? = null,
+    val targetPaceSecondsPerKm: Int? = null,
+    val targetHrZone: String? = null,
 )
 
 @Serializable
@@ -78,6 +85,13 @@ data class BackupSession(
     val endedAt: Long?,
     val totalDurationSeconds: Long,
     val notes: String,
+    val modality: String = "strength",
+    val source: String = "plan",
+    val title: String = "",
+    val totalDistanceMeters: Double? = null,
+    val poolLengthMeters: Int? = null,
+    val stroke: String? = null,
+    val sessionRpe: Double? = null,
     val exercises: List<BackupSessionExercise>,
 )
 

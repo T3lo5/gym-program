@@ -172,4 +172,120 @@ class BackupMapperTest {
         assertEquals(1, setLogs.size)
         assertEquals(500L, setLogs.first().exerciseLogId)
     }
+
+    @Test
+    fun sessao_manual_com_plan_id_zero() {
+        val dto = BackupSession(
+            id = 50,
+            planId = 0,
+            dayId = 0,
+            planName = "",
+            dayName = "",
+            status = "completed",
+            startedAt = 1,
+            endedAt = 2,
+            totalDurationSeconds = 1,
+            notes = "",
+            modality = "swim",
+            source = "manual",
+            title = "Natação",
+            totalDistanceMeters = 1500.0,
+            poolLengthMeters = 25,
+            stroke = "crawl",
+            sessionRpe = 7.0,
+            exercises = emptyList(),
+        )
+
+        val entity = BackupMapper.toEntity(dto, planId = dto.planId)
+
+        assertEquals(0L, entity.planId)
+        assertEquals(0L, entity.dayId)
+        assertEquals("swim", entity.modality)
+        assertEquals("manual", entity.source)
+        assertEquals("Natação", entity.title)
+    }
+
+    @Test
+    fun sessao_com_piscina_e_stroke() {
+        val dto = BackupSession(
+            id = 50,
+            planId = 0,
+            dayId = 0,
+            planName = "",
+            dayName = "",
+            status = "completed",
+            startedAt = 1,
+            endedAt = 60,
+            totalDurationSeconds = 59,
+            notes = "8 x 100 m",
+            modality = "swim",
+            source = "manual",
+            title = "Natação",
+            totalDistanceMeters = 1500.0,
+            poolLengthMeters = 50,
+            stroke = "costas",
+            sessionRpe = 6.5,
+            exercises = emptyList(),
+        )
+
+        val entity = BackupMapper.toEntity(dto, planId = dto.planId)
+
+        assertEquals(1500.0, entity.totalDistanceMeters!!, 0.0)
+        assertEquals(50, entity.poolLengthMeters!!)
+        assertEquals("costas", entity.stroke)
+        assertEquals(6.5, entity.sessionRpe!!, 0.0)
+        assertEquals("8 x 100 m", entity.notes)
+    }
+
+    @Test
+    fun dia_sem_weekday() {
+        val dto = BackupDay(
+            id = 10,
+            planId = 1,
+            name = "A",
+            dayOrder = 0,
+            notes = "",
+            isRestDay = false,
+            modality = "run",
+            weekday = null,
+            exercises = emptyList(),
+        )
+
+        val entity = BackupMapper.toEntity(dto, planId = dto.planId)
+
+        assertEquals("run", entity.modality)
+        assertEquals(null, entity.weekday)
+    }
+
+    @Test
+    fun exercicio_sem_alvos() {
+        val dto = BackupPlanExercise(
+            id = 100,
+            exerciseId = "e",
+            exerciseName = "Ex",
+            primaryMuscles = "",
+            equipment = "",
+            exerciseOrder = 0,
+            sets = 3,
+            targetReps = "8-12",
+            targetRpe = null,
+            restSeconds = 90,
+            notes = "",
+            isSupersetWithPrevious = false,
+            dayId = 10,
+            metricType = "distance_duration",
+            targetDurationSeconds = null,
+            targetDistanceMeters = null,
+            targetPaceSecondsPerKm = null,
+            targetHrZone = null,
+        )
+
+        val entity = BackupMapper.toEntity(dto, dayId = dto.dayId)
+
+        assertEquals("distance_duration", entity.metricType)
+        assertEquals(null, entity.targetDurationSeconds)
+        assertEquals(null, entity.targetDistanceMeters)
+        assertEquals(null, entity.targetPaceSecondsPerKm)
+        assertEquals(null, entity.targetHrZone)
+    }
 }

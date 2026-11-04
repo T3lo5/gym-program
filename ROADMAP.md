@@ -35,12 +35,12 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
 | Restauração por `deviceId` | 🟡 | `downloadNow` funciona; restaurar outro ID e atomicidade ficam em H1-7 |
 | Download do backend | 🟡 | `downloadSync` funciona, mas não é atômico e snapshot vazio apaga dados; H1-7 |
-| Testes + CI | 🟡 | 12 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
+| Testes + CI | 🟡 | 13 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
 | Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
 | Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
 | Backup/restore do usuário | 🟡 | Backup JSON implementado, mas botões de exportar/importar estão sem efeito; H1-7 |
 | Imagem/vídeo de exercício | ✅/❌ | Imagens via catálogo (H1-3); vídeo não |
-| Migrações Room | ❌ | Schema v1 com `fallbackToDestructiveMigration`; H1-6 |
+| Migrações Room | ✅ | Room v2 com `MIGRATION_1_2` + `MigrationTest` (1→2 preservando linhas); `fallbackToDestructiveMigration` removido (H1-6) |
 | Registro avulso (natação) | 📋 | H2-5 |
 | Plano híbrido / revisão por IA | 📋 | H2-6 (proposta) |
 | Mobilidade / alongamento | 📋 | H2-7 (proposta) |
@@ -77,12 +77,12 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-5 | Peso/altura na geração | `ProfileValidator`, `profile_adjustments`, `suggest_initial_load`, prompt com perfil; [spec](docs/specs/H1-5-profile.md) |
 | H2-2 | Wear OS MVP (Data Layer) | Módulo `:wear` no build; Data Layer envia sessão para o relógio; tela com timer e próximo exercício; dois APKs no gate; [spec](docs/specs/H2-2-wear-os.md) |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend"; [spec](docs/specs/H2-3-backend-download.md) |
+| H1-6 | Fundação de dados: migração, backup v2 e sync | `AppDatabase.MIGRATION_1_2` sem `fallbackToDestructiveMigration`; schema `2.json` versionado e usado pelo `MigrationTest`; backup v2 (importa v1) com enums validados; sync com campos aditivos e download por `id` interno; migração aditiva no SQLite do backend; testes `MigrationTest`, `BackupSerializationTest`, `BackupValidatorTest`, `BackupMapperTest`, `back/tests/test_sync_contract.py`; [spec](docs/specs/H1-6-data-foundation.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H1-6 | Fundação de dados: migração, backup v2 e sync | **M** | Schema v1 usa `fallbackToDestructiveMigration`; qualquer campo novo apaga dados. Backup v1 é rígido e o sync não tem modalidade. | Migração 1→2 real, backup v2 compatível com v1, campos de modalidade no sync e correção do download por `local_id`. | 3-4 dias | — | [H1-6](docs/specs/H1-6-data-foundation.md) |
 | H1-7 | Correções de restauração, backup e Ajustes | **M** | Botões de backup sem efeito, download não atômico, snapshot vazio apaga dados, `deviceId` muda antes do sucesso e texto de Ajustes contraditório. | File pickers, restauração transacional, validação de snapshot, `deviceId` só após sucesso, importação aplica o ID e texto corrigido. | 3-4 dias | H1-6 | [H1-7](docs/specs/H1-7-restore-backup-fixes.md) |
 
 ### Horizon 2 — Próximo (1-2 meses): multimodal, conectividade e histórico
@@ -111,7 +111,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
-| Fundação de dados (H1-6) | Registro avulso (H2-5) | Mobilidade (H2-7) | Backend na nuvem (H3-4) |
+| Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) | Mobilidade (H2-7) | Backend na nuvem (H3-4) |
 | Correções de restauração/backup (H1-7) | Plano híbrido (H2-6) | Histórico com calendário (H2-4) | Progressão automática de carga (H3-5) |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) | Polimento + animações (H3-2) | Export CSV/Sheets |
 | Testes de UI/Room (H3-1) | Wear OS MVP (H2-2) ✅ | Acessibilidade (H3-3) | Widget/complicação do relógio |
@@ -122,10 +122,9 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 ## 6. Esforço e caminho crítico
 
 ```
-Concluído:  H1-1..H1-5 core + H2-2 Wear + H2-3 download
-Agora:      H1-6 fundação de dados   → não perder histórico ao evoluir
-Próximo:    H1-7 restauração/backup  → parar de apagar dados e ligar a UI
-Depois:     H2-5 registro avulso     → natação/aula entram no histórico
+Concluído:  H1-1..H1-5 core + H2-2 Wear + H2-3 download + H1-6 fundação de dados
+Agora:      H1-7 restauração/backup  → parar de apagar dados e ligar a UI
+Próximo:    H2-5 registro avulso     → natação/aula entram no histórico
 Depois:     H2-6 plano híbrido       → semana com academia + corrida + revisão
 Depois:     H2-7 mobilidade, H2-1 LAN, H2-4 histórico
 Qualidade:  H3-1..H3-5
@@ -167,18 +166,14 @@ não vê (UI, Room, migração e contrato).
 
 ## 9. Próximo passo imediato
 
-Implementar **H1-6 (fundação de dados)** seguindo
-[docs/specs/H1-6-data-foundation.md](docs/specs/H1-6-data-foundation.md):
-migração 1→2, backup v2 compatível com v1, campos de modalidade no sync e
-correção do download.
-
-Depois: **H1-7 (correções de restauração, backup e Ajustes)** —
+Implementar **H1-7 (correções de restauração, backup e Ajustes)** —
 [docs/specs/H1-7-restore-backup-fixes.md](docs/specs/H1-7-restore-backup-fixes.md):
 ligar os file pickers, tornar a restauração transacional, impedir que snapshot
 vazio apague dados, persistir `deviceId` só após sucesso e aplicar o ID vindo do
 backup.
 
-Depois: **H2-5 (registro avulso)**. **H2-6** e **H2-7** são propostas e não
+Depois: **H2-5 (registro avulso)**, que usa os campos de `modality`/`source`
+criados em H1-6. **H2-6** e **H2-7** são propostas e não
 devem começar sem aprovação explícita.
 
 Para iniciar qualquer item, leia a spec correspondente em
@@ -195,8 +190,8 @@ Para iniciar qualquer item, leia a spec correspondente em
 - [H1-3 — Imagens dos exercícios](docs/specs/H1-3-exercise-media.md) — concluída
 - [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — concluída (lógica); UI em H1-7
 - [H1-5 — Peso e altura](docs/specs/H1-5-profile.md) — concluída
-- [H1-6 — Fundação de dados](docs/specs/H1-6-data-foundation.md) — pronta para implementar
-- [H1-7 — Correções de restauração, backup e Ajustes](docs/specs/H1-7-restore-backup-fixes.md) — aprovada; implementar após H1-6
+- [H1-6 — Fundação de dados](docs/specs/H1-6-data-foundation.md) — concluída
+- [H1-7 — Correções de restauração, backup e Ajustes](docs/specs/H1-7-restore-backup-fixes.md) — aprovada; próximo item
 - [H2-1 — Descoberta LAN](docs/specs/H2-1-lan-discovery.md) — pronta para implementar
 - [H2-2 — Wear OS MVP](docs/specs/H2-2-wear-os.md) — concluída
 - [H2-3 — Download do backend](docs/specs/H2-3-backend-download.md) — concluída (retroativa)
@@ -204,7 +199,7 @@ Para iniciar qualquer item, leia a spec correspondente em
 - [H2-5 — Registro avulso](docs/specs/H2-5-adhoc-log.md) — pronta para implementar
 - [H2-6 — Plano híbrido](docs/specs/H2-6-hybrid-plan.md) — proposta
 - [H2-7 — Mobilidade](docs/specs/H2-7-mobility.md) — proposta
-- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — parcial (12 arquivos JVM + gate; falta UI/Room/contrato)
+- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — parcial (13 arquivos JVM + gate + migração Room e contrato app↔backend; falta UI)
 - [H3-2 — Polimento visual](docs/specs/H3-2-visual-polish.md) — pronta para implementar
 - [H3-3 — Acessibilidade](docs/specs/H3-3-accessibility.md) — pronta para implementar
 - [H3-4 — Backend na nuvem com token](docs/specs/H3-4-cloud-backend.md) — pronta para implementar

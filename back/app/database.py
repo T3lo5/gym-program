@@ -22,6 +22,10 @@ DB_PATH = Path(os.getenv("DATABASE_PATH", str(DEFAULT_DB_PATH)))
 _lock = threading.Lock()
 
 
+def _get_db_path() -> Path:
+    return Path(DB_PATH) if not isinstance(DB_PATH, Path) else DB_PATH
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS plan_generations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,6 +73,8 @@ CREATE TABLE IF NOT EXISTS synced_plan_days (
     day_order INTEGER NOT NULL DEFAULT 0,
     notes TEXT NOT NULL DEFAULT '',
     is_rest_day INTEGER NOT NULL DEFAULT 0,
+    modality TEXT NOT NULL DEFAULT 'strength',
+    weekday INTEGER,
     UNIQUE(plan_id, local_id)
 );
 
@@ -86,6 +92,11 @@ CREATE TABLE IF NOT EXISTS synced_plan_exercises (
     exercise_name TEXT NOT NULL DEFAULT '',
     primary_muscles TEXT NOT NULL DEFAULT '[]',
     equipment TEXT NOT NULL DEFAULT '',
+    metric_type TEXT NOT NULL DEFAULT 'reps_weight',
+    target_duration_seconds INTEGER,
+    target_distance_meters REAL,
+    target_pace_seconds_per_km INTEGER,
+    target_hr_zone TEXT,
     UNIQUE(day_id, exercise_order)
 );
 
@@ -103,6 +114,13 @@ CREATE TABLE IF NOT EXISTS synced_sessions (
     total_duration_seconds INTEGER NOT NULL DEFAULT 0,
     notes TEXT NOT NULL DEFAULT '',
     synced_at TEXT NOT NULL,
+    modality TEXT NOT NULL DEFAULT 'strength',
+    source TEXT NOT NULL DEFAULT 'plan',
+    title TEXT NOT NULL DEFAULT '',
+    total_distance_meters REAL,
+    pool_length_meters INTEGER,
+    stroke TEXT,
+    session_rpe REAL,
     UNIQUE(device_id, local_id)
 );
 
@@ -154,8 +172,9 @@ def _now_iso() -> str:
 @contextmanager
 def get_connection():
     """Abre uma conexão por operação (seguro para o uvicorn/threads)."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    db_path = _get_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
@@ -168,9 +187,48 @@ def get_connection():
         conn.close()
 
 
+def _ensure_columns(conn: sqlite3.Connection, table: str, columns: Dict[str, str]) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+
 def init_db() -> None:
     with _lock, get_connection() as conn:
         conn.executescript(SCHEMA)
+        _ensure_columns(
+            conn,
+            "synced_plan_days",
+            {
+                "modality": "TEXT NOT NULL DEFAULT 'strength'",
+                "weekday": "INTEGER",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "synced_plan_exercises",
+            {
+                "metric_type": "TEXT NOT NULL DEFAULT 'reps_weight'",
+                "target_duration_seconds": "INTEGER",
+                "target_distance_meters": "REAL",
+                "target_pace_seconds_per_km": "INTEGER",
+                "target_hr_zone": "TEXT",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "synced_sessions",
+            {
+                "modality": "TEXT NOT NULL DEFAULT 'strength'",
+                "source": "TEXT NOT NULL DEFAULT 'plan'",
+                "title": "TEXT NOT NULL DEFAULT ''",
+                "total_distance_meters": "REAL",
+                "pool_length_meters": "INTEGER",
+                "stroke": "TEXT",
+                "session_rpe": "REAL",
+            },
+        )
 
 
 def save_generation(
@@ -257,8 +315,8 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
         cursor = conn.execute(
             """
             INSERT INTO synced_plan_days (
-                plan_id, local_id, name, day_order, notes, is_rest_day
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                plan_id, local_id, name, day_order, notes, is_rest_day, modality, weekday
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 plan_id,
@@ -267,6 +325,8 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
                 int(day.get("dayOrder", 0)),
                 day.get("notes", ""),
                 1 if day.get("isRestDay") else 0,
+                day.get("modality", "strength"),
+                day.get("weekday"),
             ),
         )
         day_id = int(cursor.lastrowid)
@@ -277,8 +337,10 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
                     day_id, exercise_id, exercise_order, sets, target_reps,
                     target_rpe, rest_seconds, notes,
                     is_superset_with_previous, exercise_name,
-                    primary_muscles, equipment
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    primary_muscles, equipment, metric_type,
+                    target_duration_seconds, target_distance_meters,
+                    target_pace_seconds_per_km, target_hr_zone
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     day_id,
@@ -293,6 +355,11 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
                     exercise.get("exerciseName", ""),
                     json.dumps(exercise.get("primaryMuscles", []), ensure_ascii=False),
                     exercise.get("equipment", ""),
+                    exercise.get("metricType", "reps_weight"),
+                    exercise.get("targetDurationSeconds"),
+                    exercise.get("targetDistanceMeters"),
+                    exercise.get("targetPaceSecondsPerKm"),
+                    exercise.get("targetHrZone"),
                 ),
             )
     return plan_id
@@ -304,8 +371,9 @@ def _upsert_session(conn: sqlite3.Connection, device_id: str, session: Dict[str,
         INSERT INTO synced_sessions (
             device_id, local_id, plan_local_id, day_local_id, plan_name,
             day_name, status, started_at, ended_at, total_duration_seconds,
-            notes, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            notes, synced_at, modality, source, title,
+            total_distance_meters, pool_length_meters, stroke, session_rpe
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(device_id, local_id) DO UPDATE SET
             plan_local_id = excluded.plan_local_id,
             day_local_id = excluded.day_local_id,
@@ -316,7 +384,14 @@ def _upsert_session(conn: sqlite3.Connection, device_id: str, session: Dict[str,
             ended_at = excluded.ended_at,
             total_duration_seconds = excluded.total_duration_seconds,
             notes = excluded.notes,
-            synced_at = excluded.synced_at
+            synced_at = excluded.synced_at,
+            modality = excluded.modality,
+            source = excluded.source,
+            title = excluded.title,
+            total_distance_meters = excluded.total_distance_meters,
+            pool_length_meters = excluded.pool_length_meters,
+            stroke = excluded.stroke,
+            session_rpe = excluded.session_rpe
         """,
         (
             device_id,
@@ -331,6 +406,13 @@ def _upsert_session(conn: sqlite3.Connection, device_id: str, session: Dict[str,
             int(session.get("totalDurationSeconds", 0)),
             session.get("notes", ""),
             synced_at,
+            session.get("modality", "strength"),
+            session.get("source", "plan"),
+            session.get("title", ""),
+            session.get("totalDistanceMeters"),
+            session.get("poolLengthMeters"),
+            session.get("stroke"),
+            session.get("sessionRpe"),
         ),
     )
     row = conn.execute(
@@ -479,7 +561,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
     with get_connection() as conn:
         plans = conn.execute(
             """
-            SELECT local_id, name, description, goal, days_per_week, is_active,
+            SELECT id, local_id, name, description, goal, days_per_week, is_active,
                    generated_by_ai, created_at, updated_at, version, next_review_at,
                    review_after_weeks, source, synced_at
             FROM synced_plans WHERE device_id = ?
@@ -488,57 +570,59 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
         ).fetchall()
 
         plan_rows = [dict(r) for r in plans]
-        plan_ids = [str(r["local_id"]) for r in plan_rows]
+        plan_ids_internal = [r["id"] for r in plan_rows]
 
         days: List[Dict[str, Any]] = []
-        day_ids: List[str] = []
-        if plan_ids:
-            placeholders = ",".join("?" for _ in plan_ids)
+        day_ids_internal: List[str] = []
+        if plan_ids_internal:
+            placeholders = ",".join("?" for _ in plan_ids_internal)
             day_rows = conn.execute(
                 f"""
-                SELECT id, plan_id, local_id, name, day_order, notes, is_rest_day
+                SELECT id, plan_id, local_id, name, day_order, notes, is_rest_day, modality, weekday
                 FROM synced_plan_days
                 WHERE plan_id IN ({placeholders})
                 """,
-                [int(pid) for pid in plan_ids],
+                plan_ids_internal,
             ).fetchall()
             days = [dict(r) for r in day_rows]
-            day_ids = [str(r["local_id"]) for r in days]
+            day_ids_internal = [str(r["id"]) for r in days]
 
         plan_exercises: List[Dict[str, Any]] = []
-        if day_ids:
-            placeholders = ",".join("?" for _ in day_ids)
-            day_row_ids = [str(d["id"]) for d in days]
+        if day_ids_internal:
+            placeholders = ",".join("?" for _ in day_ids_internal)
             ex_rows = conn.execute(
                 f"""
                 SELECT id, day_id, exercise_id, exercise_order, sets, target_reps,
                        target_rpe, rest_seconds, notes, is_superset_with_previous,
-                       exercise_name, primary_muscles, equipment
+                       exercise_name, primary_muscles, equipment, metric_type,
+                       target_duration_seconds, target_distance_meters,
+                       target_pace_seconds_per_km, target_hr_zone
                 FROM synced_plan_exercises
                 WHERE day_id IN ({placeholders})
                 ORDER BY day_id, exercise_order
                 """,
-                day_row_ids,
+                day_ids_internal,
             ).fetchall()
             plan_exercises = [dict(r) for r in ex_rows]
 
         sessions: List[Dict[str, Any]] = []
-        session_ids: List[str] = []
+        session_ids_internal: List[str] = []
         sess_rows = conn.execute(
             """
             SELECT id, device_id, local_id, plan_local_id, day_local_id, plan_name,
                    day_name, status, started_at, ended_at, total_duration_seconds,
-                   notes, synced_at
+                   notes, synced_at, modality, source, title,
+                   total_distance_meters, pool_length_meters, stroke, session_rpe
             FROM synced_sessions WHERE device_id = ?
             """,
             (device_id,),
         ).fetchall()
         sessions = [dict(r) for r in sess_rows]
-        session_ids = [str(r["local_id"]) for r in sessions]
+        session_ids_internal = [str(r["id"]) for r in sessions]
 
         session_exercises: List[Dict[str, Any]] = []
-        if session_ids:
-            placeholders = ",".join("?" for _ in session_ids)
+        if session_ids_internal:
+            placeholders = ",".join("?" for _ in session_ids_internal)
             sess_ex_rows = conn.execute(
                 f"""
                 SELECT id, session_id, local_id, exercise_id, exercise_name,
@@ -547,7 +631,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
                 WHERE session_id IN ({placeholders})
                 ORDER BY session_id, exercise_order
                 """,
-                [str(r["id"]) for r in sessions],
+                session_ids_internal,
             ).fetchall()
             session_exercises = [dict(r) for r in sess_ex_rows]
 
@@ -568,12 +652,127 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
             ).fetchall()
             set_logs = [dict(r) for r in set_rows]
 
+    plan_local_by_id = {row["id"]: row["local_id"] for row in plan_rows}
+    day_local_by_id = {row["id"]: row["local_id"] for row in days}
+    session_local_by_id = {row["id"]: row["local_id"] for row in sessions}
+
+    def _bool(value: Any) -> bool:
+        return bool(value)
+
     return {
         "deviceId": device_id,
-        "plans": plan_rows,
-        "days": days,
-        "planExercises": plan_exercises,
-        "sessions": sessions,
-        "sessionExercises": session_exercises,
-        "setLogs": set_logs,
+        "plans": [
+            {
+                "localId": row["local_id"],
+                "name": row["name"],
+                "description": row["description"],
+                "goal": row["goal"],
+                "daysPerWeek": row["days_per_week"],
+                "isActive": _bool(row["is_active"]),
+                "generatedByAi": _bool(row["generated_by_ai"]),
+                "createdAt": row["created_at"],
+                "updatedAt": row["updated_at"],
+                "version": row["version"],
+                "nextReviewAt": row["next_review_at"],
+                "reviewAfterWeeks": row["review_after_weeks"],
+                "source": row["source"],
+                "syncedAt": row["synced_at"],
+            }
+            for row in plan_rows
+        ],
+        "days": [
+            {
+                "id": row["local_id"],
+                "planId": plan_local_by_id[row["plan_id"]],
+                "localId": row["local_id"],
+                "name": row["name"],
+                "dayOrder": row["day_order"],
+                "notes": row["notes"],
+                "isRestDay": _bool(row["is_rest_day"]),
+                "modality": row["modality"],
+                "weekday": row["weekday"],
+            }
+            for row in days
+        ],
+        "planExercises": [
+            {
+                "id": row["id"],
+                "dayId": day_local_by_id[row["day_id"]],
+                "exerciseId": row["exercise_id"],
+                "exerciseOrder": row["exercise_order"],
+                "sets": row["sets"],
+                "targetReps": row["target_reps"],
+                "targetRpe": row["target_rpe"],
+                "restSeconds": row["rest_seconds"],
+                "notes": row["notes"],
+                "isSupersetWithPrevious": _bool(row["is_superset_with_previous"]),
+                "exerciseName": row["exercise_name"],
+                "primaryMuscles": row["primary_muscles"],
+                "equipment": row["equipment"],
+                "metricType": row["metric_type"],
+                "targetDurationSeconds": row["target_duration_seconds"],
+                "targetDistanceMeters": row["target_distance_meters"],
+                "targetPaceSecondsPerKm": row["target_pace_seconds_per_km"],
+                "targetHrZone": row["target_hr_zone"],
+            }
+            for row in plan_exercises
+        ],
+        "sessions": [
+            {
+                "id": row["id"],
+                "deviceId": row["device_id"],
+                "localId": row["local_id"],
+                "planLocalId": row["plan_local_id"],
+                "dayLocalId": row["day_local_id"],
+                "planName": row["plan_name"],
+                "dayName": row["day_name"],
+                "status": row["status"],
+                "startedAt": row["started_at"],
+                "endedAt": row["ended_at"],
+                "totalDurationSeconds": row["total_duration_seconds"],
+                "notes": row["notes"],
+                "syncedAt": row["synced_at"],
+                "modality": row["modality"],
+                "source": row["source"],
+                "title": row["title"],
+                "totalDistanceMeters": row["total_distance_meters"],
+                "poolLengthMeters": row["pool_length_meters"],
+                "stroke": row["stroke"],
+                "sessionRpe": row["session_rpe"],
+            }
+            for row in sessions
+        ],
+        "sessionExercises": [
+            {
+                "id": row["id"],
+                "sessionId": session_local_by_id[row["session_id"]],
+                "localId": row["local_id"],
+                "exerciseId": row["exercise_id"],
+                "exerciseName": row["exercise_name"],
+                "exerciseOrder": row["exercise_order"],
+                "plannedSets": row["planned_sets"],
+                "completedSets": row["completed_sets"],
+                "startedAt": row["started_at"],
+                "endedAt": row["ended_at"],
+            }
+            for row in session_exercises
+        ],
+        "setLogs": [
+            {
+                "id": row["id"],
+                "sessionExerciseId": row["session_exercise_id"],
+                "localId": row["local_id"],
+                "setNumber": row["set_number"],
+                "reps": row["reps"],
+                "weightKg": row["weight_kg"],
+                "rpe": row["rpe"],
+                "durationSeconds": row["duration_seconds"],
+                "distanceMeters": row["distance_meters"],
+                "isCompleted": _bool(row["is_completed"]),
+                "isWarmup": _bool(row["is_warmup"]),
+                "restTakenSeconds": row["rest_taken_seconds"],
+                "completedAt": row["completed_at"],
+            }
+            for row in set_logs
+        ],
     }

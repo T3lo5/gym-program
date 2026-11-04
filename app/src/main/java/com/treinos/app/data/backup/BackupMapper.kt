@@ -36,6 +36,8 @@ object BackupMapper {
             dayOrder = day.dayOrder,
             notes = day.notes,
             isRestDay = day.isRestDay,
+            modality = day.modality,
+            weekday = day.weekday,
             exercises = exercises,
         )
 
@@ -54,6 +56,11 @@ object BackupMapper {
             notes = exercise.notes,
             isSupersetWithPrevious = exercise.isSupersetWithPrevious,
             dayId = dayId,
+            metricType = exercise.metricType,
+            targetDurationSeconds = exercise.targetDurationSeconds,
+            targetDistanceMeters = exercise.targetDistanceMeters,
+            targetPaceSecondsPerKm = exercise.targetPaceSecondsPerKm,
+            targetHrZone = exercise.targetHrZone,
         )
 
     fun toDto(session: WorkoutSessionEntity, exercises: List<BackupSessionExercise>): BackupSession =
@@ -68,6 +75,13 @@ object BackupMapper {
             endedAt = session.endedAt,
             totalDurationSeconds = session.totalDurationSeconds,
             notes = session.notes,
+            modality = session.modality,
+            source = session.source,
+            title = session.title,
+            totalDistanceMeters = session.totalDistanceMeters,
+            poolLengthMeters = session.poolLengthMeters,
+            stroke = session.stroke,
+            sessionRpe = session.sessionRpe,
             exercises = exercises,
         )
 
@@ -132,6 +146,8 @@ object BackupMapper {
             dayOrder = dto.dayOrder,
             notes = dto.notes,
             isRestDay = dto.isRestDay,
+            modality = dto.modality,
+            weekday = dto.weekday,
         )
 
     fun toEntity(dto: BackupPlanExercise, dayId: Long): WorkoutPlanExerciseEntity =
@@ -149,6 +165,11 @@ object BackupMapper {
             restSeconds = dto.restSeconds,
             notes = dto.notes,
             isSupersetWithPrevious = dto.isSupersetWithPrevious,
+            metricType = dto.metricType,
+            targetDurationSeconds = dto.targetDurationSeconds,
+            targetDistanceMeters = dto.targetDistanceMeters,
+            targetPaceSecondsPerKm = dto.targetPaceSecondsPerKm,
+            targetHrZone = dto.targetHrZone,
         )
 
     fun toEntity(dto: BackupSession, planId: Long): WorkoutSessionEntity =
@@ -163,6 +184,13 @@ object BackupMapper {
             endedAt = dto.endedAt,
             totalDurationSeconds = dto.totalDurationSeconds,
             notes = dto.notes,
+            modality = dto.modality,
+            source = dto.source,
+            title = dto.title,
+            totalDistanceMeters = dto.totalDistanceMeters,
+            poolLengthMeters = dto.poolLengthMeters,
+            stroke = dto.stroke,
+            sessionRpe = dto.sessionRpe,
         )
 
     fun toEntity(dto: BackupSessionExercise, sessionId: Long): SessionExerciseEntity =
