@@ -13,6 +13,7 @@ import com.treinos.app.data.discovery.dedupeBackends
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.prefs.AppPreferences
+import com.treinos.app.data.SyncDownloadResult
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
@@ -310,7 +311,13 @@ class AppViewModel(
 
     private var restJob: Job? = null
 
-    val deviceId: String = preferences.deviceId
+    private val _deviceId = MutableStateFlow(preferences.deviceId)
+    val deviceId: StateFlow<String> = _deviceId.asStateFlow()
+
+    private val deviceRestore = RestoreByDeviceId(
+        downloader = repository,
+        devices = preferences,
+    )
 
     // ---------------- Navegação ----------------
 
@@ -548,27 +555,24 @@ class AppViewModel(
 
     fun restoreByDeviceId(deviceId: String) {
         if (_isRestoring.value) return
-        if (deviceId.isBlank()) {
-            _restoreMessage.value = "Informe um ID de aparelho válido."
-            return
-        }
         viewModelScope.launch {
             _isRestoring.value = true
-            try {
-                preferences.deviceId = deviceId
-                val data = repository.downloadSync()
-                _lastSyncAt.value = preferences.lastSyncAt
-                val planCount = data.plans.size
-                _restoreMessage.value =
-                    if (planCount > 0) "Restaurado: ${planCount} plano(s) do backup do dispositivo $deviceId."
-                    else "Nenhum dado encontrado para o dispositivo $deviceId."
-                _restoreDeviceId.value = ""
-            } catch (error: Exception) {
-                _restoreMessage.value = error.message
-                    ?: "Não foi possível restaurar o backup do dispositivo $deviceId."
-            } finally {
-                _isRestoring.value = false
+            val outcome = deviceRestore(deviceId)
+            _restoreMessage.value = when (outcome) {
+                RestoreOutcome.InvalidDeviceId -> "Informe um ID de aparelho válido."
+                RestoreOutcome.Empty ->
+                    "Nenhum dado encontrado para o dispositivo ${deviceId.trim()}; " +
+                        "seus dados locais e o ID atual foram mantidos."
+                is RestoreOutcome.Failed -> outcome.message
+                is RestoreOutcome.Success -> {
+                    _deviceId.value = preferences.deviceId
+                    _lastSyncAt.value = preferences.lastSyncAt
+                    _restoreDeviceId.value = ""
+                    "Restaurado: ${outcome.planCount} plano(s) e ${outcome.sessionCount} " +
+                        "sessão(ões) do aparelho ${deviceId.trim()}. O ID deste aparelho foi atualizado."
+                }
             }
+            _isRestoring.value = false
         }
     }
 
@@ -627,12 +631,17 @@ class AppViewModel(
         viewModelScope.launch {
             _isDownloading.value = true
             try {
-                val data = repository.downloadSync()
-                _lastSyncAt.value = preferences.lastSyncAt
-                val planCount = data.plans.size
-                _downloadMessage.value =
-                    if (planCount > 0) "Restaurado: ${planCount} plano(s) do backend."
-                    else "Nenhum dado encontrado para este dispositivo (deviceId: ${preferences.deviceId}). Verifique se está usando o mesmo aparelho que gerou o treino."
+                _downloadMessage.value = when (
+                    val result = repository.downloadSync(preferences.deviceId)
+                ) {
+                    is SyncDownloadResult.Restored -> {
+                        _lastSyncAt.value = preferences.lastSyncAt
+                        "Restaurado: ${result.planCount} plano(s) e ${result.sessionCount} " +
+                            "sessão(ões) do backend."
+                    }
+                    SyncDownloadResult.Empty ->
+                        "Nenhum dado encontrado; seus dados locais foram mantidos."
+                }
             } catch (error: Exception) {
                 _downloadMessage.value = error.message
                     ?: "Não foi possível baixar dados do backend."
@@ -677,8 +686,13 @@ class AppViewModel(
         viewModelScope.launch {
             _backupImportState.value = BackupImportState.Importing
             try {
-                repository.importBackup(payload)
-                _backupMessage.value = "Backup importado com sucesso."
+                repository.importBackup(payload, preferences)
+                _deviceId.value = preferences.deviceId
+                _backupMessage.value = if (payload.deviceId.isNotBlank()) {
+                    "Backup importado. O ID deste aparelho passou a ser ${payload.deviceId.trim()}."
+                } else {
+                    "Backup importado com sucesso."
+                }
                 _backupImportState.value = BackupImportState.Idle
                 pendingBackupPayload = null
             } catch (error: Exception) {

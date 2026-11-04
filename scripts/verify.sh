@@ -54,6 +54,7 @@ docker run --rm \
   -e VERSION_NAME="${VERSION_NAME:-0.0.0-local}" \
   -e SKIP_TESTS="${SKIP_TESTS:-0}" \
   -e SKIP_LINT="${SKIP_LINT:-0}" \
+  -e ROBOLECTRIC_REPO_URL="${ROBOLECTRIC_REPO_URL:-}" \
   -v "$ROOT:/app" \
   -v "$CACHE_DIR:/home/ci/.gradle" \
   -w /app \

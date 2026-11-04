@@ -7,8 +7,29 @@
 | Item do roadmap | `H1-7` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-04` |
-| Implementação | `pendente` (depende de H1-6) |
+| Implementação | `concluída` |
+| Verificação | `./scripts/verify.sh` verde em 2026-11-04: 85 testes JVM do `:app` (inclui `RestoreDownloadTest` 8, `BackupImportTest` 3 e `RestoreDeviceIdTest` 4), `:protocol`, `:wear`, lint dos dois módulos, `assembleDebug`, `apksigner verify`, Ruff + 22 testes do backend |
 | Depende de | H1-6 (schema v2, backup v2 e sync aditivo) |
+
+### Notas de implementação
+
+- A costura de testabilidade criou `BackendApi` (implementado por
+  `BackendClient`), `SnapshotDownloader` e `DeviceIdStore` (implementado por
+  `AppPreferences`), permitindo testar a restauração sem rede e, no caso de
+  `RestoreDeviceIdTest`, sem Robolectric.
+- `WorkoutRepository.downloadSync(deviceId: String)` ficou **sem** o argumento
+  com default que a spec esboçava: Kotlin proíbe default em método que
+  `override` de uma interface, então quem chama passa o `deviceId`
+  explicitamente (`AppViewModel.downloadNow` usa `preferences.deviceId`).
+- A atomicidade usa o `@Transaction` já existente em `WorkoutDao.replaceAllData`
+  (operação "ou reutilizar `replaceAllData`" prevista na spec); nenhum DAO novo
+  foi criado.
+- `app/build.gradle.kts` + `scripts/verify.sh` ganharam `ROBOLECTRIC_REPO_URL`:
+  o Maven Central devolvia HTTP 429 para o `android-all` e derrubava o gate por
+  infra. Sem a variável o comportamento é o de antes (repo1), então o CI do
+  GitHub não muda.
+- `restSeconds` de exercício de sessão continua fora do sync — lacuna documentada
+  de H1-6, a ser tratada em H3-1.
 
 ## Objetivo
 

@@ -1,5 +1,8 @@
 package com.treinos.app.ui
 
+import android.content.Context
+import android.content.pm.PackageInfo
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
@@ -23,6 +28,10 @@ import com.treinos.app.ui.screens.HomeScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.ExerciseDetailSheet
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
@@ -42,6 +51,10 @@ fun TreinosApp(viewModel: AppViewModel) {
     val connectionMessage by viewModel.connectionMessage.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val downloadMessage by viewModel.downloadMessage.collectAsStateWithLifecycle()
+    val isRestoring by viewModel.isRestoring.collectAsStateWithLifecycle()
+    val restoreDeviceId by viewModel.restoreDeviceId.collectAsStateWithLifecycle()
+    val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
+    val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val backupImportState by viewModel.backupImportState.collectAsStateWithLifecycle()
@@ -54,6 +67,47 @@ fun TreinosApp(viewModel: AppViewModel) {
     val catalogMessage by viewModel.catalogMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // O JSON é gerado e escrito no cacheDir antes de tocar no arquivo escolhido:
+    // se a geração falhar, o backup anterior do usuário continua intacto.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val (versionName, versionCode) = appVersionInfo(context)
+                val json = viewModel.exportBackupJson(
+                    appVersionName = versionName,
+                    appVersionCode = versionCode,
+                )
+                val cacheFile = File(context.cacheDir, "backup-treinos.json")
+                cacheFile.writeText(json)
+                val output = context.contentResolver.openOutputStream(uri)
+                    ?: error("Não foi possível abrir o arquivo escolhido para escrita.")
+                output.use { out -> cacheFile.inputStream().use { it.copyTo(out) } }
+                viewModel.setBackupMessage("Backup exportado no arquivo escolhido.")
+            } catch (error: Exception) {
+                viewModel.setBackupMessage(error.message ?: "Não foi possível exportar o backup.")
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val input = context.contentResolver.openInputStream(uri)
+            if (input == null) {
+                viewModel.setBackupMessage("Não foi possível ler o arquivo escolhido.")
+                return@launch
+            }
+            val json = input.bufferedReader().use { it.readText() }
+            viewModel.prepareImport(json)
+        }
+    }
 
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -132,16 +186,25 @@ fun TreinosApp(viewModel: AppViewModel) {
                     syncMessage = syncMessage,
                     downloadMessage = downloadMessage,
                     lastSyncAt = lastSyncAt,
-                    deviceId = viewModel.deviceId,
+                    deviceId = deviceId,
                     backupImportState = backupImportState,
                     backupMessage = backupMessage,
+                    isRestoring = isRestoring,
+                    restoreDeviceId = restoreDeviceId,
+                    restoreMessage = restoreMessage,
                     onBack = viewModel::goHome,
                     onSaveUrl = viewModel::saveBackendUrl,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,
                     onDownload = viewModel::downloadNow,
-                    onExportBackup = { /* same as before */ },
-                    onImportFileSelected = { /* same */ },
+                    onRestoreDeviceIdChanged = viewModel::onRestoreDeviceIdChanged,
+                    onRestoreByDeviceId = viewModel::restoreByDeviceId,
+                    onExportBackup = {
+                        exportLauncher.launch(backupFileName())
+                    },
+                    onImportFileSelected = {
+                        importLauncher.launch(arrayOf("application/json"))
+                    },
                     onPrepareImport = { json -> viewModel.prepareImport(json) },
                     onConfirmImport = { viewModel.confirmImport() },
                     onCancelImport = { viewModel.cancelImport() },
@@ -162,4 +225,14 @@ fun TreinosApp(viewModel: AppViewModel) {
             onDismiss = { viewModel.closeExerciseDetail() },
         )
     }
+}
+
+private fun backupFileName(): String {
+    val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
+    return "treinos-backup-$stamp.json"
+}
+
+private fun appVersionInfo(context: Context): Pair<String, Long> {
+    val info: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+    return (info.versionName ?: "desconhecida") to PackageInfoCompat.getLongVersionCode(info)
 }

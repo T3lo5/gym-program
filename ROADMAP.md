@@ -33,12 +33,12 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Execução de treino | ✅ | Timer de descanso, séries, RPE, carga, histórico (H1-2) |
 | Geração via IA | ✅ | Backend + SenseNova + fallback local |
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
-| Restauração por `deviceId` | 🟡 | `downloadNow` funciona; restaurar outro ID e atomicidade ficam em H1-7 |
-| Download do backend | 🟡 | `downloadSync` funciona, mas não é atômico e snapshot vazio apaga dados; H1-7 |
-| Testes + CI | 🟡 | 13 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
+| Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
+| Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
+| Testes + CI | 🟡 | 16 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
 | Descoberta LAN | 📋 | mDNS no backend; app usa URL configurável |
 | Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
-| Backup/restore do usuário | 🟡 | Backup JSON implementado, mas botões de exportar/importar estão sem efeito; H1-7 |
+| Backup/restore do usuário | ✅ | Exportar/importar ligados aos file pickers (SAF), pré-visualização + confirmação e `deviceId` do arquivo aplicado só após importação válida (H1-7) |
 | Imagem/vídeo de exercício | ✅/❌ | Imagens via catálogo (H1-3); vídeo não |
 | Migrações Room | ✅ | Room v2 com `MIGRATION_1_2` + `MigrationTest` (1→2 preservando linhas); `fallbackToDestructiveMigration` removido (H1-6) |
 | Registro avulso (natação) | 📋 | H2-5 |
@@ -73,17 +73,18 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-1 | Recuperação por `deviceId` | `AppPreferences.deviceId`, `AppViewModel.downloadNow`, `WorkoutRepository.downloadSync`; [spec](docs/specs/H1-1-device-restore.md) |
 | H1-2 | Execução por séries (não circuito) | `WorkoutScreen` registra série, `AppViewModel.logSet`, `ExerciseProgress` + testes; [spec](docs/specs/H1-2-set-execution.md) |
 | H1-3 | Imagens dos exercícios | `ExerciseMediaRepository`, `ExerciseImage`, `ExerciseDetailSheet`, miniaturas em `WorkoutScreen`/`HistoryScreen`, botão “Atualizar catálogo” em `SettingsScreen`, `CatalogResponseDto`, Coil + cache 7 dias + testes; [spec](docs/specs/H1-3-exercise-media.md) |
-| H1-4 | Exportar/importar backup JSON (manual) | Lógica de backup, validação, mapper e `replaceAllData`; a ligação dos botões e o `deviceId` ficam em H1-7; [spec](docs/specs/H1-4-backup-json.md) |
+| H1-4 | Exportar/importar backup JSON (manual) | Lógica de backup, validação, mapper e `replaceAllData`; botões e `deviceId` ligados em H1-7; [spec](docs/specs/H1-4-backup-json.md) |
 | H1-5 | Peso/altura na geração | `ProfileValidator`, `profile_adjustments`, `suggest_initial_load`, prompt com perfil; [spec](docs/specs/H1-5-profile.md) |
 | H2-2 | Wear OS MVP (Data Layer) | Módulo `:wear` no build; Data Layer envia sessão para o relógio; tela com timer e próximo exercício; dois APKs no gate; [spec](docs/specs/H2-2-wear-os.md) |
 | H2-3 | Download/restauração do backend | `BackendClient.syncDownload`, `WorkoutRepository.downloadSync`, botão "Restaurar do backend"; [spec](docs/specs/H2-3-backend-download.md) |
 | H1-6 | Fundação de dados: migração, backup v2 e sync | `AppDatabase.MIGRATION_1_2` sem `fallbackToDestructiveMigration`; schema `2.json` versionado e usado pelo `MigrationTest`; backup v2 (importa v1) com enums validados; sync com campos aditivos e download por `id` interno; migração aditiva no SQLite do backend; testes `MigrationTest`, `BackupSerializationTest`, `BackupValidatorTest`, `BackupMapperTest`, `back/tests/test_sync_contract.py`; [spec](docs/specs/H1-6-data-foundation.md) |
+| H1-7 | Correções de restauração, backup e Ajustes | `WorkoutRepository.downloadSync` valida o snapshot (`mapSnapshot`) antes de escrever e usa a transação única `dao.replaceAllData`; snapshot vazio devolve `SyncDownloadResult.Empty` e mantém os dados locais; `RestoreByDeviceId` persiste o `deviceId` só após sucesso; `importBackup` aplica o `deviceId` do arquivo; file pickers (SAF) ligados em `TreinosApp.kt` com confirmação nas duas pontas; texto de Ajustes corrigido + card "Restaurar de outro aparelho"; testes `RestoreDownloadTest`, `BackupImportTest`, `RestoreDeviceIdTest`; [spec](docs/specs/H1-7-restore-backup-fixes.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
-| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
-|----|------|--------|----------|------------------|---------|------------|------|
-| H1-7 | Correções de restauração, backup e Ajustes | **M** | Botões de backup sem efeito, download não atômico, snapshot vazio apaga dados, `deviceId` muda antes do sucesso e texto de Ajustes contraditório. | File pickers, restauração transacional, validação de snapshot, `deviceId` só após sucesso, importação aplica o ID e texto corrigido. | 3-4 dias | H1-6 | [H1-7](docs/specs/H1-7-restore-backup-fixes.md) |
+Nada pendente: H1-1..H1-7 estão concluídos e listados em §4.1. O Horizon 1
+fechou com H1-7 (restauração/backup não apagam mais dados e a UI está ligada);
+a fila continua em H2-5.
 
 ### Horizon 2 — Próximo (1-2 meses): multimodal, conectividade e histórico
 
@@ -99,7 +100,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. Parcial: 12 arquivos JVM + gate. | Compose UI testing, Robolectric/instrumented para Room e migrações, testes de contrato app↔backend; manter Wear coberto. | 5 dias | Módulos estáveis | [H3-1](docs/specs/H3-1-ui-instrumented-tests.md) |
+| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. Parcial: 16 arquivos JVM + gate. | Compose UI testing, Robolectric/instrumented para Room e migrações, testes de contrato app↔backend; manter Wear coberto. | 5 dias | Módulos estáveis | [H3-1](docs/specs/H3-1-ui-instrumented-tests.md) |
 | H3-2 | Polimento visual e animações | **C** | Telas funcionais, sem identidade refinada. | Animações Compose, transições, tema consistente, loading/empty states. | 4 dias | `Theme.kt`, telas existentes | [H3-2](docs/specs/H3-2-visual-polish.md) |
 | H3-3 | Acessibilidade (A11y) | **C** | Sem `contentDescription`, escala de fonte e TalkBack nas telas principais. | `contentDescription`, fonte escalável, navegação TalkBack nas 4 tabs. | 3 dias | Telas existentes | [H3-3](docs/specs/H3-3-accessibility.md) |
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | [H3-4](docs/specs/H3-4-cloud-backend.md) |
@@ -112,7 +113,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) | Mobilidade (H2-7) | Backend na nuvem (H3-4) |
-| Correções de restauração/backup (H1-7) | Plano híbrido (H2-6) | Histórico com calendário (H2-4) | Progressão automática de carga (H3-5) |
+| Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) | Histórico com calendário (H2-4) | Progressão automática de carga (H3-5) |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) | Polimento + animações (H3-2) | Export CSV/Sheets |
 | Testes de UI/Room (H3-1) | Wear OS MVP (H2-2) ✅ | Acessibilidade (H3-3) | Widget/complicação do relógio |
 | Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | |
@@ -122,15 +123,14 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 ## 6. Esforço e caminho crítico
 
 ```
-Concluído:  H1-1..H1-5 core + H2-2 Wear + H2-3 download + H1-6 fundação de dados
-Agora:      H1-7 restauração/backup  → parar de apagar dados e ligar a UI
-Próximo:    H2-5 registro avulso     → natação/aula entram no histórico
-Depois:     H2-6 plano híbrido       → semana com academia + corrida + revisão
+Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-2 Wear + H2-3 download
+Agora:      H2-5 registro avulso     → natação/aula entram no histórico
+Próximo:    H2-6 plano híbrido       → semana com academia + corrida + revisão
 Depois:     H2-7 mobilidade, H2-1 LAN, H2-4 histórico
 Qualidade:  H3-1..H3-5
 ```
 
-**Caminho crítico:** H1-6 → H1-7 → H2-5 → H2-6.
+**Caminho crítico:** H1-6 ✅ → H1-7 ✅ → H2-5 → H2-6.
 O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda
 não vê (UI, Room, migração e contrato).
 
@@ -157,8 +157,8 @@ não vê (UI, Room, migração e contrato).
 | Catálogo não cobre corrida/natação | Alta | Médio | Templates locais para corrida; natação como registro (H2-5/H2-6) |
 | BT instável celular ↔ relógio | Média | Médio | Relógio opera autônomo com fila local; reconcilia ao reconectar |
 | Android 15+ restringe LAN | Baixa | Alto | Manter fallback manual de IP; testar em preview |
-| Desinstalar app apaga dados locais | Alta | Alto | H1-4 (backup JSON) + H1-1 (restore por deviceId); H1-7 liga os botões e protege contra snapshot vazio |
-| Restauração/backup apagar dados | Alta | Alto | H1-7: transação única, validação antes de apagar, snapshot vazio não substitui e `deviceId` só após sucesso |
+| Desinstalar app apaga dados locais | Alta | Alto | H1-4 (backup JSON) + H1-1 (restore por deviceId); H1-7 ligou os botões e protege contra snapshot vazio |
+| Restauração/backup apagar dados | Baixa | Alto | Mitigado em H1-7: validação do snapshot antes de apagar, transação única (`replaceAllData`), snapshot vazio não substitui e `deviceId` só após sucesso |
 | “Dor nas costas” virar promessa médica | Média | Alto | H2-7: aviso, sinais de alerta e nenhum diagnóstico |
 | Contrato v1/v2 divergir | Média | Médio | Fixtures v1/v2 e testes de contrato no gate |
 
@@ -166,15 +166,16 @@ não vê (UI, Room, migração e contrato).
 
 ## 9. Próximo passo imediato
 
-Implementar **H1-7 (correções de restauração, backup e Ajustes)** —
-[docs/specs/H1-7-restore-backup-fixes.md](docs/specs/H1-7-restore-backup-fixes.md):
-ligar os file pickers, tornar a restauração transacional, impedir que snapshot
-vazio apague dados, persistir `deviceId` só após sucesso e aplicar o ID vindo do
-backup.
+Implementar **H2-5 (registro avulso genérico, natação primeiro)** —
+[docs/specs/H2-5-adhoc-log.md](docs/specs/H2-5-adhoc-log.md): usar os campos de
+`modality`/`source` criados em H1-6 para registrar sessão avulsa com resumo
+(duração, distância, RPE, notas), edição e exclusão no histórico.
 
-Depois: **H2-5 (registro avulso)**, que usa os campos de `modality`/`source`
-criados em H1-6. **H2-6** e **H2-7** são propostas e não
-devem começar sem aprovação explícita.
+H1-7 (restauração, backup e Ajustes) está concluída: os file pickers foram
+ligados, a restauração valida o snapshot antes de escrever em transação única,
+snapshot vazio mantém os dados locais e o `deviceId` só muda após sucesso.
+
+**H2-6** e **H2-7** são propostas e não devem começar sem aprovação explícita.
 
 Para iniciar qualquer item, leia a spec correspondente em
 [docs/specs/](docs/specs/); se não existir, crie a partir de
@@ -188,10 +189,10 @@ Para iniciar qualquer item, leia a spec correspondente em
 - [H1-1 — Recuperação por deviceId](docs/specs/H1-1-device-restore.md) — concluída (retroativa)
 - [H1-2 — Execução por séries](docs/specs/H1-2-set-execution.md) — concluída (retroativa)
 - [H1-3 — Imagens dos exercícios](docs/specs/H1-3-exercise-media.md) — concluída
-- [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — concluída (lógica); UI em H1-7
+- [H1-4 — Backup JSON](docs/specs/H1-4-backup-json.md) — concluída (lógica e UI via H1-7)
 - [H1-5 — Peso e altura](docs/specs/H1-5-profile.md) — concluída
 - [H1-6 — Fundação de dados](docs/specs/H1-6-data-foundation.md) — concluída
-- [H1-7 — Correções de restauração, backup e Ajustes](docs/specs/H1-7-restore-backup-fixes.md) — aprovada; próximo item
+- [H1-7 — Correções de restauração, backup e Ajustes](docs/specs/H1-7-restore-backup-fixes.md) — concluída
 - [H2-1 — Descoberta LAN](docs/specs/H2-1-lan-discovery.md) — pronta para implementar
 - [H2-2 — Wear OS MVP](docs/specs/H2-2-wear-os.md) — concluída
 - [H2-3 — Download do backend](docs/specs/H2-3-backend-download.md) — concluída (retroativa)
@@ -199,7 +200,7 @@ Para iniciar qualquer item, leia a spec correspondente em
 - [H2-5 — Registro avulso](docs/specs/H2-5-adhoc-log.md) — pronta para implementar
 - [H2-6 — Plano híbrido](docs/specs/H2-6-hybrid-plan.md) — proposta
 - [H2-7 — Mobilidade](docs/specs/H2-7-mobility.md) — proposta
-- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — parcial (13 arquivos JVM + gate + migração Room e contrato app↔backend; falta UI)
+- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — parcial (16 arquivos JVM + gate + migração Room e contrato app↔backend; falta UI)
 - [H3-2 — Polimento visual](docs/specs/H3-2-visual-polish.md) — pronta para implementar
 - [H3-3 — Acessibilidade](docs/specs/H3-3-accessibility.md) — pronta para implementar
 - [H3-4 — Backend na nuvem com token](docs/specs/H3-4-cloud-backend.md) — pronta para implementar

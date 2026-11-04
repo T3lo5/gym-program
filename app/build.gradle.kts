@@ -67,6 +67,14 @@ android {
                 ?: System.getenv("ROBOLECTRIC_USER_HOME")
                 ?: System.getProperty("java.io.tmpdir")
             it.systemProperty("user.home", writableHome)
+
+            // O android-all (~140 MB) vem do Maven Central, que devolve HTTP 429
+            // para IPs anônimos e derruba o teste por infra, não por código. A
+            // env aponta para um espelho do mesmo artefato; o CI no GitHub não a
+            // define e continua usando o padrão.
+            System.getenv("ROBOLECTRIC_REPO_URL")?.takeIf { url -> url.isNotBlank() }?.let { url ->
+                it.systemProperty("robolectric.dependency.repo.url", url)
+            }
         }
     }
 

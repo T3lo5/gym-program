@@ -90,6 +90,11 @@ comentar código). Corrija a causa.
 
 - Pré-requisito: Docker com daemon acessível. O primeiro `verify.sh` baixa o
   Android SDK e pode demorar; os seguintes usam `.gradle-docker/`.
+- Robolectric baixa o `android-all` (~140 MB) do Maven Central, que devolve
+  HTTP 429 para alguns IPs. Nesse caso o gate falha por infra (`Failed to fetch
+  maven artifact`), não pelo código. Rode com um espelho:
+  `ROBOLECTRIC_REPO_URL=https://maven-central.storage-download.googleapis.com/maven2 ./scripts/verify.sh`.
+  Sem a variável o CI usa o repo padrão e o GitHub Actions não muda.
 - Saídas: `dist/treinos.apk`, `dist/wear.apk`, `dist/dist.sha256`,
   `app/build/reports/tests/...`, `app/build/reports/lint-results-debug.html`,
   `wear/build/reports/lint-results-debug.html`.

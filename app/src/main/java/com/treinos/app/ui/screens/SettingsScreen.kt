@@ -56,11 +56,16 @@ fun SettingsScreen(
     deviceId: String,
     backupImportState: BackupImportState,
     backupMessage: String?,
+    isRestoring: Boolean,
+    restoreDeviceId: String,
+    restoreMessage: String?,
     onBack: () -> Unit,
     onSaveUrl: (String) -> Unit,
     onTest: () -> Unit,
     onSync: () -> Unit,
     onDownload: () -> Unit,
+    onRestoreDeviceIdChanged: (String) -> Unit,
+    onRestoreByDeviceId: (String) -> Unit,
     onExportBackup: () -> Unit,
     onImportFileSelected: () -> Unit,
     onPrepareImport: (String) -> Unit,
@@ -73,6 +78,66 @@ fun SettingsScreen(
     onClearCatalogMessage: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
+    var showDownloadConfirm by remember { mutableStateOf(false) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
+
+    if (showDownloadConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDownloadConfirm = false },
+            title = { Text("Substituir os dados locais?") },
+            text = {
+                Text(
+                    "Restaurar do backend apaga os planos, treinos e séries deste " +
+                        "aparelho e grava no lugar o snapshot deste deviceId. " +
+                        "Exporte um backup JSON antes, se quiser voltar atrás.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDownloadConfirm = false
+                        onDownload()
+                    },
+                ) {
+                    Text("Restaurar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDownloadConfirm = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
+    if (showRestoreConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirm = false },
+            title = { Text("Assumir este aparelho?") },
+            text = {
+                Text(
+                    "Os dados locais serão substituídos pelo snapshot de " +
+                        "$restoreDeviceId e este app passará a usar esse deviceId. " +
+                        "Se o deviceId estiver errado, nada muda.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRestoreConfirm = false
+                        onRestoreByDeviceId(restoreDeviceId)
+                    },
+                ) {
+                    Text("Restaurar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreConfirm = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = { ScreenTopBar(title = "Ajustes", onBack = onBack) },
@@ -164,14 +229,14 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        text = "Sincronização manual (apenas envio)",
+                        text = "Sincronização com o backend",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Os treinos e as séries ficam somente no SQLite do aparelho. " +
-                            "Ao tocar no botão abaixo, o app envia um snapshot completo " +
-                            "(planos, treinos e séries) para o banco do backend. " +
-                            "Não é feito download de dados do servidor.",
+                        text = "Os treinos e as séries ficam no SQLite do aparelho. " +
+                            "Enviar ao backend grava um snapshot completo (planos, treinos e séries) " +
+                            "no banco do servidor. Restaurar do backend baixa o snapshot deste " +
+                            "deviceId e substitui os dados locais — exporte um backup JSON antes.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
@@ -207,7 +272,7 @@ fun SettingsScreen(
                         )
                     }
                     Button(
-                        onClick = onDownload,
+                        onClick = { showDownloadConfirm = true },
                         enabled = !isDownloading,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -232,6 +297,65 @@ fun SettingsScreen(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "Restaurar de outro aparelho",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Informe o deviceId que aparece nos Ajustes do outro celular. " +
+                            "O app baixa o snapshot daquele aparelho, substitui os dados locais " +
+                            "e passa a usar esse deviceId.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    OutlinedTextField(
+                        value = restoreDeviceId,
+                        onValueChange = onRestoreDeviceIdChanged,
+                        label = { Text("deviceId do outro aparelho") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = { showRestoreConfirm = true },
+                        enabled = restoreDeviceId.isNotBlank() && !isRestoring,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (isRestoring) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                                Text("Restaurando…")
+                            } else {
+                                Text("Restaurar")
+                            }
+                        }
+                    }
+                    restoreMessage?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
@@ -273,8 +397,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-
-                Card(modifier = Modifier.fillMaxWidth()) {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -392,6 +514,4 @@ fun SettingsScreen(
             }
         }
     }
-}
-
 }

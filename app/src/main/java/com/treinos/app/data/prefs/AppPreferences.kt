@@ -3,6 +3,7 @@ package com.treinos.app.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import java.util.UUID
+import com.treinos.app.data.DeviceIdStore
 import com.treinos.app.data.wear.CommandDedupe
 
 /**
@@ -13,7 +14,7 @@ import com.treinos.app.data.wear.CommandDedupe
  */
 class AppPreferences private constructor(
     private val prefs: SharedPreferences,
-) {
+) : DeviceIdStore {
 
     constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences("treinos_prefs", Context.MODE_PRIVATE)
@@ -27,7 +28,7 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_BACKEND_URL, normalized).apply()
         }
 
-    var deviceId: String
+    override var deviceId: String
         get() {
             prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
             val created = UUID.randomUUID().toString()

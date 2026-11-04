@@ -12,7 +12,7 @@ import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.prefs.AppPreferences
-import com.treinos.app.data.remote.BackendClient
+import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.backup.BackupApp
@@ -51,9 +51,9 @@ import java.time.Instant
  */
 class WorkoutRepository(
     private val dao: WorkoutDao,
-    private val backendClient: BackendClient,
+    private val backendClient: BackendApi,
     private val preferences: AppPreferences,
-) {
+) : SnapshotDownloader {
 
     fun observeActivePlan(): Flow<WorkoutPlanWithDetails?> = combine(
         dao.observeActivePlanEntity(),
@@ -228,162 +228,232 @@ class WorkoutRepository(
         return response
     }
 
-    suspend fun downloadSync(): SyncDownloadDto {
-        val data = backendClient.syncDownload(preferences.deviceId)
+    override suspend fun downloadSync(deviceId: String): SyncDownloadResult =
         withContext(Dispatchers.IO) {
-            dao.deleteAllData()
+            val data = backendClient.syncDownload(deviceId)
+            if (data.plans.isEmpty() && data.sessions.isEmpty()) {
+                return@withContext SyncDownloadResult.Empty
+            }
+            val snapshot = mapSnapshot(data)
+            dao.replaceAllData(
+                plans = snapshot.plans,
+                days = snapshot.days,
+                planExercises = snapshot.planExercises,
+                sessions = snapshot.sessions,
+                sessionExercises = snapshot.sessionExercises,
+                setLogs = snapshot.setLogs,
+            )
+            preferences.lastSyncAt = Instant.now().toString()
+            SyncDownloadResult.Restored(
+                planCount = snapshot.plans.size,
+                sessionCount = snapshot.sessions.size,
+            )
         }
 
-        // Mapeia localId do servidor -> novo ID do Room
-        val planIdMap = mutableMapOf<Long, Long>()
-        val dayIdMap = mutableMapOf<Long, Long>()
-
-        // Restaura planos, dias e exercícios
-        for (planDto in data.plans) {
-            val newPlanId = dao.insertPlan(
-                WorkoutPlanEntity(
-                    id = planDto.localId,
-                    serverPlanId = null,
-                    name = planDto.name,
-                    description = planDto.description,
-                    goal = planDto.goal,
-                    daysPerWeek = planDto.daysPerWeek,
-                    isActive = planDto.isActive,
-                    generatedByAi = planDto.generatedByAi,
-                    createdAt = planDto.createdAt,
-                    updatedAt = planDto.updatedAt,
-                    nextReviewAt = planDto.nextReviewAt,
-                    reviewAfterWeeks = planDto.reviewAfterWeeks,
-                    source = planDto.source,
-                    version = planDto.version,
-                )
+    /**
+     * Converte o snapshot do backend em entidades do Room preservando os IDs
+     * locais do aparelho (campos `localId`).
+     *
+     * Só leitura: nada é escrito aqui. ID repetido, ID não positivo ou referência
+     * a um pai que não existe no snapshot derruba a restauração antes de o banco
+     * local ser tocado.
+     */
+    private fun mapSnapshot(data: SyncDownloadDto): RestoredSnapshot {
+        val usedPlanIds = mutableSetOf<Long>()
+        val plans = data.plans.map { dto ->
+            requirePositiveId(dto.localId, "plano '${dto.name}'")
+            require(usedPlanIds.add(dto.localId)) { "IDs de plano duplicados no snapshot (${dto.localId})." }
+            WorkoutPlanEntity(
+                id = dto.localId,
+                serverPlanId = null,
+                name = dto.name,
+                description = dto.description,
+                goal = dto.goal,
+                daysPerWeek = dto.daysPerWeek,
+                isActive = dto.isActive,
+                generatedByAi = dto.generatedByAi,
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                nextReviewAt = dto.nextReviewAt,
+                reviewAfterWeeks = dto.reviewAfterWeeks,
+                source = dto.source,
+                version = dto.version,
             )
-            planIdMap[planDto.localId] = newPlanId
-            val dayDtos = data.days.filter { it.planId == planDto.localId }
-            for (dayDto in dayDtos) {
-                val dayId = dao.insertDay(
-                    WorkoutDayEntity(
-                        id = dayDto.id,
-                        planId = newPlanId,
-                        name = dayDto.name,
-                        dayOrder = dayDto.dayOrder,
-                        notes = dayDto.notes,
-                        isRestDay = dayDto.isRestDay,
-                        modality = dayDto.modality,
-                        weekday = dayDto.weekday,
-                    )
-                )
-                dayIdMap[dayDto.localId] = dayId
-                val exDtos = data.planExercises.filter { it.dayId == dayDto.id }
-                dao.insertPlanExercises(
-                    exDtos.map { ex ->
-                        WorkoutPlanExerciseEntity(
-                            id = ex.id,
-                            dayId = dayId,
-                            exerciseId = ex.exerciseId,
-                            exerciseName = ex.exerciseName,
-                            primaryMuscles = ex.primaryMuscles,
-                            equipment = ex.equipment,
-                            exerciseOrder = ex.exerciseOrder,
-                            sets = ex.sets,
-                            targetReps = ex.targetReps,
-                            targetRpe = ex.targetRpe,
-                            restSeconds = ex.restSeconds,
-                            notes = ex.notes,
-                            isSupersetWithPrevious = ex.isSupersetWithPrevious,
-                            metricType = ex.metricType,
-                            targetDurationSeconds = ex.targetDurationSeconds,
-                            targetDistanceMeters = ex.targetDistanceMeters,
-                            targetPaceSecondsPerKm = ex.targetPaceSecondsPerKm,
-                            targetHrZone = ex.targetHrZone,
-                        )
-                    }
-                )
+        }
+
+        val activeIndex = plans.indexOfFirst { it.isActive }.takeIf { it >= 0 } ?: 0
+        val normalizedPlans = plans.mapIndexed { index, plan ->
+            plan.copy(isActive = index == activeIndex)
+        }
+        val planIds = normalizedPlans.mapTo(mutableSetOf()) { it.id }
+
+        val usedDayIds = mutableSetOf<Long>()
+        val days = data.days.map { dto ->
+            requirePositiveId(dto.localId, "dia '${dto.name}'")
+            require(usedDayIds.add(dto.localId)) { "IDs de dia duplicados no snapshot (${dto.localId})." }
+            require(dto.planId in planIds) {
+                "Dia '${dto.name}' referencia um plano que não está no snapshot (planId ${dto.planId})."
+            }
+            WorkoutDayEntity(
+                id = dto.localId,
+                planId = dto.planId,
+                name = dto.name,
+                dayOrder = dto.dayOrder,
+                notes = dto.notes,
+                isRestDay = dto.isRestDay,
+                modality = dto.modality,
+                weekday = dto.weekday,
+            )
+        }
+        val dayIds = days.mapTo(mutableSetOf()) { it.id }
+
+        val planExercises = data.planExercises.map { dto ->
+            require(dto.dayId in dayIds) {
+                "Exercício '${dto.exerciseName.ifBlank { dto.exerciseId }}' referencia um dia " +
+                    "que não está no snapshot (dayId ${dto.dayId})."
+            }
+            WorkoutPlanExerciseEntity(
+                dayId = dto.dayId,
+                exerciseId = dto.exerciseId,
+                exerciseName = dto.exerciseName,
+                primaryMuscles = dto.primaryMuscles,
+                equipment = dto.equipment,
+                exerciseOrder = dto.exerciseOrder,
+                sets = dto.sets,
+                targetReps = dto.targetReps,
+                targetRpe = dto.targetRpe,
+                restSeconds = dto.restSeconds,
+                notes = dto.notes,
+                isSupersetWithPrevious = dto.isSupersetWithPrevious,
+                metricType = dto.metricType,
+                targetDurationSeconds = dto.targetDurationSeconds,
+                targetDistanceMeters = dto.targetDistanceMeters,
+                targetPaceSecondsPerKm = dto.targetPaceSecondsPerKm,
+                targetHrZone = dto.targetHrZone,
+            )
+        }
+
+        val usedSessionIds = mutableSetOf<Long>()
+        val sessions = data.sessions.map { dto ->
+            requirePositiveId(dto.localId, "sessão ${dto.localId}")
+            require(usedSessionIds.add(dto.localId)) {
+                "IDs de sessão duplicados no snapshot (${dto.localId})."
+            }
+            require(dto.planLocalId >= 0 && dto.dayLocalId >= 0) {
+                "Sessão ${dto.localId} tem referência negativa (planId ${dto.planLocalId}, " +
+                    "dayId ${dto.dayLocalId})."
+            }
+            require(dto.planLocalId == 0L || dto.planLocalId in planIds) {
+                "Sessão ${dto.localId} referencia um plano que não está no snapshot " +
+                    "(planId ${dto.planLocalId})."
+            }
+            require(dto.dayLocalId == 0L || dto.dayLocalId in dayIds) {
+                "Sessão ${dto.localId} referencia um dia que não está no snapshot " +
+                    "(dayId ${dto.dayLocalId})."
+            }
+            WorkoutSessionEntity(
+                id = dto.localId,
+                planId = dto.planLocalId,
+                dayId = dto.dayLocalId,
+                planName = dto.planName,
+                dayName = dto.dayName,
+                status = dto.status,
+                startedAt = dto.startedAt,
+                endedAt = dto.endedAt,
+                totalDurationSeconds = dto.totalDurationSeconds,
+                notes = dto.notes,
+                modality = dto.modality,
+                source = dto.source,
+                title = dto.title,
+                totalDistanceMeters = dto.totalDistanceMeters,
+                poolLengthMeters = dto.poolLengthMeters,
+                stroke = dto.stroke,
+                sessionRpe = dto.sessionRpe,
+            )
+        }
+        val sessionIds = sessions.mapTo(mutableSetOf()) { it.id }
+
+        val usedSessionExerciseIds = mutableSetOf<Long>()
+        val sessionExercises = data.sessionExercises.map { dto ->
+            requirePositiveId(dto.localId, "exercício de sessão '${dto.exerciseName}'")
+            require(usedSessionExerciseIds.add(dto.localId)) {
+                "IDs de exercício de sessão duplicados no snapshot (${dto.localId})."
+            }
+            require(dto.sessionId in sessionIds) {
+                "Exercício de sessão '${dto.exerciseName}' referencia uma sessão que não está " +
+                    "no snapshot (sessionId ${dto.sessionId})."
+            }
+            SessionExerciseEntity(
+                id = dto.localId,
+                sessionId = dto.sessionId,
+                exerciseId = dto.exerciseId,
+                exerciseName = dto.exerciseName,
+                exerciseOrder = dto.exerciseOrder,
+                plannedSets = dto.plannedSets,
+                completedSets = dto.completedSets,
+                startedAt = dto.startedAt,
+                endedAt = dto.endedAt,
+            )
+        }
+        // As séries chegam referenciando o `id` que o backend deu ao exercício de
+        // sessão; é essa chave que liga a série ao ID local preservado acima.
+        val roomIdBySnapshotExerciseId = mutableMapOf<Long, Long>()
+        data.sessionExercises.forEach { dto ->
+            requirePositiveId(dto.id, "exercício de sessão '${dto.exerciseName}'")
+            require(roomIdBySnapshotExerciseId.put(dto.id, dto.localId) == null) {
+                "IDs de exercício de sessão duplicados no snapshot (${dto.id})."
             }
         }
 
-        // Garante que exatamente um plano esteja ativo (o primeiro com isActive=true,
-        // senão o primeiro da lista)
-        val allPlans = dao.getAllPlanEntities()
-        if (allPlans.isNotEmpty()) {
-            dao.deactivateAll()
-            val activePlan = allPlans.firstOrNull { it.isActive } ?: allPlans[0]
-            dao.updatePlanActive(activePlan.id)
-        }
-
-        // Mapeia localId de sessão -> novo ID do Room
-        val sessionIdMap = mutableMapOf<Long, Long>()
-
-        // Restaura sessões, exercícios de sessão e set logs
-        for (sessionDto in data.sessions) {
-            val planRoomId = planIdMap[sessionDto.planLocalId] ?: sessionDto.planLocalId
-            val dayRoomId = dayIdMap[sessionDto.dayLocalId] ?: sessionDto.dayLocalId
-            val newSessionId = dao.insertSession(
-                WorkoutSessionEntity(
-                    id = sessionDto.id,
-                    planId = planRoomId,
-                    dayId = dayRoomId,
-                    planName = sessionDto.planName,
-                    dayName = sessionDto.dayName,
-                    status = sessionDto.status,
-                    startedAt = sessionDto.startedAt,
-                    endedAt = sessionDto.endedAt,
-                    totalDurationSeconds = sessionDto.totalDurationSeconds,
-                    notes = sessionDto.notes,
-                    modality = sessionDto.modality,
-                    source = sessionDto.source,
-                    title = sessionDto.title,
-                    totalDistanceMeters = sessionDto.totalDistanceMeters,
-                    poolLengthMeters = sessionDto.poolLengthMeters,
-                    stroke = sessionDto.stroke,
-                    sessionRpe = sessionDto.sessionRpe,
-                )
-            )
-            sessionIdMap[sessionDto.localId] = newSessionId
-            val sessExDtos = data.sessionExercises.filter { it.sessionId == sessionDto.localId }
-            val newExIds = dao.insertSessionExercises(
-                sessExDtos.map { ex ->
-                    SessionExerciseEntity(
-                        id = ex.id,
-                        sessionId = newSessionId,
-                        exerciseId = ex.exerciseId,
-                        exerciseName = ex.exerciseName,
-                        exerciseOrder = ex.exerciseOrder,
-                        plannedSets = ex.plannedSets,
-                        completedSets = ex.completedSets,
-                        restSeconds = 90,
-                        startedAt = ex.startedAt,
-                        endedAt = ex.endedAt,
-                    )
-                }
-            )
-            val exIdMap = sessExDtos.zip(newExIds).toMap()
-            for ((exDto, newExId) in sessExDtos.zip(newExIds)) {
-                val setDtos = data.setLogs.filter { it.sessionExerciseId == exDto.id }
-                for (set in setDtos) {
-                    dao.insertSetLog(
-                        SetLogEntity(
-                            id = set.id,
-                            exerciseLogId = newExId,
-                            setNumber = set.setNumber,
-                            reps = set.reps,
-                            weightKg = set.weightKg,
-                            rpe = set.rpe,
-                            durationSeconds = set.durationSeconds,
-                            distanceMeters = set.distanceMeters,
-                            isCompleted = set.isCompleted,
-                            isWarmup = set.isWarmup,
-                            restTakenSeconds = set.restTakenSeconds,
-                            completedAt = set.completedAt,
-                        )
-                    )
-                }
+        val usedSetLogIds = mutableSetOf<Long>()
+        val setLogs = data.setLogs.map { dto ->
+            requirePositiveId(dto.localId, "série ${dto.setNumber}")
+            require(usedSetLogIds.add(dto.localId)) {
+                "IDs de série duplicados no snapshot (${dto.localId})."
             }
+            val exerciseLogId = roomIdBySnapshotExerciseId[dto.sessionExerciseId]
+            require(exerciseLogId != null) {
+                "Série ${dto.setNumber} referencia um exercício de sessão que não está no snapshot " +
+                    "(exerciseLogId ${dto.sessionExerciseId})."
+            }
+            SetLogEntity(
+                id = dto.localId,
+                exerciseLogId = exerciseLogId,
+                setNumber = dto.setNumber,
+                reps = dto.reps,
+                weightKg = dto.weightKg,
+                rpe = dto.rpe,
+                durationSeconds = dto.durationSeconds,
+                distanceMeters = dto.distanceMeters,
+                isCompleted = dto.isCompleted,
+                isWarmup = dto.isWarmup,
+                restTakenSeconds = dto.restTakenSeconds,
+                completedAt = dto.completedAt,
+            )
         }
 
-        preferences.lastSyncAt = Instant.now().toString()
-        return data
+        return RestoredSnapshot(
+            plans = normalizedPlans,
+            days = days,
+            planExercises = planExercises,
+            sessions = sessions,
+            sessionExercises = sessionExercises,
+            setLogs = setLogs,
+        )
     }
+
+    private fun requirePositiveId(id: Long, subject: String) {
+        require(id > 0) { "$subject tem ID de aparelho inválido ($id); exporte um backup antes de restaurar." }
+    }
+
+    private data class RestoredSnapshot(
+        val plans: List<WorkoutPlanEntity>,
+        val days: List<WorkoutDayEntity>,
+        val planExercises: List<WorkoutPlanExerciseEntity>,
+        val sessions: List<WorkoutSessionEntity>,
+        val sessionExercises: List<SessionExerciseEntity>,
+        val setLogs: List<SetLogEntity>,
+    )
 
     // ---------------- Backup JSON manual ----------------
 
@@ -446,38 +516,48 @@ class WorkoutRepository(
         Json { encodeDefaults = true }.encodeToString(BackupFile.serializer(), file)
     }
 
-    suspend fun importBackup(payload: BackupFile) = withContext(Dispatchers.IO) {
-        val validation = BackupValidator.validate(payload)
-        require(validation.valid) { validation.message ?: "Backup inválido" }
+    /**
+     * Substitui todo o banco local pelo backup, já validado, e só então aplica o
+     * `deviceId` do arquivo: se a validação ou a escrita falhar, nem os dados nem
+     * a identidade do aparelho mudam.
+     */
+    suspend fun importBackup(payload: BackupFile, deviceIdStore: DeviceIdStore = preferences) =
+        withContext(Dispatchers.IO) {
+            val validation = BackupValidator.validate(payload)
+            require(validation.valid) { validation.message ?: "Backup inválido" }
 
-        val plans = payload.plans.map { BackupMapper.toEntity(it) }
-        val days = payload.plans.flatMap { plan ->
-            plan.days.map { BackupMapper.toEntity(it, planId = plan.id) }
-        }
-        val planExercises = payload.plans.flatMap { plan ->
-            plan.days.flatMap { day ->
-                day.exercises.map { BackupMapper.toEntity(it, dayId = day.id) }
+            val plans = payload.plans.map { BackupMapper.toEntity(it) }
+            val days = payload.plans.flatMap { plan ->
+                plan.days.map { BackupMapper.toEntity(it, planId = plan.id) }
+            }
+            val planExercises = payload.plans.flatMap { plan ->
+                plan.days.flatMap { day ->
+                    day.exercises.map { BackupMapper.toEntity(it, dayId = day.id) }
+                }
+            }
+            val sessions = payload.sessions.map { BackupMapper.toEntity(it, planId = it.planId) }
+            val sessionExercises = payload.sessions.flatMap { session ->
+                session.exercises.map { BackupMapper.toEntity(it, sessionId = session.id) }
+            }
+            val setLogs = payload.sessions.flatMap { session ->
+                session.exercises.flatMap { exercise ->
+                    exercise.sets.map { BackupMapper.toEntity(it, exerciseLogId = exercise.id) }
+                }
+            }
+
+            dao.replaceAllData(
+                plans = plans,
+                days = days,
+                planExercises = planExercises,
+                sessions = sessions,
+                sessionExercises = sessionExercises,
+                setLogs = setLogs,
+            )
+
+            if (payload.deviceId.isNotBlank()) {
+                deviceIdStore.deviceId = payload.deviceId
             }
         }
-        val sessions = payload.sessions.map { BackupMapper.toEntity(it, planId = it.planId) }
-        val sessionExercises = payload.sessions.flatMap { session ->
-            session.exercises.map { BackupMapper.toEntity(it, sessionId = session.id) }
-        }
-        val setLogs = payload.sessions.flatMap { session ->
-            session.exercises.flatMap { exercise ->
-                exercise.sets.map { BackupMapper.toEntity(it, exerciseLogId = exercise.id) }
-            }
-        }
-
-        dao.replaceAllData(
-            plans = plans,
-            days = days,
-            planExercises = planExercises,
-            sessions = sessions,
-            sessionExercises = sessionExercises,
-            setLogs = setLogs,
-        )
-    }
 
     suspend fun testConnection() = withContext(Dispatchers.IO) {
         backendClient.health()

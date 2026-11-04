@@ -20,24 +20,24 @@ import java.util.concurrent.TimeUnit
 class BackendClient(
     private val baseUrlProvider: () -> String,
     private val client: OkHttpClient = defaultClient(),
-) {
+) : BackendApi {
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
 
-    suspend fun health(): HealthResponse = get("/health")
+    override suspend fun health(): HealthResponse = get("/health")
 
-    suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse =
+    override suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse =
         post("/v1/generate-workout", json.encodeToString(GeneratePlanRequest.serializer(), request))
 
-    suspend fun sync(request: SyncRequestDto): SyncResponseDto =
+    override suspend fun sync(request: SyncRequestDto): SyncResponseDto =
         post("/v1/sync", json.encodeToString(SyncRequestDto.serializer(), request))
 
-    suspend fun syncDownload(deviceId: String): SyncDownloadDto =
+    override suspend fun syncDownload(deviceId: String): SyncDownloadDto =
         get("/v1/sync/download?deviceId=$deviceId")
 
-    suspend fun catalog(): CatalogResponseDto = get("/v1/catalog")
+    override suspend fun catalog(): CatalogResponseDto = get("/v1/catalog")
 
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder()
