@@ -16,6 +16,19 @@ data class GeneratePlanRequest(
     val reviewAfterWeeks: Int = 4,
     val bodyWeightKg: Double? = null,
     val heightCm: Int? = null,
+    val modalities: List<ModalityDto> = emptyList(),
+)
+
+@Serializable
+data class ModalityDto(
+    val type: String = "strength",
+    val sessionsPerWeek: Int = 1,
+    val goal: String = "hypertrophy",
+    val level: String = "intermediate",
+    val availableEquipment: List<String> = emptyList(),
+    val targetMuscles: List<String> = emptyList(),
+    val focus: String? = null,
+    val recent5kSeconds: Int? = null,
 )
 
 @Serializable
@@ -44,6 +57,8 @@ data class WorkoutDayDto(
     val dayOrder: Int = 0,
     val exercises: List<WorkoutExerciseDto> = emptyList(),
     val isRestDay: Boolean = false,
+    val weekday: Int? = null,
+    val modality: String = "strength",
 )
 
 @Serializable
@@ -59,6 +74,11 @@ data class WorkoutExerciseDto(
     val exerciseName: String = "",
     val primaryMuscles: List<String> = emptyList(),
     val equipment: String = "",
+    val metricType: String = "reps_weight",
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceMeters: Double? = null,
+    val targetPaceSecondsPerKm: Int? = null,
+    val targetHrZone: String? = null,
 )
 
 @Serializable
@@ -324,3 +344,36 @@ data class CatalogResponseDto(
 
 @Serializable
 data class ApiErrorDto(val detail: String = "Erro desconhecido")
+
+// ---------------- Revisão de plano (H2-6) ----------------
+
+@Serializable
+data class ReviewPlanRequest(
+    val deviceId: String,
+    val plan: WorkoutPlanDto,
+    val history: ReviewPlanHistory = ReviewPlanHistory(),
+)
+
+@Serializable
+data class ReviewPlanHistory(
+    val weeks: Int = 0,
+    val adherence: Double = 1.0,
+    val sessions: List<ReviewPlanSession> = emptyList(),
+)
+
+@Serializable
+data class ReviewPlanSession(
+    val modality: String = "strength",
+    val completed: Boolean = false,
+    val durationSeconds: Long = 0,
+    val distanceMeters: Double? = null,
+    val rpe: Double? = null,
+    val startedAt: Long = 0,
+)
+
+@Serializable
+data class ReviewPlanResponse(
+    val workout: WorkoutPlanDto,
+    val changes: List<String> = emptyList(),
+    val source: String = "local",
+)

@@ -7,9 +7,12 @@ exercícios do catálogo. Assim o app sempre recebe um treino utilizável.
 
 import random
 import re
+from collections import defaultdict
 from datetime import date, timedelta
 from difflib import get_close_matches
 from typing import Any, Dict, List, Optional, Tuple
+
+from .run_templates import template_for
 
 MUSCLE_ALIASES: Dict[str, List[str]] = {
     "back": ["lats", "middle back", "traps"],
@@ -293,14 +296,16 @@ def _pick_exercise(
     candidates = [
         exercise
         for exercise in pool
-        if exercise["id"] not in used
+        if exercise.get("id") not in used
         and muscle in [str(m).lower() for m in exercise.get("primaryMuscles", [])]
     ]
     if not candidates:
-        candidates = [exercise for exercise in pool if exercise["id"] not in used]
+        candidates = [exercise for exercise in pool if exercise.get("id") not in used]
     if not candidates:
         return None
-    return rng.choice(candidates)
+    chosen = rng.choice(candidates)
+    used.add(chosen.get("id"))
+    return chosen
 
 
 def _day_groups(
@@ -404,3 +409,269 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
         plan = suggest_initial_load(plan, body_weight_kg)
 
     return plan
+
+
+MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
+
+
+def _pick_strength_exercise(
+    pool: List[Dict[str, Any]],
+    muscles: List[str],
+    goal: str,
+    rng: random.Random,
+    used: set,
+) -> Optional[Dict[str, Any]]:
+    """Escolhe um exercício de musculação do catálogo, sem repetir IDs."""
+    groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
+    for group in groups:
+        candidate = _pick_exercise(pool, group, rng, used)
+        if candidate:
+            return candidate
+    return _pick_exercise(pool, "chest", rng, used)
+
+
+def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Monta uma semana híbrida (musculação, corrida, mobilidade) sem IA.
+
+    Distribui as sessões das modalidades em weekdays (1 = segunda ... 7 =
+    domingo) em round-robin, permitindo mais de uma sessão no mesmo dia. A soma
+    de sessionsPerWeek pode exceder 7.
+    """
+    modalities = getattr(request, "modalities", None) or []
+    if not modalities:
+        return build_local_plan(request, catalog)
+
+    session_duration = int(getattr(request, "sessionDurationMinutes", 60))
+    review_after_weeks = int(getattr(request, "reviewAfterWeeks", 4))
+    goal = getattr(request, "goal", "general")
+    level = getattr(request, "currentLevel", "intermediate")
+    equipment = list(getattr(request, "availableEquipment", []) or [])
+    muscles = list(getattr(request, "targetMuscles", []) or [])
+    rng = random.Random()
+
+    pool = _build_pool(catalog, equipment, level)
+    if len(pool) < 10:
+        pool = list(catalog)
+
+    # Um slot por sessão planejada de cada modalidade.
+    slots: List[str] = []
+    modality_cfg: Dict[str, Dict[str, Any]] = {}
+    for m in modalities:
+        mtype = str(m.get("type", "strength")).lower()
+        modality_cfg[mtype] = m
+        sessions = max(1, int(m.get("sessionsPerWeek", 1)))
+        for _ in range(sessions):
+            slots.append(mtype)
+
+    # Round-robin pelos dias da semana (1..7).
+    by_weekday: Dict[int, List[tuple[int, str]]] = defaultdict(list)
+    for i, mtype in enumerate(slots):
+        wd = (i % 7) + 1
+        by_weekday[wd].append((i, mtype))
+
+    days: List[Dict[str, Any]] = []
+    used: set = set()
+    day_index = 0
+
+    for wd in sorted(by_weekday):
+        entries = by_weekday[wd]
+        entries.sort(key=lambda e: (MODALITY_RANK.get(e[1], 9), e[0]))
+
+        day_exercises: List[Dict[str, Any]] = []
+        day_order = 0
+        primary_modality = entries[0][1]
+
+        for _, mtype in entries:
+            if mtype == "run":
+                run_cfg = modality_cfg.get("run", {})
+                block = template_for(run_cfg.get("level", level), run_cfg.get("recent5kSeconds"))
+                exercise = {
+                    "exerciseId": block["exerciseId"],
+                    "exerciseOrder": day_order,
+                    "sets": block["sets"],
+                    "targetReps": block.get("targetReps", ""),
+                    "targetRpe": block.get("targetRpe", 7.0),
+                    "restSeconds": block.get("restSeconds", 60),
+                    "notes": block.get("notes", ""),
+                    "isSupersetWithPrevious": False,
+                    "exerciseName": block["exerciseName"],
+                    "primaryMuscles": ["legs"],
+                    "equipment": "nenhum",
+                    "metricType": "distance_duration",
+                    "targetDurationSeconds": None,
+                    "targetDistanceMeters": block.get("targetDistanceMeters"),
+                    "targetPaceSecondsPerKm": block.get("targetPaceSecondsPerKm"),
+                    "targetHrZone": None,
+                }
+            elif mtype == "mobility":
+                mob_cfg = modality_cfg.get("mobility", {})
+                focus = mob_cfg.get("focus")
+                exercise = {
+                    "exerciseId": f"mobility_{focus or 'full'}",
+                    "exerciseOrder": day_order,
+                    "exerciseName": "Mobilidade"
+                    + (f" - {focus}" if focus else ""),
+                    "metricType": "duration",
+                    "sets": 1,
+                    "targetReps": "",
+                    "targetRpe": 5.0,
+                    "restSeconds": 0,
+                    "notes": (
+                        f"Rotina de mobilidade{(' para ' + focus) if focus else ''} "
+                        f"({session_duration} min)."
+                    ),
+                    "isSupersetWithPrevious": False,
+                    "primaryMuscles": [],
+                    "equipment": "body only",
+                    "targetDurationSeconds": session_duration * 60,
+                    "targetDistanceMeters": None,
+                    "targetPaceSecondsPerKm": None,
+                    "targetHrZone": None,
+                }
+            else:
+                exercise = _pick_strength_exercise(pool, muscles, goal, rng, used)
+                if exercise is None:
+                    continue
+                # O catálogo armazena o ID sob `id`; o plano espera `exerciseId`.
+                exercise["exerciseId"] = exercise.get("id")
+                exercise["exerciseOrder"] = day_order
+                exercise["sets"] = SETS_BY_GOAL.get(goal, 3)
+                exercise["targetReps"] = REPS_BY_GOAL.get(goal, "8-12")
+                exercise["targetRpe"] = RPE_BY_GOAL.get(goal, 8.0)
+                exercise["restSeconds"] = REST_BY_GOAL.get(goal, 90)
+                exercise["notes"] = ""
+                exercise["isSupersetWithPrevious"] = False
+                exercise["metricType"] = "reps_weight"
+                exercise["targetDurationSeconds"] = None
+                exercise["targetDistanceMeters"] = None
+                exercise["targetPaceSecondsPerKm"] = None
+                exercise["targetHrZone"] = None
+
+            day_exercises.append(exercise)
+            day_order += 1
+
+        if not day_exercises:
+            continue
+
+        modality_names = {"strength": "Musculação", "run": "Corrida", "mobility": "Mobilidade"}
+        if len({e["exerciseId"].split("_")[0] for e in day_exercises}) == 1:
+            day_name = modality_names.get(primary_modality, "Treino")
+        else:
+            day_name = "Treino híbrido"
+
+        days.append(
+            {
+                "name": day_name,
+                "dayOrder": day_index,
+                "weekday": wd,
+                "modality": primary_modality,
+                "isRestDay": False,
+                "exercises": day_exercises,
+            }
+        )
+        day_index += 1
+
+    if not days:
+        return build_local_plan(request, catalog)
+
+    plan = {
+        "name": "Semana híbrida",
+        "description": (
+            "Plano semanal com musculação, corrida e mobilidade gerado localmente. "
+            "Ajuste cargas e ritmo conforme sua evolução."
+        ),
+        "goal": goal,
+        "daysPerWeek": len(days),
+        "days": days,
+    }
+    plan = enrich_plan(plan, catalog)
+
+    body_weight_kg = getattr(request, "bodyWeightKg", None)
+    height_cm = getattr(request, "heightCm", None)
+    if body_weight_kg is not None or height_cm is not None:
+        plan = profile_adjustments(plan, body_weight_kg, height_cm)
+        plan = suggest_initial_load(plan, body_weight_kg)
+
+    return plan
+
+
+def _session_stats(sessions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Agrega RPE médio, flag de dor/limitação e natação das sessões manuais."""
+    rpes = [float(s["rpe"]) for s in sessions if s.get("rpe") is not None]
+    avg_rpe = (sum(rpes) / len(rpes)) if rpes else None
+    pain = any("dor" in str(s.get("notes", "")).lower() for s in sessions)
+    swim = any(str(s.get("modality", "")) == "swim" for s in sessions)
+    return {"avgRpe": avg_rpe, "pain": pain, "swim": swim}
+
+
+def review_plan(
+    plan: Dict[str, Any], history: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Revisa um plano com base no histórico real.
+
+    Retorna um dict com `workout` (plano proposto), `changes` (lista de strings
+    legíveis) e `source`. Sem histórico (weeks == 0) devolve o plano atual com
+    changes vazio. Todas as mudanças são proposições: o app só salva se o
+    usuário confirmar.
+    """
+    changes: List[str] = []
+    history = history or {}
+    sessions = history.get("sessions") or []
+    weeks = int(history.get("weeks", 0))
+    # A adesão vem do histórico quando informada; sem sessions ela ainda pode
+    # ser conhecida (ex.: 4 semanas, 40% de adesão, sem lista de sessões).
+    adherence = float(history.get("adherence", 1.0))
+
+    if weeks == 0:
+        return {
+            "workout": plan,
+            "changes": [],
+            "source": "local",
+        }
+
+    stats = _session_stats(sessions)
+
+    # Regra: adesão baixa → não aumentar volume; reduzir 20% das séries.
+    if adherence < 0.60:
+        changed = False
+        for day in plan.get("days", []):
+            for exercise in day.get("exercises", []):
+                if exercise.get("metricType", "reps_weight") != "reps_weight":
+                    continue
+                current_sets = int(exercise.get("sets", 3))
+                new_sets = max(2, int(current_sets * 0.8))
+                if new_sets != current_sets:
+                    exercise["sets"] = new_sets
+                    changed = True
+        if changed:
+            changes.append("Volume reduzido 20% por adesão baixa nas últimas semanas.")
+        return {"workout": plan, "changes": changes, "source": "local"}
+
+    # Regra: RPE médio alto por duas semanas → deload (menos séries).
+    if stats["avgRpe"] is not None and stats["avgRpe"] > 8.5:
+        changed = False
+        for day in plan.get("days", []):
+            for exercise in day.get("exercises", []):
+                if exercise.get("metricType", "reps_weight") != "reps_weight":
+                    continue
+                current_sets = int(exercise.get("sets", 3))
+                new_sets = max(2, current_sets - 1)
+                if new_sets != current_sets:
+                    exercise["sets"] = new_sets
+                    changed = True
+        if changed:
+            changes.append("Deload: redução de séries por RPE médio acima de 8,5.")
+
+    # Regra: dor/limitação nas notas → não aumentar volume; sugerir mobilidade.
+    if stats["pain"]:
+        changes.append(
+            "Não aumentar volume devido a relatos de dor/limitação; "
+            "considere adicionar mobilidade."
+        )
+
+    # Natação registrada entra como contexto de fadiga, sem gerar bloco de natação.
+    if stats["swim"]:
+        changes.append("Natação registrada considerada como volume/fadiga (sem bloco de natação).")
+
+    return {"workout": plan, "changes": changes, "source": "local"}
+

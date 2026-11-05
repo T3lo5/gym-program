@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -21,12 +21,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.treinos.app.data.remote.ModalityDto
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ScreenTopBar
@@ -72,6 +76,22 @@ private val muscleOptions = listOf(
 private val durationOptions = listOf(30, 45, 60, 90)
 private val reviewOptions = listOf(2, 4, 6, 8)
 
+/** Rascunho de uma modalidade da semana híbrida antes de gerar. */
+data class ModalityDraft(
+    val included: Boolean = false,
+    val sessionsPerWeek: Int = 1,
+    val goal: String = "hypertrophy",
+    val level: String = "intermediate",
+    val focus: String? = null,
+    val recent5kSeconds: Int? = null,
+)
+
+private val modalityTypes = listOf(
+    "strength" to "Musculação",
+    "run" to "Corrida",
+    "mobility" to "Mobilidade",
+)
+
 @Composable
 fun GenerateScreen(
     isGenerating: Boolean,
@@ -79,6 +99,7 @@ fun GenerateScreen(
     savedBodyWeightKg: Double? = null,
     savedHeightCm: Int? = null,
     onGenerate: (
+        modalities: List<ModalityDto>,
         goal: String,
         daysPerWeek: Int,
         level: String,
@@ -100,6 +121,32 @@ fun GenerateScreen(
     var bodyWeightKgText by remember { mutableStateOf(savedBodyWeightKg?.toString() ?: "") }
     var heightCmText by remember { mutableStateOf(savedHeightCm?.toString() ?: "") }
     var profileError by remember { mutableStateOf<String?>(null) }
+
+    // Um draft por tipo de modalidade.
+    var modalityDrafts by remember {
+        mutableStateOf(
+            modalityTypes.map { (type, _) -> type to ModalityDraft() }.toMap()
+        )
+    }
+
+    fun modalityToDto(type: String, draft: ModalityDraft): ModalityDto? {
+        if (!draft.included) return null
+        return ModalityDto(
+            type = type,
+            sessionsPerWeek = draft.sessionsPerWeek.coerceAtLeast(1),
+            goal = when (type) {
+                "strength" -> draft.goal
+                "run" -> "endurance"
+                "mobility" -> "general"
+                else -> draft.goal
+            },
+            level = draft.level,
+            availableEquipment = equipment.toList(),
+            targetMuscles = if (type == "strength") muscles.toList() else emptyList(),
+            focus = if (type == "mobility") draft.focus else null,
+            recent5kSeconds = if (type == "run") draft.recent5kSeconds else null,
+        )
+    }
 
     Scaffold(
         topBar = { ScreenTopBar(title = "Novo treino", onBack = onBack) },
@@ -127,7 +174,111 @@ fun GenerateScreen(
                 }
             }
 
-            item { SectionTitle("Objetivo") }
+            item { SectionTitle("Modalidades da semana") }
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    modalityTypes.forEach { (type, label) ->
+                        key(type) {
+                            val draft = modalityDrafts[type] ?: ModalityDraft()
+                            var included by remember(type) { mutableStateOf(draft.included) }
+                            var sessions by remember(type) { mutableStateOf(draft.sessionsPerWeek) }
+                            var recent5kText by remember(type) {
+                                mutableStateOf(draft.recent5kSeconds?.toString() ?: "")
+                            }
+                            var focusText by remember(type) { mutableStateOf(draft.focus ?: "") }
+
+                            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Checkbox(
+                                            checked = included,
+                                            onCheckedChange = {
+                                                included = it
+                                                modalityDrafts = modalityDrafts + (type to draft.copy(included = it))
+                                            },
+                                        )
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text = "${draft.sessionsPerWeek}x/semana",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (included) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            OutlinedTextField(
+                                                value = sessions.toString(),
+                                                onValueChange = {
+                                                    val v = it.toIntOrNull() ?: 1
+                                                    sessions = v
+                                                    val updated = draft.copy(included = true, sessionsPerWeek = v)
+                                                    modalityDrafts = modalityDrafts + (type to updated)
+                                                },
+                                                label = { Text("Sessões por semana") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        when (type) {
+                                            "run" -> {
+                                                OutlinedTextField(
+                                                    value = recent5kText,
+                                                    onValueChange = {
+                                                        recent5kText = it
+                                                        val updated = draft.copy(included = true, recent5kSeconds = it.toIntOrNull())
+                                                        modalityDrafts = modalityDrafts + (type to updated)
+                                                    },
+                                                    label = { Text("Benchmark 5 km (s, opcional)") },
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                )
+                                            }
+                                            "mobility" -> {
+                                                OutlinedTextField(
+                                                    value = focusText,
+                                                    onValueChange = {
+                                                        focusText = it
+                                                        val updated = draft.copy(included = true, focus = it.takeIf { it.isNotBlank() })
+                                                        modalityDrafts = modalityDrafts + (type to updated)
+                                                    },
+                                                    label = { Text("Foco (ex.: costas, quadril, opcional)") },
+                                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "Pelo menos uma modalidade deve estar incluída. Natação não entra no plano: " +
+                        "registre-a como atividade avulsa no histórico.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+
+            item { SectionTitle("Objetivo (musculação)") }
             item {
                 ChipGroup(
                     options = goalOptions,
@@ -145,7 +296,7 @@ fun GenerateScreen(
                 )
             }
 
-            item { SectionTitle("Seu nível") }
+            item { SectionTitle("Seu nível (musculação)") }
             item {
                 ChipGroup(
                     options = levelOptions,
@@ -165,7 +316,7 @@ fun GenerateScreen(
                 )
             }
 
-            item { SectionTitle("Foco muscular (opcional)") }
+            item { SectionTitle("Foco muscular (opcional, musculação)") }
             item {
                 ChipGroup(
                     options = muscleOptions,
@@ -244,28 +395,22 @@ fun GenerateScreen(
                                 color = MaterialTheme.colorScheme.primary,
                             )
                             savedBodyWeightKg?.let {
-                                Text(
-                                    text = "Peso: $it kg",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                                Text(text = "Peso: $it kg", style = MaterialTheme.typography.bodyMedium)
                             }
                             savedHeightCm?.let {
-                                Text(
-                                    text = "Altura: $it cm",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                                Text(text = "Altura: $it cm", style = MaterialTheme.typography.bodyMedium)
                             }
                             if (savedBodyWeightKg != null && savedHeightCm != null) {
                                 val bmi = savedBodyWeightKg / ((savedHeightCm / 100.0) * (savedHeightCm / 100.0))
-                                Text(
-                                    text = "IMC: ${"%.1f".format(bmi)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                                Text(text = "IMC: ${"%.1f".format(bmi)}", style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
                 }
             }
+
+            val selectedModalities = modalityDrafts.entries.filter { it.value.included }
+            val hasModalities = selectedModalities.isNotEmpty()
 
             item {
                 Button(
@@ -276,7 +421,15 @@ fun GenerateScreen(
                             return@Button
                         }
                         profileError = null
+                        if (!hasModalities) {
+                            profileError = "Inclua pelo menos uma modalidade."
+                            return@Button
+                        }
+                        val dtoList = selectedModalities.map { (type, draft) ->
+                            modalityToDto(type, draft)
+                        }.filterNotNull()
                         onGenerate(
+                            dtoList,
                             goal,
                             daysPerWeek,
                             level,
@@ -288,7 +441,7 @@ fun GenerateScreen(
                             heightCmText,
                         )
                     },
-                    enabled = !isGenerating,
+                    enabled = !isGenerating && hasModalities,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
@@ -303,9 +456,9 @@ fun GenerateScreen(
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Text("Gerando treino…")
+                            Text("Gerando semana…")
                         } else {
-                            Text("Gerar treino")
+                            Text("Gerar semana híbrida")
                         }
                     }
                 }
@@ -313,8 +466,8 @@ fun GenerateScreen(
 
             item {
                 Text(
-                    text = "Se a IA não estiver disponível, o backend monta um plano válido com o " +
-                        "catálogo local de exercícios. Você sempre recebe um treino utilizável.",
+                    text = "Se a IA não estiver disponível, o backend monta uma semana híbrida válida " +
+                        "com os templates locais de corrida e mobilidade. Você sempre recebe um plano utilizável.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 12.dp),

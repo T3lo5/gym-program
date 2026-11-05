@@ -8,6 +8,8 @@
       {
         "name": "Treino A",
         "dayOrder": 0,
+        "weekday": 1,
+        "modality": "strength",
         "isRestDay": false,
         "exercises": [
           {
@@ -21,7 +23,12 @@
             "isSupersetWithPrevious": false,
             "exerciseName": "Supino reto",
             "primaryMuscles": ["chest"],
-            "equipment": "barbell"
+            "equipment": "barbell",
+            "metricType": "reps_weight",
+            "targetDurationSeconds": null,
+            "targetDistanceMeters": null,
+            "targetPaceSecondsPerKm": null,
+            "targetHrZone": null
           }
         ]
       }
@@ -32,5 +39,6 @@
   "planId": 42,
   "nextReviewAt": "2026-12-01",
   "reviewAfterWeeks": 4,
-  "source": "local"
+  "source": "local",
+  "changes": []
 }

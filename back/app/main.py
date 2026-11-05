@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any, Dict
 import httpx
 import os
 import json
@@ -20,12 +20,15 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from . import database as db
 from .plan_builder import (
     build_local_plan,
+    build_hybrid_plan,
     enrich_plan,
     resolve_plan_ids,
     review_date,
     profile_adjustments,
     suggest_initial_load,
+    review_plan,
 )
+from .run_templates import template_for
 
 # Config
 SENSENOVA_API_KEY = os.getenv("SENSENOVA_API_KEY")
@@ -210,6 +213,11 @@ class GenerateRequest(BaseModel):
     reviewAfterWeeks: int = Field(ge=1, le=12, default=4)
     bodyWeightKg: Optional[float] = Field(default=None, ge=30.0, le=300.0)
     heightCm: Optional[int] = Field(default=None, ge=120, le=250)
+    modalities: Optional[List[Dict[str, Any]]] = Field(
+        default_factory=list,
+        description="Lista de modalidades da semana híbrida (strength/run/mobility). "
+        "Quando vazia, gera apenas musculação (compatível com v1).",
+    )
 
 
 class ExerciseDTO(BaseModel):
@@ -218,12 +226,17 @@ class ExerciseDTO(BaseModel):
     sets: int = Field(ge=1, le=6)
     targetReps: str
     targetRpe: Optional[float] = Field(default=None, ge=5.0, le=10.0)
-    restSeconds: int = Field(ge=30, le=300, default=90)
+    restSeconds: int = Field(ge=0, le=300, default=90)
     notes: str = ""
     isSupersetWithPrevious: bool = False
     exerciseName: str = ""
     primaryMuscles: List[str] = Field(default_factory=list)
     equipment: str = ""
+    metricType: str = "reps_weight"
+    targetDurationSeconds: Optional[int] = None
+    targetDistanceMeters: Optional[float] = None
+    targetPaceSecondsPerKm: Optional[int] = None
+    targetHrZone: Optional[str] = None
 
 
 class DayDTO(BaseModel):
@@ -231,6 +244,8 @@ class DayDTO(BaseModel):
     dayOrder: int
     exercises: List[ExerciseDTO]
     isRestDay: bool = False
+    weekday: Optional[int] = None
+    modality: str = "strength"
 
 
 class WorkoutPlanDTO(BaseModel):
@@ -248,6 +263,18 @@ class GenerateResponse(BaseModel):
     planId: int = 0
     nextReviewAt: str
     reviewAfterWeeks: int = 4
+    source: str = "local"
+
+
+class GenerateReviewRequest(BaseModel):
+    deviceId: str = "default"
+    plan: Dict[str, Any]
+    history: Dict[str, Any] = Field(default_factory=dict)
+
+
+class GenerateReviewResponse(BaseModel):
+    workout: WorkoutPlanDTO
+    changes: List[str] = Field(default_factory=list)
     source: str = "local"
 
 
@@ -404,6 +431,33 @@ Retorne APENAS o JSON válido."""
     return prompt
 
 
+def build_hybrid_user_prompt(request: GenerateRequest) -> str:
+    """Prompt para geração de semana híbrida (musculação/corrida/mobilidade)."""
+    lines = ["Gere uma semana híbrida com as seguintes modalidades:"]
+    for m in request.modalities or []:
+        mtype = m.get("type", "strength")
+        sessions = m.get("sessionsPerWeek", 1)
+        lines.append(
+            f"- {mtype}: {sessions} sessão(ões)/semana"
+            + (f", objetivo={m.get('goal')}" if m.get("goal") else "")
+            + (f", nível={m.get('level')}" if m.get("level") else "")
+            + (f", foco={m.get('focus')}" if m.get("focus") else "")
+            + (
+                f", benchmark5k={m.get('recent5kSeconds')}s"
+                if m.get("recent5kSeconds") is not None
+                else ""
+            )
+        )
+    lines.append(f"- Duração por sessão: ~{request.sessionDurationMinutes} min")
+    lines.append(f"- Revisar após: {request.reviewAfterWeeks} semanas")
+    lines.append(
+        "Distribua as sessões pelos dias da semana (seg=1 ... dom=7), permitindo "
+        "mais de uma sessão no mesmo dia. Corrida usa distância/pace (não reps); "
+        "mobilidade usa duração; musculação usa reps/peso. Retorne APENAS o JSON válido."
+    )
+    return "\n".join(lines)
+
+
 @app.post("/v1/generate-workout", response_model=GenerateResponse)
 async def generate_workout(request: GenerateRequest):
     """Gera um plano sob demanda.
@@ -420,7 +474,13 @@ async def generate_workout(request: GenerateRequest):
     source = "local"
     model_used = "local-fallback"
 
-    user_prompt = build_user_prompt(request)
+    modalities = getattr(request, "modalities", None) or []
+    is_hybrid = bool(modalities)
+
+    if is_hybrid:
+        user_prompt = build_hybrid_user_prompt(request)
+    else:
+        user_prompt = build_user_prompt(request)
 
     if SENSENOVA_API_KEY:
         try:
@@ -468,7 +528,10 @@ async def generate_workout(request: GenerateRequest):
         print("SENSENOVA_API_KEY not set; using local fallback")
 
     if workout_data is None:
-        workout_data = build_local_plan(request, EXERCISE_CATALOG)
+        if is_hybrid:
+            workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
+        else:
+            workout_data = build_local_plan(request, EXERCISE_CATALOG)
 
     next_review = review_date(request.reviewAfterWeeks)
     plan_id = 0
@@ -495,6 +558,22 @@ async def generate_workout(request: GenerateRequest):
         nextReviewAt=next_review,
         reviewAfterWeeks=request.reviewAfterWeeks,
         source=source,
+    )
+
+
+@app.post("/v1/review-plan", response_model=GenerateReviewResponse)
+async def review_plan_endpoint(request: GenerateReviewRequest):
+    """Propõe ajustes ao plano com base no histórico real.
+
+    O app mostra as `changes` e só salva se o usuário confirmar. Todas as
+    regras são determinísticas (fallback local); a IA não altera o plano sem
+    confirmação.
+    """
+    result = review_plan(request.plan, request.history or {})
+    return GenerateReviewResponse(
+        workout=WorkoutPlanDTO(**result["workout"]),
+        changes=result.get("changes", []),
+        source=result.get("source", "local"),
     )
 
 

@@ -23,13 +23,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
+import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.formatDistanceMeters
+import com.treinos.app.ui.formatDuration
+import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
+import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
 import com.treinos.app.ui.reviewIsDue
 
@@ -37,6 +43,7 @@ import com.treinos.app.ui.reviewIsDue
 fun HomeScreen(
     plan: WorkoutPlanWithDetails?,
     inProgressSession: SessionWithExercises?,
+    sessions: List<SessionWithExercises> = emptyList(),
     onGenerate: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
@@ -100,6 +107,16 @@ fun HomeScreen(
 
                 items(plan.days.sortedBy { it.day.dayOrder }, key = { it.day.id }) { day ->
                     DayCard(day = day, onStart = { onStartDay(day.day.id) })
+                }
+
+                val todayManual = sessions.filter {
+                    it.session.source == MANUAL_SESSION_SOURCE && isToday(it.session.startedAt)
+                }
+                if (todayManual.isNotEmpty()) {
+                    item { SectionTitle("Atividades de hoje") }
+                    items(todayManual, key = { it.session.id }) { session ->
+                        ActivitySummaryCard(session)
+                    }
                 }
 
                 item {
@@ -302,4 +319,46 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun ActivitySummaryCard(session: SessionWithExercises) {
+    val modality = ActivityModality.fromStorageValue(session.session.modality)
+    val title = session.session.title.ifBlank { session.session.dayName }.ifBlank { modality.label }
+    val distance = formatDistanceMeters(session.session.totalDistanceMeters)
+    val pace = when (modality) {
+        ActivityModality.RUN ->
+            formatPacePerKm(session.session.totalDurationSeconds, session.session.totalDistanceMeters)
+        else -> null
+    }
+    val summary = buildList {
+        add(formatDuration(session.session.totalDurationSeconds))
+        distance?.let { add(it) }
+        pace?.let { add(it) }
+        session.session.sessionRpe?.let { add("RPE ${trimNumber(it)}") }
+    }.joinToString(" • ")
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "$summary • ${formatDateTime(session.session.startedAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun trimNumber(value: Double): String {
+    val rounded = value.toLong()
+    return if (value == rounded.toDouble()) rounded.toString()
+    else String.format("%.1f", value)
 }

@@ -39,6 +39,9 @@ class BackendClient(
 
     override suspend fun catalog(): CatalogResponseDto = get("/v1/catalog")
 
+    override suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
+        post("/v1/review-plan", json.encodeToString(ReviewPlanRequest.serializer(), request))
+
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(baseUrlProvider() + path)

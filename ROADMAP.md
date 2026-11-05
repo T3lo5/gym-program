@@ -42,7 +42,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Imagem/vídeo de exercício | ✅/❌ | Imagens via catálogo (H1-3); vídeo não |
 | Migrações Room | ✅ | Room v2 com `MIGRATION_1_2` + `MigrationTest` (1→2 preservando linhas); `fallbackToDestructiveMigration` removido (H1-6) |
 | Registro avulso (natação) | ✅ | `ActivityLog` valida e grava sessão manual (`source = "manual"`, `planId = dayId = 0`, zero exercícios); tela de registro/edição, card de atividade e filtro por modalidade no histórico, exclusão com confirmação (H2-5) |
-| Plano híbrido / revisão por IA | 📋 | H2-6 (proposta) |
+| Plano híbrido / revisão por IA | ✅ | H2-6 (concluído) |
 | Mobilidade / alongamento | 📋 | H2-7 (proposta) |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
 
@@ -81,19 +81,19 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H1-7 | Correções de restauração, backup e Ajustes | `WorkoutRepository.downloadSync` valida o snapshot (`mapSnapshot`) antes de escrever e usa a transação única `dao.replaceAllData`; snapshot vazio devolve `SyncDownloadResult.Empty` e mantém os dados locais; `RestoreByDeviceId` persiste o `deviceId` só após sucesso; `importBackup` aplica o `deviceId` do arquivo; file pickers (SAF) ligados em `TreinosApp.kt` com confirmação nas duas pontas; texto de Ajustes corrigido + card "Restaurar de outro aparelho"; testes `RestoreDownloadTest`, `BackupImportTest`, `RestoreDeviceIdTest`; [spec](docs/specs/H1-7-restore-backup-fixes.md) |
 | H2-1 | Descoberta LAN automática (mDNS/NSD) | `BackendDiscoveryManager` (`NsdManager` em `_treinos._tcp.`, resolve com timeout de 5 s, TXT `version`, `stop()` ao sair da tela), `DiscoveredBackend` com `url`/`endpoint`/`isVersionKnown`, `BackendConnector` que sonda `GET /health` e só salva `AppPreferences.backendUrl` em 200 (falha mantém a URL anterior), `HttpBackendHealthChecker`, seção "Backend na rede local" em `SettingsScreen` com "Buscar backends"/"Parar"/"Conectar" e aviso de versão desconhecida, `ACCESS_LOCAL_NETWORK` no manifest; testes `DiscoveredBackendTest` e `BackendConnectorTest`; [spec](docs/specs/H2-1-lan-discovery.md) |
 | H2-5 | Registro avulso genérico (natação primeiro) | `ActivityLog.kt` com `ActivityModality`, `ActivityLogInput`/`ActivityLogDraft`, `validateActivityLog` e pace; `WorkoutRepository.logActivity/updateActivity/deleteActivity/lastManualSession` sobre `WorkoutSessionEntity` com `source = "manual"`, `planId = dayId = 0` e zero exercícios; `LogActivityScreen` na rota `Screen.LogActivity`, botão "Registrar atividade" na Home, card de atividade + filtro por modalidade + exclusão com confirmação no histórico; `formatDistanceMeters`/`formatPacePer100m`/`formatPacePerKm`; testes `ActivityLogTest`, `ActivityFormatTest`, `ManualSessionDaoTest`, `BackupMapperTest.sessao_manual_round_trip` e `back/tests/test_sync_contract.py::test_sessao_manual_round_trip`; [spec](docs/specs/H2-5-adhoc-log.md) |
+| H2-6 | Plano híbrido e revisão por IA | `WorkoutRepository.reviewPlan`, `build_hybrid_plan`, `run_templates.py`, `POST /v1/review-plan`; Generate/Home/History com seleção de modalidades; fallback local híbrido; testes backend (`test_hybrid_plan.py`, `test_contract_v2.py`) e app (`WeeklyScheduleTest`, `RunMetricsTest`); [spec](docs/specs/H2-6-hybrid-plan.md) |
 | H2-4 | Histórico com calendário e métricas | `HistoryScreen` com calendário do mês, cards de métricas (treinos, séries, volume, duração), volume por músculo e filtro por dia; `HistoryMetrics` e `CalendarMonth` com regras de agregação; `MetricCard` em `Common.kt`; formatters `formatVolumeKg`, `formatMonthYear`, `formatDateShort` em `Formatters.kt`; mapeamento de músculo em `TreinosApp.kt`; testes `HistoryMetricsTest`, `CalendarMonthTest` e `ActivityFormatTest`; [spec](docs/specs/H2-4-history-calendar.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
 Nada pendente: H1-1..H1-7 estão concluídos e listados em §4.1. O Horizon 1
 fechou com H1-7 (restauração/backup não apagam mais dados e a UI está ligada);
-H2-5, H2-1 e H2-4 também já estão em §4.1, então a fila continua em H2-6 (proposta).
+H2-5, H2-1 e H2-4 também já estão em §4.1, então a fila continua em H2-7 (proposta).
 
 ### Horizon 2 — Próximo (1-2 meses): multimodal, conectividade e histórico
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H2-6 | Plano híbrido e revisão por IA | **S** | Semana real mistura academia, corrida e natação; o app só planeja musculação. | Semana com modalidades e `weekday`, geração de corrida com templates, revisão por IA com histórico e fallback local. | 6-8 dias | H1-6, H2-5 (H2-7 opcional) | [H2-6](docs/specs/H2-6-hybrid-plan.md) (proposta) |
 | H2-7 | Mobilidade e alongamento | **C** | Usuário quer rotina curta para costas/quadril, mas o app não oferece. | Rotinas curadas de 5-15 min com timer, aviso de segurança e registro no histórico. | 3-4 dias | H1-6 | [H2-7](docs/specs/H2-7-mobility.md) (proposta) |
 
 ### Horizon 3 — Depois (2-4 meses): evolução e qualidade
@@ -126,12 +126,12 @@ H2-5, H2-1 e H2-4 também já estão em §4.1, então a fila continua em H2-6 (p
 Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-2 Wear
             + H2-3 download + H2-5 registro avulso + H2-1 descoberta LAN
 Agora:      — (H2-4 entregue; ver §4.1)
-Próximo:    H2-6 plano híbrido       → semana com academia + corrida + revisão
+Próximo:    H2-7 mobilidade                 → rotinas curtas de costas/quadril
 Depois:     H2-7 mobilidade
 Qualidade:  H3-1..H3-5
 ```
 
-**Caminho crítico:** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 (proposta, exige aprovação).
+**Caminho crítico:** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅.
 O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda
 não vê (UI, Room, migração e contrato).
 
@@ -167,7 +167,14 @@ não vê (UI, Room, migração e contrato).
 
 ## 9. Próximo passo imediato
 
-Implementar **H2-6 (plano híbrido)** — proposta, exige aprovação explícita antes de iniciar; [spec](docs/specs/H2-6-hybrid-plan.md). O histórico (H2-4) está concluído: calendário, métricas de volume/duração/séries e filtro por dia já estão no app.
+## 9. Próximo passo imediato
+
+**H2-6 (plano híbrido) está concluído** — implementado e verificado com o gate. O
+próximo item da fila é **H2-7 (mobilidade/alongamento)**, que é uma proposta e
+exige aprovação explícita antes de iniciar; [spec](docs/specs/H2-7-mobility.md).
+
+O histórico (H2-4) está concluído: calendário, métricas de volume/duração/séries e
+filtro por dia já estão no app.
 
 H2-1 (descoberta LAN) está concluída: Ajustes → "Buscar backends" usa
 `NsdManager` em `_treinos._tcp.`, "Conectar" sonda `GET /health` e **só** salva a
@@ -182,8 +189,6 @@ exclusão com confirmação e filtro por modalidade no histórico, e sobrevive a
 backup e sync (testes `ActivityLogTest`, `ActivityFormatTest`,
 `ManualSessionDaoTest`, `sessao_manual_round_trip` no `BackupMapperTest` e no
 contrato do backend).
-
-**H2-6** e **H2-7** são propostas e não devem começar sem aprovação explícita.
 
 Para iniciar qualquer item, leia a spec correspondente em
 [docs/specs/](docs/specs/); se não existir, crie a partir de

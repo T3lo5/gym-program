@@ -19,6 +19,15 @@ import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.SyncDownloadResult
 import com.treinos.app.data.remote.GeneratePlanRequest
+import com.treinos.app.data.remote.GeneratePlanResponse
+import com.treinos.app.data.remote.ModalityDto
+import com.treinos.app.data.remote.ReviewPlanRequest
+import com.treinos.app.data.remote.ReviewPlanResponse
+import com.treinos.app.data.remote.ReviewPlanHistory
+import com.treinos.app.data.remote.ReviewPlanSession
+import com.treinos.app.data.remote.WorkoutDayDto
+import com.treinos.app.data.remote.WorkoutExerciseDto
+import com.treinos.app.data.remote.WorkoutPlanDto
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
@@ -45,6 +54,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
@@ -139,6 +150,18 @@ class AppViewModel(
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
+
+    private val _isReviewing = MutableStateFlow(false)
+    val isReviewing: StateFlow<Boolean> = _isReviewing.asStateFlow()
+
+    private val _reviewMessage = MutableStateFlow<String?>(null)
+    val reviewMessage: StateFlow<String?> = _reviewMessage.asStateFlow()
+
+    private val _reviewChanges = MutableStateFlow<List<String>>(emptyList())
+    val reviewChanges: StateFlow<List<String>> = _reviewChanges.asStateFlow()
+
+    /** Proposta de revisão aguardando confirmação do usuário. */
+    private var pendingReview: ReviewPlanResponse? = null
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -373,6 +396,7 @@ class AppViewModel(
     // ---------------- Geração ----------------
 
     fun generatePlan(
+        modalities: List<ModalityDto>,
         goal: String,
         daysPerWeek: Int,
         level: String,
@@ -413,6 +437,7 @@ class AppViewModel(
                         reviewAfterWeeks = reviewWeeks,
                         bodyWeightKg = validation.bodyWeightKg,
                         heightCm = validation.heightCm,
+                        modalities = modalities,
                     )
                 )
                 _screen.value = Screen.Home
@@ -426,6 +451,95 @@ class AppViewModel(
                 _isGenerating.value = false
             }
         }
+    }
+
+    private fun nextReviewAt(reviewAfterWeeks: Int): String =
+        Instant.now().plus(reviewAfterWeeks.toLong(), ChronoUnit.WEEKS).toString()
+
+    // ---------------- Revisão de plano (H2-6) ----------------
+
+    fun reviewPlan() {
+        val plan = activePlan.value ?: run {
+            _message.value = "Nenhum plano ativo para revisar."
+            return
+        }
+        if (_isReviewing.value) return
+        viewModelScope.launch {
+            _isReviewing.value = true
+            try {
+                val cutoff = Instant.now().minus(4L, ChronoUnit.WEEKS).toEpochMilli()
+                val sessionList = sessions.value.filter { it.session.startedAt >= cutoff }
+                val history = ReviewPlanHistory(
+                    weeks = 4,
+                    adherence = if (sessionList.isEmpty()) 1.0 else {
+                        sessionList.count { it.session.status == "completed" } / sessionList.size.toDouble()
+                    },
+                    sessions = sessionList.map { s ->
+                        ReviewPlanSession(
+                            modality = s.session.modality,
+                            completed = s.session.status == "completed",
+                            durationSeconds = s.session.totalDurationSeconds,
+                            distanceMeters = s.session.totalDistanceMeters,
+                            rpe = s.session.sessionRpe,
+                            startedAt = s.session.startedAt,
+                        )
+                    },
+                )
+                val response = repository.reviewPlan(
+                    ReviewPlanRequest(
+                        deviceId = preferences.deviceId,
+                        plan = plan.toReviewPlanDto(),
+                        history = history,
+                    )
+                )
+                pendingReview = response
+                _reviewChanges.value = response.changes
+                _reviewMessage.value =
+                    if (response.changes.isEmpty()) {
+                        "Sem mudanças propostas. O plano permanece como está."
+                    } else {
+                        "Revisão proposta: ${response.changes.joinToString(" • ")}. Confirme para aplicar."
+                    }
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível revisar o plano."
+            } finally {
+                _isReviewing.value = false
+            }
+        }
+    }
+
+    fun acceptReview() {
+        val response = pendingReview ?: return
+        viewModelScope.launch {
+            try {
+                repository.saveGeneratedPlan(
+                    GeneratePlanResponse(
+                        workout = response.workout,
+                        source = response.source,
+                        nextReviewAt = activePlan.value?.plan?.nextReviewAt
+                            ?: nextReviewAt(activePlan.value?.plan?.reviewAfterWeeks ?: 4),
+                        reviewAfterWeeks = activePlan.value?.plan?.reviewAfterWeeks ?: 4,
+                    )
+                )
+                pendingReview = null
+                _reviewChanges.value = emptyList()
+                _reviewMessage.value = null
+                _message.value = "Plano atualizado com a revisão."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível aplicar a revisão."
+            }
+        }
+    }
+
+    fun discardReview() {
+        pendingReview = null
+        _reviewChanges.value = emptyList()
+        _reviewMessage.value = null
+        _message.value = "Revisão descartada. O plano permanece como está."
+    }
+
+    fun clearReviewMessage() {
+        _reviewMessage.value = null
     }
 
     // ---------------- Execução ----------------
@@ -926,3 +1040,46 @@ sealed interface BackupImportState {
     object Importing : BackupImportState
     data class Error(val message: String) : BackupImportState
 }
+
+/** Converte o plano ativo em DTO de revisão para enviar ao backend. */
+private fun WorkoutPlanWithDetails.toReviewPlanDto(): WorkoutPlanDto =
+    WorkoutPlanDto(
+        name = plan.name,
+        description = plan.description,
+        goal = plan.goal,
+        daysPerWeek = plan.daysPerWeek,
+        days = days.map { day ->
+            WorkoutDayDto(
+                name = day.day.name,
+                dayOrder = day.day.dayOrder,
+                exercises = day.exercises
+                    .sortedBy { it.exerciseOrder }
+                    .map { ex ->
+                        WorkoutExerciseDto(
+                            exerciseId = ex.exerciseId,
+                            exerciseOrder = ex.exerciseOrder,
+                            sets = ex.sets,
+                            targetReps = ex.targetReps,
+                            targetRpe = ex.targetRpe,
+                            restSeconds = ex.restSeconds,
+                            notes = ex.notes,
+                            isSupersetWithPrevious = ex.isSupersetWithPrevious,
+                            exerciseName = ex.exerciseName,
+                            primaryMuscles = ex.primaryMuscles
+                                .split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() },
+                            equipment = ex.equipment,
+                            metricType = ex.metricType,
+                            targetDurationSeconds = ex.targetDurationSeconds,
+                            targetDistanceMeters = ex.targetDistanceMeters,
+                            targetPaceSecondsPerKm = ex.targetPaceSecondsPerKm,
+                            targetHrZone = ex.targetHrZone,
+                        )
+                    },
+                isRestDay = day.day.isRestDay,
+                weekday = day.day.weekday,
+                modality = day.day.modality,
+            )
+        },
+    )

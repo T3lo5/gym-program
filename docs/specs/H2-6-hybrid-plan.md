@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H2-6` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente (proposta)` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-05` |
+| Implementação | `concluída` |
 | Depende de | H1-6 (campos de modalidade e sync v2), H2-5 (registro avulso); H2-7 é opcional |
 
 ## Objetivo
@@ -43,6 +43,7 @@ base no que foi realmente feito, sem tirar o app do modo local-first.
 | `contracts/generate_response.json` | Fixture v2 (campos novos, compatível com v1) |
 | `back/tests/test_hybrid_plan.py` | **Novo.** Geração e revisão |
 | `app/src/test/java/com/treinos/app/ui/WeeklyScheduleTest.kt` | **Novo.** Ordenação e duplicidade de dia |
+| `app/src/test/java/com/treinos/app/ui/RunMetricsTest.kt` | **Novo.** Métricas de corrida: pace, duração do bloco, sem benchmark usa RPE |
 
 Não edite `shared/` nem `com.treinos.shared/` (legado).
 

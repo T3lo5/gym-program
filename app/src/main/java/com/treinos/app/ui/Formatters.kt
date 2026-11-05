@@ -118,6 +118,17 @@ fun formatPacePer100m(durationSeconds: Long, distanceMeters: Double?): String? =
 fun formatPacePerKm(durationSeconds: Long, distanceMeters: Double?): String? =
     paceSecondsPerKm(durationSeconds, distanceMeters)?.let { "${formatMinuteSecond(it)}/km" }
 
+/** Estima a duração (min) de um bloco de corrida: sets × distância × pace. */
+fun estimateRunBlockDurationMinutes(
+    sets: Int,
+    distanceMeters: Double,
+    paceSecondsPerKm: Int,
+): Long {
+    val km = distanceMeters / 1000.0
+    val seconds = sets.toDouble() * km * paceSecondsPerKm.toDouble()
+    return (seconds / 60.0).coerceAtLeast(0.0).toLong()
+}
+
 private fun formatMinuteSecond(totalSeconds: Long): String =
     "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
 

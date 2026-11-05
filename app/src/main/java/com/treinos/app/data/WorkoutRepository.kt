@@ -16,6 +16,8 @@ import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
+import com.treinos.app.data.remote.ReviewPlanRequest
+import com.treinos.app.data.remote.ReviewPlanResponse
 import com.treinos.app.data.backup.BackupApp
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupMapper
@@ -64,6 +66,13 @@ class WorkoutRepository(
         plan?.let { buildPlanDetails(it, days, exercises) }
     }
 
+    /** Dias do plano ativo, ordenados, para a visão da semana híbrida. */
+    fun observeWeek(): Flow<List<WorkoutDayWithExercises>> =
+        observeActivePlan().map { it?.days ?: emptyList() }
+
+    suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
+        backendClient.reviewPlan(request)
+
     fun observeSessions(): Flow<List<SessionWithExercises>> = combine(
         dao.observeSessionEntities(),
         dao.observeAllSessionExercises(),
@@ -85,7 +94,8 @@ class WorkoutRepository(
         return response
     }
 
-    private suspend fun saveGeneratedPlan(response: GeneratePlanResponse): Long =
+    /** Salva o plano gerado (genérico: geração ou revisão aceita). */
+    suspend fun saveGeneratedPlan(response: GeneratePlanResponse): Long =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
             val dto = response.workout
@@ -97,6 +107,8 @@ class WorkoutRepository(
                     name = dayDto.name,
                     dayOrder = dayDto.dayOrder,
                     isRestDay = dayDto.isRestDay,
+                    weekday = dayDto.weekday,
+                    modality = dayDto.modality,
                 )
             }
 
@@ -117,6 +129,11 @@ class WorkoutRepository(
                             restSeconds = exercise.restSeconds,
                             notes = exercise.notes,
                             isSupersetWithPrevious = exercise.isSupersetWithPrevious,
+                            metricType = exercise.metricType,
+                            targetDurationSeconds = exercise.targetDurationSeconds,
+                            targetDistanceMeters = exercise.targetDistanceMeters,
+                            targetPaceSecondsPerKm = exercise.targetPaceSecondsPerKm,
+                            targetHrZone = exercise.targetHrZone,
                         )
                     }
             }

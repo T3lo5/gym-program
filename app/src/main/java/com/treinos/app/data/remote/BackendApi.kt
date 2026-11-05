@@ -15,4 +15,6 @@ interface BackendApi {
     suspend fun syncDownload(deviceId: String): SyncDownloadDto
 
     suspend fun catalog(): CatalogResponseDto
+
+    suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse
 }

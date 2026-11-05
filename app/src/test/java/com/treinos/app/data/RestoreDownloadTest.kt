@@ -17,6 +17,8 @@ import com.treinos.app.data.remote.CatalogResponseDto
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.remote.HealthResponse
+import com.treinos.app.data.remote.ReviewPlanRequest
+import com.treinos.app.data.remote.ReviewPlanResponse
 import com.treinos.app.data.remote.SyncDownloadDayDto
 import com.treinos.app.data.remote.SyncDownloadDto
 import com.treinos.app.data.remote.SyncDownloadPlanDto
@@ -317,5 +319,8 @@ class RestoreDownloadTest {
         override suspend fun syncDownload(deviceId: String): SyncDownloadDto = snapshot
 
         override suspend fun catalog(): CatalogResponseDto = error("não usado")
+
+        override suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
+            error("não usado")
     }
 }

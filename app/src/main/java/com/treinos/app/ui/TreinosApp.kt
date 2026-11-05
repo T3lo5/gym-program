@@ -157,6 +157,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                 Screen.Home -> HomeScreen(
                     plan = plan,
                     inProgressSession = inProgressSession,
+                    sessions = sessions,
                     onGenerate = viewModel::openGenerate,
                     onHistory = viewModel::openHistory,
                     onSettings = viewModel::openSettings,
