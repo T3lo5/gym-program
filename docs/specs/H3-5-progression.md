@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-5` |
 | MoSCoW | `W` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` (gate `./scripts/verify.sh` verde em `2026-11-05`, com `ProgressionEngineTest` 16 e `ReviewScheduleTest` 8) |
 | Depende de | H1-2 (séries), H2-4 (histórico), H1-5 (opcional, perfil) |
 
 ## Objetivo
@@ -98,12 +98,21 @@ fun deloadSuggested(
 
 ```kotlin
 // ReviewSchedule.kt
+const val REVIEW_POSTPONE_WEEKS = 2
+
 fun postponeReviewDate(
     currentIsoDate: String?,
     today: LocalDate,
-    weeks: Int = 2,
+    weeks: Int = REVIEW_POSTPONE_WEEKS,
 ): LocalDate
 ```
+
+A implementação expõe ainda três auxiliares do mesmo contrato puro (nenhum deles
+muda schema nem backend): `PROGRESSION_HISTORY_DAYS = 42`;
+`progressionHistory(sessions, exerciseId)` em `ProgressionEngine.kt`, que traduz
+`List<SessionWithExercises>` → `List<ProgressionSet>`; e `PlanCycle(week,
+isDeloadSuggested)` em `AppViewModel.kt`, exposto como `planCycle` ao lado de
+`progressionSuggestions`.
 
 ### Regras de sugestão
 

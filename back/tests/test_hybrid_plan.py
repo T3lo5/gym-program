@@ -97,6 +97,19 @@ def test_corrida_com_benchmark_calcula_paces():
     assert ex["targetPaceSecondsPerKm"] == 342
 
 
+def test_geracao_local_e_deterministica():
+    """A chave real de `back/.env` não pode ligar a IA durante os testes."""
+    client = _client()
+    payload = _hybrid_payload()
+    payload["modalities"] = [
+        {"type": "run", "sessionsPerWeek": 1, "level": "intermediate", "recent5kSeconds": 1800}
+    ]
+    first = client.post("/v1/generate-workout", json=payload).json()
+    second = client.post("/v1/generate-workout", json=payload).json()
+    assert first["source"] == "local"
+    assert first["workout"] == second["workout"]
+
+
 def test_fallback_sem_ia():
     client = _client()
     r = client.post("/v1/generate-workout", json=_hybrid_payload())

@@ -31,6 +31,7 @@ já funciona nesta versão:
 | Sincronização manual app → backend | ✅ Funciona pelo botão **Sincronizar agora** |
 | Restauração do backend por `deviceId` | ✅ Funciona pelo botão **Restaurar do backend** |
 | Backup JSON manual | 🟡 Lógica pronta; botões de exportar/importar em correção (H1-7) |
+| Sugestão de carga e alerta de revisão | ✅ Funciona sem internet, calculado no aparelho (H3-5) |
 | Módulo Wear OS | ✅ MVP (H2-2), APK separado `wear.apk` |
 
 > **Resumo:** o app já cria treinos, executa o treino, registra as séries no
@@ -286,6 +287,13 @@ O plano é salvo no SQLite do aparelho e a tela inicial passa a mostrar:
 - a **próxima revisão** (em vermelho se a data já passou);
 - um cartão por dia de treino, com o botão **Iniciar treino**.
 
+Se a data de revisão já passou, a tela inicial mostra também o cartão **Revisar
+plano** com duas saídas: **Gerar novo treino** (o fluxo acima) ou **Adiar 2
+semanas**, que empurra a data salva sem nunca antecipá-la. Quando o plano entra
+na semana 6 do ciclo e você já concluiu pelo menos 8 treinos, aparece o aviso
+**Ciclo do plano**, sugerindo reduzir 1 série por exercício; **Entendi** só
+esconde o aviso nesta sessão de uso.
+
 > **Importante:** gerar um treino novo substitui o plano ativo no aparelho.
 > O plano anterior continua no banco local e será enviado na próxima
 > sincronização se você optar por enviar tudo.
@@ -300,6 +308,15 @@ O plano é salvo no SQLite do aparelho e a tela inicial passa a mostrar:
    - **Carga (kg)**;
    - **RPE** (opcional).
 5. Toque em **Salvar série**.
+
+Quando você já tem histórico suficiente do mesmo exercício (duas sessões nos
+últimos 42 dias), o diálogo de série mostra uma linha **Sugestão:** com a carga
+ou as repetições e o motivo — por exemplo
+`Sugestão: 42,5 kg — Duas sessões no topo da faixa com RPE confortável.`. A
+sugestão também pré-preenche o campo **Carga (kg)** apenas quando ele está
+vazio, e o que você digitar prevalece. O app **não** altera o plano sozinho: a
+sugestão é calculada no aparelho, a partir das séries que você registrou, e não
+vai para o backend.
 
 A série é gravada **imediatamente** no SQLite do aparelho. Depois de salvar:
 

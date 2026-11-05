@@ -38,6 +38,14 @@ import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.nextIncompleteExercise
+import com.treinos.app.ui.progression.ProgressionContext
+import com.treinos.app.ui.progression.ProgressionSuggestion
+import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
+import com.treinos.app.ui.progression.completedSessionsSincePlan
+import com.treinos.app.ui.progression.cycleWeek
+import com.treinos.app.ui.progression.deloadSuggested
+import com.treinos.app.ui.progression.progressionHistory
+import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.progressText
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -117,6 +125,47 @@ class AppViewModel(
 
     private val _exerciseIndex = MutableStateFlow(0)
     val exerciseIndex: StateFlow<Int> = _exerciseIndex.asStateFlow()
+
+    /**
+     * Sugestão de carga por `exerciseId` do plano ativo, derivada apenas do
+     * histórico local. O usuário sempre pode digitar outro valor.
+     */
+    val progressionSuggestions: StateFlow<Map<String, ProgressionSuggestion>> = combine(
+        activePlan,
+        sessions,
+    ) { plan, sessionList ->
+        val exercises = plan?.days?.flatMap { it.exercises }.orEmpty()
+        val nowMillis = System.currentTimeMillis()
+        exercises.associate { exercise ->
+            exercise.exerciseId to suggestProgression(
+                ProgressionContext(
+                    exerciseId = exercise.exerciseId,
+                    targetReps = exercise.targetReps,
+                    equipment = exercise.equipment,
+                    primaryMuscles = exercise.primaryMuscles,
+                ),
+                progressionHistory(sessionList, exercise.exerciseId),
+                nowMillis,
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val planCycle: StateFlow<PlanCycle?> = combine(activePlan, sessions) { plan, sessionList ->
+        val entity = plan?.plan
+        if (entity == null) {
+            null
+        } else {
+            val nowMillis = System.currentTimeMillis()
+            PlanCycle(
+                week = cycleWeek(entity.createdAt, nowMillis),
+                isDeloadSuggested = deloadSuggested(
+                    planCreatedAtMillis = entity.createdAt,
+                    nowMillis = nowMillis,
+                    completedSessionsSincePlan = completedSessionsSincePlan(sessionList, entity.createdAt),
+                ),
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _exercises: StateFlow<List<ExerciseSessionData>> = repository.observeSessions()
         .map { sessions ->
@@ -545,6 +594,19 @@ class AppViewModel(
 
     fun clearReviewMessage() {
         _reviewMessage.value = null
+    }
+
+    // ---------------- Progressão de carga e ciclo (H3-5) ----------------
+
+    fun postponeReview(planId: Long, weeks: Int = REVIEW_POSTPONE_WEEKS) {
+        viewModelScope.launch {
+            try {
+                repository.postponeReview(planId, weeks)
+                _message.value = "Revisão adiada em $weeks semanas."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível adiar a revisão."
+            }
+        }
     }
 
     // ---------------- Execução ----------------
@@ -1070,6 +1132,9 @@ class AppViewModel(
         }
     }
 }
+
+/** Posição do plano ativo no ciclo; o aviso de deload não altera nada sozinho. */
+data class PlanCycle(val week: Int, val isDeloadSuggested: Boolean)
 
 sealed interface BackupImportState {
     object Idle : BackupImportState

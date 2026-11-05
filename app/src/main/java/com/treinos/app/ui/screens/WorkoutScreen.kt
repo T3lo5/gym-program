@@ -62,6 +62,8 @@ import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.progression.ProgressionAction
+import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.progressStateDescription
 import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
@@ -78,6 +80,7 @@ fun WorkoutScreen(
     onFinish: () -> Unit,
     hasInProgressSession: Boolean,
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
+    progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
 ) {
     var exerciseToLog by remember { mutableStateOf<SessionExerciseWithSets?>(null) }
@@ -215,6 +218,8 @@ fun WorkoutScreen(
     exerciseToLog?.let { exercise ->
         AddSetDialog(
             exercise = exercise,
+            suggestion = progressionSuggestions[exercise.exercise.exerciseId]
+                ?.takeIf { it.action != ProgressionAction.NONE },
             onDismiss = { exerciseToLog = null },
             onConfirm = { reps, weight, rpe ->
                 onLogSet(exercise, reps, weight, rpe)
@@ -379,14 +384,22 @@ private fun ExerciseCard(
 @Composable
 private fun AddSetDialog(
     exercise: SessionExerciseWithSets,
+    suggestion: ProgressionSuggestion?,
     onDismiss: () -> Unit,
     onConfirm: (Int?, Double?, Double?) -> Unit,
 ) {
     val last = exercise.sets.maxByOrNull { it.setNumber }
     var reps by remember { mutableStateOf(last?.reps?.toString().orEmpty()) }
-    var weight by remember { mutableStateOf(last?.weightKg?.let { formatWeight(it) }.orEmpty()) }
+    var weight by remember {
+        mutableStateOf(
+            last?.weightKg?.let { formatWeight(it) }
+                ?: suggestion?.suggestedWeightKg?.let { formatWeight(it) }
+                ?: "",
+        )
+    }
     var rpe by remember { mutableStateOf(last?.rpe?.let { formatWeight(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    val suggestionText = suggestionLabel(suggestion)
     fun submit() {
         val parsedReps = reps.toIntOrNull()
         if (reps.isNotBlank() && parsedReps == null) {
@@ -408,6 +421,13 @@ private fun AddSetDialog(
                         "Preencha o que você fez.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                suggestionText?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 OutlinedTextField(
                     value = reps,
                     onValueChange = { reps = it.filter(Char::isDigit); error = null },
@@ -465,6 +485,15 @@ private fun AddSetDialog(
 
 private fun parseDecimal(value: String): Double? =
     value.trim().replace(',', '.').toDoubleOrNull()
+
+/** Texto de apoio do motor de progressão; `null` quando não há o que sugerir. */
+private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
+    if (suggestion == null || suggestion.action == ProgressionAction.NONE) return null
+    val weight = suggestion.suggestedWeightKg?.let { "${formatWeight(it)} kg" }
+    val reps = if (weight == null) suggestion.suggestedReps?.let { "$it repetições" } else null
+    val target = weight ?: reps ?: return null
+    return "Sugestão: $target — ${suggestion.reason}"
+}
 
 private fun formatWeight(value: Double): String {
     val rounded = value.toLong()

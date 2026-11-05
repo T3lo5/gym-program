@@ -16,6 +16,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -70,6 +71,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isUpdatingCatalog by viewModel.isUpdatingCatalog.collectAsStateWithLifecycle()
     val catalogMessage by viewModel.catalogMessage.collectAsStateWithLifecycle()
     val activityPrefill by viewModel.activityPrefill.collectAsStateWithLifecycle()
+    val progressionSuggestions by viewModel.progressionSuggestions.collectAsStateWithLifecycle()
+    val planCycle by viewModel.planCycle.collectAsStateWithLifecycle()
     val activityEditingId by viewModel.activityEditingId.collectAsStateWithLifecycle()
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
     val isSavingActivity by viewModel.isSavingActivity.collectAsStateWithLifecycle()
@@ -79,6 +82,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isConnectingBackend by viewModel.isConnectingBackend.collectAsStateWithLifecycle()
     val discoveryMessage by viewModel.discoveryMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // Dispensar o aviso de deload é só visual: nada aqui muda o plano gravado.
+    var isDeloadNoticeDismissed by remember { mutableStateOf(false) }
     val historyMuscleByExerciseId = remember(plan) { muscleLabelByExerciseId(plan) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -161,6 +166,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     plan = plan,
                     inProgressSession = inProgressSession,
                     sessions = sessions,
+                    planCycle = planCycle,
+                    showDeloadNotice = planCycle?.isDeloadSuggested == true && !isDeloadNoticeDismissed,
+                    onDismissDeloadNotice = { isDeloadNoticeDismissed = true },
                     onGenerate = viewModel::openGenerate,
                     onHistory = viewModel::openHistory,
                     onSettings = viewModel::openSettings,
@@ -168,6 +176,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onResume = viewModel::resumeWorkout,
                     onLogActivity = viewModel::openLogActivity,
                     onOpenMobility = viewModel::openMobility,
+                    onPostponeReview = { planId -> viewModel.postponeReview(planId) },
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -190,6 +199,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onFinish = viewModel::finishWorkout,
                     hasInProgressSession = inProgressSession != null,
                     exerciseMedia = exerciseMedia,
+                    progressionSuggestions = progressionSuggestions,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                 )
 

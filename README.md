@@ -29,6 +29,7 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 | 🔗 Descoberta LAN (mDNS) | ✅ Ajustes → "Buscar backends" conecta com 1 toque; IP manual segue como fallback (H2-1) |
 | ⏱ Timer de descanso no relógio | ✅ MVP junto com H2-2 |
 | 🏃 Corrida, natação e mobilidade | 🟡 Registro avulso de natação/corrida pronto (H2-5); plano híbrido e mobilidade em H2-6/H2-7 |
+| 📈 Progressão de carga e alerta de revisão | ✅ Sugestão de carga/RPE pelo histórico local + cartão "Revisar plano" (H3-5) |
 | ☁️ Backend grátis (Codespaces/Oracle) | ✅ Docker Compose |
 
 ---
@@ -51,6 +52,7 @@ TreinosApp/
 │       ├── data/prefs/          # AppPreferences
 │       ├── data/WorkoutRepository.kt
 │       └── ui/                  # ViewModel + screens Compose
+│           └── progression/     # Sugestão de carga e revisão (H3-5)
 ├── protocol/                    # Contrato Kotlin/JVM celular ↔ relógio
 ├── wear/                        # App Wear OS (módulo :wear, ativo)
 ├── shared/                      # ⚠️ legado, fora do build (ver LEGACY.md)
@@ -259,10 +261,8 @@ spec em [docs/specs/](docs/specs/) definindo como ele deve ser feito.
 
 | Horizonte | Foco |
 |---|---|
-| Concluído | H1-1 a H1-5, H2-2 (Wear OS) e H2-3 (download do backend) |
-| Agora | H1-6 fundação de dados e H1-7 correções de restauração/backup |
-| Próximo | H2-5 registro avulso (natação), H2-6 plano híbrido, H2-1 LAN |
-| Depois | H2-7 mobilidade, H2-4 histórico com calendário, H3-1 a H3-5 |
+| Concluído | H1-1 a H1-7, H2-1 a H2-7 e H3-1/H3-2/H3-3/H3-5 (detalhes e evidência em `ROADMAP.md` §4.1) |
+| Pendente | H3-4 backend na nuvem com token (**Won't now** até priorizar) |
 
 > `docs/SPRINT-PLAN.md` é histórico e **não** deve ser usado para decidir o
 > próximo passo.

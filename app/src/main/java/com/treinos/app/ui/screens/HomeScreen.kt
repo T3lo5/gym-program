@@ -33,6 +33,7 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.ui.ActivityModality
+import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.formatDateTime
@@ -42,6 +43,7 @@ import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
 import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
+import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
 
@@ -50,6 +52,8 @@ fun HomeScreen(
     plan: WorkoutPlanWithDetails?,
     inProgressSession: SessionWithExercises?,
     sessions: List<SessionWithExercises> = emptyList(),
+    planCycle: PlanCycle? = null,
+    showDeloadNotice: Boolean = false,
     onGenerate: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
@@ -57,6 +61,8 @@ fun HomeScreen(
     onResume: () -> Unit,
     onLogActivity: () -> Unit,
     onOpenMobility: () -> Unit = {},
+    onPostponeReview: (Long) -> Unit = {},
+    onDismissDeloadNotice: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -109,6 +115,23 @@ fun HomeScreen(
                 }
             } else {
                 item { ActivePlanCard(plan) }
+
+                if (reviewIsDue(plan.plan.nextReviewAt)) {
+                    item {
+                        ReviewPlanCard(
+                            reviewDate = formatReviewDate(plan.plan.nextReviewAt).orEmpty(),
+                            onGenerate = onGenerate,
+                            onPostpone = { onPostponeReview(plan.plan.id) },
+                        )
+                    }
+                }
+
+                val cycle = planCycle
+                if (showDeloadNotice && cycle != null) {
+                    item {
+                        DeloadNoticeCard(week = cycle.week, onDismiss = onDismissDeloadNotice)
+                    }
+                }
 
                 item { SectionTitle("Dias de treino") }
 
@@ -272,6 +295,82 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                     color = if (due) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpone: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                if (reviewDate.isNotBlank()) stateDescription = reviewStateDescription(reviewDate, true)
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Revisar plano",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "A revisão de $reviewDate está atrasada. Gere um treino novo ou adie a revisão.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onGenerate,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Gerar novo treino")
+                }
+                OutlinedButton(
+                    onClick = onPostpone,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Adiar $REVIEW_POSTPONE_WEEKS semanas")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeloadNoticeCard(week: Int, onDismiss: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Ciclo do plano",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "Semana $week do ciclo — considere reduzir 1 série por exercício.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "O app não muda o plano sozinho. Ajuste as séries ao registrar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text("Entendi")
             }
         }
     }

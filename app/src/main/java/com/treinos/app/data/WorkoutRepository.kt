@@ -37,6 +37,8 @@ import com.treinos.app.data.remote.SyncResponseDto
 import com.treinos.app.data.remote.SyncSessionDto
 import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
+import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
+import com.treinos.app.ui.progression.postponeReviewDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -45,6 +47,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * Fonte única de dados do app.
@@ -156,6 +159,16 @@ class WorkoutRepository(
                 days = days,
                 exercisesByDay = exercisesByDay,
             )
+        }
+
+    // ---------------- Revisão do plano (H3-5) ----------------
+
+    /** Adia `nextReviewAt` sem nunca antecipar a data que já está salva. */
+    suspend fun postponeReview(planId: Long, weeks: Int = REVIEW_POSTPONE_WEEKS) =
+        withContext(Dispatchers.IO) {
+            val plan = dao.getPlan(planId) ?: return@withContext
+            val next = postponeReviewDate(plan.nextReviewAt, LocalDate.now(), weeks)
+            dao.updatePlanReviewDate(planId, next.toString())
         }
 
     // ---------------- Execução do treino ----------------

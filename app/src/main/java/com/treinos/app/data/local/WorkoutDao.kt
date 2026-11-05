@@ -45,6 +45,9 @@ interface WorkoutDao {
     @Query("UPDATE workout_plans SET isActive = 1 WHERE id = :planId")
     suspend fun updatePlanActive(planId: Long)
 
+    @Query("UPDATE workout_plans SET nextReviewAt = :nextReviewAt WHERE id = :planId")
+    suspend fun updatePlanReviewDate(planId: Long, nextReviewAt: String)
+
     @Insert
     suspend fun insertPlan(plan: WorkoutPlanEntity): Long
 

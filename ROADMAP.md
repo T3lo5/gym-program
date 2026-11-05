@@ -35,7 +35,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
 | Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
 | Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
-| Testes + CI | 🟡 | 20 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
+| Testes + CI | 🟡 | 34 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); falta UI/instrumentado |
 | Descoberta LAN | ✅ | Ajustes → "Buscar backends" (`NsdManager` em `_treinos._tcp.`); "Conectar" sonda `GET /health` e só salva a URL em 200; IP manual continua como fallback (H2-1) |
 | Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
 | Backup/restore do usuário | ✅ | Exportar/importar ligados aos file pickers (SAF), pré-visualização + confirmação e `deviceId` do arquivo aplicado só após importação válida (H1-7) |
@@ -47,6 +47,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Polimento visual / animações | ✅ | `Motion.kt` + transições em `TreinosApp`, tema/estados em `Theme`/`Common`; testes `MotionTest` (H3-2) |
 | Acessibilidade | ✅ | `A11y.kt`/`Contrast.kt` + semântica TalkBack/foco/fonte/contraste nas telas principais e componentes; testes `A11yTest`/`ContrastTest` (H3-3) |
 | Testes de UI/Room/contrato | ✅ | Compose no Robolectric dentro do gate (`HistoryScreenTest`, `BackupFlowUiTest`), Room em memória (`WorkoutDaoTest`), contrato `contracts/generate_response.json` nos dois lados, `assembleDebugAndroidTest` no gate e cobertura com `COVERAGE=1` (H3-1) |
+| Periodização e progressão de carga | ✅ | `ProgressionEngine` sugere carga/reps pelo melhor série das sessões dos últimos 42 dias (incremento por equipamento + RPE), `ReviewSchedule` adia `nextReviewAt` sem antecipar, card de revisão atrasada e aviso de deload na Home, sugestão pré-preenche o diálogo de série; testes `ProgressionEngineTest`/`ReviewScheduleTest` (H3-5) |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
 
 > A tabela envelhece rápido. Ao entregar um item, mova-o para §4.1 e atualize esta
@@ -90,6 +91,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-2 | Polimento visual e animações | `Motion.kt` + transições em `TreinosApp`, ajustes em `Theme`/`Common`/telas para estados e identidade visual; testes `MotionTest`; [spec](docs/specs/H3-2-visual-polish.md) |
 | H3-3 | Acessibilidade (TalkBack, fonte e contraste) | `A11y.kt`/`Contrast.kt` + semântica Compose nas telas principais (`Home`, `Generate`, `Workout`, `History`, `Settings`) e componentes compartilhados; testes `A11yTest`/`ContrastTest`; [spec](docs/specs/H3-3-accessibility.md) |
 | H3-1 | Testes de UI/instrumentados + cobertura | `HistoryScreenTest` (4) e `BackupFlowUiTest` (3) rodam Compose no Robolectric dentro de `:app:testDebugUnitTest` — o gate passou a ver telas; `WorkoutDaoTest` (4) cobre plano completo, `deleteAllData` e `replaceAllData` atômico que preserva IDs em Room in-memory; `ContractTest` + `back/tests/test_contract.py` validam o fixture único `contracts/generate_response.json`; `:app:assembleDebugAndroidTest` entrou no `scripts/ci-android.sh` (instrumentados compilam no gate; `connectedDebugAndroidTest` continua fora, documentado em `docs/MANUAL.md`); `COVERAGE=1` gera `app/build/reports/coverage/test/debug/index.html` e o workflow sobe o artifact; correção de layout achada pelos testes: botões do card de backup com `weight(1f)` em `SettingsScreen`; [spec](docs/specs/H3-1-ui-instrumented-tests.md) |
+| H3-5 | Periodização e progressão de carga | `ui/progression/ProgressionEngine.kt` (`ProgressionAction`, `ProgressionSet`/`ProgressionContext`, `suggestProgression`, `progressionHistory`, `roundToIncrement`, `cycleWeek`, `deloadSuggested`, `completedSessionsSincePlan`) com melhor série por sessão nos últimos 42 dias, incremento por equipamento (barra 5/2,5 kg, halter/máquina 2,5 kg, peso corporal → +1 rep) e gatilhos de RPE (≤8,5 aumenta, ≥9,5 reduz), arredondamento em múltiplos de 2,5 kg entre 2,5 e 500; `ui/progression/ReviewSchedule.kt` (`postponeReviewDate`, `REVIEW_POSTPONE_WEEKS = 2`) adia `nextReviewAt` sem nunca antecipar a data salva; `WorkoutDao.updatePlanReviewDate` + `WorkoutRepository.postponeReview` (sem mudança de schema Room); `AppViewModel.progressionSuggestions`/`planCycle`/`postponeReview`; `AddSetDialog` pré-preenche a carga sugerida e mostra o motivo, Home ganhou `ReviewPlanCard` (revisão atrasada) e `DeloadNoticeCard` (semana do ciclo); o app **não** altera o plano sozinho nem sincroniza sugestões; testes `ProgressionEngineTest` (16) e `ReviewScheduleTest` (8); [spec](docs/specs/H3-5-progression.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -105,7 +107,9 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | [H3-4](docs/specs/H3-4-cloud-backend.md) |
-| H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não evolui carga/séries. | Mesociclos, sugestão de carga por RPE/séries, alerta de revisão. | 5 dias | Histórico completo, H2-4 | [H3-5](docs/specs/H3-5-progression.md) |
+
+Sobra apenas H3-4 (**Won't now** até ser priorizado). H3-1..H3-3 e H3-5 estão
+concluídos e listados em §4.1.
 
 ---
 
@@ -114,7 +118,7 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | Backend na nuvem (H3-4) |
-| Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Progressão automática de carga (H3-5) |
+| Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Progressão automática de carga (H3-5) ✅ |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Export CSV/Sheets |
 | Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | | Widget/complicação do relógio |
 | Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | |
@@ -127,11 +131,11 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1..H2-7
             (Wear, download, descoberta LAN, histórico, registro avulso,
             plano híbrido, mobilidade) + H3-1/H3-2/H3-3 (testes de UI/Room/
-            contrato, polimento e acessibilidade)
+            contrato, polimento e acessibilidade) + H3-5 (progressão de carga)
 Agora:      — (Horizons 1 e 2 e o Must do Horizon 3 fechados; ver §4.1)
-Próximo:    nada em Must — H3-4/H3-5 pedem priorização e aprovação antes
-Depois:     H3-4 nuvem/token, H3-5 progressão
-Qualidade:  H3-4/H3-5 (Won't now até priorizar)
+Próximo:    nada em Must/Should — sobra H3-4, que pede priorização e aprovação
+Depois:     H3-4 nuvem/token
+Qualidade:  H3-4 (Won't now até priorizar)
 ```
 
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅.
@@ -174,11 +178,12 @@ os testes instrumentados compilam no gate e rodam fora dele com
 
 Horizons 1 e 2 estão concluídos (H1-1..H1-7, H2-1..H2-7) e o Horizon 3 fechou o
 único **Must** que tinha: **H3-1 (testes de UI/Room/contrato)**, ao lado de
-H3-2/H3-3 — os três estão em §4.1.
+H3-2/H3-3 e de **H3-5 (periodização e progressão de carga)** — os quatro estão
+em §4.1.
 
-Não resta item Must/Should no roadmap. O próximo passo é escolher entre
-**H3-4** (backend na nuvem; exige token antes de expor) e **H3-5** (progressão
-de carga) — ambos **Won't now** até serem priorizados explicitamente.
+Não resta item Must/Should no roadmap. O único item que sobra é **H3-4** (backend
+na nuvem; exige token antes de expor) — **Won't now** até ser priorizado
+explicitamente.
 
 Para iniciar qualquer item, leia a spec correspondente em
 [docs/specs/](docs/specs/); se não existir ou estiver pendente de aprovação,
@@ -208,7 +213,7 @@ confirme antes de implementar.
 - [H3-2 — Polimento visual](docs/specs/H3-2-visual-polish.md) — concluída
 - [H3-3 — Acessibilidade](docs/specs/H3-3-accessibility.md) — concluída
 - [H3-4 — Backend na nuvem com token](docs/specs/H3-4-cloud-backend.md) — pronta para implementar
-- [H3-5 — Progressão de carga](docs/specs/H3-5-progression.md) — pronta para implementar
+- [H3-5 — Progressão de carga](docs/specs/H3-5-progression.md) — concluída
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
