@@ -1,5 +1,6 @@
 package com.treinos.app.ui
 
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -39,5 +40,22 @@ class ActivityFormatTest {
         assertEquals("30s", formatDuration(30L))
         assertEquals("1h 00min", formatDuration(3_600L))
         assertEquals("—", formatDuration(0L))
+    }
+
+    @Test
+    fun formata_volume() {
+        assertEquals("0 kg", formatVolumeKg(0.0))
+        assertEquals("850 kg", formatVolumeKg(850.0))
+        assertEquals("999 kg", formatVolumeKg(999.4))
+        assertEquals("1,0 t", formatVolumeKg(999.6))
+        assertEquals("1,1 t", formatVolumeKg(1_080.0))
+        assertEquals("12,3 t", formatVolumeKg(12_345.0))
+    }
+
+    @Test
+    fun formata_mes_ano_e_dia() {
+        assertEquals("Novembro de 2026", formatMonthYear(2026, 11))
+        assertEquals("Março de 2027", formatMonthYear(2027, 3))
+        assertEquals("04/11", formatDateShort(LocalDate.of(2026, 11, 4)))
     }
 }

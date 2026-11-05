@@ -7,7 +7,7 @@
 | Item do roadmap | `H2-4` |
 | MoSCoW | `C` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
 | Depende de | H1-2 (séries), H1-3 (opcional, para músculo) |
 
 ## Objetivo

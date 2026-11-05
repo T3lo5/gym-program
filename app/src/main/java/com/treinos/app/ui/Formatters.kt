@@ -2,13 +2,18 @@ package com.treinos.app.ui
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Month
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.math.roundToLong
 
 private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+private val shortDateFormatter = DateTimeFormatter.ofPattern("dd/MM")
+private val ptBr = Locale.forLanguageTag("pt-BR")
 
 fun formatDateTime(millis: Long): String =
     Instant.ofEpochMilli(millis)
@@ -126,4 +131,22 @@ fun safeParseDate(isoDate: String?): LocalDate? = try {
     isoDate?.let { LocalDate.parse(it) }
 } catch (_: DateTimeParseException) {
     null
+}
+
+fun formatDateShort(date: LocalDate): String = date.format(shortDateFormatter)
+
+fun formatMonthYear(year: Int, month: Int): String {
+    val name = Month.of(month).getDisplayName(TextStyle.FULL, ptBr)
+    return name.replaceFirstChar { it.uppercaseChar() } + " de $year"
+}
+
+/**
+ * Volume com carga: quilogramas até 999 e toneladas com uma casa a partir de 1000 kg.
+ * O arredondamento acontece aqui, nunca no cálculo agregado.
+ */
+fun formatVolumeKg(volumeKg: Double): String {
+    val kilograms = volumeKg.roundToLong()
+    if (kilograms < 1000) return "${groupThousands(kilograms)} kg"
+    val tonsTenths = (volumeKg / 100.0).roundToLong()
+    return "${groupThousands(tonsTenths / 10)},${tonsTenths % 10} t"
 }

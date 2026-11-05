@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
 import com.treinos.app.ui.screens.HomeScreen
@@ -76,6 +77,7 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isConnectingBackend by viewModel.isConnectingBackend.collectAsStateWithLifecycle()
     val discoveryMessage by viewModel.discoveryMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val historyMuscleByExerciseId = remember(plan) { muscleLabelByExerciseId(plan) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -193,6 +195,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                     onEditActivity = viewModel::editLogActivity,
                     onDeleteActivity = viewModel::deleteLogActivity,
+                    muscleByExerciseId = historyMuscleByExerciseId,
+                    onGenerate = viewModel::openGenerate,
                 )
 
                 Screen.LogActivity -> LogActivityScreen(
@@ -270,6 +274,16 @@ private fun backupFileName(): String {
     val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
     return "treinos-backup-$stamp.json"
 }
+
+/**
+ * `exerciseId` -> músculos do plano ativo, separados por vírgula. Exercícios fora do
+ * plano são agrupados em "Outros" pela agregação do histórico.
+ */
+private fun muscleLabelByExerciseId(plan: WorkoutPlanWithDetails?): Map<String, String> =
+    plan?.days
+        ?.flatMap { it.exercises }
+        ?.associate { it.exerciseId to it.primaryMuscles.trim() }
+        .orEmpty()
 
 private fun appVersionInfo(context: Context): Pair<String, Long> {
     val info: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
