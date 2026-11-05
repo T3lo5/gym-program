@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -19,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -27,7 +29,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.remote.ModalityDto
@@ -193,7 +200,7 @@ fun GenerateScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Checkbox(
@@ -201,6 +208,9 @@ fun GenerateScreen(
                                             onCheckedChange = {
                                                 included = it
                                                 modalityDrafts = modalityDrafts + (type to draft.copy(included = it))
+                                            },
+                                            modifier = Modifier.minimumInteractiveComponentSize().semantics {
+                                                stateDescription = if (included) "Ligado" else "Desligado"
                                             },
                                         )
                                         Text(
@@ -229,7 +239,9 @@ fun GenerateScreen(
                                                     modalityDrafts = modalityDrafts + (type to updated)
                                                 },
                                                 label = { Text("Sessões por semana") },
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                supportingText = { Text("Número inteiro") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                                isError = sessions < 1,
                                                 modifier = Modifier.weight(1f),
                                             )
                                         }
@@ -243,7 +255,8 @@ fun GenerateScreen(
                                                         modalityDrafts = modalityDrafts + (type to updated)
                                                     },
                                                     label = { Text("Benchmark 5 km (s, opcional)") },
-                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                    supportingText = { Text("Opcional. Tempo em segundos.") },
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                                 )
                                             }
@@ -256,6 +269,8 @@ fun GenerateScreen(
                                                         modalityDrafts = modalityDrafts + (type to updated)
                                                     },
                                                     label = { Text("Foco (ex.: costas, quadril, opcional)") },
+                                                    supportingText = { Text("Opcional") },
+                                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                                 )
                                             }
@@ -355,14 +370,19 @@ fun GenerateScreen(
                         value = bodyWeightKgText,
                         onValueChange = { bodyWeightKgText = it; profileError = null },
                         label = { Text("Peso (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = { Text("Opcional") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        isError = profileError != null && bodyWeightKgText.isNotBlank(),
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = heightCmText,
                         onValueChange = { heightCmText = it; profileError = null },
                         label = { Text("Altura (cm)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = { Text("Opcional") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { }),
+                        isError = profileError != null && heightCmText.isNotBlank(),
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -444,7 +464,8 @@ fun GenerateScreen(
                     enabled = !isGenerating && hasModalities,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = 16.dp)
+                        .minimumInteractiveComponentSize(),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

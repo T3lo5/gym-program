@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-2` |
 | MoSCoW | `C` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` (`3780557 feat: polimento visual e animações (H3-2)`) |
 | Depende de | H1-4, H2-4 (telas finais) |
 
 ## Objetivo

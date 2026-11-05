@@ -31,7 +31,6 @@ import com.treinos.app.ui.screens.LogActivityScreen
 import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
-import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.ExerciseDetailSheet
 import java.io.File
 import java.text.SimpleDateFormat

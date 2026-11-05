@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H2-7` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente (proposta)` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-05` |
+| Implementação | `concluída` (`c2830cd feat: H2-7 mobilidade e alongamento`) |
 | Depende de | H1-6 (campos `modality`/`metricType`/`targetDurationSeconds`) |
 
 ## Objetivo

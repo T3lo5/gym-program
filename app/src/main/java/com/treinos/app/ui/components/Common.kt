@@ -19,6 +19,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -27,8 +28,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.treinos.app.ui.exerciseContentDescription
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,10 +46,13 @@ fun ScreenTopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
-        title = { Text(title) },
+        title = { Text(title, modifier = Modifier.semantics { heading() }) },
         navigationIcon = {
             if (onBack != null) {
-                IconButton(onClick = onBack) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Voltar",
@@ -62,7 +73,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(top = 12.dp, bottom = 6.dp),
+        modifier = modifier.padding(top = 12.dp, bottom = 6.dp).semantics { heading() },
     )
 }
 
@@ -83,6 +94,11 @@ fun ChipGroup(
                 selected = value in selected,
                 onClick = { onToggle(value) },
                 label = { Text(label) },
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics {
+                        stateDescription = if (value in selected) "Selecionado" else "Não selecionado"
+                    },
             )
         }
     }
@@ -95,7 +111,7 @@ fun KeyValueRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -119,7 +135,7 @@ fun MetricCard(
     modifier: Modifier = Modifier,
     detail: String? = null,
 ) {
-    Card(modifier = modifier.wrapContentHeight()) {
+    Card(modifier = modifier.wrapContentHeight().semantics(mergeDescendants = true) { }) {
         Column(
             modifier = Modifier
                 .wrapContentHeight()
@@ -150,7 +166,9 @@ fun MetricCard(
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
+        modifier = modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) {
+            contentDescription = "Carregando"
+        },
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator()
@@ -169,7 +187,9 @@ fun ErrorState(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(text = message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        onRetry?.let { Button(onClick = it) { Text("Tentar de novo") } }
+        onRetry?.let {
+            Button(onClick = it, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Tentar de novo") }
+        }
     }
 }
 
@@ -183,7 +203,8 @@ fun EmptyState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(24.dp)
+            .semantics(mergeDescendants = true) { },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -196,3 +217,6 @@ fun EmptyState(
         action?.invoke()
     }
 }
+
+fun exerciseHeadingDescription(name: String): String = exerciseContentDescription(name)
+

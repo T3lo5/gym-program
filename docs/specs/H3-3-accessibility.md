@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-3` |
 | MoSCoW | `C` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
 | Depende de | H3-2 (tema/estados) |
 
 ## Objetivo

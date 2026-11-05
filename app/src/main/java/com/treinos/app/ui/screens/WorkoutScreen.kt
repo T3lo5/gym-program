@@ -1,5 +1,6 @@
 package com.treinos.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,8 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -27,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,20 +38,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
-import com.treinos.app.ui.components.EmptyState
-import com.treinos.app.ui.components.ScreenTopBar
-import com.treinos.app.ui.formatDateTime
-
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.unit.dp
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
+import com.treinos.app.ui.components.ScreenTopBar
+import com.treinos.app.ui.decorativeContentDescription
+import com.treinos.app.ui.exerciseContentDescription
+import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.progressStateDescription
+import com.treinos.app.ui.restStateDescription
+import com.treinos.app.ui.setContentDescription
+import com.treinos.app.ui.timerShouldAnnounce
 
 @Composable
 fun WorkoutScreen(
@@ -144,8 +162,18 @@ fun WorkoutScreen(
                             )
                             val done = current.exercises.sumOf { it.exercise.completedSets }
                             val planned = current.exercises.sumOf { it.exercise.plannedSets }
+                            LinearProgressIndicator(
+                                progress = { if (planned > 0) done.toFloat() / planned else 0f },
+                                modifier = Modifier.fillMaxWidth().semantics {
+                                    progressBarRangeInfo = ProgressBarRangeInfo(
+                                        current = done.toFloat(),
+                                        range = 0f..planned.coerceAtLeast(1).toFloat(),
+                                    )
+                                    stateDescription = progressStateDescription(done, planned)
+                                },
+                            )
                             Text(
-                                text = "$done de $planned séries registradas",
+                                text = progressStateDescription(done, planned),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -198,34 +226,45 @@ fun WorkoutScreen(
 
 @Composable
 private fun RestCard(remaining: Int, total: Int, onSkip: () -> Unit) {
+    val announce = timerShouldAnnounce(remaining)
+    val message = if (remaining > 0) {
+        "Descanso: ${formatSeconds(remaining)}"
+    } else {
+        "Descanso concluído. Bora para a próxima série."
+    }
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(16.dp).semantics(mergeDescendants = true) {
+                stateDescription = if (remaining > 0) restStateDescription(remaining, total) else "Descanso concluído"
+                if (announce) liveRegion = LiveRegionMode.Polite
+            },
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             if (remaining > 0) {
-                Text(
-                    text = "Descanso: ${formatSeconds(remaining)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                LinearProgressIndicator(
+                    progress = { if (total > 0) (total - remaining).toFloat() / total else 0f },
+                    modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
                 )
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text(
                     text = "Total de ${formatSeconds(total)}. A próxima série pode começar quando quiser.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-            } else {
-                Text(
-                    text = "Descanso concluído. Bora para a próxima série.",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
             }
-            OutlinedButton(onClick = onSkip) { Text("Pular descanso") }
+            OutlinedButton(
+                onClick = onSkip,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text("Pular descanso")
+            }
         }
     }
 }
@@ -237,6 +276,7 @@ private fun ExerciseCard(
     onLogSet: () -> Unit,
     onOpenDetail: () -> Unit,
 ) {
+    val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -245,20 +285,24 @@ private fun ExerciseCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenDetail() },
+                    .minimumInteractiveComponentSize()
+                    .semantics { role = Role.Button }
+                    .clickable(onClickLabel = "Abrir detalhes do exercício", onClick = onOpenDetail),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ExerciseImage(
                     imageUrl = media?.imageUrl,
-                    exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                    exerciseName = name,
+                    contentDescription = decorativeContentDescription(),
                     size = 72.dp,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                        text = name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
                     )
                     Text(
                         text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
@@ -280,7 +324,16 @@ private fun ExerciseCard(
                 sets.forEach { set ->
                     HorizontalDivider()
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics(mergeDescendants = true) {
+                                stateDescription = setContentDescription(
+                                    set.setNumber,
+                                    set.reps,
+                                    set.weightKg,
+                                    set.rpe,
+                                ) + ", série concluída"
+                            },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -306,7 +359,7 @@ private fun ExerciseCard(
                         )
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = "Série concluída",
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -315,7 +368,7 @@ private fun ExerciseCard(
 
             Button(
                 onClick = onLogSet,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             ) {
                 Text("Registrar série ${exercise.sets.size + 1}")
             }
@@ -334,6 +387,14 @@ private fun AddSetDialog(
     var weight by remember { mutableStateOf(last?.weightKg?.let { formatWeight(it) }.orEmpty()) }
     var rpe by remember { mutableStateOf(last?.rpe?.let { formatWeight(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    fun submit() {
+        val parsedReps = reps.toIntOrNull()
+        if (reps.isNotBlank() && parsedReps == null) {
+            error = "Informe as repetições como número inteiro."
+        } else {
+            onConfirm(parsedReps, parseDecimal(weight), parseDecimal(rpe))
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -349,30 +410,37 @@ private fun AddSetDialog(
                 )
                 OutlinedTextField(
                     value = reps,
-                    onValueChange = { reps = it.filter(Char::isDigit) },
+                    onValueChange = { reps = it.filter(Char::isDigit); error = null },
                     label = { Text("Repetições") },
+                    supportingText = { Text(if (reps.isBlank()) "Opcional" else "Número inteiro") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { value ->
                         weight = value.filter { it.isDigit() || it == ',' || it == '.' }
+                        error = null
                     },
                     label = { Text("Carga (kg)") },
+                    supportingText = { Text("Opcional. Use vírgula ou ponto.") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = rpe,
                     onValueChange = { value ->
                         rpe = value.filter { it.isDigit() || it == ',' || it == '.' }
+                        error = null
                     },
                     label = { Text("RPE (opcional)") },
+                    supportingText = { Text("Opcional, de 1 a 10.") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 error?.let {
@@ -385,25 +453,12 @@ private fun AddSetDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    val parsedReps = reps.toIntOrNull()
-                    if (reps.isNotBlank() && parsedReps == null) {
-                        error = "Informe as repetições como número inteiro."
-                        return@TextButton
-                    }
-                    onConfirm(
-                        parsedReps,
-                        parseDecimal(weight),
-                        parseDecimal(rpe),
-                    )
-                },
-            ) {
+            TextButton(onClick = ::submit, modifier = Modifier.minimumInteractiveComponentSize()) {
                 Text("Salvar série")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
         },
     )
 }

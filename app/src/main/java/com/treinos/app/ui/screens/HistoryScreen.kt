@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,6 +63,7 @@ import com.treinos.app.ui.components.KeyValueRow
 import com.treinos.app.ui.components.MetricCard
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
@@ -78,6 +86,8 @@ import com.treinos.app.ui.history.weekDayLabels
 import com.treinos.app.ui.swimStrokeOptions
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun HistoryScreen(
@@ -122,7 +132,7 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding),
                 action = {
-                    Button(onClick = onGenerate) {
+                    Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Text("Gerar treino")
                     }
                 },
@@ -340,14 +350,35 @@ private fun DayCell(
         isToday -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
     }
+    val workoutCount = (if (hasCompleted) 1 else 0) + (if (hasInProgress) 1 else 0)
+    val dayDescription = date?.let {
+        val label = it.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("pt-BR")))
+        if (workoutCount > 0) "$label, $workoutCount treino${if (workoutCount > 1) "s" else ""}" else label
+    }
     Column(
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .wrapContentSize(Alignment.Center)
             .clip(RoundedCornerShape(8.dp))
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
             )
-            .then(if (date != null && clickable) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (date != null && clickable) {
+                    Modifier
+                        .clickable(onClick = onClick)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = dayDescription.orEmpty()
+                            stateDescription = when {
+                                isSelected -> "Selecionado"
+                                else -> if (hasInProgress && !hasCompleted) "Em andamento" else "Concluído"
+                            }
+                        }
+                } else {
+                    Modifier.clearAndSetSemantics { }
+                },
+            )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -482,8 +513,8 @@ private fun ActivityCard(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEdit) { Text("Editar") }
-                TextButton(onClick = { showDeleteDialog = true }) {
+                TextButton(onClick = onEdit, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Editar") }
+                TextButton(onClick = { showDeleteDialog = true }, modifier = Modifier.minimumInteractiveComponentSize()) {
                     Text("Excluir", color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -501,12 +532,13 @@ private fun ActivityCard(
                         showDeleteDialog = false
                         onDelete()
                     },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Text("Excluir", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
             },
         )
     }
@@ -528,6 +560,10 @@ private fun SessionCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                stateDescription = if (expanded) "Expandido" else "Recolhido"
+            }
             .clickable { expanded = !expanded },
     ) {
         Column(
@@ -544,7 +580,10 @@ private fun SessionCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Text(
                         text = if (completed) "Concluído" else "Em andamento",
                         style = MaterialTheme.typography.labelMedium,
@@ -554,7 +593,7 @@ private fun SessionCard(
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp
                         else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Recolher" else "Expandir",
+                        contentDescription = decorativeContentDescription(),
                     )
                 }
             }
@@ -579,13 +618,19 @@ private fun SessionCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onOpenExerciseDetail(exercise.exercise.exerciseId) },
+                                .minimumInteractiveComponentSize()
+                                .semantics { role = Role.Button }
+                                .clickable(
+                                    onClickLabel = "Abrir detalhes do exercício",
+                                    onClick = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
+                                ),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             ExerciseImage(
                                 imageUrl = exerciseMedia[exercise.exercise.exerciseId]?.imageUrl,
                                 exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                                contentDescription = decorativeContentDescription(),
                                 size = 48.dp,
                             )
                             Column(modifier = Modifier.weight(1f)) {

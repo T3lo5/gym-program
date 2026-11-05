@@ -16,6 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -53,7 +54,7 @@ fun ExerciseDetailSheet(
                     text = media?.name?.takeIf { it.isNotBlank() } ?: "Exercício",
                     style = MaterialTheme.typography.titleLarge,
                 )
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                     Icon(Icons.Default.Close, contentDescription = "Fechar")
                 }
             }
@@ -62,7 +63,7 @@ fun ExerciseDetailSheet(
             if (!imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = imageUrl,
-                    contentDescription = media?.name?.let { "Imagem do exercício $it" },
+                    contentDescription = "Imagem do exercício ${media.name.ifBlank { "exercício" }}",
                     modifier = Modifier
                         .fillMaxWidth()
                         .size(240.dp),
@@ -72,6 +73,7 @@ fun ExerciseDetailSheet(
                 ExerciseImage(
                     imageUrl = null,
                     exerciseName = media?.name.orEmpty(),
+                    contentDescription = null,
                     modifier = Modifier.fillMaxWidth(),
                     size = 240.dp,
                 )

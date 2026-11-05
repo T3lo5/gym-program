@@ -19,7 +19,7 @@ fun ExerciseImage(
     exerciseName: String,
     modifier: Modifier = Modifier,
     size: Dp = 72.dp,
-    contentDescription: String? = if (imageUrl.isNullOrBlank()) null else "Imagem do exercício $exerciseName",
+    contentDescription: String? = null,
 ) {
     if (imageUrl.isNullOrBlank()) {
         Box(
@@ -39,7 +39,7 @@ fun ExerciseImage(
 
     AsyncImage(
         model = imageUrl,
-        contentDescription = contentDescription,
+        contentDescription = contentDescription ?: "Imagem do exercício $exerciseName",
         modifier = modifier.size(size),
         contentScale = ContentScale.Crop,
     )

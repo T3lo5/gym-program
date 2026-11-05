@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -24,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -180,8 +183,10 @@ fun SettingsScreen(
                         value = url,
                         onValueChange = { url = it },
                         label = { Text("URL do backend") },
+                        supportingText = { Text("Ex.: http://192.168.0.10:3000") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { onSaveUrl(url) }),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(
@@ -189,7 +194,7 @@ fun SettingsScreen(
                     ) {
                         OutlinedButton(
                             onClick = { onSaveUrl(url) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                         ) {
                             Text("Salvar")
                         }
@@ -199,7 +204,7 @@ fun SettingsScreen(
                                 onTest()
                             },
                             enabled = !isTesting,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                         ) {
                             if (isTesting) {
                                 CircularProgressIndicator(
@@ -255,7 +260,7 @@ fun SettingsScreen(
                             }
                         },
                         enabled = !isConnectingBackend,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -368,7 +373,7 @@ fun SettingsScreen(
                     Button(
                         onClick = onSync,
                         enabled = !isSyncing,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -396,7 +401,7 @@ fun SettingsScreen(
                     Button(
                         onClick = { showDownloadConfirm = true },
                         enabled = !isDownloading,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -449,13 +454,19 @@ fun SettingsScreen(
                         value = restoreDeviceId,
                         onValueChange = onRestoreDeviceIdChanged,
                         label = { Text("deviceId do outro aparelho") },
+                        supportingText = { Text(if (restoreDeviceId.isBlank()) "Obrigatório para restaurar" else "Pronto para restaurar") },
+                        isError = restoreDeviceId.isBlank() && restoreMessage != null,
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (restoreDeviceId.isNotBlank()) showRestoreConfirm = true
+                        }),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Button(
                         onClick = { showRestoreConfirm = true },
                         enabled = restoreDeviceId.isNotBlank() && !isRestoring,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -510,10 +521,11 @@ fun SettingsScreen(
                             Button(
                                 onClick = onUpdateCatalog,
                                 enabled = !isUpdatingCatalog,
+                                modifier = Modifier.minimumInteractiveComponentSize(),
                             ) {
                                 Text(if (isUpdatingCatalog) "Atualizando..." else "Atualizar catálogo")
                             }
-                            TextButton(onClick = onClearCatalogMessage) {
+                            TextButton(onClick = onClearCatalogMessage, modifier = Modifier.minimumInteractiveComponentSize()) {
                                 Text("Limpar")
                             }
                         }
@@ -551,7 +563,7 @@ fun SettingsScreen(
                         Button(
                             onClick = onExportBackup,
                             enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                         ) {
                             if (backupImportState is BackupImportState.Importing) {
                                 CircularProgressIndicator(
@@ -566,7 +578,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = onImportFileSelected,
                             enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                         ) {
                             if (backupImportState is BackupImportState.Importing) {
                                 CircularProgressIndicator(
@@ -597,13 +609,13 @@ fun SettingsScreen(
                             ) {
                                 Button(
                                     onClick = onConfirmImport,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                                 ) {
                                     Text("Substituir tudo")
                                 }
                                 OutlinedButton(
                                     onClick = onCancelImport,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                                 ) {
                                     Text("Cancelar")
                                 }
@@ -617,7 +629,7 @@ fun SettingsScreen(
                             )
                             OutlinedButton(
                                 onClick = onClearBackupMessage,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                             ) {
                                 Text("Dispensar")
                             }

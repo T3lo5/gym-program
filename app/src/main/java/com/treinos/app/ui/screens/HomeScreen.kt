@@ -18,9 +18,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
@@ -38,6 +43,7 @@ import com.treinos.app.ui.formatReviewDate
 import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
 import com.treinos.app.ui.reviewIsDue
+import com.treinos.app.ui.reviewStateDescription
 
 @Composable
 fun HomeScreen(
@@ -95,7 +101,7 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Button(onClick = onGenerate) {
+                            Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
                                 Text("Gerar meu primeiro treino")
                             }
                         }
@@ -125,7 +131,8 @@ fun HomeScreen(
                         onClick = onGenerate,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
+                            .padding(top = 8.dp)
+                            .minimumInteractiveComponentSize(),
                     ) {
                         Text("Gerar novo treino")
                     }
@@ -137,7 +144,8 @@ fun HomeScreen(
                     onClick = onLogActivity,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
+                        .padding(top = 8.dp)
+                        .minimumInteractiveComponentSize(),
                 ) {
                     Text("Registrar atividade")
                 }
@@ -147,7 +155,8 @@ fun HomeScreen(
                 OutlinedButton(
                     onClick = onOpenMobility,
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .minimumInteractiveComponentSize(),
                 ) {
                     Text("Mobilidade e alongamento")
                 }
@@ -222,7 +231,11 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
     val due = reviewIsDue(entity.nextReviewAt)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                review?.let { stateDescription = reviewStateDescription(it, due) }
+            },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
@@ -236,6 +249,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
                 text = "${goalLabel(entity.goal)} • ${entity.daysPerWeek}x por semana",
@@ -318,6 +332,7 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                                     text = "•",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clearAndSetSemantics { },
                                 )
                                 Text(
                                     text = exercise.exerciseName,
@@ -331,7 +346,7 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                 }
                 Button(
                     onClick = onStart,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
                 ) {
                     Text("Iniciar treino")
                 }
