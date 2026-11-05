@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -153,7 +154,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            when (screen) {
+            AnimatedContent(targetState = screen, label = "screen") { targetScreen ->
+                when (targetScreen) {
                 Screen.Home -> HomeScreen(
                     plan = plan,
                     inProgressSession = inProgressSession,
@@ -258,6 +260,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onConnectBackend = viewModel::connectDiscoveredBackend,
                     onClearDiscoveryMessage = viewModel::clearDiscoveryMessage,
                 )
+            }
             }
         }
     }
