@@ -196,7 +196,7 @@ class BackupFlowUiTest {
 
     @Test
     fun mostra_erro_de_versao() {
-        val invalido = arquivo(schemaVersion = 3)
+        val invalido = arquivo(schemaVersion = 4)
         val resultado = BackupValidator.validate(invalido)
         val mensagem = requireNotNull(resultado.message)
         val state = mutableStateOf<BackupImportState>(BackupImportState.Error(mensagem))
@@ -239,5 +239,14 @@ class BackupFlowUiTest {
         // A confirmação sai da tela: sem pré-visualização e sem botão de substituir.
         composeRule.onNodeWithText(textoPreview).assertDoesNotExist()
         composeRule.onNodeWithText("Substituir tudo").assertDoesNotExist()
+    }
+
+    @Test
+    fun card_de_backup_avisa_que_o_arquivo_contem_o_perfil() {
+        render(mutableStateOf<BackupImportState>(BackupImportState.Idle))
+
+        composeRule.onNodeWithText("perfil (peso e altura)", substring = true)
+            .performScrollTo()
+            .assertExists()
     }
 }

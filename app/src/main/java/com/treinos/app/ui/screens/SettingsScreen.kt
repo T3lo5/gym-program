@@ -552,8 +552,9 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        text = "Exporte todos os seus planos, treinos e séries para um arquivo JSON " +
-                            "no aparelho. Restaure depois, mesmo após desinstalar o app.",
+                        text = "Exporte seus planos, treinos, séries e o perfil (peso e altura) para um " +
+                            "arquivo JSON. Restaure depois, mesmo após desinstalar o app. Quem tiver o " +
+                            "arquivo lê esses dados — inclua peso e altura.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

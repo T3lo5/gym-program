@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.treinos.app.data.DeviceIdStore
+import com.treinos.app.data.ProfileStore
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.AppDatabase
 import com.treinos.app.data.local.SessionExerciseEntity
@@ -121,7 +122,70 @@ class BackupImportTest {
         assertEquals(1, dao.getAllSessionEntities().size)
     }
 
+    @Test
+    fun `importa backup v3 restaura perfil`() = runTest {
+        seedWorkout()
+        preferences.bodyWeightKg = 82.5
+        preferences.heightCm = 178
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+        val profileStore = FakeProfileStore(bodyWeightKg = null, heightCm = null)
+
+        repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+
+        assertEquals(82.5, profileStore.bodyWeightKg)
+        assertEquals(178, profileStore.heightCm)
+    }
+
+    @Test
+    fun `backup sem perfil no arquivo mantem perfil local`() = runTest {
+        seedWorkout()
+        val payload = backupFromCurrentData(deviceId = "celular-antigo").copy(profile = null)
+        val profileStore = FakeProfileStore(bodyWeightKg = 70.0, heightCm = 170)
+
+        repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+
+        assertEquals(70.0, profileStore.bodyWeightKg)
+        assertEquals(170, profileStore.heightCm)
+    }
+
+    @Test
+    fun `v3 com perfil nulo limpa perfil local`() = runTest {
+        seedWorkout()
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+            .copy(profile = BackupProfile(bodyWeightKg = null, heightCm = null))
+        val profileStore = FakeProfileStore(bodyWeightKg = 70.0, heightCm = 170)
+
+        repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+
+        assertEquals(null, profileStore.bodyWeightKg)
+        assertEquals(null, profileStore.heightCm)
+    }
+
+    @Test
+    fun `importacao invalida nao altera perfil`() = runTest {
+        seedWorkout()
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+            .copy(
+                profile = BackupProfile(bodyWeightKg = 90.0, heightCm = 180),
+                app = BackupApp(packageName = "com.outro.app", versionName = "1.0", versionCode = 1L),
+            )
+        val profileStore = FakeProfileStore(bodyWeightKg = 70.0, heightCm = 170)
+
+        val failure = runCatching {
+            repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+        }.exceptionOrNull()
+
+        assertNotNull(failure)
+        assertEquals(70.0, profileStore.bodyWeightKg)
+        assertEquals(170, profileStore.heightCm)
+    }
+
     private class FakeDeviceIdStore(override var deviceId: String) : DeviceIdStore
+
+    private class FakeProfileStore(
+        override var bodyWeightKg: Double?,
+        override var heightCm: Int?,
+    ) : ProfileStore
 
     private class UnusedBackend : BackendApi {
         override suspend fun health(): HealthResponse = error("não usado")

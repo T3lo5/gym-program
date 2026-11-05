@@ -31,6 +31,7 @@ import com.treinos.app.data.remote.WorkoutPlanDto
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
+import com.treinos.app.data.backup.backupImportDecoder
 import com.treinos.app.data.wear.WearSessionMapper
 import com.treinos.app.data.wear.WearSyncRepository
 import com.treinos.app.ui.ExerciseSessionData
@@ -61,7 +62,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import com.treinos.protocol.WearCommand
@@ -989,7 +989,7 @@ class AppViewModel(
         viewModelScope.launch {
             _backupImportState.value = BackupImportState.Reading
             try {
-                val file = Json.decodeFromString(BackupFile.serializer(), json)
+                val file = backupImportDecoder.decodeFromString(BackupFile.serializer(), json)
                 val result = BackupValidator.validate(file)
                 if (!result.valid) {
                     _backupImportState.value = BackupImportState.Error(result.message ?: "Backup inválido")

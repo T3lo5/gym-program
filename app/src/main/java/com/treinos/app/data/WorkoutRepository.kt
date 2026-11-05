@@ -21,7 +21,9 @@ import com.treinos.app.data.remote.ReviewPlanResponse
 import com.treinos.app.data.backup.BackupApp
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupMapper
+import com.treinos.app.data.backup.BackupProfile
 import com.treinos.app.data.backup.BackupValidator
+import com.treinos.app.data.backup.backupExportEncoder
 import com.treinos.app.data.remote.SyncDayDto
 import com.treinos.app.data.remote.SyncPlanDto
 import com.treinos.app.data.remote.SyncPlanExerciseDto
@@ -45,7 +47,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
 
@@ -567,7 +568,7 @@ class WorkoutRepository(
         }
 
         val file = BackupFile(
-            schemaVersion = 2,
+            schemaVersion = 3,
             exportedAt = Instant.now().toString(),
             app = BackupApp(
                 packageName = "com.treinos.app",
@@ -577,18 +578,25 @@ class WorkoutRepository(
             deviceId = preferences.deviceId,
             plans = backupPlans,
             sessions = backupSessions,
+            profile = BackupProfile(
+                bodyWeightKg = preferences.bodyWeightKg,
+                heightCm = preferences.heightCm,
+            ),
         )
 
-        Json { encodeDefaults = true }.encodeToString(BackupFile.serializer(), file)
+        backupExportEncoder.encodeToString(BackupFile.serializer(), file)
     }
 
     /**
      * Substitui todo o banco local pelo backup, já validado, e só então aplica o
-     * `deviceId` do arquivo: se a validação ou a escrita falhar, nem os dados nem
-     * a identidade do aparelho mudam.
+     * `deviceId` e o perfil do arquivo: se a validação ou a escrita falhar, nem os
+     * dados nem a identidade do aparelho mudam.
      */
-    suspend fun importBackup(payload: BackupFile, deviceIdStore: DeviceIdStore = preferences) =
-        withContext(Dispatchers.IO) {
+    suspend fun importBackup(
+        payload: BackupFile,
+        deviceIdStore: DeviceIdStore = preferences,
+        profileStore: ProfileStore = preferences,
+    ) = withContext(Dispatchers.IO) {
             val validation = BackupValidator.validate(payload)
             require(validation.valid) { validation.message ?: "Backup inválido" }
 
@@ -622,6 +630,13 @@ class WorkoutRepository(
 
             if (payload.deviceId.isNotBlank()) {
                 deviceIdStore.deviceId = payload.deviceId
+            }
+
+            // Backup v1/v2 não fala de perfil (profile == null): o perfil local
+            // continua. Só um v3 que declara "não informado" limpa o campo.
+            payload.profile?.let { profile ->
+                profileStore.bodyWeightKg = profile.bodyWeightKg
+                profileStore.heightCm = profile.heightCm
             }
         }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.util.UUID
 import com.treinos.app.data.DeviceIdStore
+import com.treinos.app.data.ProfileStore
 import com.treinos.app.data.discovery.BackendUrlStore
 import com.treinos.app.data.wear.CommandDedupe
 
@@ -15,7 +16,7 @@ import com.treinos.app.data.wear.CommandDedupe
  */
 class AppPreferences private constructor(
     private val prefs: SharedPreferences,
-) : DeviceIdStore, BackendUrlStore {
+) : DeviceIdStore, BackendUrlStore, ProfileStore {
 
     constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences("treinos_prefs", Context.MODE_PRIVATE)
@@ -46,7 +47,7 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_LAST_SYNC_AT, value).apply()
         }
 
-    var bodyWeightKg: Double?
+    override var bodyWeightKg: Double?
         get() = if (prefs.contains(KEY_BODY_WEIGHT_KG)) prefs.getFloat(KEY_BODY_WEIGHT_KG, 0f).toDouble() else null
         set(value) {
             if (value == null) {
@@ -56,7 +57,7 @@ class AppPreferences private constructor(
             }
         }
 
-    var heightCm: Int?
+    override var heightCm: Int?
         get() = if (prefs.contains(KEY_HEIGHT_CM)) prefs.getInt(KEY_HEIGHT_CM, 0) else null
         set(value) {
             if (value == null) {

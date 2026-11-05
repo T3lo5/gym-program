@@ -1,8 +1,10 @@
 package com.treinos.app.ui
 
+import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.treinos.app.data.backup.BackupSizeGuard
+import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
@@ -118,12 +122,24 @@ fun TreinosApp(viewModel: AppViewModel) {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
+            val knownSize = documentSize(context.contentResolver, uri)
+            if (knownSize != null) {
+                val sizeCheck = BackupValidator.validateSize(knownSize)
+                if (!sizeCheck.valid) {
+                    viewModel.setBackupMessage(sizeCheck.message ?: BackupSizeGuard.tooLargeMessage)
+                    return@launch
+                }
+            }
             val input = context.contentResolver.openInputStream(uri)
             if (input == null) {
                 viewModel.setBackupMessage("Não foi possível ler o arquivo escolhido.")
                 return@launch
             }
-            val json = input.bufferedReader().use { it.readText() }
+            val json = input.use { BackupSizeGuard.readLimited(it) }
+            if (json == null) {
+                viewModel.setBackupMessage(BackupSizeGuard.tooLargeMessage)
+                return@launch
+            }
             viewModel.prepareImport(json)
         }
     }
@@ -295,6 +311,18 @@ private fun backupFileName(): String {
     val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
     return "treinos-backup-$stamp.json"
 }
+
+/**
+ * Tamanho informado pelo provedor do SAF. `null` também quando ele não sabe —
+ * provedores de nuvem costumam não reportar, então o limite é aplicado pela
+ * leitura limitada ([BackupSizeGuard.readLimited]).
+ */
+private fun documentSize(resolver: ContentResolver, uri: Uri): Long? =
+    runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+        }
+    }.getOrNull()
 
 /**
  * `exerciseId` -> músculos do plano ativo, separados por vírgula. Exercícios fora do

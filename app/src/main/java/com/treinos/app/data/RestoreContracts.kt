@@ -25,3 +25,9 @@ interface SnapshotDownloader {
 interface DeviceIdStore {
     var deviceId: String
 }
+
+/** Onde o app guarda o perfil (peso/altura); implementada por [com.treinos.app.data.prefs.AppPreferences]. */
+interface ProfileStore {
+    var bodyWeightKg: Double?
+    var heightCm: Int?
+}

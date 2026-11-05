@@ -9,8 +9,14 @@ data class BackupValidationResult(
 object BackupValidator {
 
     private const val EXPECTED_PACKAGE_NAME = "com.treinos.app"
-    private const val MAX_FILE_BYTES = 25L * 1024 * 1024
-    private val SUPPORTED_VERSIONS = setOf(1, 2)
+
+    /** Limite do arquivo de backup; usado antes de ler o conteúdo (H3-6). */
+    const val MAX_FILE_BYTES = 25L * 1024 * 1024
+    private const val MIN_WEIGHT_KG = 30.0
+    private const val MAX_WEIGHT_KG = 300.0
+    private const val MIN_HEIGHT_CM = 120
+    private const val MAX_HEIGHT_CM = 250
+    private val SUPPORTED_VERSIONS = setOf(1, 2, 3)
     private val MODALITIES = setOf("strength", "run", "swim", "mobility", "other")
     private val SOURCES = setOf("plan", "manual")
     private val METRIC_TYPES = setOf("reps_weight", "duration", "distance_duration")
@@ -21,7 +27,7 @@ object BackupValidator {
         if (fileSizeBytes > MAX_FILE_BYTES) {
             BackupValidationResult(
                 valid = false,
-                message = "Arquivo muito grande para importar (limite de 25 MB).",
+                message = BackupSizeGuard.tooLargeMessage,
                 preview = null,
             )
         } else {
@@ -32,7 +38,7 @@ object BackupValidator {
         if (file.schemaVersion !in SUPPORTED_VERSIONS) {
             return BackupValidationResult(
                 valid = false,
-                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada 1 ou 2).",
+                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada 1, 2 ou 3).",
                 preview = null,
             )
         }
@@ -43,6 +49,28 @@ object BackupValidator {
                 message = "Arquivo de backup não pertence a este app (${file.app.packageName}).",
                 preview = null,
             )
+        }
+
+        val profile = file.profile
+        if (profile != null) {
+            val weight = profile.bodyWeightKg
+            if (weight != null &&
+                (weight.isNaN() || weight.isInfinite() || weight < MIN_WEIGHT_KG || weight > MAX_WEIGHT_KG)
+            ) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Peso do perfil fora da faixa permitida (30–300 kg).",
+                    preview = null,
+                )
+            }
+            val height = profile.heightCm
+            if (height != null && (height < MIN_HEIGHT_CM || height > MAX_HEIGHT_CM)) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Altura do perfil fora da faixa permitida (120–250 cm).",
+                    preview = null,
+                )
+            }
         }
 
         val planIds = mutableSetOf<Long>()

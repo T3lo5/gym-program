@@ -5,6 +5,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -117,6 +118,59 @@ class BackupSerializationTest {
                 )
             ),
         )
+
+    @Test
+    fun v3_round_trip_preserva_perfil() {
+        val file = sampleFile().copy(
+            schemaVersion = 3,
+            profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178),
+        )
+
+        val encoded = json.encodeToString(BackupFile.serializer(), file)
+        val decoded = json.decodeFromString(BackupFile.serializer(), encoded)
+
+        assertEquals(3, decoded.schemaVersion)
+        assertEquals(82.5, decoded.profile?.bodyWeightKg)
+        assertEquals(178, decoded.profile?.heightCm)
+    }
+
+    @Test
+    fun v3_escreve_os_campos_nulos_do_perfil() {
+        val encoded = backupExportEncoder.encodeToString(
+            BackupFile.serializer(),
+            sampleFile().copy(schemaVersion = 3, profile = BackupProfile()),
+        )
+
+        assertTrue(encoded.contains("\"profile\""))
+        assertTrue(encoded.contains("\"bodyWeightKg\":null"))
+        assertTrue(encoded.contains("\"heightCm\":null"))
+    }
+
+    @Test
+    fun chave_profile_ausente_decodifica_com_null() {
+        val encoded = json.encodeToString(
+            BackupFile.serializer(),
+            sampleFile().copy(schemaVersion = 3, profile = null),
+        )
+
+        val decoded = json.decodeFromString(BackupFile.serializer(), encoded)
+
+        assertNull(decoded.profile)
+    }
+
+    @Test
+    fun decoder_de_producao_ignora_chave_desconhecida() {
+        val escritoPeloExport = backupExportEncoder.encodeToString(
+            BackupFile.serializer(),
+            sampleFile().copy(schemaVersion = 3, profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178)),
+        )
+        val comChaveFutura = escritoPeloExport.dropLast(1) + ",\"avatar\":\"x\"}"
+
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), comChaveFutura)
+
+        assertEquals(3, decoded.schemaVersion)
+        assertEquals(178, decoded.profile?.heightCm)
+    }
 
     @Test
     fun roundTripPreservaTodosOsCampos() {

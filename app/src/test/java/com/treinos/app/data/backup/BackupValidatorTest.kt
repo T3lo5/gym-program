@@ -240,10 +240,61 @@ class BackupValidatorTest {
     }
 
     @Test
-    fun rejeita_v3() {
-        val result = BackupValidator.validate(validFile(schemaVersion = 3))
+    fun aceita_v3() {
+        assertTrue(BackupValidator.validate(validFile(schemaVersion = 3)).valid)
+    }
+
+    @Test
+    fun rejeita_v4() {
+        val result = BackupValidator.validate(validFile(schemaVersion = 4))
         assertFalse(result.valid)
-        assertTrue(result.message?.contains("3") == true)
+        assertTrue(result.message?.contains("4") == true)
+    }
+
+    @Test
+    fun aceita_v3_com_perfil_valido() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178))
+
+        assertTrue(BackupValidator.validate(file).valid)
+    }
+
+    @Test
+    fun aceita_v3_com_perfil_totalmente_nulo() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile())
+
+        assertTrue(BackupValidator.validate(file).valid)
+    }
+
+    @Test
+    fun aceita_v2_sem_perfil() {
+        val file = validFile(schemaVersion = 2).copy(profile = null)
+
+        assertTrue(BackupValidator.validate(file).valid)
+    }
+
+    @Test
+    fun rejeita_peso_fora_da_faixa_no_perfil() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(bodyWeightKg = 29.0))
+
+        val result = BackupValidator.validate(file)
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("Peso") == true)
+    }
+
+    @Test
+    fun rejeita_nan_no_perfil() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(bodyWeightKg = Double.NaN))
+
+        assertFalse(BackupValidator.validate(file).valid)
+    }
+
+    @Test
+    fun rejeita_altura_fora_da_faixa_no_perfil() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(heightCm = 119))
+
+        val result = BackupValidator.validate(file)
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("Altura") == true)
     }
 
     @Test

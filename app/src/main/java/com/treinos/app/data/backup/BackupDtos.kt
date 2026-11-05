@@ -10,6 +10,14 @@ data class BackupFile(
     val deviceId: String,
     val plans: List<BackupPlan>,
     val sessions: List<BackupSession>,
+    val profile: BackupProfile? = null,
+)
+
+/** Perfil local (H1-5). Ausente em backups v1/v2. */
+@Serializable
+data class BackupProfile(
+    val bodyWeightKg: Double? = null,
+    val heightCm: Int? = null,
 )
 
 @Serializable

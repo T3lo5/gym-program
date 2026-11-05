@@ -367,14 +367,17 @@ agora**, o banco do backend não recebe nenhum dado do app.
 
 - **Restaurar do backend** baixa o snapshot do `deviceId` exibido em Ajustes e
   **substitui** o banco local. Use antes de limpar os dados ou reinstalar.
-- **Exportar backup** gera um arquivo JSON com planos, sessões e séries.
-- **Importar backup** lê o arquivo e substitui os dados locais.
+- **Exportar backup** gera um arquivo JSON com planos, sessões, séries e o
+  perfil (peso e altura). Você escolhe o destino na tela de arquivos do sistema,
+  inclusive uma pasta do Google Drive, OneDrive ou Dropbox.
+- **Importar backup** lê o arquivo e substitui os dados locais, depois reescreve
+  o perfil. A operação é destrutiva: exporte antes de importar.
 - O backup JSON é o caminho mais seguro: ele não depende de o backend estar no
   ar nem de o `deviceId` ter sido sincronizado antes.
 
-> **Versão atual:** a lógica de backup existe, mas os botões de exportar/importar
-> ainda não abrem o seletor de arquivo. A correção está no item H1-7. Até lá,
-> use o backup do Android ou mantenha o app instalado.
+> **Segredo não vai no arquivo:** o JSON do backup nunca contém `apiToken`,
+> `backendUrl` ou qualquer chave. Se você editar o backup à mão, mantenha esses
+> campos fora.
 
 #### 3.3.5 Funcionamento sem internet
 
@@ -1237,10 +1240,22 @@ docker compose up -d --build
 - O arquivo `back/.env` contém sua chave e **não** vai para o Git. Guarde uma
   cópia segura se precisar.
 - **Dados do app:** ficam no SQLite interno do aparelho (`treinos.db` do Room).
-  Desinstalar o app apaga esses dados. A lógica de **Exportar backup** e
-  **Importar backup** existe, mas a ligação dos botões está em correção (H1-7).
-  Também é possível usar **Restaurar do backend**, desde que você já tenha
-  sincronizado o `deviceId`.
+  Desinstalar o app apaga esses dados. Use **Exportar backup** em Ajustes para
+  gerar um JSON e **Importar backup** para restaurá-lo depois — inclusive num
+  aparelho recém-formatado. O arquivo (formato `schemaVersion = 3`) contém
+  planos, dias, exercícios, séries, sessões, o `deviceId` **e o seu perfil: peso
+  e altura**. Qualquer pessoa com o arquivo lê isso; não compartilhe o JSON como
+  quem compartilha uma foto.
+  - Arquivos acima de 25 MB são recusados **antes** da leitura, com mensagem de
+    tamanho. Isso vale também para backup importado direto do Google Drive,
+    OneDrive ou Dropbox — o app abre esses provedores pela mesma tela de arquivos
+    do sistema, sem conta nem SDK de nuvem.
+  - Backups antigos (`schemaVersion` 1 ou 2) continuam importando. Como eles não
+    falam de perfil, o peso e a altura **que já estão no aparelho são mantidos** —
+    restaurar um backup velho não apaga seu perfil.
+  - A importação é **destrutiva**: ela substitui todo o banco local. Exporte antes.
+  - Também é possível usar **Restaurar do backend**, desde que você já tenha
+    sincronizado o `deviceId`.
 - **Dados do backend:** ficam em `back/data/treinos.db`. Para backup, copie
   esse arquivo com o backend parado:
 
