@@ -28,7 +28,9 @@ import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
 import com.treinos.app.ui.screens.HomeScreen
 import com.treinos.app.ui.screens.LogActivityScreen
+import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.SettingsScreen
+import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.ExerciseDetailSheet
 import java.io.File
@@ -166,6 +168,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onStartDay = viewModel::startWorkout,
                     onResume = viewModel::resumeWorkout,
                     onLogActivity = viewModel::openLogActivity,
+                    onOpenMobility = viewModel::openMobility,
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -213,6 +216,11 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onCopyLast = viewModel::copyLastActivity,
                     onSave = viewModel::saveActivity,
                     onDelete = { activityEditingId?.let(viewModel::deleteLogActivity) },
+                )
+
+                Screen.Mobility -> MobilityScreen(
+                    onBack = viewModel::goHome,
+                    onFinishMobility = viewModel::finishMobility,
                 )
 
                 Screen.Settings -> SettingsScreen(

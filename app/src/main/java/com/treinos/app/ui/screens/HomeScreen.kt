@@ -50,6 +50,7 @@ fun HomeScreen(
     onStartDay: (Long) -> Unit,
     onResume: () -> Unit,
     onLogActivity: () -> Unit,
+    onOpenMobility: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -143,8 +144,26 @@ fun HomeScreen(
             }
 
             item {
+                OutlinedButton(
+                    onClick = onOpenMobility,
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                ) {
+                    Text("Mobilidade e alongamento")
+                }
+            }
+
+            item {
                 Text(
                     text = "Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            item {
+                Text(
+                    text = "Rotinas curtas de mobilidade/alongamento para bem-estar e recuperação.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

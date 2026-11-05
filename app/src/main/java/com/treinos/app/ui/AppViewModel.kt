@@ -67,6 +67,7 @@ enum class Screen {
     History,
     Settings,
     LogActivity,
+    Mobility,
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -383,6 +384,10 @@ class AppViewModel(
 
     fun openSettings() {
         _screen.value = Screen.Settings
+    }
+
+    fun openMobility() {
+        _screen.value = Screen.Mobility
     }
 
     fun goHome() {
@@ -720,6 +725,39 @@ class AppViewModel(
                 _message.value = "Registro manual excluído."
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível excluir o registro."
+            }
+        }
+    }
+
+    // ---------------- Mobilidade ----------------
+
+    fun finishMobility(routineId: String, elapsedSeconds: Long) {
+        viewModelScope.launch {
+            try {
+                val routine = com.treinos.app.ui.MobilityRoutineTemplates.getRoutine(routineId)
+                val duration = if (elapsedSeconds > 0) elapsedSeconds else {
+                    routine?.let { com.treinos.app.ui.MobilityRoutineTemplates.totalDurationSeconds(it) } ?: 0
+                }
+                val session = com.treinos.app.data.local.WorkoutSessionEntity(
+                    planId = 0,
+                    dayId = 0,
+                    planName = "",
+                    dayName = "Mobilidade",
+                    status = "completed",
+                    startedAt = System.currentTimeMillis() - (duration.toLong() * 1000L),
+                    endedAt = System.currentTimeMillis(),
+                    totalDurationSeconds = duration.toLong(),
+                    modality = "mobility",
+                    source = "manual",
+                    title = routine?.name ?: "Mobilidade",
+                    notes = routine?.focus ?: "",
+                )
+                repository.logActivity(session)
+                _message.value = "Mobilidade finalizada e salva no histórico."
+                _screen.value = Screen.Home
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível salvar a mobilidade."
+                _screen.value = Screen.Home
             }
         }
     }
