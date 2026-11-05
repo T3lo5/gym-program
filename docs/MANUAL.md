@@ -484,6 +484,28 @@ sdk.dir=C\:\\Users\\SEU_USUARIO\\AppData\\Local\\Android\\Sdk
 O APK de release só será assinado se as variáveis de assinatura estiverem
 configuradas. Para testes, use o APK de debug publicado pelo CI.
 
+**Testes que o gate não roda:**
+
+`./scripts/verify.sh` roda os testes JVM (incluindo as telas Compose no Robolectric e
+o Room em memória) e **compila** os testes instrumentados, mas não os executa: o
+Docker do gate não tem emulador. Para rodar no celular/emulador conectado por USB:
+
+```bash
+adb devices          # confirma que o aparelho aparece
+./gradlew :app:connectedDebugAndroidTest
+```
+
+Isso é opcional e continua fora do gate — um build verde não depende dele.
+
+**Cobertura (informativa):**
+
+```bash
+COVERAGE=1 ./scripts/ci-android.sh
+```
+
+Gera `app/build/reports/coverage/test/debug/index.html` a partir dos testes JVM. O
+número não reprova o build: o gate falha por teste quebrado, não por percentual.
+
 ### 3.8 Problemas comuns do app
 
 | Problema | Causa provável | Solução |

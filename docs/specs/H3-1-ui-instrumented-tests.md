@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-1` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-03` |
-| Implementação | `em andamento` (16 arquivos JVM + gate; falta UI/Room/contrato) |
+| Implementação | `concluída` (2026-11-05, gate verde) — UI Compose + Room no `:app:testDebugUnitTest`, contrato nos dois lados, instrumentados compilando no gate, cobertura com `COVERAGE=1` |
 | Depende de | H1-4 (fluxo de backup) e H2-4 (histórico) para os testes de UI |
 
 ## Objetivo
@@ -225,3 +225,28 @@ Regras:
   que incentive testar getter.
 - **Rollback:** remover as dependências de teste, os novos arquivos de teste e
   o `exportSchema = true`. O app e o gate voltam ao estado atual.
+
+## Entrega — o que diferiu da spec
+
+- `testImplementation("androidx.test.espresso:espresso-core:3.5.1")`: o `ui-test`
+  resolve o idle pelo Espresso. Sem ela o teste de Compose no Robolectric morre em
+  `NoClassDefFoundError` antes da primeira asserção.
+- `androidTestImplementation("androidx.room:room-testing:2.6.1")`: o
+  `MigrationTestHelper` do device não herda a dependência do source set de unit test.
+- `sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")`: o
+  `MigrationTest` JVM (Robolectric) lê os schemas pelos assets do variante debug, não
+  só do androidTest.
+- `HistoryScreenTest` usa `@Config(qualifiers = "w411dp-h1600dp")`: no viewport
+  padrão do Robolectric (320x470 dp) o `LazyColumn` não compõe o card do treino, e a
+  asserção falharia por layout não composto, não por comportamento.
+- `scripts/ci-android.sh` passou a incluir `:app:assembleDebugAndroidTest` (sempre) e
+  `:app:createDebugUnitTestCoverageReport` (só com `COVERAGE=1`). Instrumentado
+  quebrado agora reprova o gate — antes entrava no repo sem ninguém compilar.
+- O `AppDatabaseMigrationTest` do device migra 1→2 com `runMigrationsAndValidate` em
+  vez de só abrir o banco: a regra 5 valia enquanto a versão era `1`; hoje é `2`.
+- Bug achado pelos testes e corrigido em `SettingsScreen`: os dois botões do card de
+  backup usavam `Modifier.fillMaxWidth()` no mesmo `Row`, sem `weight`, então o
+  segundo ("Cancelar" / "Importar backup") media 0 dp e não era clicável.
+  `cancela_sem_alterar` é a regressão.
+- Critério de aceite 2 conferido com mutação: renomear "Nenhum treino registrado"
+  deixou `mostra_estado_vazio` vermelho em `:app:testDebugUnitTest` (revertido depois).

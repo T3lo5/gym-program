@@ -52,8 +52,10 @@ android {
 
     // O MigrationTestHelper lê os schemas exportados do Room pelos assets. Para os
     // unit tests (Robolectric) o AGP usa o merge de assets do variante debug, então
-    // é ali que `app/schemas` — fonte única, versionada — precisa aparecer.
+    // é ali que `app/schemas` — fonte única, versionada — precisa aparecer. O teste
+    // instrumentado (AppDatabaseMigrationTest) lê do assets do próprio androidTest.
     sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 
     testOptions {
         unitTests.isReturnDefaultValues = true
@@ -149,12 +151,16 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation(platform("androidx.compose:compose-bom:2024.04.01"))
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    // `ui-test` resolve o idle pelo Espresso; sem esta dependência o teste de
+    // Compose no Robolectric quebra em NoClassDefFoundError antes da primeira asserção.
+    testImplementation("androidx.test.espresso:espresso-core:3.5.1")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.04.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

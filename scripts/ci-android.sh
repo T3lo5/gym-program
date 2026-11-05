@@ -36,6 +36,13 @@ if [[ "${SKIP_LINT:-0}" != "1" ]]; then
 fi
 TASKS+=(":app:assembleDebug")
 TASKS+=(":wear:assembleDebug")
+# Os testes instrumentados não RODAM aqui (o Docker não tem emulador), mas têm de
+# compilar: sem este passo o source set `androidTest` apodrece sem ninguém ver —
+# foi assim que arquivos quebrados entraram no repo.
+TASKS+=(":app:assembleDebugAndroidTest")
+if [[ "${COVERAGE:-0}" == "1" ]]; then
+  TASKS+=(":app:createDebugUnitTestCoverageReport")
+fi
 
 echo "==> [1/5] Gradle: ${TASKS[*]}"
 echo "    versionCode=$VERSION_CODE versionName=$VERSION_NAME"
@@ -82,6 +89,9 @@ echo "    App APK:   dist/treinos.apk ($APP_SIZE)"
 echo "    Wear APK:  dist/wear.apk ($WEAR_SIZE)"
 echo "    SHA-256:   dist/dist.sha256"
 echo "    Testes:    app/build/reports/tests/testDebugUnitTest/index.html"
+if [[ "${COVERAGE:-0}" == "1" ]]; then
+  echo "    Cobertura: app/build/reports/coverage/test/debug/index.html"
+fi
 echo "    Lint:      app/build/reports/lint-results-debug.html / wear/build/reports/lint-results-debug.html"
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then

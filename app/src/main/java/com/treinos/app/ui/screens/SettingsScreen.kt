@@ -563,7 +563,7 @@ fun SettingsScreen(
                         Button(
                             onClick = onExportBackup,
                             enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                         ) {
                             if (backupImportState is BackupImportState.Importing) {
                                 CircularProgressIndicator(
@@ -578,7 +578,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = onImportFileSelected,
                             enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                         ) {
                             if (backupImportState is BackupImportState.Importing) {
                                 CircularProgressIndicator(
@@ -609,13 +609,13 @@ fun SettingsScreen(
                             ) {
                                 Button(
                                     onClick = onConfirmImport,
-                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                                 ) {
                                     Text("Substituir tudo")
                                 }
                                 OutlinedButton(
                                     onClick = onCancelImport,
-                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                                 ) {
                                     Text("Cancelar")
                                 }

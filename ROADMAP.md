@@ -46,6 +46,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Mobilidade / alongamento | ✅ | `MobilityRoutine`/`MobilityRoutineTemplates`, `MobilityScreen` com timer/pausa/avanço, atalho na Home e sessão `modality = "mobility"` no histórico; testes `MobilityRoutineTest`/`MobilitySessionTest` (H2-7) |
 | Polimento visual / animações | ✅ | `Motion.kt` + transições em `TreinosApp`, tema/estados em `Theme`/`Common`; testes `MotionTest` (H3-2) |
 | Acessibilidade | ✅ | `A11y.kt`/`Contrast.kt` + semântica TalkBack/foco/fonte/contraste nas telas principais e componentes; testes `A11yTest`/`ContrastTest` (H3-3) |
+| Testes de UI/Room/contrato | ✅ | Compose no Robolectric dentro do gate (`HistoryScreenTest`, `BackupFlowUiTest`), Room em memória (`WorkoutDaoTest`), contrato `contracts/generate_response.json` nos dois lados, `assembleDebugAndroidTest` no gate e cobertura com `COVERAGE=1` (H3-1) |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
 
 > A tabela envelhece rápido. Ao entregar um item, mova-o para §4.1 e atualize esta
@@ -88,6 +89,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H2-7 | Mobilidade e alongamento | `MobilityRoutine`/`MobilityRoutineTemplates` com rotinas curtas, `MobilityScreen` com timer/pausa/avanço/finalização, atalho "Mobilidade" na Home, rota em `TreinosApp`, sessão `modality = "mobility"` via `WorkoutRepository`/histórico; testes `MobilityRoutineTest` e `MobilitySessionTest`; [spec](docs/specs/H2-7-mobility.md) |
 | H3-2 | Polimento visual e animações | `Motion.kt` + transições em `TreinosApp`, ajustes em `Theme`/`Common`/telas para estados e identidade visual; testes `MotionTest`; [spec](docs/specs/H3-2-visual-polish.md) |
 | H3-3 | Acessibilidade (TalkBack, fonte e contraste) | `A11y.kt`/`Contrast.kt` + semântica Compose nas telas principais (`Home`, `Generate`, `Workout`, `History`, `Settings`) e componentes compartilhados; testes `A11yTest`/`ContrastTest`; [spec](docs/specs/H3-3-accessibility.md) |
+| H3-1 | Testes de UI/instrumentados + cobertura | `HistoryScreenTest` (4) e `BackupFlowUiTest` (3) rodam Compose no Robolectric dentro de `:app:testDebugUnitTest` — o gate passou a ver telas; `WorkoutDaoTest` (4) cobre plano completo, `deleteAllData` e `replaceAllData` atômico que preserva IDs em Room in-memory; `ContractTest` + `back/tests/test_contract.py` validam o fixture único `contracts/generate_response.json`; `:app:assembleDebugAndroidTest` entrou no `scripts/ci-android.sh` (instrumentados compilam no gate; `connectedDebugAndroidTest` continua fora, documentado em `docs/MANUAL.md`); `COVERAGE=1` gera `app/build/reports/coverage/test/debug/index.html` e o workflow sobe o artifact; correção de layout achada pelos testes: botões do card de backup com `weight(1f)` em `SettingsScreen`; [spec](docs/specs/H3-1-ui-instrumented-tests.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -102,7 +104,6 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H3-1 | Testes de UI/instrumentados + cobertura | **M** | Gate cobre lógica pura e build, mas não UI, Room nem migrações. Parcial: 16 arquivos JVM + gate. | Compose UI testing, Robolectric/instrumented para Room e migrações, testes de contrato app↔backend; manter Wear coberto. | 5 dias | Módulos estáveis | [H3-1](docs/specs/H3-1-ui-instrumented-tests.md) |
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro | [H3-4](docs/specs/H3-4-cloud-backend.md) |
 | H3-5 | Periodização e progressão de carga | **W** | Plano é estático; não evolui carga/séries. | Mesociclos, sugestão de carga por RPE/séries, alerta de revisão. | 5 dias | Histórico completo, H2-4 | [H3-5](docs/specs/H3-5-progression.md) |
 
@@ -115,7 +116,7 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | Backend na nuvem (H3-4) |
 | Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Progressão automática de carga (H3-5) |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Export CSV/Sheets |
-| Testes de UI/Room (H3-1) | Wear OS MVP (H2-2) ✅ | | Widget/complicação do relógio |
+| Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | | Widget/complicação do relógio |
 | Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | |
 
 ---
@@ -125,16 +126,19 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 ```
 Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1..H2-7
             (Wear, download, descoberta LAN, histórico, registro avulso,
-            plano híbrido, mobilidade) + H3-2/H3-3 (polimento e acessibilidade)
-Agora:      — (Horizons 1 e 2 fechados; ver §4.1)
-Próximo:    H3-1 testes UI/Room/contrato      → cobrir o que o gate ainda não vê
+            plano híbrido, mobilidade) + H3-1/H3-2/H3-3 (testes de UI/Room/
+            contrato, polimento e acessibilidade)
+Agora:      — (Horizons 1 e 2 e o Must do Horizon 3 fechados; ver §4.1)
+Próximo:    nada em Must — H3-4/H3-5 pedem priorização e aprovação antes
 Depois:     H3-4 nuvem/token, H3-5 progressão
-Qualidade:  H3-1 (Must, parcial) + H3-4/H3-5 (Won't now até priorizar)
+Qualidade:  H3-4/H3-5 (Won't now até priorizar)
 ```
 
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅.
-O gate (`./scripts/verify.sh`) roda em todo commit; H3-1 cobre o que ele ainda
-não vê (UI, Room, migração e contrato).
+O gate (`./scripts/verify.sh`) roda em todo commit e, desde H3-1, também enxerga
+UI (Compose no Robolectric), Room em memória, migração e o contrato app↔backend;
+os testes instrumentados compilam no gate e rodam fora dele com
+`./gradlew :app:connectedDebugAndroidTest`.
 
 ---
 
@@ -168,13 +172,13 @@ não vê (UI, Room, migração e contrato).
 
 ## 9. Próximo passo imediato
 
-Horizons 1 e 2 estão concluídos (H1-1..H1-7, H2-1..H2-7) e H3-2/H3-3 também já
-estão em §4.1. O próximo foco é **H3-1 (testes de UI/Room/contrato)**, que está
-em andamento (parcial, 16 arquivos JVM + gate + migração/contrato; falta UI):
-[spec](docs/specs/H3-1-ui-instrumented-tests.md).
+Horizons 1 e 2 estão concluídos (H1-1..H1-7, H2-1..H2-7) e o Horizon 3 fechou o
+único **Must** que tinha: **H3-1 (testes de UI/Room/contrato)**, ao lado de
+H3-2/H3-3 — os três estão em §4.1.
 
-Itens restantes fora de execução imediata: **H3-4** (Won't now) e **H3-5**
-(Won't now) — só iniciar com aprovação/priorização.
+Não resta item Must/Should no roadmap. O próximo passo é escolher entre
+**H3-4** (backend na nuvem; exige token antes de expor) e **H3-5** (progressão
+de carga) — ambos **Won't now** até serem priorizados explicitamente.
 
 Para iniciar qualquer item, leia a spec correspondente em
 [docs/specs/](docs/specs/); se não existir ou estiver pendente de aprovação,
@@ -200,7 +204,7 @@ confirme antes de implementar.
 - [H2-5 — Registro avulso](docs/specs/H2-5-adhoc-log.md) — concluída
 - [H2-6 — Plano híbrido](docs/specs/H2-6-hybrid-plan.md) — concluída
 - [H2-7 — Mobilidade](docs/specs/H2-7-mobility.md) — concluída
-- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — parcial (16 arquivos JVM + gate + migração Room e contrato app↔backend; falta UI)
+- [H3-1 — Testes de UI, Room e contrato](docs/specs/H3-1-ui-instrumented-tests.md) — concluída
 - [H3-2 — Polimento visual](docs/specs/H3-2-visual-polish.md) — concluída
 - [H3-3 — Acessibilidade](docs/specs/H3-3-accessibility.md) — concluída
 - [H3-4 — Backend na nuvem com token](docs/specs/H3-4-cloud-backend.md) — pronta para implementar

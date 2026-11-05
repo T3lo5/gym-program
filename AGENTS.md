@@ -23,6 +23,8 @@ working tree, com `clean`:
 - `:wear:testDebugUnitTest` — testes unitários JVM do relógio;
 - `:app:lintDebug` e `:wear:lintDebug` — Android Lint;
 - `:app:assembleDebug` e `:wear:assembleDebug` — compilação limpa;
+- `:app:assembleDebugAndroidTest` — compila os testes instrumentados (eles não
+  rodam: o Docker não tem emulador, então pelo menos não apodrecem);
 - `apksigner verify` — assinatura dos APKs do celular e do relógio;
 - pacotes `dist/treinos.apk` e `dist/wear.apk` + SHA-256;
 - backend: Ruff, import do FastAPI e Pytest em container limpo.

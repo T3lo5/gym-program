@@ -1,21 +1,20 @@
 package com.treinos.app.data.local
 
-import androidx.room.Room
-import androidx.room.testing.Frameworks
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.IOException
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import kotlinx.coroutines.runBlocking
 
 /**
- * Teste instrumentado de migração do AppDatabase.
- *
- * Enquanto a versão for 1, o teste apenas abre o banco e valida que o
- * schema exportado está presente. Não há migrations para testar ainda.
+ * Migração no device: o schema exportado (`app/schemas`) e a `MIGRATION_1_2` são
+ * validados contra o SQLite real do Android. O gate compila este teste
+ * (`:app:assembleDebugAndroidTest`) mas não o executa — o Docker não tem emulador.
  *
  * Rode com: ./gradlew :app:connectedDebugAndroidTest
  */
@@ -23,24 +22,30 @@ import kotlinx.coroutines.runBlocking
 class AppDatabaseMigrationTest {
 
     @get:Rule
-    val migrationTestHelper: MigrationTestHelper = MigrationTestHelper(
+    val helper: MigrationTestHelper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
-        AppDatabase::class.java.canonicalName,
-        Frameworks.newFrameworkInstrumentation()
+        AppDatabase::class.java,
+        emptyList(),
+        FrameworkSQLiteOpenHelperFactory(),
     )
 
     @Test
-    fun abreBancoNaVersaoAtual() = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val database = Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "treinos_migration_test.db",
-        )
-            .addMigrations()
-            .build()
+    @Throws(IOException::class)
+    fun abre_banco_na_versao_atual() {
+        // Migra de 1 para 2 no SQLite do aparelho e valida o resultado contra o schema
+        // exportado de 2.json; o Robolectric usa SQLite embutido do host, não este.
+        val version = 2
+        helper.createDatabase(TEST_DB, 1).close()
+        val migrated =
+            helper.runMigrationsAndValidate(TEST_DB, version, true, AppDatabase.MIGRATION_1_2)
+        migrated.query("PRAGMA user_version").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(version, cursor.getInt(0))
+        }
+        migrated.close()
+    }
 
-        assertTrue(database.isOpen)
-        database.close()
+    private companion object {
+        const val TEST_DB = "migration-test-device"
     }
 }
