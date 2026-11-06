@@ -37,7 +37,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
 | Testes + CI | ✅ | 35 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); Compose no Robolectric, Room em memória e contrato nos dois lados dentro do gate; instrumentados compilam no gate (H3-1) |
 | Descoberta LAN | ✅ | Ajustes → "Buscar backends" (`NsdManager` em `_treinos._tcp.`); "Conectar" sonda `GET /health` e só salva a URL em 200; IP manual continua como fallback (H2-1) |
-| Wear OS | ✅ | Wear OS MVP (H2-2): módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate |
+| Wear OS | 🟡 | MVP H2-2 entregue (módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate), mas com lacunas de uso real: alvo de reps vazio, timer local não ligado, corrida/mobilidade sem tela coerente e fila offline incompleta — ver "Roadmap do relógio" no §4 |
 | Backup/restore do usuário | ✅ | Exportar/importar ligados aos file pickers (SAF), pré-visualização + confirmação e `deviceId` do arquivo aplicado só após importação válida (H1-7) |
 | Perfil no backup JSON | ✅ | `BackupProfile` no `schemaVersion = 3` (peso, altura e sexo viajam no arquivo; v1/v2 continuam aceitos e **não** limpam o perfil local); guarda de 25 MB ligada antes de ler o stream, com leitura limitada quando o provedor não informa o tamanho (H3-6, H3-7) |
 | Sexo opcional no perfil | ✅ | Seletor em "Seu perfil (opcional)" com `Feminino`/`Masculino`/`Outro`/`Prefiro não informar`, salvo em `AppPreferences.sex` e enviado só quando preenchido; aparece no prompt da IA e **não** muda descanso, RPE, séries nem cargas (H3-7) |
@@ -118,6 +118,10 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
+| H3-17 | Alvo de reps e última série no pulso | **M** | Relógio mostra "Alvo: " vazio e ignora a última carga/reps. | Mapper usa o `targetReps` do exercício e a tela mostra a última série. | 0,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
+| H3-18 | Timer de descanso contando no pulso | **M** | `WearTimer` existe com testes, mas não está ligado na tela; o número é estático. | Ligar o reducer à tela (tick, reset, skip). | 0,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
+| H3-19 | Corrida e mobilidade no relógio | **M** | Sessões sem exercícios (H3-11) viram tela vazia no relógio. | Relógio distingue o tipo da sessão e mostra estado coerente. | 1 dia | H3-11 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
+| H3-20 | Robustez de conexão do relógio | **S** | Sem selo "Sem conexão", sem debounce e fila offline guarda só IDs. | Selo + debounce 2 s + fila real reenviada ao reconectar. | 1–1,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
 | H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
 | H3-14 | Imagens dos exercícios no plano | **C** | O plano não exibe imagem dos exercícios; usuário que não conhece o nome não sabe o que fazer. | Ligar `ExerciseMedia`/`Coil` nos cards de exercício do plano e da tela de execução (já existe H1-3, expor na UI de geração/home). | 1 dia | H1-3 | [H3-14](docs/specs/H3-14-imagens-exercicios.md) |
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
@@ -136,6 +140,37 @@ com seletor; com H3-16, o plano complementar respeita foco exclusivo e
 casa/peso corporal de ponta a ponta (contrato, fallback, IA e UI).
 H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 
+### Roadmap do relógio (Wear OS)
+
+O H2-2 entregou a base: módulo `:wear` no gate, Data Layer celular → relógio
+(`WearWorkoutState`) e comandos do pulso (concluir série, pular descanso,
+finalizar). O MVP do relógio, porém, não está fechado — o código atual tem
+lacunas que aparecem no uso real. As specs pendentes do projeto (H3-8, H3-14,
+H3-4, H3-9) são detalhes futuros do **celular**; o foco agora é fechar o MVP do
+pulso antes de qualquer função nova.
+
+**MVP do relógio (agora):**
+
+| ID | Item | MoSCoW | Problema (evidência no código) | Solução prevista | Esforço | Depende de |
+|----|------|--------|-------------------------------|------------------|---------|------------|
+| H3-17 | Alvo de reps e última série no pulso | **M** | `WearSessionMapper` envia `targetReps = ""` — a tela mostra "Alvo: " vazio; `lastWeightKg`/`lastReps` viajam no protocolo mas a UI não exibe. | Mapper usa `ExerciseSessionEntity.targetReps` (o mesmo texto do plano) e a tela mostra "última: X kg × Y reps" quando houver. | 0,5 dia | H2-2 |
+| H3-18 | Timer de descanso contando no pulso | **M** | `WearTimer` (reducer puro, com testes) existe mas não é usado pela `WorkoutWearScreen`; o número na tela só muda quando chega estado novo do celular. | Ligar o reducer à tela: tick por segundo, reset com estado novo, `Skip` ligado ao `SKIP_REST`. | 0,5 dia | H2-2 |
+| H3-19 | Corrida e mobilidade no relógio | **M** | Com a H3-11, corrida/mobilidade são sessões sem exercícios; o mapper produz tela vazia ("Série 1/0", nome em branco) nesses treinos. | O relógio distingue o tipo da sessão: força continua como hoje; corrida/mobilidade mostram nome da sessão, "em andamento" e finalizar (o que mais aparece — ex. duração decorrida — fica na spec). | 1 dia | H3-11 |
+| H3-20 | Robustez de conexão do relógio | **S** | Bordas da H2-2 que ficaram de fora: sem selo "Sem conexão" (borda 3), sem debounce de 2 s no botão (borda 5 — o dedupe por `commandId` não protege de toque duplo) e a "fila" em `WearStateStore` guarda só IDs, nada reenvia (borda 6). | Selo de conexão na tela, botão desabilitado 2 s após o toque e fila real de comandos reenviada em `onPeerConnected`, aplicada uma única vez. | 1–1,5 dia | H2-2 |
+
+Os quatro itens são pequenos e de alto valor: H3-17/H3-18/H3-20 não mudam o
+contrato `:protocol` (os campos já existem); a H3-19 pode exigir um campo
+aditivo, que é seguro porque os dois lados decodificam com
+`ignoreUnknownKeys`. Cada um entra só com spec aprovada em `docs/specs/`,
+criada a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md).
+
+**Depois do MVP (Won't now — nenhuma entra sem spec aprovada):** tiles,
+complicações e widget; modo standalone (treinar sem o celular por uma sessão
+inteira); editar carga/reps no relógio; métricas de corrida no pulso
+(GPS/ritmo/FC — exigiria as permissões de sensor que a H2-2 explicitamente não
+pede); notificações e watchface. São as melhorias detalhadas que o MVP não
+precisa para ser útil amanhã.
+
 ---
 
 ## 5. Priorização consolidada (MoSCoW)
@@ -152,6 +187,7 @@ H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 | Séries/reps visíveis (H3-12) ✅ | | | |
 | Título varia conforme split (H3-13) ✅ | | | |
 | Múltiplos planos (H3-15) ✅ | Geração complementar (H3-16) ✅ | | |
+| Fechar o MVP do relógio (H3-17–H3-20) | | | |
 
 ---
 
@@ -165,11 +201,16 @@ Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1
             backup/sexo, rules do Android ligadas, sessões híbridas por
             modalidade, volume visível, títulos por split, múltiplos planos na
             Home e geração complementar)
-Agora:      H3-8 (nuvem via SAF — validar/documentar) e H3-14 (imagens no plano)
+Agora:      MVP do relógio H3-17 → H3-18 → H3-19 → H3-20 (fechar o que a
+            H2-2 prometeu no uso real); H3-8 (nuvem via SAF) e H3-14 (imagens
+            no plano) continuam Could, sem prioridade agora
 Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar)
 ```
 
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅.
+O elo atual é o **MVP do relógio** (H3-17 → H3-18 → H3-19 → H3-20): itens
+pequenos, sem mudança de contrato (exceto campo aditivo possível na H3-19) e
+que fecham o que a H2-2 prometeu.
 O elo de **qualidade/plataforma** estava em **H3-10** (concluída): com as rules
 do Android ligadas e o nome do banco conferido por teste, o backup de plataforma
 deixou de ser um caminho não escolhido — e a H3-4 perdeu seu pré-requisito.
@@ -199,7 +240,7 @@ os testes instrumentados compilam no gate e rodam fora dele com
 | Migração Room apagar dados | Alta | Alto | H1-6: migração real + teste 1→2; remover `fallbackToDestructiveMigration` |
 | SenseNova muda API/limite | Baixa | Médio | Backend agnóstico (OpenAI-compatible); fallback local em 1 commit |
 | Catálogo não cobre corrida/natação | Alta | Médio | Templates locais para corrida; natação como registro (H2-5/H2-6) |
-| BT instável celular ↔ relógio | Média | Médio | Relógio opera autônomo com fila local; reconcilia ao reconectar |
+| BT instável celular ↔ relógio | Média | Médio | Hoje o relógio mantém o último estado, mas a "fila" guarda só IDs e o comando pode se perder; H3-20 entrega fila real, selo de conexão e debounce |
 | Android 15+ restringe LAN | Baixa | Alto | Manter fallback manual de IP; testar em preview |
 | Desinstalar app apaga dados locais | Alta | Alto | H1-4 (backup JSON) + H1-1 (restore por deviceId); H1-7 ligou os botões e protege contra snapshot vazio |
 | Restauração/backup apagar dados | Baixa | Alto | Mitigado em H1-7: validação do snapshot antes de apagar, transação única (`replaceAllData`), snapshot vazio não substitui e `deviceId` só após sucesso |
@@ -222,11 +263,18 @@ com abas, volume (`sets × reps`) visível nos cards, título de força por spli
 múltiplos planos coexistindo na Home e geração complementar com foco exclusivo e
 casa/peso corporal.
 
-**Agora (Could, specs propostas — aguardam aprovação):** **H3-8** (validar/
-documentar SAF com Drive/OneDrive/Dropbox — sem SDK) e **H3-14** (imagens dos
-exercícios expostas nos cards do plano/execução; H1-3 já existe).
+**Agora (Must — MVP do relógio):** fechar o que a H2-2 prometeu no uso real —
+**H3-17** (alvo de reps e última série no pulso), **H3-18** (timer de descanso
+contando no relógio), **H3-19** (corrida/mobilidade com tela coerente) e
+**H3-20** (selo de conexão, debounce e fila offline real). Nenhuma tem spec
+ainda: criar a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) e aprovar
+antes de implementar.
+**Could (specs prontas, sem prioridade agora):** **H3-8** (validar/documentar
+SAF com Drive/OneDrive/Dropbox — sem SDK) e **H3-14** (imagens dos exercícios
+expostas nos cards do plano/execução; H1-3 já existe).
 **Won't now:** H3-4 (backend na nuvem com token — pré-requisito H3-10 já
-cumprido) e H3-9 (backup automático).
+cumprido), H3-9 (backup automático) e as funções futuras do relógio
+(tiles/complicação, standalone, edição no pulso, métricas de corrida).
 
 Nenhuma das specs acima listadas como propostas está aprovada para execução. Para
 iniciar qualquer item, leia a spec em [docs/specs/](docs/specs/); se estiver
@@ -268,6 +316,10 @@ confirme antes de implementar.
 - [H3-10 — Regras de backup do Android](docs/specs/H3-10-android-backup-rules.md) — concluída
 - [H3-15 — Múltiplos planos coexistindo na Home](docs/specs/H3-15-planos-multiplos.md) — concluída
 - [H3-16 — Geração complementar: foco exclusivo e casa/peso corporal](docs/specs/H3-16-geracao-complementar.md) — concluída
+- H3-17 — Alvo de reps e última série no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
+- H3-18 — Timer de descanso contando no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
+- H3-19 — Corrida e mobilidade no relógio — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
+- H3-20 — Robustez de conexão do relógio — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
