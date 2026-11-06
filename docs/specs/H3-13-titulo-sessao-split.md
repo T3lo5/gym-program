@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-13` |
 | MoSCoW | `M` |
 | Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Implementação | `concluída` |
 | Depende de | H3-11 (geração híbrida por sessão e abas por modalidade) |
 
 ## Objetivo

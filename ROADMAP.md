@@ -273,6 +273,8 @@ confirme antes de implementar.
 - [H3-5 — Progressão de carga](docs/specs/H3-5-progression.md) — concluída
 - [H3-6 — Perfil no backup e guarda de tamanho](docs/specs/H3-6-profile-in-backup.md) — concluída
 - [H3-7 — Sexo opcional no perfil](docs/specs/H3-7-profile-sex.md) — concluída
+- [H3-11 — Correção da geração híbrida](docs/specs/H3-11-hybrid-plan-fix.md) — concluída
+- [H3-13 — Título da sessão varia conforme split](docs/specs/H3-13-titulo-sessao-split.md) — concluída
 - [H3-8 — Backup na nuvem do usuário via SAF](docs/specs/H3-8-cloud-saf-backup.md) — proposta, aguardando aprovação
 - [H3-9 — Backup automático no destino escolhido](docs/specs/H3-9-auto-cloud-backup.md) — proposta (Won't now)
 - [H3-10 — Regras de backup do Android](docs/specs/H3-10-android-backup-rules.md) — proposta, aguardando aprovação

@@ -671,7 +671,9 @@ def build_strength_session(
                 exercises.insert(0, ex)
                 break
 
-    name = _session_name_for_modality("strength", len(exercises), day_order)
+    split_idx = day_order % len(STRENGTH_SPLITS)
+    split_labels = ["Empurrar", "Puxar", "Pernas e Core"]
+    name = f"Treino {chr(65 + split_idx)} — {split_labels[split_idx]}"
     return {
         "name": name,
         "dayOrder": day_order,
