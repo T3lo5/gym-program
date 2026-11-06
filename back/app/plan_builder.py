@@ -528,6 +528,30 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
     return plan
 
 
+def _build_strength_exercise_dict(
+    candidate: Dict[str, Any],
+    exercise_id: str,
+    order: int,
+    goal: str,
+) -> Dict[str, Any]:
+    """Monta o dicionário do exercício de musculação com campos padronizados."""
+    exercise = dict(candidate)
+    exercise["exerciseId"] = exercise_id
+    exercise["exerciseOrder"] = order
+    exercise["sets"] = SETS_BY_GOAL.get(goal, 3)
+    exercise["targetReps"] = REPS_BY_GOAL.get(goal, "8-12")
+    exercise["targetRpe"] = RPE_BY_GOAL.get(goal, 8.0)
+    exercise["restSeconds"] = REST_BY_GOAL.get(goal, 90)
+    exercise["notes"] = ""
+    exercise["isSupersetWithPrevious"] = order > 0 and False
+    exercise["metricType"] = "reps_weight"
+    exercise["targetDurationSeconds"] = None
+    exercise["targetDistanceMeters"] = None
+    exercise["targetPaceSecondsPerKm"] = None
+    exercise["targetHrZone"] = None
+    return exercise
+
+
 def build_strength_session(
     pool: List[Dict[str, Any]],
     modality_cfg: Dict[str, Any],
@@ -573,12 +597,26 @@ def build_strength_session(
     if not muscles:
         muscles = ["chest", "lats", "quadriceps"]
 
-    # Cicla pelos grupos musculares para distribuir os exercícios por todo o
-    # corpo em vez de empilhar sempre o primeiro grupo (ex.: só peito).
     groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
 
     exercises: List[Dict[str, Any]] = []
     attempts = 0
+
+    # 1) Garante pelo menos 1 exercício por grupo muscular solicitado, se houver
+    #    no pool. Assim o usuário recebe peito, costas e pernas (e não só peito).
+    for group in groups:
+        if len(exercises) >= count:
+            break
+        candidate = _pick_exercise(strength_pool, group, rng, used)
+        if candidate is None:
+            continue
+        exercise_id = candidate.get("id")
+        if exercise_id in used:
+            continue
+        used.add(exercise_id)
+        exercises.append(_build_strength_exercise_dict(candidate, exercise_id, len(exercises), goal))
+
+    # 2) Preenche o restante ciclando pelos grupos, sem repetir IDs.
     group_idx = 0
     while len(exercises) < count and attempts < count * 6:
         attempts += 1
@@ -591,21 +629,7 @@ def build_strength_session(
         if exercise_id in used:
             continue
         used.add(exercise_id)
-        exercise = dict(candidate)
-        exercise["exerciseId"] = exercise_id
-        exercise["exerciseOrder"] = len(exercises)
-        exercise["sets"] = SETS_BY_GOAL.get(goal, 3)
-        exercise["targetReps"] = REPS_BY_GOAL.get(goal, "8-12")
-        exercise["targetRpe"] = RPE_BY_GOAL.get(goal, 8.0)
-        exercise["restSeconds"] = REST_BY_GOAL.get(goal, 90)
-        exercise["notes"] = ""
-        exercise["isSupersetWithPrevious"] = len(exercises) > 0 and False
-        exercise["metricType"] = "reps_weight"
-        exercise["targetDurationSeconds"] = None
-        exercise["targetDistanceMeters"] = None
-        exercise["targetPaceSecondsPerKm"] = None
-        exercise["targetHrZone"] = None
-        exercises.append(exercise)
+        exercises.append(_build_strength_exercise_dict(candidate, exercise_id, len(exercises), goal))
 
     if not exercises:
         return None
