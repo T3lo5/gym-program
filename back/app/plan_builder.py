@@ -528,22 +528,6 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
     return plan
 
 
-def _pick_strength_exercise(
-    pool: List[Dict[str, Any]],
-    muscles: List[str],
-    goal: str,
-    rng: random.Random,
-    used: set,
-) -> Optional[Dict[str, Any]]:
-    """Escolhe um exercício de musculação do catálogo, sem repetir IDs."""
-    groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
-    for group in groups:
-        candidate = _pick_exercise(pool, group, rng, used)
-        if candidate:
-            return candidate
-    return _pick_exercise(pool, "chest", rng, used)
-
-
 def build_strength_session(
     pool: List[Dict[str, Any]],
     modality_cfg: Dict[str, Any],
@@ -589,13 +573,20 @@ def build_strength_session(
     if not muscles:
         muscles = ["chest", "lats", "quadriceps"]
 
+    # Cicla pelos grupos musculares para distribuir os exercícios por todo o
+    # corpo em vez de empilhar sempre o primeiro grupo (ex.: só peito).
+    groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
+
     exercises: List[Dict[str, Any]] = []
     attempts = 0
+    group_idx = 0
     while len(exercises) < count and attempts < count * 6:
         attempts += 1
-        candidate = _pick_strength_exercise(strength_pool, muscles, goal, rng, used)
+        group = groups[group_idx % len(groups)]
+        group_idx += 1
+        candidate = _pick_exercise(strength_pool, group, rng, used)
         if candidate is None:
-            break
+            continue
         exercise_id = candidate.get("id")
         if exercise_id in used:
             continue
