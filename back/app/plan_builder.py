@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 from datetime import date, timedelta
 from difflib import get_close_matches
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from .run_templates import template_for
 
@@ -132,6 +132,114 @@ STRENGTH_SPLITS: List[List[str]] = [
     ["lats", "middle back", "biceps", "traps"],  # B — puxar
     ["quadriceps", "hamstrings", "glutes", "calves", "abdominals"],  # C — pernas/core
 ]
+
+# ---------------------------------------------------------------------------
+# Plano complementar (H3-16): foco exclusivo e ambiente casa/peso corporal.
+#
+# O plano complementar é SÓ DE FORÇA (decisão de produto de 2026-11-06):
+# corrida e mobilidade continuam no plano principal via híbrido (H3-11).
+# `focusMuscles` presente ⇒ plano complementar: nenhum grupo de template entra
+# junto e o filtro de equipamento nunca é ignorado por falta de candidatos.
+# ---------------------------------------------------------------------------
+
+# Equipamentos aceitos como "sem equipamento" no catálogo (case-insensitive).
+BODYWEIGHT_EQUIPMENT: Set[str] = {"body only", "none"}
+
+# Nº de exercícios por sessão no complementar, pela duração (15→3 … ≥45→6).
+COMPLEMENTARY_MIN_EXERCISES = 3
+COMPLEMENTARY_MAX_EXERCISES = 6
+
+# Rótulos pt-BR dos grupos de MUSCLE_ALIASES, para nomes de plano e sessão.
+MUSCLE_LABELS_PT: Dict[str, str] = {
+    "back": "Costas",
+    "legs": "Pernas",
+    "arms": "Braços",
+    "abs": "Abdômen",
+    "chest": "Peito",
+    "shoulders": "Ombros",
+    "biceps": "Bíceps",
+    "triceps": "Tríceps",
+    "glutes": "Glúteos",
+    "calves": "Panturrilhas",
+    "quadriceps": "Quadríceps",
+    "hamstrings": "Posterior de coxa",
+    "abdominals": "Abdômen",
+}
+
+ENVIRONMENT_LABELS_PT: Dict[str, str] = {
+    "gym": "Academia",
+    "home": "Casa",
+    "bodyweight": "Casa",
+}
+
+
+def complementary_exercise_count(duration_minutes: int) -> int:
+    """Nº de exercícios por sessão no plano complementar (3 a 6).
+
+    15 min → 3, 20 min → 4, 30 min → 5, ≥ 45 min → 6.
+    """
+    if duration_minutes < 20:
+        return 3
+    if duration_minutes < 30:
+        return 4
+    if duration_minutes < 45:
+        return 5
+    return COMPLEMENTARY_MAX_EXERCISES
+
+
+def is_complementary_request(request: Any) -> bool:
+    """Plano complementar = `focusMuscles` presente (lista não vazia)."""
+    return bool(list(getattr(request, "focusMuscles", []) or []))
+
+
+def complementary_equipment_filter(request: Any) -> Optional[Set[str]]:
+    """Conjunto estrito de equipamentos do modo complementar (H3-16).
+
+    Retorna `None` quando o filtro estrito não se aplica (comportamento atual,
+    com a regra dos ≥ 20 candidatos). Regras:
+    - environment = "bodyweight": apenas {"body only", "none"};
+    - environment = "home": availableEquipment ∪ {"body only", "none"};
+    - foco presente (gym ou sem ambiente): segue o availableEquipment informado.
+    """
+    focus = list(getattr(request, "focusMuscles", []) or [])
+    environment = str(getattr(request, "environment", "") or "").strip().lower()
+    equipment = {
+        str(item).strip().lower()
+        for item in (getattr(request, "availableEquipment", []) or [])
+        if str(item).strip()
+    }
+    if environment == "bodyweight":
+        return set(BODYWEIGHT_EQUIPMENT)
+    if environment == "home":
+        return equipment | BODYWEIGHT_EQUIPMENT
+    if focus:
+        return equipment or None
+    return None
+
+
+def complementary_focus_label(request: Any) -> str:
+    """Rótulo pt-BR do foco exclusivo (ex.: "Abdômen", "Abdômen e Glúteos")."""
+    focus = list(getattr(request, "focusMuscles", []) or [])
+    labels = [
+        MUSCLE_LABELS_PT.get(str(muscle).strip().lower(), str(muscle))
+        for muscle in focus
+        if str(muscle).strip()
+    ]
+    return " e ".join(labels) if labels else ""
+
+
+def complementary_plan_name(request: Any) -> str:
+    """Nome do plano complementar: "Complementar — <foco>" ou "Complementar — Casa"."""
+    label = complementary_focus_label(request)
+    if label:
+        return f"Complementar — {label}"
+    environment = str(getattr(request, "environment", "") or "").strip().lower()
+    return f"Complementar — {ENVIRONMENT_LABELS_PT.get(environment, 'Casa')}"
+
+
+def _focus_muscle_set(request: Any) -> Set[str]:
+    """Foco expandido por MUSCLE_ALIASES (vazio quando não há foco)."""
+    return set(_expand_muscles(list(getattr(request, "focusMuscles", []) or [])))
 
 # IDs sintéticos que a IA costuma devolver com nomes próximos. Mapeia para o
 # ID estável usado pelos templates e pelo normalize_hybrid_plan.
@@ -403,18 +511,36 @@ def _expand_muscles(muscles: List[str]) -> List[str]:
 
 
 def _build_pool(
-    catalog: List[Dict[str, Any]], equipment: List[str], level: str
+    catalog: List[Dict[str, Any]],
+    equipment: List[str],
+    level: str,
+    strict_equipment: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
+    """Pool de exercícios do catálogo.
+
+    `strict_equipment` (modo complementar, H3-16): quando informado, o filtro de
+    equipamento é APLICADO SEMPRE — a regra dos ≥ 20 candidatos nunca o ignora.
+    Sem ele, vale o comportamento histórico do plano principal.
+    """
     pool = list(catalog)
-    selected_equipment = {item.strip().lower() for item in equipment if item.strip()}
-    if selected_equipment:
-        filtered = [
-            exercise
-            for exercise in pool
-            if (exercise.get("equipment") or "").strip().lower() in selected_equipment
-        ]
-        if len(filtered) >= 20:
-            pool = filtered
+    if strict_equipment is not None:
+        selected = {str(item).strip().lower() for item in strict_equipment if str(item).strip()}
+        if selected:
+            pool = [
+                exercise
+                for exercise in pool
+                if (exercise.get("equipment") or "").strip().lower() in selected
+            ]
+    else:
+        selected_equipment = {item.strip().lower() for item in equipment if item.strip()}
+        if selected_equipment:
+            filtered = [
+                exercise
+                for exercise in pool
+                if (exercise.get("equipment") or "").strip().lower() in selected_equipment
+            ]
+            if len(filtered) >= 20:
+                pool = filtered
 
     if level == "beginner":
         filtered = [
@@ -433,6 +559,7 @@ def _pick_exercise(
     muscle: str,
     rng: random.Random,
     used: set,
+    strict: bool = False,
 ) -> Optional[Dict[str, Any]]:
     candidates = [
         exercise
@@ -440,7 +567,9 @@ def _pick_exercise(
         if exercise.get("id") not in used
         and muscle in [str(m).lower() for m in exercise.get("primaryMuscles", [])]
     ]
-    if not candidates:
+    # Modo estrito (foco exclusivo, H3-16): sem candidato do grupo ⇒ nenhum
+    # exercício fora do foco para "completar" a sessão.
+    if not candidates and not strict:
         candidates = [exercise for exercise in pool if exercise.get("id") not in used]
     if not candidates:
         return None
@@ -451,6 +580,12 @@ def _pick_exercise(
 def _day_groups(
     request: Any, day_index: int, total_days: int
 ) -> List[str]:
+    # Foco exclusivo (H3-16): os grupos são exatamente o foco expandido —
+    # nenhum grupo de template do split entra junto.
+    focus = _expand_muscles(list(getattr(request, "focusMuscles", []) or []))
+    if focus:
+        return focus
+
     preferred = getattr(request, "preferredSplit", None) or "full_body"
     templates = DAY_TEMPLATES.get(preferred, DAY_TEMPLATES["full_body"])
     template = templates[day_index % len(templates)]
@@ -466,15 +601,38 @@ def _day_groups(
 
 def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Monta um plano válido usando somente o catálogo, sem IA."""
-    days_per_week = max(2, min(6, int(getattr(request, "daysPerWeek", 4))))
+    focus = _expand_muscles(list(getattr(request, "focusMuscles", []) or []))
+    days_per_week = int(getattr(request, "daysPerWeek", 4))
+    if focus:
+        days_per_week = max(1, min(6, days_per_week))
+    else:
+        days_per_week = max(2, min(6, days_per_week))
     goal = getattr(request, "goal", "hypertrophy")
     level = getattr(request, "currentLevel", "intermediate")
     equipment = list(getattr(request, "availableEquipment", []) or [])
+    duration = int(getattr(request, "sessionDurationMinutes", 60))
     rng = random.Random()
 
-    pool = _build_pool(catalog, equipment, level)
-    if len(pool) < 10:
+    strict_equipment = complementary_equipment_filter(request) if focus else None
+    pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+    if strict_equipment is None and len(pool) < 10:
         pool = list(catalog)
+
+    if focus:
+        # Pool efetivo do complementar: força ∩ foco. Vazio ⇒ erro explícito
+        # (o endpoint converte em 422), nunca um plano cheio de exercício fora do foco.
+        focus_set = set(focus)
+        pool = [
+            exercise
+            for exercise in pool
+            if _is_strength_exercise(exercise)
+            and focus_set & {str(m).lower() for m in exercise.get("primaryMuscles", [])}
+        ]
+        if len(pool) < COMPLEMENTARY_MIN_EXERCISES:
+            raise ValueError(
+                "Nenhum exercício compatível com o foco/ambiente informado. "
+                "Ajuste o foco ou o ambiente e tente de novo."
+            )
 
     days: List[Dict[str, Any]] = []
     day_letters = "ABCDEF"
@@ -483,9 +641,17 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
         groups = _day_groups(request, day_index, days_per_week)
         used: set = set()
         exercises: List[Dict[str, Any]] = []
+        # Complementar: nº de exercícios pela duração (3 a 6). Sem foco, um por grupo.
+        target_count = (
+            min(complementary_exercise_count(duration), len(pool))
+            if focus
+            else len(groups)
+        )
 
         for group in groups:
-            exercise = _pick_exercise(pool, group, rng, used)
+            if len(exercises) >= target_count:
+                break
+            exercise = _pick_exercise(pool, group, rng, used, strict=bool(focus))
             if not exercise:
                 continue
             used.add(exercise["id"])
@@ -502,9 +668,11 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
                 }
             )
 
-        # Garante pelo menos 3 exercícios por dia.
+        # Garante pelo menos 3 exercícios por dia. Com foco, completa apenas com
+        # exercícios do próprio foco (modo estrito); sem foco, vale o peito.
         while len(exercises) < 3:
-            exercise = _pick_exercise(pool, "chest", rng, used)
+            fill_group = groups[0] if focus else "chest"
+            exercise = _pick_exercise(pool, fill_group, rng, used, strict=bool(focus))
             if not exercise:
                 break
             used.add(exercise["id"])
@@ -521,6 +689,12 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
                 }
             )
 
+        if focus and len(exercises) < COMPLEMENTARY_MIN_EXERCISES:
+            raise ValueError(
+                "Nenhum exercício compatível com o foco/ambiente informado. "
+                "Ajuste o foco ou o ambiente e tente de novo."
+            )
+
         days.append(
             {
                 "name": f"Treino {day_letters[day_index % len(day_letters)]}",
@@ -530,8 +704,13 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
             }
         )
 
+    plan_name = (
+        complementary_plan_name(request)
+        if focus
+        else f"Plano de {GOAL_LABELS.get(goal, goal)} — {days_per_week}x/semana"
+    )
     plan = {
-        "name": f"Plano de {GOAL_LABELS.get(goal, goal)} — {days_per_week}x/semana",
+        "name": plan_name,
         "description": (
             "Plano gerado localmente a partir do catálogo de exercícios. "
             "Ajuste cargas e repetições conforme sua evolução."
@@ -587,6 +766,7 @@ def build_strength_session(
     used: set,
     day_order: int,
     focus_muscles: Optional[List[str]] = None,
+    complementary: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Constrói uma única sessão de musculação com 4 a 8 exercícios.
 
@@ -596,8 +776,11 @@ def build_strength_session(
 
     `focus_muscles`, quando fornecido, sobrepõe `target_muscles` para aplicar
     split por sessão (ex.: apenas empurrar, apenas puxar, apenas pernas/core).
+
+    `complementary=True` (H3-16): foco EXCLUSIVO — só exercícios cujos
+    primaryMuscles intersectam o foco, nº de exercícios pela duração (3 a 6) e
+    pool insuficiente devolve None (o endpoint converte em 422).
     """
-    count = strength_exercise_count(duration_minutes)
     selected_equipment = {item.strip().lower() for item in getattr(modality_cfg, "availableEquipment", []) or [] if item.strip()}
 
     # Pool apenas de força: filtra por categoria quando disponível.
@@ -606,10 +789,32 @@ def build_strength_session(
         for exercise in pool
         if _is_strength_exercise(exercise)
     ]
-    if not strength_pool:
-        strength_pool = list(pool)
 
-    if environment == "gym" and selected_equipment and "body only" not in selected_equipment:
+    muscles = list(focus_muscles) if focus_muscles else list(getattr(modality_cfg, "targetMuscles", []) or target_muscles)
+    if not muscles:
+        muscles = ["chest", "lats", "quadriceps"]
+
+    groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
+
+    if complementary:
+        # Foco exclusivo: interseção com o foco é obrigatória; sem fallback para
+        # o pool completo e sem reposição por exercícios fora do foco.
+        focus_set = set(groups)
+        strength_pool = [
+            exercise
+            for exercise in strength_pool
+            if focus_set & {str(m).lower() for m in exercise.get("primaryMuscles", [])}
+        ]
+        if len(strength_pool) < COMPLEMENTARY_MIN_EXERCISES:
+            return None
+        count = complementary_exercise_count(duration_minutes)
+        count = max(COMPLEMENTARY_MIN_EXERCISES, min(count, len(strength_pool)))
+    else:
+        count = strength_exercise_count(duration_minutes)
+        if not strength_pool:
+            strength_pool = list(pool)
+
+    if not complementary and environment == "gym" and selected_equipment and "body only" not in selected_equipment:
         strength_pool = [
             exercise
             for exercise in strength_pool
@@ -620,12 +825,6 @@ def build_strength_session(
             if not strength_pool:
                 strength_pool = list(pool)
 
-    muscles = list(focus_muscles) if focus_muscles else list(getattr(modality_cfg, "targetMuscles", []) or target_muscles)
-    if not muscles:
-        muscles = ["chest", "lats", "quadriceps"]
-
-    groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
-
     exercises: List[Dict[str, Any]] = []
     attempts = 0
 
@@ -634,7 +833,7 @@ def build_strength_session(
     for group in groups:
         if len(exercises) >= count:
             break
-        candidate = _pick_exercise(strength_pool, group, rng, used)
+        candidate = _pick_exercise(strength_pool, group, rng, used, strict=complementary)
         if candidate is None:
             continue
         exercise_id = candidate.get("id")
@@ -649,7 +848,7 @@ def build_strength_session(
         attempts += 1
         group = groups[group_idx % len(groups)]
         group_idx += 1
-        candidate = _pick_exercise(strength_pool, group, rng, used)
+        candidate = _pick_exercise(strength_pool, group, rng, used, strict=complementary)
         if candidate is None:
             continue
         exercise_id = candidate.get("id")
@@ -671,9 +870,20 @@ def build_strength_session(
                 exercises.insert(0, ex)
                 break
 
-    split_idx = day_order % len(STRENGTH_SPLITS)
-    split_labels = ["Empurrar", "Puxar", "Pernas e Core"]
-    name = f"Treino {chr(65 + split_idx)} — {split_labels[split_idx]}"
+    if complementary:
+        # Título na mesma família do helper da H3-13 ("Treino X — rótulo"),
+        # com o rótulo do foco exclusivo no lugar do split.
+        labels = [
+            MUSCLE_LABELS_PT.get(str(m).strip().lower(), str(m))
+            for m in focus_muscles or []
+            if str(m).strip()
+        ]
+        focus_label = " e ".join(labels) if labels else "Complementar"
+        name = f"Treino {chr(65 + (day_order % 6))} — {focus_label}"
+    else:
+        split_idx = day_order % len(STRENGTH_SPLITS)
+        split_labels = ["Empurrar", "Puxar", "Pernas e Core"]
+        name = f"Treino {chr(65 + split_idx)} — {split_labels[split_idx]}"
     return {
         "name": name,
         "dayOrder": day_order,
@@ -824,6 +1034,111 @@ def normalize_hybrid_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
     return plan
 
 
+def enforce_complementary_plan(
+    plan: Dict[str, Any],
+    request: Any,
+    catalog: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Aplica as garantias do plano complementar (H3-16) depois da IA.
+
+    1. Só sessões de força (dias de corrida/mobilidade são removidos).
+    2. Remove exercícios fora do foco exclusivo ou do equipamento permitido.
+    3. Sessão que sobrar com menos de 3 exercícios é reconstruída pelo fallback
+       local com as mesmas restrições.
+    4. Pool efetivo (força ∩ foco ∩ equipamento) com menos de 3 exercícios
+       levanta ValueError — o endpoint converte em 422.
+
+    Chamada após `enrich_plan` (precisa de primaryMuscles/equipment preenchidos)
+    e após `normalize_hybrid_plan`. Sem `focusMuscles` no request, devolve o
+    plano inalterado.
+    """
+    focus = _expand_muscles(list(getattr(request, "focusMuscles", []) or []))
+    if not focus:
+        return plan
+
+    focus_set = set(focus)
+    allowed_equipment = complementary_equipment_filter(request)
+    level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
+    equipment = list(getattr(request, "availableEquipment", []) or [])
+    duration = int(getattr(request, "sessionDurationMinutes", 60) or 60)
+    environment = str(getattr(request, "environment", "") or "").strip().lower() or "bodyweight"
+    goal = getattr(request, "goal", "general")
+
+    pool = _build_pool(catalog, equipment, level, strict_equipment=allowed_equipment)
+    effective_pool = [
+        exercise
+        for exercise in pool
+        if _is_strength_exercise(exercise)
+        and focus_set & {str(m).lower() for m in exercise.get("primaryMuscles", [])}
+    ]
+    if len(effective_pool) < COMPLEMENTARY_MIN_EXERCISES:
+        raise ValueError(
+            "Nenhum exercício compatível com o foco/ambiente informado. "
+            "Ajuste o foco ou o ambiente e tente de novo."
+        )
+
+    days = [
+        day
+        for day in plan.get("days", [])
+        if str(day.get("modality", "strength")) == "strength" and not day.get("isRestDay")
+    ]
+
+    enforced_days: List[Dict[str, Any]] = []
+    for day in days:
+        kept = []
+        for exercise in day.get("exercises", []):
+            if str(exercise.get("metricType", "reps_weight")) != "reps_weight":
+                continue
+            muscles = {str(m).lower() for m in exercise.get("primaryMuscles", [])}
+            if not (muscles & focus_set):
+                continue
+            eq = str(exercise.get("equipment", "")).strip().lower()
+            if allowed_equipment is not None and eq not in allowed_equipment:
+                continue
+            kept.append(exercise)
+
+        if len(kept) >= COMPLEMENTARY_MIN_EXERCISES:
+            day = dict(day)
+            day["exercises"] = kept[:COMPLEMENTARY_MAX_EXERCISES]
+            day["modality"] = "strength"
+            enforced_days.append(day)
+            continue
+
+        # Sessão insuficiente: reconstrói localmente com as mesmas restrições.
+        rng = random.Random()
+        session = build_strength_session(
+            pool,
+            request,
+            goal,
+            level,
+            environment,
+            duration,
+            [],
+            rng,
+            set(),
+            len(enforced_days),
+            focus,
+            complementary=True,
+        )
+        if session is None:
+            raise ValueError(
+                "Nenhum exercício compatível com o foco/ambiente informado. "
+                "Ajuste o foco ou o ambiente e tente de novo."
+            )
+        session["weekday"] = day.get("weekday", 1) or 1
+        enforced_days.append(session)
+
+    enforced_days.sort(key=lambda d: (d.get("weekday", 1), d.get("dayOrder", 0)))
+    for i, day in enumerate(enforced_days):
+        day["dayOrder"] = i
+
+    plan = dict(plan)
+    plan["days"] = enforced_days
+    plan["daysPerWeek"] = len(enforced_days)
+    plan["name"] = complementary_plan_name(request)
+    return plan
+
+
 def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Monta uma semana híbrida (musculação, corrida, mobilidade) sem IA.
 
@@ -835,6 +1150,13 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
     if not modalities:
         return build_local_plan(request, catalog)
 
+    # Plano complementar (H3-16): focusMuscles presente ⇒ só força, foco
+    # exclusivo e filtro de equipamento estrito (nunca ignorado por falta de
+    # candidatos).
+    focus_request = list(getattr(request, "focusMuscles", []) or [])
+    is_complementary = bool(focus_request)
+    expanded_focus = _expand_muscles(focus_request)
+
     session_duration = int(getattr(request, "sessionDurationMinutes", 60))
     review_after_weeks = int(getattr(request, "reviewAfterWeeks", 4))
     goal = getattr(request, "goal", "general")
@@ -844,8 +1166,11 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
     environment = str(getattr(request, "environment", "") or "").strip().lower() or "bodyweight"
     rng = random.Random()
 
-    pool = _build_pool(catalog, equipment, level)
-    if len(pool) < 10:
+    strict_equipment = complementary_equipment_filter(request)
+    pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+    # Com filtro estrito o pool NUNCA volta ao catálogo completo: isso esconderia
+    # a incompatibilidade que precisa virar 422.
+    if strict_equipment is None and len(pool) < 10:
         pool = list(catalog)
 
     # Cria uma sessão independente por sessão planejada de cada modalidade.
@@ -857,6 +1182,10 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
 
     for m in modalities:
         mtype = str(getattr(m, "type", "strength")).lower()
+        if is_complementary and mtype != "strength":
+            # Complementar é só de força (decisão de produto); o validador do
+            # endpoint já bloqueia, aqui é defesa em profundidade.
+            continue
         m_sessions = max(1, int(getattr(m, "sessionsPerWeek", 1)))
         m_duration = int(getattr(m, "sessionDurationMinutes", session_duration))
         m_duration = max(5, min(120, m_duration))
@@ -935,21 +1264,44 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
             else:
                 # strength
                 strength_session_index += 1
-                # Aplica split tradicional em ciclo: push -> pull -> legs -> push...
-                focus_muscles = STRENGTH_SPLITS[(strength_session_index - 1) % len(STRENGTH_SPLITS)]
-                session = build_strength_session(
-                    pool,
-                    m,
-                    goal,
-                    level,
-                    environment,
-                    m_duration,
-                    muscles,
-                    rng,
-                    set(),
-                    strength_session_index - 1,
-                    focus_muscles,
-                )
+                if is_complementary:
+                    # Foco exclusivo: sem rotação de STRENGTH_SPLITS — a sessão
+                    # inteira é o foco pedido (H3-16).
+                    session = build_strength_session(
+                        pool,
+                        m,
+                        goal,
+                        level,
+                        environment,
+                        m_duration,
+                        muscles,
+                        rng,
+                        set(),
+                        strength_session_index - 1,
+                        expanded_focus,
+                        complementary=True,
+                    )
+                    if session is None:
+                        raise ValueError(
+                            "Nenhum exercício compatível com o foco/ambiente "
+                            "informado. Ajuste o foco ou o ambiente e tente de novo."
+                        )
+                else:
+                    # Aplica split tradicional em ciclo: push -> pull -> legs -> push...
+                    focus_muscles = STRENGTH_SPLITS[(strength_session_index - 1) % len(STRENGTH_SPLITS)]
+                    session = build_strength_session(
+                        pool,
+                        m,
+                        goal,
+                        level,
+                        environment,
+                        m_duration,
+                        muscles,
+                        rng,
+                        set(),
+                        strength_session_index - 1,
+                        focus_muscles,
+                    )
                 if session is None:
                     continue
                 sessions.append(session)
@@ -960,8 +1312,16 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
     days = assign_weekdays(sessions, sessions_per_modality)
 
     plan = {
-        "name": "Semana híbrida",
+        "name": (
+            complementary_plan_name(request)
+            if is_complementary
+            else "Semana híbrida"
+        ),
         "description": (
+            "Plano complementar de força com foco exclusivo, gerado a partir do "
+            "catálogo de exercícios. Ajuste cargas e repetições conforme sua evolução."
+            if is_complementary
+            else
             "Plano semanal com sessões independentes por modalidade "
             "(musculação, corrida, mobilidade). Ajuste cargas e ritmo conforme "
             "sua evolução."

@@ -1,7 +1,12 @@
 """Valida o contrato v2 de geração/revisão (`contracts/generate_response.json`)
 contra os modelos Pydantic do backend, garantindo compatibilidade com v1."""
 
-from app.main import GenerateResponse, GenerateReviewRequest, GenerateReviewResponse
+from app.main import (
+    GenerateResponse,
+    GenerateReviewRequest,
+    GenerateReviewResponse,
+    GenerateRequest,
+)
 
 FIXTURE_V2 = {
     "workout": {
@@ -204,4 +209,94 @@ def test_request_com_environment_e_duracao_por_modalidade():
     req_v1 = GenerateRequest(deviceId="d1")
     assert req_v1.modalities == []
     assert req_v1.environment is None
+
+
+# ---------------- Novos testes de contrato v2 (H3-16) ----------------
+
+
+def test_generate_com_focus_muscles():
+    """Fixture do plano complementar valida contra GenerateRequest (H3-16).
+
+    Mesmo padrão do `test_contract.py`: o JSON é inline porque o container de
+    CI do backend monta apenas `back/`. O arquivo físico
+    `contracts/generate_request_complementary.json` é lido pelo app
+    (`ContractTest.kt`) e precisa manter o mesmo conteúdo.
+    """
+    fixture = {
+        "deviceId": "contrato",
+        "goal": "hypertrophy",
+        "environment": "bodyweight",
+        "daysPerWeek": 2,
+        "availableEquipment": ["body only"],
+        "targetMuscles": [],
+        "injuriesOrLimitations": "",
+        "currentLevel": "intermediate",
+        "sessionDurationMinutes": 15,
+        "reviewAfterWeeks": 4,
+        "focusMuscles": ["abs"],
+        "modalities": [
+            {
+                "type": "strength",
+                "sessionsPerWeek": 2,
+                "goal": "hypertrophy",
+                "level": "intermediate",
+                "availableEquipment": ["body only"],
+                "targetMuscles": [],
+                "sessionDurationMinutes": 15,
+            }
+        ],
+    }
+
+    request = GenerateRequest.model_validate(fixture)
+    assert request.focusMuscles == ["abs"]
+    # Modo complementar aceita duração/dias fora dos limites do plano principal.
+    assert request.sessionDurationMinutes == 15
+    assert request.daysPerWeek == 2
+    assert request.environment == "bodyweight"
+    assert [m.type for m in request.modalities] == ["strength"]
+
+
+def test_focus_muscles_omitido_continua_valido():
+    """Sem focusMuscles o request do plano principal continua válido (v1)."""
+    request = GenerateRequest(deviceId="d1", daysPerWeek=4, sessionDurationMinutes=60)
+    assert request.focusMuscles is None
+
+
+def test_focus_muscles_vazio_422():
+    """Lista vazia é entrada inválida: o app omite o campo quando não há foco."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as exc_info:
+        GenerateRequest(deviceId="d1", focusMuscles=[])
+    assert "vazia" in str(exc_info.value)
+
+
+def test_focus_muscles_com_run_422():
+    """Complementar é só de força: run junto do foco é rejeitado."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as exc_info:
+        GenerateRequest(
+            deviceId="d1",
+            focusMuscles=["abs"],
+            modalities=[
+                {"type": "strength", "sessionsPerWeek": 1},
+                {"type": "run", "sessionsPerWeek": 1},
+            ],
+        )
+    assert "força" in str(exc_info.value)
+
+
+def test_duracao_15_sem_foco_422():
+    """15 min só é aceito no modo complementar; sem foco, mínimo 30."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        GenerateRequest(deviceId="d1", sessionDurationMinutes=15)
+    # Com foco, 15 min é aceito.
+    request = GenerateRequest(deviceId="d1", focusMuscles=["abs"], sessionDurationMinutes=15)
+    assert request.sessionDurationMinutes == 15
 

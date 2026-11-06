@@ -1,0 +1,24 @@
+{
+  "deviceId": "contrato",
+  "goal": "hypertrophy",
+  "environment": "bodyweight",
+  "daysPerWeek": 2,
+  "availableEquipment": ["body only"],
+  "targetMuscles": [],
+  "injuriesOrLimitations": "",
+  "currentLevel": "intermediate",
+  "sessionDurationMinutes": 15,
+  "reviewAfterWeeks": 4,
+  "focusMuscles": ["abs"],
+  "modalities": [
+    {
+      "type": "strength",
+      "sessionsPerWeek": 2,
+      "goal": "hypertrophy",
+      "level": "intermediate",
+      "availableEquipment": ["body only"],
+      "targetMuscles": [],
+      "sessionDurationMinutes": 15
+    }
+  ]
+}

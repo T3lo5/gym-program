@@ -298,6 +298,25 @@ esconde o aviso nesta sessão de uso.
 > O plano anterior continua no banco local e será enviado na próxima
 > sincronização se você optar por enviar tudo.
 
+**Plano complementar (foco exclusivo ou casa).** Em **Novo treino**, escolha
+**Adicionar plano complementar** para criar um treino curto que convive com o
+plano principal — por exemplo, abdômen em casa nos dias de folga. Nesse modo:
+
+- o plano é **só de musculação** (corrida e mobilidade ficam no plano principal);
+- o **foco exclusivo** define o plano: todo exercício é do grupo escolhido
+  (abdômen, glúteos, peito…), sem outros grupos entrando para "completar";
+- **Peso corporal** restringe o treino aos exercícios sem equipamento; **Casa**
+  aceita também os equipamentos marcados; **Academia** segue os equipamentos
+  disponíveis;
+- as durações são curtas (15, 20, 30 ou 45 minutos) e os dias vão de 1 a 6;
+- é preciso escolher o foco **ou** um ambiente diferente de academia antes de
+  gerar.
+
+O plano complementar aparece na Home junto do principal e nada é desativado;
+o nome vem do foco ou do ambiente (ex.: "Complementar — Abdômen",
+"Complementar — Casa"). Se o foco escolhido não tiver exercícios suficientes no
+ambiente, o app avisa em vez de gerar um plano fora do foco.
+
 #### 3.3.2 Fazer o treino e registrar as séries
 
 1. Toque em **Iniciar treino** no dia escolhido.

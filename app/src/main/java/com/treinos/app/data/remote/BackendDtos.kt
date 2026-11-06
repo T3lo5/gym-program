@@ -19,6 +19,10 @@ data class GeneratePlanRequest(
     val heightCm: Int? = null,
     val sex: String? = null,
     val modalities: List<ModalityDto> = emptyList(),
+    // Foco EXCLUSIVO do plano complementar (H3-16), 1–4 grupos do contrato
+    // (ex.: ["abs"]). Presente ⇒ o backend gera plano só de força. Null quando
+    // não há foco (o campo nem viaja: explicitNulls = false).
+    val focusMuscles: List<String>? = null,
 )
 
 @Serializable

@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal, Any, Dict
 import httpx
 import os
@@ -19,8 +19,10 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from . import database as db
 from .plan_builder import (
+    MUSCLE_ALIASES,
     build_local_plan,
     build_hybrid_plan,
+    enforce_complementary_plan,
     enrich_plan,
     resolve_plan_ids,
     review_date,
@@ -28,6 +30,8 @@ from .plan_builder import (
     suggest_initial_load,
     review_plan,
     normalize_hybrid_plan,
+    is_complementary_request,
+    complementary_equipment_filter,
 )
 from .run_templates import template_for
 
@@ -161,6 +165,27 @@ FORMATO DE SAÍDA (JSON):
 }}"""
 
 
+# Restrições do plano complementar (H3-16) anexadas ao prompt de sistema quando
+# o request traz `focusMuscles`. Sem foco, o prompt híbrido é exatamente o de hoje.
+COMPLEMENTARY_SYSTEM_RULES = """
+
+RESTRIÇÕES DE PLANO COMPLEMENTAR (obrigatórias):
+1. Apenas sessões de força (musculação). Nenhum `day` de corrida ou mobilidade.
+2. FOCO EXCLUSIVO: todo exercício deve ter primaryMuscles dentro do foco
+   informado. Nenhum exercício de outro grupo muscular, nem para "completar".
+3. EQUIPAMENTO ESTRICTO: use apenas os equipamentos permitidos informados;
+   nunca substitua por barra, máquina ou polia fora da lista.
+4. Sessões curtas: 3 a 6 exercícios por `day`, conforme a duração informada.
+"""
+
+
+def system_prompt_hybrid(complementary: bool = False) -> str:
+    """Prompt de sistema híbrido; com plano complementar, anexa as restrições."""
+    if complementary:
+        return SYSTEM_PROMPT_HYBRID + COMPLEMENTARY_SYSTEM_RULES
+    return SYSTEM_PROMPT_HYBRID
+
+
 # mDNS/Zeroconf for LAN discovery
 def get_local_ip():
     """Get the local IP address for mDNS registration"""
@@ -273,12 +298,15 @@ class GenerateRequest(BaseModel):
     deviceId: str = "default"
     goal: Literal["hypertrophy", "strength", "endurance", "power", "fat_loss", "general"] = "hypertrophy"
     environment: Optional[Literal["gym", "home", "bodyweight"]] = None
-    daysPerWeek: int = Field(ge=2, le=6, default=4)
+    # Limites estáticos cobrem o modo complementar (1..6 dias, 15..120 min);
+    # o validador abaixo recoloca os limites do plano principal (2..6, 30..120)
+    # quando não há foco exclusivo.
+    daysPerWeek: int = Field(ge=1, le=6, default=4)
     availableEquipment: List[str] = Field(default_factory=list)  # e.g., ["dumbbell", "barbell", "body only"]
     targetMuscles: List[str] = Field(default_factory=list)       # e.g., ["chest", "back", "legs"]
     injuriesOrLimitations: str = ""
     currentLevel: Literal["beginner", "intermediate", "advanced"] = "intermediate"
-    sessionDurationMinutes: int = Field(ge=30, le=120, default=60)
+    sessionDurationMinutes: int = Field(ge=15, le=120, default=60)
     preferredSplit: Optional[Literal["full_body", "upper_lower", "push_pull_legs", "bro_split"]] = None
     reviewAfterWeeks: int = Field(ge=1, le=12, default=4)
     bodyWeightKg: Optional[float] = Field(default=None, ge=30.0, le=300.0)
@@ -289,6 +317,61 @@ class GenerateRequest(BaseModel):
         description="Lista de modalidades da semana híbrida (strength/run/mobility). "
         "Quando vazia, gera apenas musculação (compatível com v1).",
     )
+    focusMuscles: Optional[List[str]] = Field(
+        default=None,
+        description="Foco EXCLUSIVO do plano complementar (H3-16), 1–4 grupos de "
+        "MUSCLE_ALIASES (ex.: ['abs']). Presente ⇒ plano só de força.",
+    )
+
+    @model_validator(mode="after")
+    def validate_complementary(self) -> "GenerateRequest":
+        """Validações condicionais do modo complementar (H3-16).
+
+        Sem `focusMuscles`, as regras do plano principal valem como antes
+        (2–6 dias, 30–120 min). Com `focusMuscles`, o plano é só de força,
+        aceita 1–6 dias e 15–120 min, e cada grupo precisa existir em
+        MUSCLE_ALIASES.
+        """
+        focus = self.focusMuscles
+        if focus is None:
+            if self.daysPerWeek < 2:
+                raise ValueError(
+                    "daysPerWeek deve ser entre 2 e 6 "
+                    "(com foco exclusivo, 1 a 6)."
+                )
+            if self.sessionDurationMinutes < 30:
+                raise ValueError(
+                    "sessionDurationMinutes deve ser entre 30 e 120 "
+                    "(com foco exclusivo, 15 a 120)."
+                )
+            return self
+
+        if len(focus) == 0:
+            raise ValueError(
+                "focusMuscles não pode ser uma lista vazia: omita o campo "
+                "quando não houver foco exclusivo."
+            )
+        if len(focus) > 4:
+            raise ValueError(
+                "focusMuscles aceita no máximo 4 grupos "
+                f"(recebido {len(focus)})."
+            )
+        invalid = [m for m in focus if str(m).strip().lower() not in MUSCLE_ALIASES]
+        if invalid:
+            raise ValueError(
+                "Grupo muscular inválido em focusMuscles: "
+                f"{', '.join(invalid)}. "
+                f"Valores válidos: {', '.join(sorted(MUSCLE_ALIASES))}."
+            )
+        if self.modalities:
+            non_strength = [m.type for m in self.modalities if m.type != "strength"]
+            if non_strength:
+                raise ValueError(
+                    "Plano complementar é apenas de força; modalidades "
+                    f"inválidas: {', '.join(non_strength)}. "
+                    "Use modalities = ['strength']."
+                )
+        return self
 
 
 class ExerciseDTO(BaseModel):
@@ -536,6 +619,20 @@ def build_hybrid_user_prompt(request: GenerateRequest) -> str:
         "",
         "Modalidades (cada uma gera sessões próprias, nunca misturadas num único dia):",
     ]
+    if is_complementary_request(request):
+        # Plano complementar (H3-16): foco exclusivo e equipamento estrito
+        # entram no prompt para a IA não responder fora das restrições.
+        allowed = complementary_equipment_filter(request)
+        allowed_str = (
+            ", ".join(sorted(allowed)) if allowed else "os equipamentos informados"
+        )
+        lines.insert(
+            1,
+            "PLANO COMPLEMENTAR — foque EXCLUSIVAMENTE em: "
+            + ", ".join(request.focusMuscles or [])
+            + ". Nenhum exercício fora desse foco; apenas força.",
+        )
+        lines.insert(2, f"- Equipamentos PERMITIDOS (estrito): {allowed_str}")
     for m in request.modalities or []:
         lines.append(
             f"- {m.type}: {m.sessionsPerWeek} sessão(ões)/semana"
@@ -579,10 +676,11 @@ async def generate_workout(request: GenerateRequest):
 
     modalities = getattr(request, "modalities", None) or []
     is_hybrid = bool(modalities)
+    is_complementary = is_complementary_request(request)
 
     if is_hybrid:
         user_prompt = build_hybrid_user_prompt(request)
-        system_prompt = SYSTEM_PROMPT_HYBRID
+        system_prompt = system_prompt_hybrid(is_complementary)
     else:
         user_prompt = build_user_prompt(request)
         system_prompt = SYSTEM_PROMPT
@@ -627,6 +725,11 @@ async def generate_workout(request: GenerateRequest):
             workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
             if is_hybrid:
                 workout_data = normalize_hybrid_plan(workout_data)
+            if is_complementary:
+                # Garantias do complementar valgem para a resposta da IA:
+                # remove o que saiu fora do foco/equipamento e reconstrói
+                # sessões insuficientes (H3-16).
+                workout_data = enforce_complementary_plan(workout_data, request, EXERCISE_CATALOG)
             source = "ai"
             model_used = MODEL_ID
         except Exception as exc:
@@ -643,11 +746,20 @@ async def generate_workout(request: GenerateRequest):
         print("SENSENOVA_API_KEY not set; using local fallback")
 
     if workout_data is None:
-        if is_hybrid:
-            workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
-            workout_data = normalize_hybrid_plan(workout_data)
-        else:
-            workout_data = build_local_plan(request, EXERCISE_CATALOG)
+        try:
+            if is_hybrid:
+                workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
+                workout_data = normalize_hybrid_plan(workout_data)
+                if is_complementary:
+                    workout_data = enforce_complementary_plan(
+                        workout_data, request, EXERCISE_CATALOG
+                    )
+            else:
+                workout_data = build_local_plan(request, EXERCISE_CATALOG)
+        except ValueError as exc:
+            # Pool vazio no modo complementar (foco/ambiente sem candidatos
+            # suficientes): erro de entrada, não falha de servidor (H3-16).
+            raise HTTPException(422, str(exc))
 
     next_review = review_date(request.reviewAfterWeeks)
     plan_id = 0

@@ -194,4 +194,36 @@ class ContractTest {
         val decoded = json.decodeFromString(ModalityDto.serializer(), encoded)
         assertEquals(60, decoded.sessionDurationMinutes)
     }
+
+    @Test
+    fun request_com_focus_muscles_round_trip() {
+        // Fixture compartilhado com o backend (test_contract_v2.py): o mesmo
+        // arquivo valida os dois lados do contrato (H3-16).
+        val file = File("../contracts/generate_request_complementary.json")
+        assertTrue("Fixture de contrato não encontrado em ${file.absolutePath}", file.exists())
+        val request = json.decodeFromString(GeneratePlanRequest.serializer(), file.readText())
+
+        assertEquals(listOf("abs"), request.focusMuscles)
+        assertEquals(15, request.sessionDurationMinutes)
+        assertEquals(2, request.daysPerWeek)
+        assertEquals("bodyweight", request.environment)
+        assertEquals(listOf("strength"), request.modalities.map { it.type })
+
+        // Round-trip: codifica e decodifica de volta sem perder o foco.
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), request)
+        assertTrue(encoded.contains("\"focusMuscles\":[\"abs\"]"))
+        val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
+        assertEquals(listOf("abs"), decoded.focusMuscles)
+    }
+
+    @Test
+    fun request_sem_focus_muscles_omite_campo() {
+        // Plano principal: sem foco o campo nem viaja (explicitNulls = false).
+        val request = GeneratePlanRequest(deviceId = "d1")
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), request)
+        assertFalse(encoded.contains("focusMuscles"))
+
+        val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
+        assertNull(decoded.focusMuscles)
+    }
 }

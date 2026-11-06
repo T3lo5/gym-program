@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-16` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-06` |
+| Implementação | `concluída` |
 
 **Depende da [H3-15](H3-15-planos-multiplos.md)** (modo "complementar" e
 persistência sem substituir o plano principal).

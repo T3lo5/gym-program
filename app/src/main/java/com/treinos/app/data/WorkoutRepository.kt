@@ -90,8 +90,22 @@ class WorkoutRepository(
 
     suspend fun generatePlan(request: GeneratePlanRequest, kind: String = "main"): GeneratePlanResponse {
         val response = backendClient.generatePlan(request)
-        saveGeneratedPlan(response, kind)
-        return response
+        // O backend não conhece `kind` (H3-15): com foco exclusivo ele já nomeia
+        // "Complementar — <foco>" (H3-16); no complementar só de ambiente, o
+        // app aplica o nome localmente ao salvar.
+        val finalResponse = if (
+            kind == "extra" && !response.workout.name.startsWith("Complementar")
+        ) {
+            val label = when (request.environment) {
+                "home", "bodyweight" -> "Casa"
+                else -> "Academia"
+            }
+            response.copy(workout = response.workout.copy(name = "Complementar — $label"))
+        } else {
+            response
+        }
+        saveGeneratedPlan(finalResponse, kind)
+        return finalResponse
     }
 
     /**

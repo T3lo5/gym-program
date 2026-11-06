@@ -522,21 +522,56 @@ class AppViewModel(
                 // O campo nasce com a seleção salva, então null aqui é escolha explícita.
                 preferences.sex = validation.sex
                 _sex.value = preferences.sex
+
+                // Modo complementar (H3-16): foco exclusivo via focusMuscles e
+                // apenas força; o backend aplica o filtro estrito de equipamento.
+                // Sem foco, o campo é omitido (o ambiente restrito segue valendo).
+                val isComplementary = kind == "extra"
+                val focusMuscles = if (isComplementary && muscles.isNotEmpty()) muscles else null
+                val effectiveModalities = if (isComplementary) {
+                    listOf(
+                        ModalityDto(
+                            type = "strength",
+                            sessionsPerWeek = daysPerWeek.coerceIn(1, 6),
+                            goal = goal,
+                            level = level,
+                            availableEquipment = equipment,
+                            targetMuscles = emptyList(),
+                            sessionDurationMinutes = sessionDuration,
+                        )
+                    )
+                } else {
+                    modalities
+                }
+                if (isComplementary) {
+                    val complementary = ComplementaryValidator.validate(
+                        focusMuscles = focusMuscles,
+                        daysPerWeek = daysPerWeek,
+                        sessionDurationMinutes = sessionDuration,
+                        modalityTypes = effectiveModalities.map { it.type },
+                    )
+                    if (!complementary.valid) {
+                        _message.value = complementary.error ?: "Plano complementar inválido."
+                        return@launch
+                    }
+                }
+
                 val response = repository.generatePlan(
                     GeneratePlanRequest(
                         deviceId = preferences.deviceId,
                         goal = goal,
                         daysPerWeek = daysPerWeek,
                         availableEquipment = equipment,
-                        targetMuscles = muscles,
+                        targetMuscles = if (isComplementary) emptyList() else muscles,
                         currentLevel = level,
                         sessionDurationMinutes = sessionDuration,
                         reviewAfterWeeks = reviewWeeks,
                         bodyWeightKg = validation.bodyWeightKg,
                         heightCm = validation.heightCm,
                         sex = validation.sex,
-                        modalities = modalities,
+                        modalities = effectiveModalities,
                         environment = environment,
+                        focusMuscles = focusMuscles,
                     ),
                     kind = kind,
                 )

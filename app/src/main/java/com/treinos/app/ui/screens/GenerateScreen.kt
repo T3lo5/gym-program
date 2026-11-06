@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.remote.ModalityDto
+import com.treinos.app.ui.ComplementaryValidator
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ScreenTopBar
@@ -81,6 +82,9 @@ private val muscleOptions = listOf(
 )
 
 private val durationOptions = listOf(30, 45, 60, 90)
+
+/** Durações do modo complementar (H3-16): sessões curtas, 15–45 min. */
+private val complementaryDurationOptions = listOf(15, 20, 30, 45)
 private val reviewOptions = listOf(2, 4, 6, 8)
 
 /** Rótulos pt-BR → valores de contrato (H3-7); o valor escolhido é o que viaja no request. */
@@ -144,6 +148,7 @@ fun GenerateScreen(
     var sexChoice by remember { mutableStateOf(savedSex) }
     var profileError by remember { mutableStateOf<String?>(null) }
     var environment by remember { mutableStateOf("gym") }
+    val isComplementary = planKind == "extra"
 
     // Um draft por tipo de modalidade.
     var modalityDrafts by remember {
@@ -206,13 +211,21 @@ fun GenerateScreen(
                         "extra" to "Adicionar plano complementar",
                     ),
                     selected = setOf(planKind),
-                    onToggle = { planKind = it },
+                    onToggle = { value ->
+                        planKind = value
+                        // A duração selecionada pode não existir no outro modo.
+                        val options = if (value == "extra") complementaryDurationOptions else durationOptions
+                        if (duration !in options) {
+                            duration = if (value == "extra") 30 else 60
+                        }
+                    },
                 )
             }
             item {
                 Text(
                     text = if (planKind == "extra") {
-                        "O plano complementar aparece ao lado do principal na Home; nada é desativado."
+                        "O plano complementar aparece ao lado do principal na Home; nada é desativado. " +
+                            "Complementar é só de força, com foco exclusivo e sessões curtas."
                     } else {
                         "O plano principal anterior é desativado; planos complementares continuam ativos."
                     },
@@ -221,7 +234,8 @@ fun GenerateScreen(
                 )
             }
 
-            item { SectionTitle("Modalidades da semana") }
+            if (!isComplementary) {
+                item { SectionTitle("Modalidades da semana") }
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     modalityTypes.forEach { (type, label) ->
@@ -323,14 +337,15 @@ fun GenerateScreen(
                 }
             }
 
-            item {
-                Text(
-                    text = "Pelo menos uma modalidade deve estar incluída. Natação não entra no plano: " +
-                        "registre-a como atividade avulsa no histórico.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+                item {
+                    Text(
+                        text = "Pelo menos uma modalidade deve estar incluída. Natação não entra no plano: " +
+                            "registre-a como atividade avulsa no histórico.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
             }
 
             item { SectionTitle("Objetivo (musculação)") }
@@ -345,7 +360,7 @@ fun GenerateScreen(
             item { SectionTitle("Dias por semana") }
             item {
                 ChipGroup(
-                    options = (2..6).map { it.toString() to "${it}x" },
+                    options = (if (isComplementary) 1..6 else 2..6).map { it.toString() to "${it}x" },
                     selected = setOf(daysPerWeek.toString()),
                     onToggle = { daysPerWeek = it.toInt() },
                 )
@@ -371,7 +386,20 @@ fun GenerateScreen(
                 )
             }
 
-            item { SectionTitle("Foco muscular (opcional, musculação)") }
+            item {
+                SectionTitle(
+                    if (isComplementary) "Foco exclusivo (complementar)" else "Foco muscular (opcional, musculação)"
+                )
+            }
+            if (isComplementary) {
+                item {
+                    Text(
+                        text = "Todo exercício do plano será deste foco — nada de outros grupos entra junto.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             item {
                 ChipGroup(
                     options = muscleOptions,
@@ -385,7 +413,8 @@ fun GenerateScreen(
             item { SectionTitle("Duração da sessão") }
             item {
                 ChipGroup(
-                    options = durationOptions.map { it.toString() to "$it min" },
+                    options = (if (isComplementary) complementaryDurationOptions else durationOptions)
+                        .map { it.toString() to "$it min" },
                     selected = setOf(duration.toString()),
                     onToggle = { duration = it.toInt() },
                 )
@@ -512,6 +541,39 @@ fun GenerateScreen(
             val selectedModalities = modalityDrafts.entries.filter { it.value.included }
             val hasModalities = selectedModalities.isNotEmpty()
 
+            // Modo complementar (H3-16): a sessão de força é montada aqui —
+            // uma sessão por dia selecionado, duração curta, sem corrida/mobilidade.
+            val complementaryValidation = if (isComplementary) {
+                ComplementaryValidator.validate(
+                    focusMuscles = muscles.toList().takeIf { it.isNotEmpty() },
+                    daysPerWeek = daysPerWeek,
+                    sessionDurationMinutes = duration,
+                    modalityTypes = listOf("strength"),
+                )
+            } else {
+                null
+            }
+            val hasFocusOrAlternativeEnvironment = muscles.isNotEmpty() || environment != "gym"
+            val complementaryReady = complementaryValidation?.valid == true && hasFocusOrAlternativeEnvironment
+            val canGenerate = if (isComplementary) complementaryReady else hasModalities
+            val generateHint = when {
+                !isComplementary -> "Inclua pelo menos uma modalidade."
+                !hasFocusOrAlternativeEnvironment ->
+                    "Escolha o foco exclusivo ou um ambiente diferente de academia."
+                else -> complementaryValidation?.error ?: "Ajuste as opções do plano complementar."
+            }
+
+            if (!canGenerate && !isGenerating) {
+                item {
+                    Text(
+                        text = generateHint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                }
+            }
+
             item {
                 Button(
                     onClick = {
@@ -521,13 +583,27 @@ fun GenerateScreen(
                             return@Button
                         }
                         profileError = null
-                        if (!hasModalities) {
-                            profileError = "Inclua pelo menos uma modalidade."
+                        if (!canGenerate) {
+                            profileError = generateHint
                             return@Button
                         }
-                        val dtoList = selectedModalities.map { (type, draft) ->
-                            modalityToDto(type, draft)
-                        }.filterNotNull()
+                        val dtoList = if (isComplementary) {
+                            listOf(
+                                ModalityDto(
+                                    type = "strength",
+                                    sessionsPerWeek = daysPerWeek,
+                                    goal = goal,
+                                    level = level,
+                                    availableEquipment = equipment.toList(),
+                                    targetMuscles = emptyList(),
+                                    sessionDurationMinutes = duration,
+                                )
+                            )
+                        } else {
+                            selectedModalities.map { (type, draft) ->
+                                modalityToDto(type, draft)
+                            }.filterNotNull()
+                        }
                         onGenerate(
                             dtoList,
                             goal,
@@ -544,7 +620,7 @@ fun GenerateScreen(
                             planKind,
                         )
                     },
-                    enabled = !isGenerating && hasModalities,
+                    enabled = !isGenerating && canGenerate,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp)
@@ -562,7 +638,7 @@ fun GenerateScreen(
                             )
                             Text("Gerando semana…")
                         } else {
-                            Text("Gerar semana híbrida")
+                            Text(if (isComplementary) "Gerar plano complementar" else "Gerar semana híbrida")
                         }
                     }
                 }
