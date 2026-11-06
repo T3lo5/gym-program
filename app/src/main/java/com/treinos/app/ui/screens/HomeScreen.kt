@@ -365,21 +365,36 @@ private fun ModalityDayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clearAndSetSemantics { },
                                 )
-                                Text(
-                                    text = exercise.exerciseName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                }
-                Button(
-                    onClick = onStart,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
-                ) {
-                    Text("Iniciar ${tabLabel(modalityTabOf(kind))}")
+                                 Text(
+                                     text = exercise.exerciseName,
+                                     style = MaterialTheme.typography.bodyMedium,
+                                     color = MaterialTheme.colorScheme.onSurface,
+                                     maxLines = 1,
+                                     modifier = Modifier.weight(1f),
+                                 )
+                                 if (exercise.targetReps.isNotBlank()) {
+                                     Text(
+                                         text = "${exercise.sets} séries × ${exercise.targetReps}",
+                                         style = MaterialTheme.typography.bodySmall,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                         maxLines = 1,
+                                     )
+                                 } else if (exercise.sets > 0) {
+                                     Text(
+                                         text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
+                                         style = MaterialTheme.typography.bodySmall,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                         maxLines = 1,
+                                     )
+                                 }
+                             }
+                         }
+                 }
+                 Button(
+                     onClick = onStart,
+                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
+                 ) {
+                     Text("Iniciar ${tabLabel(modalityTabOf(kind))}")
                 }
             }
         }
@@ -605,21 +620,36 @@ private fun DayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clearAndSetSemantics { },
                                 )
-                                Text(
-                                    text = exercise.exerciseName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                }
-                Button(
-                    onClick = onStart,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
-                ) {
-                    Text("Iniciar treino")
+                                 Text(
+                                     text = exercise.exerciseName,
+                                     style = MaterialTheme.typography.bodyMedium,
+                                     color = MaterialTheme.colorScheme.onSurface,
+                                     maxLines = 1,
+                                     modifier = Modifier.weight(1f),
+                                 )
+                                 if (exercise.targetReps.isNotBlank()) {
+                                     Text(
+                                         text = "${exercise.sets} séries × ${exercise.targetReps}",
+                                         style = MaterialTheme.typography.bodySmall,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                         maxLines = 1,
+                                     )
+                                 } else if (exercise.sets > 0) {
+                                     Text(
+                                         text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
+                                         style = MaterialTheme.typography.bodySmall,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                         maxLines = 1,
+                                     )
+                                 }
+                             }
+                         }
+                 }
+                 Button(
+                     onClick = onStart,
+                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
+                 ) {
+                     Text("Iniciar treino")
                 }
             }
         }
