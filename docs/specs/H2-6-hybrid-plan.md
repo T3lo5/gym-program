@@ -9,6 +9,15 @@
 | Spec aprovada em | `2026-11-05` |
 | Implementação | `concluída` |
 | Depende de | H1-6 (campos de modalidade e sync v2), H2-5 (registro avulso); H2-7 é opcional |
+| Correção de escopo | **H3-11**: cada `day` passa a ser uma única sessão/modalidade; várias modalidades podem dividir o mesmo `weekday`, mas como sessões separadas; a musculação ganha 4–8 exercícios e a IA é normalizada antes de salvar |
+
+> **Correção de escopo (H3-11).** Esta spec permitia duas sessões no mesmo
+> `weekday`, mas a implementação juntou os exercícios das duas no mesmo `day`,
+> transformando-as em uma sequência única. Coexistir no mesmo dia continua
+> **permitido**; o que a H3-11 exige é que cada modalidade seja um **`day`
+> separado**, com início e aba próprios. Nenhum `day` mistura musculação,
+> corrida e mobilidade. O restante do contrato (campos, revisão e
+> compatibilidade v1/v2) continua valendo.
 
 ## Objetivo
 

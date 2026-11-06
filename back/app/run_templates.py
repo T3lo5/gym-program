@@ -66,6 +66,18 @@ RUN_TEMPLATES: dict[str, list[dict]] = {
             "restSeconds": 0,
             "notes": "Aquecimento 10 min + 5 km em ritmo constante + 5 min alongamento.",
         },
+        {
+            "exerciseId": "run_long",
+            "exerciseName": "Longão",
+            "metricType": "distance_duration",
+            "sets": 1,
+            "targetReps": "",
+            "targetDistanceMeters": 10000,
+            "targetPaceSecondsPerKm": None,
+            "targetRpe": 6.5,
+            "restSeconds": 0,
+            "notes": "10 km em ritmo leve e constante, foco em resistência aeróbia.",
+        },
     ],
     "advanced": [
         {
@@ -86,14 +98,16 @@ RUN_TEMPLATES: dict[str, list[dict]] = {
             "metricType": "distance_duration",
             "sets": 1,
             "targetReps": "",
-            "targetDistanceMeters": 12000,
+            "targetDistanceMeters": 15000,
             "targetPaceSecondsPerKm": None,
             "targetRpe": 6.5,
             "restSeconds": 0,
-            "notes": "12 km em ritmo leve e constante, foco em resistência aeróbia.",
+            "notes": "15 km em ritmo leve e constante, foco em resistência aeróbia.",
         },
     ],
 }
+
+TEMPLATE_ORDER = ["run_easy", "run_interval", "run_tempo", "run_long"]
 
 
 def pace_from_5k(recent5k_seconds: Optional[float]) -> Optional[int]:
@@ -114,8 +128,41 @@ def pace_from_5k(recent5k_seconds: Optional[float]) -> Optional[int]:
     return int(round(pace))
 
 
-def template_for(level: str, recent5k_seconds: Optional[float] = None) -> dict:
+def _rotate_template(templates: list[dict], session_index: int) -> dict:
+    """Rotaciona os templates por sessão (leve, intervalado, ritmo, longão)."""
+    if not templates:
+        return {}
+    return dict(templates[session_index % len(templates)])
+
+
+def _scale_sets(base_sets: int, duration_minutes: int) -> int:
+    """Escala o número de intervalos pela duração, entre 3 e 20."""
+    import math
+
+    scaled = int(round(base_sets * duration_minutes / 60.0))
+    return max(3, min(20, scaled))
+
+
+def _scale_distance(base_meters: Optional[int], duration_minutes: int) -> Optional[float]:
+    """Escala a distância proporcionalmente, entre 1 km e 21 km."""
+    if base_meters is None:
+        return None
+    meters = float(base_meters) * duration_minutes / 60.0
+    meters = max(1000.0, min(21000.0, meters))
+    return meters
+
+
+def template_for(
+    level: str,
+    recent5k_seconds: Optional[float] = None,
+    session_index: int = 0,
+    duration_minutes: int = 40,
+) -> dict:
     """Escolhe um template de corrida de acordo com o nível e o benchmark.
+
+    Rotaciona os templates por `session_index` (leve, intervalado, ritmo,
+    longão) em vez de repetir sempre o primeiro. Escala `sets` e distância pela
+    duração da sessão.
 
     Quando `recent5k_seconds` é válido, ajusta `targetPaceSecondsPerKm` com
     base no pace real do usuário (ligeiramente mais rápido para progressão).
@@ -124,12 +171,25 @@ def template_for(level: str, recent5k_seconds: Optional[float] = None) -> dict:
     """
     level_key = (level or "beginner").lower()
     templates = RUN_TEMPLATES.get(level_key, RUN_TEMPLATES["beginner"])
-    block = dict(templates[0])
+    block = _rotate_template(templates, session_index)
+
     if level_key == "beginner" and recent5k_seconds is None:
         for t in templates:
             if t["exerciseId"] == "run_walk":
                 block = dict(t)
                 break
+
+    duration = max(5, min(120, duration_minutes))
+
+    if block.get("exerciseId", "").startswith("run_interval"):
+        block["sets"] = _scale_sets(int(block.get("sets", 5)), duration)
+    else:
+        block["sets"] = max(1, int(block.get("sets", 1)))
+
+    block["targetDistanceMeters"] = _scale_distance(
+        block.get("targetDistanceMeters"), duration
+    )
+
     pace = pace_from_5k(recent5k_seconds)
     if pace is not None:
         # Progredir levemente acima do pace atual (menos segundos = mais rápido).

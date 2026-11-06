@@ -99,6 +99,7 @@ data class ModalityDraft(
     val level: String = "intermediate",
     val focus: String? = null,
     val recent5kSeconds: Int? = null,
+    val sessionDurationMinutes: Int = 60,
 )
 
 private val modalityTypes = listOf(
@@ -126,6 +127,7 @@ fun GenerateScreen(
         bodyWeightKgText: String,
         heightCmText: String,
         sexChoice: String?,
+        environment: String?,
     ) -> Unit,
 ) {
     var goal by remember { mutableStateOf("hypertrophy") }
@@ -139,6 +141,7 @@ fun GenerateScreen(
     var heightCmText by remember { mutableStateOf(savedHeightCm?.toString() ?: "") }
     var sexChoice by remember { mutableStateOf(savedSex) }
     var profileError by remember { mutableStateOf<String?>(null) }
+    var environment by remember { mutableStateOf("gym") }
 
     // Um draft por tipo de modalidade.
     var modalityDrafts by remember {
@@ -163,6 +166,7 @@ fun GenerateScreen(
             targetMuscles = if (type == "strength") muscles.toList() else emptyList(),
             focus = if (type == "mobility") draft.focus else null,
             recent5kSeconds = if (type == "run") draft.recent5kSeconds else null,
+            sessionDurationMinutes = draft.sessionDurationMinutes.coerceAtLeast(5).coerceAtMost(120),
         )
     }
 
@@ -420,6 +424,18 @@ fun GenerateScreen(
                     )
                 }
             }
+            item { SectionTitle("Ambiente de treino") }
+            item {
+                ChipGroup(
+                    options = listOf(
+                        "gym" to "Academia",
+                        "home" to "Casa",
+                        "bodyweight" to "Peso corporal",
+                    ),
+                    selected = setOf(environment),
+                    onToggle = { environment = it },
+                )
+            }
             profileError?.let { error ->
                 item {
                     Text(
@@ -499,6 +515,7 @@ fun GenerateScreen(
                             bodyWeightKgText,
                             heightCmText,
                             sexChoice,
+                            environment,
                         )
                     },
                     enabled = !isGenerating && hasModalities,

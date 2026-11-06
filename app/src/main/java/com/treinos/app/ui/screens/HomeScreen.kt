@@ -1,5 +1,6 @@
 package com.treinos.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,10 +17,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabPosition
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -33,9 +41,11 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.ui.ActivityModality
+import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
-import com.treinos.app.ui.components.ScreenTopBar
-import com.treinos.app.ui.components.SectionTitle
+import com.treinos.app.ui.SessionKind
+import com.treinos.app.ui.defaultModalityTab
+import com.treinos.app.ui.groupSessionsByModality
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
@@ -43,9 +53,12 @@ import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
 import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
+import com.treinos.app.ui.planVolumeLabel
 import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
+import com.treinos.app.ui.components.ScreenTopBar
+import com.treinos.app.ui.components.SectionTitle
 
 @Composable
 fun HomeScreen(
@@ -64,6 +77,19 @@ fun HomeScreen(
     onPostponeReview: (Long) -> Unit = {},
     onDismissDeloadNotice: () -> Unit = {},
 ) {
+    val tabsByModality = remember(plan) {
+        plan?.let { groupSessionsByModality(it.days) } ?: emptyMap()
+    }
+    val presentTabs = tabsByModality.keys.filter { tab ->
+        tabsByModality[tab]?.isNotEmpty() == true
+    }
+    val todayWeekday = java.time.LocalDate.now()
+        .get(java.time.temporal.ChronoField.DAY_OF_WEEK)
+    val defaultTab = remember(plan, todayWeekday) {
+        plan?.let { defaultModalityTab(it.days, todayWeekday) }
+    }
+    var selectedTab by remember { mutableStateOf<ModalityTab?>(defaultTab) }
+
     Scaffold(
         topBar = {
             ScreenTopBar(
@@ -133,10 +159,38 @@ fun HomeScreen(
                     }
                 }
 
-                item { SectionTitle("Dias de treino") }
+                if (presentTabs.isNotEmpty()) {
+                    item {
+                        TabRow(
+                            selectedTabIndex = presentTabs.indexOf(selectedTab ?: presentTabs.first()),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            presentTabs.forEach { tab ->
+                                Tab(
+                                    selected = selectedTab == tab,
+                                    onClick = { selectedTab = tab },
+                                    text = {
+                                        Text(when (tab) {
+                                            ModalityTab.STRENGTH -> "Academia"
+                                            ModalityTab.RUN -> "Corrida"
+                                            ModalityTab.MOBILITY -> "Mobilidade"
+                                        })
+                                    },
+                                )
+                            }
+                        }
+                    }
 
-                items(plan.days.sortedBy { it.day.dayOrder }, key = { it.day.id }) { day ->
-                    DayCard(day = day, onStart = { onStartDay(day.day.id) })
+                    val currentSessions = tabsByModality[selectedTab ?: presentTabs.first()].orEmpty()
+                    item { SectionTitle("Sessões de ${tabLabel(selectedTab ?: presentTabs.first())}") }
+                    items(currentSessions, key = { it.day.id }) { day ->
+                        ModalityDayCard(day = day, onStart = { onStartDay(day.day.id) })
+                    }
+                } else {
+                    item { SectionTitle("Dias de treino") }
+                    items(plan.days.sortedBy { it.day.dayOrder }, key = { it.day.id }) { day ->
+                        DayCard(day = day, onStart = { onStartDay(day.day.id) })
+                    }
                 }
 
                 val todayManual = sessions.filter {
@@ -214,6 +268,124 @@ fun HomeScreen(
     }
 }
 
+private fun tabLabel(tab: ModalityTab): String = when (tab) {
+    ModalityTab.STRENGTH -> "musculação"
+    ModalityTab.RUN -> "corrida"
+    ModalityTab.MOBILITY -> "mobilidade"
+}
+
+private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
+    SessionKind.STRENGTH -> ModalityTab.STRENGTH
+    SessionKind.RUN -> ModalityTab.RUN
+    SessionKind.MOBILITY -> ModalityTab.MOBILITY
+}
+
+@Composable
+private fun ModalityDayCard(day: WorkoutDayWithExercises, onStart: () -> Unit) {
+    val kind = SessionKind.fromModality(day.day.modality)
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = day.day.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    when (kind) {
+                        SessionKind.RUN -> {
+                            val distance = day.exercises.firstOrNull()?.targetDistanceMeters
+                            val pace = day.exercises.firstOrNull()?.targetPaceSecondsPerKm
+                            Text(
+                                text = buildList {
+                                    add("${day.exercises.size} bloco(s)")
+                                    distance?.let { add(formatDistanceMeters(it)) }
+                                    pace?.let { add(com.treinos.app.ui.formatMinuteSecond(pace.toLong()) + "/km") }
+                                }.joinToString(" • "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                        SessionKind.MOBILITY -> {
+                            val duration = day.exercises.firstOrNull()?.targetDurationSeconds?.let { it / 60 }
+                            Text(
+                                text = "${day.exercises.size} rotina(s) • ${duration ?: 0} min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                        SessionKind.STRENGTH -> {
+                            Text(
+                                text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (day.day.isRestDay) {
+                Text(
+                    text = "Dia de descanso",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    day.exercises
+                        .sortedBy { it.exerciseOrder }
+                        .take(6)
+                        .forEach { exercise ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = "•",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clearAndSetSemantics { },
+                                )
+                                Text(
+                                    text = exercise.exerciseName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                }
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
+                ) {
+                    Text("Iniciar ${tabLabel(modalityTabOf(kind))}")
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun InProgressCard(session: SessionWithExercises, onResume: () -> Unit) {
     val done = session.exercises.sumOf { it.sets.size }
@@ -275,7 +447,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "${goalLabel(entity.goal)} • ${entity.daysPerWeek}x por semana",
+                text = planVolumeLabel(plan),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(

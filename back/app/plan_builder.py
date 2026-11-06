@@ -101,6 +101,81 @@ UPPER_BODY_MUSCLES = {"chest", "shoulders", "biceps", "triceps", "lats", "middle
 LOWER_BODY_MUSCLES = {"quadriceps", "hamstrings", "glutes", "calves"}
 LOAD_EQUIPMENT = {"barbell", "dumbbell", "machine", "cable"}
 
+STRENGTH_CATEGORIES = {"strength", "powerlifting", "olympic weightlifting"}
+NON_STRENGTH_CATEGORIES = {"stretching", "cardio"}
+
+# Número de exercícios de musculação por duração (min) -> (mín, máx).
+STRENGTH_EXERCISE_COUNT = {
+    30: 4,
+    45: 5,
+    60: 6,
+    90: 8,
+}
+
+MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
+
+
+def strength_exercise_count(duration_minutes: int) -> int:
+    """Retorna o número de exercícios de musculação para a duração (sempre 4-8)."""
+    if duration_minutes <= 30:
+        return 4
+    if duration_minutes <= 45:
+        return 5
+    if duration_minutes <= 60:
+        return 6
+    if duration_minutes <= 75:
+        return 7
+    return 8
+
+
+def _is_strength_exercise(exercise: Dict[str, Any]) -> bool:
+    category = str(exercise.get("category", "")).lower()
+    equipment = str(exercise.get("equipment", "")).strip().lower()
+    if category in STRENGTH_CATEGORIES:
+        return True
+    if category in NON_STRENGTH_CATEGORIES:
+        return False
+    return equipment in LOAD_EQUIPMENT
+
+
+def _build_pool(
+    catalog: List[Dict[str, Any]],
+    equipment: List[str],
+    level: str,
+    category: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    pool = list(catalog)
+    selected_equipment = {item.strip().lower() for item in equipment if item.strip()}
+    if selected_equipment:
+        filtered = [
+            exercise
+            for exercise in pool
+            if (exercise.get("equipment") or "").strip().lower() in selected_equipment
+        ]
+        if len(filtered) >= 20:
+            pool = filtered
+
+    if category:
+        key = category.strip().lower()
+        filtered = [
+            exercise
+            for exercise in pool
+            if str(exercise.get("category", "")).lower() == key
+        ]
+        if len(filtered) >= 10:
+            pool = filtered
+
+    if level == "beginner":
+        filtered = [
+            exercise
+            for exercise in pool
+            if (exercise.get("level") or "beginner").lower() in ("beginner", "intermediate")
+        ]
+        if len(filtered) >= 20:
+            pool = filtered
+
+    return pool
+
 
 def profile_adjustments(
     plan: Dict[str, Any],
@@ -114,6 +189,9 @@ def profile_adjustments(
     - 18.5 <= IMC < 25.0: sem mudança
     - 25.0 <= IMC < 30.0: descanso +15s
     - IMC >= 30.0: descanso +30s, -1 série (mín. 2)
+
+    Apenas exercícios de musculação (metricType == "reps_weight") são ajustados.
+    Corrida e mobilidade mantêm sets, descanso e distância inalterados.
     """
     if body_weight_kg is None or height_cm is None:
         return plan
@@ -136,6 +214,8 @@ def profile_adjustments(
 
     for day in plan.get("days", []):
         for exercise in day.get("exercises", []):
+            if exercise.get("metricType", "reps_weight") != "reps_weight":
+                continue
             exercise["restSeconds"] = exercise.get("restSeconds", 90) + rest_adjustment
             if rpe_adjustment != 0:
                 current_rpe = exercise.get("targetRpe", 8.0)
@@ -195,7 +275,12 @@ def catalog_index(catalog: List[Dict[str, Any]]) -> Tuple[Dict[str, Dict[str, An
 def resolve_plan_ids(
     plan: Dict[str, Any], catalog: List[Dict[str, Any]]
 ) -> Tuple[Dict[str, Any], List[str]]:
-    """Tenta corrigir IDs devolvidos pela IA para IDs reais do catálogo."""
+    """Tenta corrigir IDs devolvidos pela IA para IDs reais do catálogo.
+
+    IDs sintéticos de corrida (`run_*`) e mobilidade (`mobility_*`) são aceitos
+    como estão: não existem no catálogo e não devem ser resolvidos nem
+    sinalizados como pendentes. Apenas exercícios de musculação são validados.
+    """
     by_id, lookup = catalog_index(catalog)
     unresolved: List[str] = []
     lookup_keys = list(lookup.keys())
@@ -203,6 +288,13 @@ def resolve_plan_ids(
     for day in plan.get("days", []):
         for exercise in day.get("exercises", []):
             raw = str(exercise.get("exerciseId", "")).strip()
+            if not raw:
+                continue
+
+            # IDs sintéticos não existem no catálogo: aceitar como estão.
+            if raw.startswith("run_") or raw.startswith("mobility_"):
+                continue
+
             if raw in by_id:
                 continue
 
@@ -210,13 +302,11 @@ def resolve_plan_ids(
             candidate = lookup.get(normalized) if normalized else None
 
             if not candidate and normalized:
-                # 1) Fuzzy match com cutoff relaxado
                 matches = get_close_matches(normalized, lookup_keys, n=1, cutoff=0.72)
                 if matches:
                     candidate = lookup[matches[0]]
 
             if not candidate and normalized:
-                # 2) Substring: o ID da IA está contido em algum ID/nome do catálogo (ou vice-versa)
                 for key in lookup_keys:
                     if normalized in key or key in normalized:
                         candidate = lookup[key]
@@ -304,7 +394,6 @@ def _pick_exercise(
     if not candidates:
         return None
     chosen = rng.choice(candidates)
-    used.add(chosen.get("id"))
     return chosen
 
 
@@ -411,9 +500,6 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
     return plan
 
 
-MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
-
-
 def _pick_strength_exercise(
     pool: List[Dict[str, Any]],
     muscles: List[str],
@@ -430,12 +516,248 @@ def _pick_strength_exercise(
     return _pick_exercise(pool, "chest", rng, used)
 
 
+def build_strength_session(
+    pool: List[Dict[str, Any]],
+    modality_cfg: Dict[str, Any],
+    goal: str,
+    level: str,
+    environment: str,
+    duration_minutes: int,
+    target_muscles: List[str],
+    rng: random.Random,
+    used: set,
+    day_order: int,
+) -> Optional[Dict[str, Any]]:
+    """Constrói uma única sessão de musculação com 4 a 8 exercícios.
+
+    Filtra o pool por categoria de força (ignora stretching/cardio), respeita o
+    ambiente (academia/home/bodyweight) e o nível, e nunca repete o mesmo
+    exerciseId dentro da sessão.
+    """
+    count = strength_exercise_count(duration_minutes)
+    selected_equipment = {item.strip().lower() for item in getattr(modality_cfg, "availableEquipment", []) or [] if item.strip()}
+
+    # Pool apenas de força: filtra por categoria quando disponível.
+    strength_pool = [
+        exercise
+        for exercise in pool
+        if _is_strength_exercise(exercise)
+    ]
+    if not strength_pool:
+        strength_pool = list(pool)
+
+    if environment == "gym" and selected_equipment and "body only" not in selected_equipment:
+        strength_pool = [
+            exercise
+            for exercise in strength_pool
+            if str(exercise.get("equipment", "")).strip().lower() in LOAD_EQUIPMENT
+        ]
+        if len(strength_pool) < 10:
+            strength_pool = [e for e in pool if _is_strength_exercise(e)]
+            if not strength_pool:
+                strength_pool = list(pool)
+
+    muscles = list(getattr(modality_cfg, "targetMuscles", []) or target_muscles)
+    if not muscles:
+        muscles = ["chest", "lats", "quadriceps"]
+
+    exercises: List[Dict[str, Any]] = []
+    attempts = 0
+    while len(exercises) < count and attempts < count * 6:
+        attempts += 1
+        candidate = _pick_strength_exercise(strength_pool, muscles, goal, rng, used)
+        if candidate is None:
+            break
+        exercise_id = candidate.get("id")
+        if exercise_id in used:
+            continue
+        used.add(exercise_id)
+        exercise = dict(candidate)
+        exercise["exerciseId"] = exercise_id
+        exercise["exerciseOrder"] = len(exercises)
+        exercise["sets"] = SETS_BY_GOAL.get(goal, 3)
+        exercise["targetReps"] = REPS_BY_GOAL.get(goal, "8-12")
+        exercise["targetRpe"] = RPE_BY_GOAL.get(goal, 8.0)
+        exercise["restSeconds"] = REST_BY_GOAL.get(goal, 90)
+        exercise["notes"] = ""
+        exercise["isSupersetWithPrevious"] = len(exercises) > 0 and False
+        exercise["metricType"] = "reps_weight"
+        exercise["targetDurationSeconds"] = None
+        exercise["targetDistanceMeters"] = None
+        exercise["targetPaceSecondsPerKm"] = None
+        exercise["targetHrZone"] = None
+        exercises.append(exercise)
+
+    if not exercises:
+        return None
+
+    # Primeiro exercício é composto (usa equipamento de carga quando disponível).
+    first = exercises[0]
+    if environment == "gym" and selected_equipment:
+        for ex in exercises:
+            eq = str(ex.get("equipment", "")).strip().lower()
+            if eq in LOAD_EQUIPMENT:
+                exercises.remove(ex)
+                exercises.insert(0, ex)
+                break
+
+    name = _session_name_for_modality("strength", len(exercises), day_order)
+    return {
+        "name": name,
+        "dayOrder": day_order,
+        "weekday": None,  # preenchido por assign_weekdays
+        "modality": "strength",
+        "isRestDay": False,
+        "exercises": exercises,
+    }
+
+
+def _session_name_for_modality(modality: str, index: int, day_order: int) -> str:
+    names = {
+        "strength": ["Academia A — Superiores", "Academia B — Inferiores", "Academia C — Total"],
+        "run": ["Corrida leve", "Corrida intervalado", "Ritmo de prova", "Longão"],
+        "mobility": ["Mobilidade — costas", "Mobilidade — quadris", "Mobilidade — pós-corrida", "Mobilidade — corpo inteiro"],
+    }
+    options = names.get(modality, ["Sessão"])
+    return options[index % len(options)]
+
+
+def assign_weekdays(
+    sessions: List[Dict[str, Any]],
+    sessions_per_modality: Dict[str, int],
+) -> List[Dict[str, Any]]:
+    """Distribui as sessões pelos weekdays (1..7).
+
+    Musculação nunca fica em dias consecutivos. Máximo 3 sessões por weekday e
+    no máximo uma de cada modalidade por dia. Várias modalidades podem compartilhar
+    o mesmo weekday, cada uma como um `day` separado (dayOrder diferente).
+    """
+    days: List[Dict[str, Any]] = []
+    # weekday -> set de modalidades já alocadas naquele dia
+    weekday_modalities: Dict[int, set] = defaultdict(set)
+    # weekday -> quantidade de sessões alocadas naquele dia
+    weekday_count: Dict[int, int] = defaultdict(int)
+    # último weekday usado por musculação (para não usar dias consecutivos)
+    last_strength_wd: Optional[int] = None
+
+    ordered = sorted(sessions, key=lambda s: MODALITY_RANK.get(s["modality"], 9))
+
+    for session in ordered:
+        modality = session["modality"]
+        placed = False
+
+        # Tenta colocar em cada weekday, começando pelo 1.
+        for wd in range(1, 8):
+            if modality in weekday_modalities[wd]:
+                continue
+            if weekday_count[wd] >= 3:
+                continue
+            if modality == "strength" and last_strength_wd is not None and abs(wd - last_strength_wd) == 1:
+                continue
+
+            session = dict(session)
+            session["weekday"] = wd
+            days.append(session)
+            weekday_modalities[wd].add(modality)
+            weekday_count[wd] += 1
+            if modality == "strength":
+                last_strength_wd = wd
+            placed = True
+            break
+
+        if not placed:
+            # Força a colocação em qualquer weekday com espaço (último recurso).
+            for wd in range(1, 8):
+                if weekday_count[wd] < 3 and modality not in weekday_modalities[wd]:
+                    session = dict(session)
+                    session["weekday"] = wd
+                    days.append(session)
+                    weekday_modalities[wd].add(modality)
+                    weekday_count[wd] += 1
+                    if modality == "strength":
+                        last_strength_wd = wd
+                    placed = True
+                    break
+
+    days.sort(key=lambda d: (d["weekday"], d["dayOrder"]))
+    for i, day in enumerate(days):
+        day["dayOrder"] = i
+    return days
+
+
+def normalize_hybrid_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Garante as invariantes do plano híbrido depois da IA ou do fallback.
+
+    1. Um day = uma sessão = uma única modalidade (todos os exercícios do dia
+       com o mesmo metricType e mesma família de modality).
+    2. Musculação: 4 a 8 exercícios, metricType reps_weight, categoria de força.
+    3. Corrida: exatamente 1 bloco por day, metricType distance_duration.
+    4. Mobilidade: exatamente 1 bloco por day, metricType duration, duração
+       300-900 s.
+    5. daysPerWeek = len(days) (total de sessões).
+    6. Várias sessões no mesmo weekday são days separados, nunca misturadas.
+    7. dayOrder único e crescente; ordena por weekday e depois dayOrder.
+    8. No máximo 3 sessões por weekday, no máximo uma de cada modalidade.
+    """
+    days = plan.get("days", [])
+    normalized_days: List[Dict[str, Any]] = []
+
+    for day in days:
+        weekday = day.get("weekday", 1)
+        exercises = list(day.get("exercises", []))
+
+        # Agrupa exercícios por metricType para separar days mistos.
+        by_metric: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for ex in exercises:
+            by_metric[str(ex.get("metricType", "reps_weight"))].append(ex)
+
+        for metric_type, exs in by_metric.items():
+            if metric_type == "reps_weight":
+                strength_exs = [ex for ex in exs if ex.get("metricType", "reps_weight") == "reps_weight"][:8]
+                if not strength_exs:
+                    continue
+                new_day = dict(day)
+                new_day["modality"] = "strength"
+                new_day["exercises"] = strength_exs
+                new_day["weekday"] = weekday
+            elif metric_type == "distance_duration":
+                run_exs = [ex for ex in exs if ex.get("metricType") == "distance_duration"][:1]
+                if not run_exs:
+                    continue
+                new_day = dict(day)
+                new_day["modality"] = "run"
+                new_day["exercises"] = run_exs
+                new_day["weekday"] = weekday
+            elif metric_type == "duration":
+                mob_exs = [ex for ex in exs if ex.get("metricType") == "duration"][:1]
+                if not mob_exs:
+                    continue
+                new_day = dict(day)
+                new_day["modality"] = "mobility"
+                new_day["exercises"] = mob_exs
+                new_day["weekday"] = weekday
+            else:
+                continue
+
+            normalized_days.append(new_day)
+
+    # Ordena por weekday e depois dayOrder original; reindexa dayOrder.
+    normalized_days.sort(key=lambda d: (d.get("weekday", 1), d.get("dayOrder", 0)))
+    for i, day in enumerate(normalized_days):
+        day["dayOrder"] = i
+
+    plan = dict(plan)
+    plan["days"] = normalized_days
+    plan["daysPerWeek"] = len(normalized_days)
+    return plan
+
+
 def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Monta uma semana híbrida (musculação, corrida, mobilidade) sem IA.
 
-    Distribui as sessões das modalidades em weekdays (1 = segunda ... 7 =
-    domingo) em round-robin, permitindo mais de uma sessão no mesmo dia. A soma
-    de sessionsPerWeek pode exceder 7.
+    Cada modalidade vira sessões independentes (uma por day), com musculação de
+    4-8 exercícios, corrida com rotação de templates e mobilidade com rotina
+    própria. Várias modalidades podem cair no mesmo weekday como days separados.
     """
     modalities = getattr(request, "modalities", None) or []
     if not modalities:
@@ -447,150 +769,135 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
     level = getattr(request, "currentLevel", "intermediate")
     equipment = list(getattr(request, "availableEquipment", []) or [])
     muscles = list(getattr(request, "targetMuscles", []) or [])
+    environment = str(getattr(request, "environment", "") or "").strip().lower() or "bodyweight"
     rng = random.Random()
 
     pool = _build_pool(catalog, equipment, level)
     if len(pool) < 10:
         pool = list(catalog)
 
-    # Um slot por sessão planejada de cada modalidade.
-    slots: List[str] = []
-    modality_cfg: Dict[str, Dict[str, Any]] = {}
+    # Cria uma sessão independente por sessão planejada de cada modalidade.
+    sessions: List[Dict[str, Any]] = []
+    sessions_per_modality: Dict[str, int] = {}
+    strength_session_index = 0
+    run_session_index = 0
+    mobility_session_index = 0
+
     for m in modalities:
-        mtype = str(m.get("type", "strength")).lower()
-        modality_cfg[mtype] = m
-        sessions = max(1, int(m.get("sessionsPerWeek", 1)))
-        for _ in range(sessions):
-            slots.append(mtype)
+        mtype = str(getattr(m, "type", "strength")).lower()
+        m_sessions = max(1, int(getattr(m, "sessionsPerWeek", 1)))
+        m_duration = int(getattr(m, "sessionDurationMinutes", session_duration))
+        m_duration = max(5, min(120, m_duration))
+        sessions_per_modality[mtype] = m_sessions
 
-    # Round-robin pelos dias da semana (1..7).
-    by_weekday: Dict[int, List[tuple[int, str]]] = defaultdict(list)
-    for i, mtype in enumerate(slots):
-        wd = (i % 7) + 1
-        by_weekday[wd].append((i, mtype))
-
-    days: List[Dict[str, Any]] = []
-    used: set = set()
-    day_index = 0
-
-    for wd in sorted(by_weekday):
-        entries = by_weekday[wd]
-        entries.sort(key=lambda e: (MODALITY_RANK.get(e[1], 9), e[0]))
-
-        day_exercises: List[Dict[str, Any]] = []
-        day_order = 0
-        primary_modality = entries[0][1]
-
-        for _, mtype in entries:
+        for _ in range(m_sessions):
             if mtype == "run":
-                run_cfg = modality_cfg.get("run", {})
-                block = template_for(run_cfg.get("level", level), run_cfg.get("recent5kSeconds"))
-                exercise = {
-                    "exerciseId": block["exerciseId"],
-                    "exerciseOrder": day_order,
-                    "sets": block["sets"],
-                    "targetReps": block.get("targetReps", ""),
-                    "targetRpe": block.get("targetRpe", 7.0),
-                    "restSeconds": block.get("restSeconds", 60),
-                    "notes": block.get("notes", ""),
-                    "isSupersetWithPrevious": False,
-                    "exerciseName": block["exerciseName"],
-                    "primaryMuscles": ["legs"],
-                    "equipment": "nenhum",
-                    "metricType": "distance_duration",
-                    "targetDurationSeconds": None,
-                    "targetDistanceMeters": block.get("targetDistanceMeters"),
-                    "targetPaceSecondsPerKm": block.get("targetPaceSecondsPerKm"),
-                    "targetHrZone": None,
-                }
+                run_cfg = m
+                block = template_for(
+                    getattr(run_cfg, "level", level),
+                    getattr(run_cfg, "recent5kSeconds", None),
+                    run_session_index,
+                    m_duration,
+                )
+                run_session_index += 1
+                sessions.append({
+                    "name": block.get("exerciseName", "Corrida"),
+                    "dayOrder": len(sessions),
+                    "weekday": None,
+                    "modality": "run",
+                    "isRestDay": False,
+                    "exercises": [{
+                        "exerciseId": block["exerciseId"],
+                        "exerciseOrder": 0,
+                        "sets": block["sets"],
+                        "targetReps": block.get("targetReps", ""),
+                        "targetRpe": block.get("targetRpe", 7.0),
+                        "restSeconds": block.get("restSeconds", 60),
+                        "notes": block.get("notes", ""),
+                        "isSupersetWithPrevious": False,
+                        "exerciseName": block["exerciseName"],
+                        "primaryMuscles": ["legs"],
+                        "equipment": "nenhum",
+                        "metricType": "distance_duration",
+                        "targetDurationSeconds": None,
+                        "targetDistanceMeters": block.get("targetDistanceMeters"),
+                        "targetPaceSecondsPerKm": block.get("targetPaceSecondsPerKm"),
+                        "targetHrZone": None,
+                    }],
+                })
             elif mtype == "mobility":
-                mob_cfg = modality_cfg.get("mobility", {})
-                focus = mob_cfg.get("focus")
-                exercise = {
-                    "exerciseId": f"mobility_{focus or 'full'}",
-                    "exerciseOrder": day_order,
-                    "exerciseName": "Mobilidade"
-                    + (f" - {focus}" if focus else ""),
-                    "metricType": "duration",
-                    "sets": 1,
-                    "targetReps": "",
-                    "targetRpe": 5.0,
-                    "restSeconds": 0,
-                    "notes": (
-                        f"Rotina de mobilidade{(' para ' + focus) if focus else ''} "
-                        f"({session_duration} min)."
-                    ),
-                    "isSupersetWithPrevious": False,
-                    "primaryMuscles": [],
-                    "equipment": "body only",
-                    "targetDurationSeconds": session_duration * 60,
-                    "targetDistanceMeters": None,
-                    "targetPaceSecondsPerKm": None,
-                    "targetHrZone": None,
-                }
+                mob_cfg = m
+                focus = getattr(mob_cfg, "focus", None)
+                mobility_session_index += 1
+                sessions.append({
+                    "name": f"Mobilidade — {focus or 'corpo inteiro'}",
+                    "dayOrder": len(sessions),
+                    "weekday": None,
+                    "modality": "mobility",
+                    "isRestDay": False,
+                    "exercises": [{
+                        "exerciseId": f"mobility_{focus or 'full'}",
+                        "exerciseOrder": 0,
+                        "exerciseName": "Mobilidade" + (f" — {focus}" if focus else ""),
+                        "metricType": "duration",
+                        "sets": 1,
+                        "targetReps": "",
+                        "targetRpe": 5.0,
+                        "restSeconds": 0,
+                        "notes": f"Rotina de mobilidade{(' para ' + focus) if focus else ''} ({m_duration} min).",
+                        "isSupersetWithPrevious": False,
+                        "primaryMuscles": [],
+                        "equipment": "body only",
+                        "targetDurationSeconds": m_duration * 60,
+                        "targetDistanceMeters": None,
+                        "targetPaceSecondsPerKm": None,
+                        "targetHrZone": None,
+                    }],
+                })
             else:
-                exercise = _pick_strength_exercise(pool, muscles, goal, rng, used)
-                if exercise is None:
+                # strength
+                strength_session_index += 1
+                session = build_strength_session(
+                    pool,
+                    m,
+                    goal,
+                    level,
+                    environment,
+                    m_duration,
+                    muscles,
+                    rng,
+                    set(),
+                    strength_session_index - 1,
+                )
+                if session is None:
                     continue
-                # O catálogo armazena o ID sob `id`; o plano espera `exerciseId`.
-                exercise["exerciseId"] = exercise.get("id")
-                exercise["exerciseOrder"] = day_order
-                exercise["sets"] = SETS_BY_GOAL.get(goal, 3)
-                exercise["targetReps"] = REPS_BY_GOAL.get(goal, "8-12")
-                exercise["targetRpe"] = RPE_BY_GOAL.get(goal, 8.0)
-                exercise["restSeconds"] = REST_BY_GOAL.get(goal, 90)
-                exercise["notes"] = ""
-                exercise["isSupersetWithPrevious"] = False
-                exercise["metricType"] = "reps_weight"
-                exercise["targetDurationSeconds"] = None
-                exercise["targetDistanceMeters"] = None
-                exercise["targetPaceSecondsPerKm"] = None
-                exercise["targetHrZone"] = None
+                sessions.append(session)
 
-            day_exercises.append(exercise)
-            day_order += 1
-
-        if not day_exercises:
-            continue
-
-        modality_names = {"strength": "Musculação", "run": "Corrida", "mobility": "Mobilidade"}
-        if len({e["exerciseId"].split("_")[0] for e in day_exercises}) == 1:
-            day_name = modality_names.get(primary_modality, "Treino")
-        else:
-            day_name = "Treino híbrido"
-
-        days.append(
-            {
-                "name": day_name,
-                "dayOrder": day_index,
-                "weekday": wd,
-                "modality": primary_modality,
-                "isRestDay": False,
-                "exercises": day_exercises,
-            }
-        )
-        day_index += 1
-
-    if not days:
+    if not sessions:
         return build_local_plan(request, catalog)
+
+    days = assign_weekdays(sessions, sessions_per_modality)
 
     plan = {
         "name": "Semana híbrida",
         "description": (
-            "Plano semanal com musculação, corrida e mobilidade gerado localmente. "
-            "Ajuste cargas e ritmo conforme sua evolução."
+            "Plano semanal com sessões independentes por modalidade "
+            "(musculação, corrida, mobilidade). Ajuste cargas e ritmo conforme "
+            "sua evolução."
         ),
         "goal": goal,
         "daysPerWeek": len(days),
         "days": days,
     }
     plan = enrich_plan(plan, catalog)
+    plan = normalize_hybrid_plan(plan)
 
     body_weight_kg = getattr(request, "bodyWeightKg", None)
     height_cm = getattr(request, "heightCm", None)
     if body_weight_kg is not None or height_cm is not None:
         plan = profile_adjustments(plan, body_weight_kg, height_cm)
         plan = suggest_initial_load(plan, body_weight_kg)
+        plan = normalize_hybrid_plan(plan)
 
     return plan
 

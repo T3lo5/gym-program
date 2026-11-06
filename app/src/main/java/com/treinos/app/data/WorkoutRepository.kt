@@ -188,6 +188,8 @@ class WorkoutRepository(
                 dayId = day.id,
                 planName = plan.name,
                 dayName = day.name,
+                title = day.name,
+                modality = day.modality,
                 status = "in_progress",
                 startedAt = now,
             )
@@ -249,6 +251,52 @@ class WorkoutRepository(
                 totalDurationSeconds = ((now - session.startedAt) / 1000L).coerceAtLeast(0L),
             )
         )
+    }
+
+    /** Finaliza uma sessão de corrida planejada: grava duração, distância e RPE. */
+    suspend fun finishRunSession(
+        sessionId: Long,
+        durationSeconds: Long,
+        distanceMeters: Double?,
+        rpe: Double?,
+    ) = withContext(Dispatchers.IO) {
+        val session = dao.getSession(sessionId) ?: return@withContext
+        val now = System.currentTimeMillis()
+        dao.updateSession(
+            session.copy(
+                status = "completed",
+                endedAt = now,
+                totalDurationSeconds = durationSeconds.coerceAtLeast(0L),
+                totalDistanceMeters = distanceMeters?.takeIf { it > 0.0 },
+                sessionRpe = rpe,
+            )
+        )
+    }
+
+    /** Grava uma sessão de mobilidade planejada concluída, sem séries. */
+    suspend fun logPlannedMobility(
+        planId: Long,
+        dayId: Long,
+        routineId: String,
+        elapsedSeconds: Long,
+    ) = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val sessionId = dao.insertSession(
+            WorkoutSessionEntity(
+                planId = planId,
+                dayId = dayId,
+                planName = "",
+                dayName = "Mobilidade",
+                title = routineId,
+                modality = "mobility",
+                source = "plan",
+                status = "completed",
+                startedAt = now - (elapsedSeconds.coerceAtLeast(0L) * 1000L),
+                endedAt = now,
+                totalDurationSeconds = elapsedSeconds.coerceAtLeast(0L),
+            )
+        )
+        sessionId
     }
 
     // ---------------- Sessão avulsa (registro manual) ----------------

@@ -72,6 +72,7 @@ enum class Screen {
     Home,
     Generate,
     Workout,
+    RunWorkout,
     History,
     Settings,
     LogActivity,
@@ -464,6 +465,7 @@ class AppViewModel(
         bodyWeightKgText: String,
         heightCmText: String,
         sexChoice: String?,
+        environment: String? = null,
     ) {
         if (_isGenerating.value) return
         viewModelScope.launch {
@@ -500,6 +502,7 @@ class AppViewModel(
                         heightCm = validation.heightCm,
                         sex = validation.sex,
                         modalities = modalities,
+                        environment = environment,
                     )
                 )
                 _screen.value = Screen.Home
@@ -624,18 +627,22 @@ class AppViewModel(
             _message.value = "Nenhum plano ativo no aparelho."
             return
         }
-        val hasDay = plan.days.any { it.day.id == dayId }
-        if (!hasDay) {
-            _message.value = "Dia de treino não encontrado."
-            return
-        }
+        val day = plan.days.firstOrNull { it.day.id == dayId }
+            ?: run {
+                _message.value = "Dia de treino não encontrado."
+                return
+            }
         viewModelScope.launch {
             try {
                 val sessionId = repository.startSession(plan.plan.id, dayId)
                 _activeSessionId.value = sessionId
                 _exerciseIndex.value = 0
-                _screen.value = Screen.Workout
                 syncWearState()
+                when (SessionKind.fromModality(day.day.modality)) {
+                    SessionKind.RUN -> _screen.value = Screen.RunWorkout
+                    SessionKind.MOBILITY -> _screen.value = Screen.Mobility
+                    SessionKind.STRENGTH -> _screen.value = Screen.Workout
+                }
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível iniciar o treino."
             }
@@ -653,7 +660,11 @@ class AppViewModel(
             return
         }
         _activeSessionId.value = session.session.id
-        _screen.value = Screen.Workout
+        when (SessionKind.fromModality(session.session.modality)) {
+            SessionKind.RUN -> _screen.value = Screen.RunWorkout
+            SessionKind.MOBILITY -> _screen.value = Screen.Mobility
+            SessionKind.STRENGTH -> _screen.value = Screen.Workout
+        }
     }
 
     fun logSet(
@@ -711,6 +722,33 @@ class AppViewModel(
                 _message.value = "Treino finalizado e salvo no aparelho."
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível finalizar o treino."
+            }
+        }
+    }
+
+    /** Finaliza uma sessão de corrida planejada. */
+    fun finishRunWorkout(sessionId: Long, durationSeconds: Long, distanceMeters: Double?, rpe: Double?) {
+        viewModelScope.launch {
+            try {
+                repository.finishRunSession(sessionId, durationSeconds, distanceMeters, rpe)
+                _activeSessionId.value = null
+                _screen.value = Screen.Home
+                _message.value = "Corrida registrada e salva no aparelho."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível finalizar a corrida."
+            }
+        }
+    }
+
+    /** Finaliza uma sessão de mobilidade planejada. */
+    fun finishPlannedMobility(planId: Long, dayId: Long, routineId: String, elapsedSeconds: Long) {
+        viewModelScope.launch {
+            try {
+                repository.logPlannedMobility(planId, dayId, routineId, elapsedSeconds)
+                _screen.value = Screen.Home
+                _message.value = "Mobilidade finalizada e salva no histórico."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível salvar a mobilidade."
             }
         }
     }

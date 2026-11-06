@@ -34,6 +34,7 @@ import com.treinos.app.ui.screens.HistoryScreen
 import com.treinos.app.ui.screens.HomeScreen
 import com.treinos.app.ui.screens.LogActivityScreen
 import com.treinos.app.ui.screens.MobilityScreen
+import com.treinos.app.ui.screens.RunWorkoutScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.ExerciseDetailSheet
@@ -221,6 +222,20 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                 )
 
+                Screen.RunWorkout -> RunWorkoutScreen(
+                    session = activeSession,
+                    onLeave = viewModel::leaveWorkout,
+                    onFinish = { input ->
+                        val sessionId = activeSession?.session?.id ?: return@RunWorkoutScreen
+                        viewModel.finishRunWorkout(
+                            sessionId = sessionId,
+                            durationSeconds = input.durationSeconds,
+                            distanceMeters = input.distanceMeters,
+                            rpe = input.rpe,
+                        )
+                    },
+                )
+
                 Screen.History -> HistoryScreen(
                     sessions = sessions,
                     onBack = viewModel::goHome,
@@ -247,7 +262,9 @@ fun TreinosApp(viewModel: AppViewModel) {
 
                 Screen.Mobility -> MobilityScreen(
                     onBack = viewModel::goHome,
-                    onFinishMobility = viewModel::finishMobility,
+                    onFinishMobility = { planId, dayId, routineId, elapsed ->
+                        viewModel.finishPlannedMobility(planId, dayId, routineId, elapsed)
+                    },
                 )
 
                 Screen.Settings -> SettingsScreen(

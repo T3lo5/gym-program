@@ -158,3 +158,50 @@ def test_v1_continua_valido():
     # Campos novos têm defaults e não quebram o v1.
     assert response.workout.days[0].modality == "strength"
     assert response.workout.days[0].weekday is None
+
+
+# ---------------- Novos testes de contrato v2 (H3-11) ----------------
+
+
+def test_dia_hibrido_tem_uma_modalidade():
+    """Cada day do plano híbrido tem exatamente uma modality."""
+    for day in FIXTURE_V2["workout"]["days"]:
+        metric_types = {ex.get("metricType") for ex in day["exercises"]}
+        assert len(metric_types) == 1, f"day mistura modalidades: {day['name']}"
+    assert FIXTURE_V2["workout"]["days"][0]["modality"] == "strength"
+    assert FIXTURE_V2["workout"]["days"][1]["modality"] == "run"
+
+
+def test_request_com_environment_e_duracao_por_modalidade():
+    """GenerateRequest aceita environment e modalities com duração por modalidade."""
+    from app.main import GenerateRequest, ModalityRequest
+
+    req = GenerateRequest(
+        deviceId="d1",
+        environment="gym",
+        modalities=[
+            ModalityRequest(
+                type="strength",
+                sessionsPerWeek=3,
+                sessionDurationMinutes=60,
+                availableEquipment=["barbell", "dumbbell"],
+            ),
+            ModalityRequest(
+                type="run",
+                sessionsPerWeek=2,
+                sessionDurationMinutes=40,
+                recent5kSeconds=1800,
+            ),
+        ],
+        reviewAfterWeeks=4,
+    )
+    assert req.environment == "gym"
+    assert req.modalities[0].type == "strength"
+    assert req.modalities[0].sessionDurationMinutes == 60
+    assert req.modalities[1].type == "run"
+    assert req.modalities[1].recent5kSeconds == 1800
+    # Request v1 (sem modalities) continua válido.
+    req_v1 = GenerateRequest(deviceId="d1")
+    assert req_v1.modalities == []
+    assert req_v1.environment is None
+

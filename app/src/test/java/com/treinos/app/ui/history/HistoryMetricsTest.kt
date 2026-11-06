@@ -235,11 +235,59 @@ class HistoryMetricsTest {
         assertTrue(metrics.volumeByMuscle.isEmpty())
     }
 
+    @Test
+    fun corrida_nao_soma_series_de_musculacao() {
+        val sessions = listOf(
+            session(
+                id = 1,
+                modality = "run",
+                durationSeconds = 1_800L,
+                distanceMeters = 5_000.0,
+                exercises = listOf(exercise("run_interval", set(reps = 10, weight = 40.0))),
+            ),
+        )
+
+        val metrics = buildHistoryMetrics(sessions, chestOnly)
+
+        assertEquals(1, metrics.sessionCount)
+        assertEquals(1, metrics.completedCount)
+        assertEquals(0, metrics.totalSets)
+        assertEquals(0, metrics.strengthSets)
+        assertEquals(0.0, metrics.totalVolumeKg, EPSILON)
+        assertEquals(0.0, metrics.strengthVolumeKg, EPSILON)
+        assertEquals(5_000.0, metrics.runDistanceMeters, EPSILON)
+        assertEquals(1_800L, metrics.runDurationSeconds)
+    }
+
+    @Test
+    fun mobilidade_nao_soma_series_de_musculacao() {
+        val sessions = listOf(
+            session(
+                id = 1,
+                modality = "mobility",
+                durationSeconds = 600L,
+                exercises = listOf(exercise("mobility_back", set(reps = 10, weight = 40.0))),
+            ),
+        )
+
+        val metrics = buildHistoryMetrics(sessions, chestOnly)
+
+        assertEquals(1, metrics.sessionCount)
+        assertEquals(1, metrics.completedCount)
+        assertEquals(0, metrics.totalSets)
+        assertEquals(0, metrics.strengthSets)
+        assertEquals(0.0, metrics.totalVolumeKg, EPSILON)
+        assertEquals(0.0, metrics.strengthVolumeKg, EPSILON)
+        assertEquals(600L, metrics.mobilityDurationSeconds)
+    }
+
     private fun session(
         id: Long,
         status: String = "completed",
         startedAt: Long = millis(day),
         durationSeconds: Long = 60L,
+        distanceMeters: Double? = null,
+        modality: String = "strength",
         exercises: List<SessionExerciseWithSets> = emptyList(),
     ) = SessionWithExercises(
         session = WorkoutSessionEntity(
@@ -247,6 +295,8 @@ class HistoryMetricsTest {
             status = status,
             startedAt = startedAt,
             totalDurationSeconds = durationSeconds,
+            totalDistanceMeters = distanceMeters,
+            modality = modality,
         ),
         exercises = exercises,
     )

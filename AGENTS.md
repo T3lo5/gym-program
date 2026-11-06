@@ -78,6 +78,27 @@ O gate é uma trava, não um obstáculo: **não** enfraqueça lint/teste para fi
 verde (remover teste, `@Ignore`, `-x lint`, `--no-verify`, baixar `minSdk` ou
 comentar código). Corrija a causa.
 
+## Protocolo de memória (MCP `memory`)
+
+A memória do projeto é um grafo de conhecimento compartilhado por **todos** os
+agentes, servido em `http://127.0.0.1:8765/mcp` pelo container
+`treinos-mcp-memory` e persistido em `.mcp-memory/memory.jsonl` (fora do git).
+Configuração e manutenção: `tools/mcp-memory/README.md`.
+
+- **Ao iniciar uma tarefa:** rode `search_nodes` (prefixado pelo agente:
+  `memory_search_nodes` no OpenCode, `mcp__memory__search_nodes` no Claude
+  Code) com o nome do módulo/feature antes de ler arquivos inteiros. Se vier
+  vazio, leia o código e registre o que aprendeu.
+- **Ao concluir uma alteração relevante:** registre a decisão com
+  `add_observations` (fato atômico, não despejo de diff) ou crie a entidade
+  com `create_entities`; use `create_relations` para ligar módulos e fluxos.
+- **Antes de reverter ou "limpar" algo que não entende:** consulte a memória
+  para ver se outro agente já registrou por que aquilo existe.
+- **Nunca grave** segredos, tokens, dados pessoais, saída de build ou
+  transcrição de conversa. Memória é decisão e contexto, não log.
+- A memória **não substitui** a leitura do código nem as specs: em conflito,
+  valem `ROADMAP.md`, `docs/specs/` e o código.
+
 ## Definition of Done
 
 - [ ] `./scripts/verify.sh` verde (saída colada na resposta)
@@ -118,3 +139,5 @@ comentar código). Corrija a causa.
 - `scripts/ci-backend.sh` — CI backend
 - `scripts/verify.sh` — gate local completo
 - `.github/workflows/android.yml` — workflow que chama os scripts acima
+- `tools/mcp-memory/` — container do MCP `memory` (memória compartilhada dos agentes)
+- `.mcp-memory/` — estado local da memória (**não versionado**)

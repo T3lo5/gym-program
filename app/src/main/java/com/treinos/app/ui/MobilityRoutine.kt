@@ -349,4 +349,17 @@ object MobilityRoutineTemplates {
     }
 
     fun isValidTemplate(routine: MobilityRoutine): Boolean = validate(routine)
+
+    /**
+     * Escolhe a rotina pelo foco. back → back_10, hips → hips_10,
+     * post_run → post_run_8, qualquer outro → full_15.
+     */
+    fun routineForFocus(focus: String?, minutes: Int): MobilityRoutine {
+        return when (focus?.lowercase()) {
+            "back" -> getRoutine("back_10") ?: routines.first()
+            "hips" -> getRoutine("hips_10") ?: routines.first()
+            "post_run" -> getRoutine("post_run_8") ?: routines.first()
+            else -> getRoutine("full_15") ?: routines.first()
+        }
+    }
 }

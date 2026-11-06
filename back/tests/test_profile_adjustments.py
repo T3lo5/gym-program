@@ -270,3 +270,112 @@ def test_sexo_fora_do_enum_da_422():
         response = client.post("/v1/generate-workout", json={"deviceId": "d1", "sex": "qualquer-coisa"})
 
     assert response.status_code == 422
+
+
+# ---------------- IMC não altera corrida nem mobilidade (H3-11) ----------------
+
+
+def _hybrid_plan():
+    return {
+        "name": "Plano híbrido",
+        "goal": "general",
+        "daysPerWeek": 5,
+        "days": [
+            {
+                "name": "Academia A",
+                "dayOrder": 0,
+                "weekday": 1,
+                "modality": "strength",
+                "exercises": [
+                    {
+                        "exerciseId": "Barbell_Bench_Press",
+                        "exerciseOrder": 0,
+                        "sets": 3,
+                        "targetReps": "8-12",
+                        "targetRpe": 8.0,
+                        "restSeconds": 90,
+                        "metricType": "reps_weight",
+                        "exerciseName": "Supino",
+                        "primaryMuscles": ["chest"],
+                        "equipment": "barbell",
+                    }
+                ],
+            },
+            {
+                "name": "Corrida",
+                "dayOrder": 1,
+                "weekday": 2,
+                "modality": "run",
+                "exercises": [
+                    {
+                        "exerciseId": "run_interval",
+                        "exerciseOrder": 0,
+                        "sets": 5,
+                        "targetReps": "",
+                        "targetRpe": 8.0,
+                        "restSeconds": 120,
+                        "metricType": "distance_duration",
+                        "targetDurationSeconds": None,
+                        "targetDistanceMeters": 1000,
+                        "targetPaceSecondsPerKm": 342,
+                        "targetHrZone": None,
+                    }
+                ],
+            },
+            {
+                "name": "Mobilidade",
+                "dayOrder": 2,
+                "weekday": 3,
+                "modality": "mobility",
+                "exercises": [
+                    {
+                        "exerciseId": "mobility_back",
+                        "exerciseOrder": 0,
+                        "sets": 1,
+                        "targetReps": "",
+                        "targetRpe": 5.0,
+                        "restSeconds": 0,
+                        "metricType": "duration",
+                        "targetDurationSeconds": 600,
+                        "targetDistanceMeters": None,
+                        "targetPaceSecondsPerKm": None,
+                        "targetHrZone": None,
+                    }
+                ],
+            },
+        ],
+    }
+
+
+def test_imc_nao_altera_corrida_nem_mobilidade():
+    """IMC alto só ajusta exercícios de musculação (reps_weight)."""
+    plan = _hybrid_plan()
+    # IMC >= 30: descanso +30s, -1 série, apenas reps_weight.
+    result = profile_adjustments(plan, 100.0, 180)
+    strength = result["days"][0]["exercises"][0]
+    assert strength["restSeconds"] == 120  # 90 + 30
+    assert strength["sets"] == 2  # 3 - 1
+
+    run = result["days"][1]["exercises"][0]
+    assert run["restSeconds"] == 120  # inalterado
+    assert run["sets"] == 5  # inalterado
+    assert run["targetDistanceMeters"] == 1000  # inalterado
+
+    mob = result["days"][2]["exercises"][0]
+    assert mob["restSeconds"] == 0  # inalterado
+    assert mob["sets"] == 1  # inalterado
+    assert mob["targetDurationSeconds"] == 600  # inalterado
+
+
+def test_imc_continua_ajustando_musculacao():
+    """IMC baixo aumenta descanso e reduz RPE apenas na musculação."""
+    plan = _hybrid_plan()
+    result = profile_adjustments(plan, 50.0, 180)
+    strength = result["days"][0]["exercises"][0]
+    assert strength["restSeconds"] == 105  # 90 + 15
+    assert strength["targetRpe"] == 7.5  # 8.0 - 0.5
+
+    # Corrida e mobilidade intocadas.
+    assert result["days"][1]["exercises"][0]["restSeconds"] == 120
+    assert result["days"][2]["exercises"][0]["restSeconds"] == 0
+

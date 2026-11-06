@@ -27,6 +27,7 @@ from .plan_builder import (
     profile_adjustments,
     suggest_initial_load,
     review_plan,
+    normalize_hybrid_plan,
 )
 from .run_templates import template_for
 
@@ -99,6 +100,55 @@ FORMATO DE SAÍDA (JSON):
           "restSeconds": 60-180,
           "notes": "string",
           "isSupersetWithPrevious": false
+        }}
+      ]
+    }}
+  ]
+}}"""
+
+SYSTEM_PROMPT_HYBRID = f"""Você é um gerador de planos de treino híbrido (musculação, corrida, mobilidade).
+
+{CATALOG_SUMMARY}
+
+REGRAS OBRIGATÓRIAS:
+1. Use APENAS exercícios do catálogo acima (IDs exatos) para musculação.
+2. Corrige usa IDs sintéticos: `run_interval`, `run_tempo`, `run_long`, `run_easy`, `run_walk` e `mobility_*` (não existem no catálogo, são válidos).
+3. Um `day` = uma sessão = uma única modalidade. Nunca misture musculação, corrida e mobilidade no mesmo `day`.
+4. Musculação: 4 a 8 exercícios por `day`, todos `metricType = "reps_weight"`, categoria de força, sem alongamento/cardio.
+5. Corrida: exatamente 1 bloco por `day`, `metricType = "distance_duration"`, com `targetDistanceMeters` e/ou `targetRpe`; `sets` até 20.
+6. Mobilidade: exatamente 1 bloco por `day`, `metricType = "duration"`, `targetDurationSeconds` entre 300 e 900.
+7. `weekday` 1..7. Várias sessões no mesmo `weekday` são `day`s separados com `dayOrder` diferente.
+8. Respeite equipamentos, nível, objetivo e duração informados por modalidade.
+9. Retorne JSON válido conforme schema WorkoutPlanDTO.
+
+FORMATO DE SAÍDA (JSON):
+{{
+  "name": "string",
+  "description": "string",
+  "goal": "general",
+  "daysPerWeek": inteiro (total de sessões, não dias distintos),
+  "days": [
+    {{
+      "name": "string (ex: 'Academia A — Superiores', 'Corrida — intervalado', 'Mobilidade — costas')",
+      "dayOrder": 0,
+      "weekday": 1-7,
+      "modality": "strength|run|mobility",
+      "isRestDay": false,
+      "exercises": [
+        {{
+          "exerciseId": "string (ID EXATO do catálogo ou sintético run_*/mobility_*)",
+          "exerciseOrder": 0,
+          "sets": 1-20,
+          "targetReps": "string ou vazio para corrida/mobilidade",
+          "targetRpe": 5.0-10.0,
+          "restSeconds": 0-300,
+          "notes": "string",
+          "isSupersetWithPrevious": false,
+          "metricType": "reps_weight|distance_duration|duration",
+          "targetDurationSeconds": inteiro ou null,
+          "targetDistanceMeters": número ou null,
+          "targetPaceSecondsPerKm": inteiro ou null,
+          "targetHrZone": null
         }}
       ]
     }}
@@ -200,9 +250,24 @@ app.add_middleware(
 
 
 # Schemas
+class ModalityRequest(BaseModel):
+    """Uma modalidade da semana híbrida (strength / run / mobility)."""
+
+    type: Literal["strength", "run", "mobility"]
+    sessionsPerWeek: int = Field(ge=1, le=7, default=1)
+    goal: Optional[Literal["hypertrophy", "strength", "endurance", "power", "fat_loss", "general"]] = None
+    level: Optional[Literal["beginner", "intermediate", "advanced"]] = None
+    availableEquipment: List[str] = Field(default_factory=list)
+    targetMuscles: List[str] = Field(default_factory=list)
+    focus: Optional[str] = None
+    sessionDurationMinutes: int = Field(ge=5, le=120, default=60)
+    recent5kSeconds: Optional[float] = None
+
+
 class GenerateRequest(BaseModel):
     deviceId: str = "default"
     goal: Literal["hypertrophy", "strength", "endurance", "power", "fat_loss", "general"] = "hypertrophy"
+    environment: Optional[Literal["gym", "home", "bodyweight"]] = None
     daysPerWeek: int = Field(ge=2, le=6, default=4)
     availableEquipment: List[str] = Field(default_factory=list)  # e.g., ["dumbbell", "barbell", "body only"]
     targetMuscles: List[str] = Field(default_factory=list)       # e.g., ["chest", "back", "legs"]
@@ -214,7 +279,7 @@ class GenerateRequest(BaseModel):
     bodyWeightKg: Optional[float] = Field(default=None, ge=30.0, le=300.0)
     heightCm: Optional[int] = Field(default=None, ge=120, le=250)
     sex: Optional[Literal["male", "female", "other", "undisclosed"]] = None
-    modalities: Optional[List[Dict[str, Any]]] = Field(
+    modalities: Optional[List[ModalityRequest]] = Field(
         default_factory=list,
         description="Lista de modalidades da semana híbrida (strength/run/mobility). "
         "Quando vazia, gera apenas musculação (compatível com v1).",
@@ -224,7 +289,7 @@ class GenerateRequest(BaseModel):
 class ExerciseDTO(BaseModel):
     exerciseId: str
     exerciseOrder: int
-    sets: int = Field(ge=1, le=6)
+    sets: int = Field(ge=1, le=20)
     targetReps: str
     targetRpe: Optional[float] = Field(default=None, ge=5.0, le=10.0)
     restSeconds: int = Field(ge=0, le=300, default=90)
@@ -448,26 +513,41 @@ Retorne APENAS o JSON válido."""
 
 def build_hybrid_user_prompt(request: GenerateRequest) -> str:
     """Prompt para geração de semana híbrida (musculação/corrida/mobilidade)."""
-    lines = ["Gere uma semana híbrida com as seguintes modalidades:"]
+    environment = request.environment or "inferir pelos equipamentos"
+    equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
+    muscles_str = ", ".join(request.targetMuscles) if request.targetMuscles else "corpo todo"
+
+    lines = [
+        "Gere uma semana híbrida com sessões independentes por modalidade.",
+        f"- Ambiente: {environment}",
+        f"- Equipamentos disponíveis: {equipment_str}",
+        f"- Foco muscular global: {muscles_str}",
+        f"- Nível: {request.currentLevel}",
+        f"- Objetivo global: {request.goal}",
+        f"- Revisar após: {request.reviewAfterWeeks} semanas",
+        "",
+        "Modalidades (cada uma gera sessões próprias, nunca misturadas num único dia):",
+    ]
     for m in request.modalities or []:
-        mtype = m.get("type", "strength")
-        sessions = m.get("sessionsPerWeek", 1)
         lines.append(
-            f"- {mtype}: {sessions} sessão(ões)/semana"
-            + (f", objetivo={m.get('goal')}" if m.get("goal") else "")
-            + (f", nível={m.get('level')}" if m.get("level") else "")
-            + (f", foco={m.get('focus')}" if m.get("focus") else "")
+            f"- {m.type}: {m.sessionsPerWeek} sessão(ões)/semana"
+            + (f", objetivo={m.goal}" if m.goal else "")
+            + (f", nível={m.level}" if m.level else "")
+            + (f", equipamentos={', '.join(m.availableEquipment)}" if m.availableEquipment else "")
+            + (f", foco muscular={', '.join(m.targetMuscles)}" if m.targetMuscles else "")
+            + (f", foco={m.focus}" if m.focus else "")
+            + (f", duração/sessão={m.sessionDurationMinutes} min" if m.sessionDurationMinutes else "")
             + (
-                f", benchmark5k={m.get('recent5kSeconds')}s"
-                if m.get("recent5kSeconds") is not None
+                f", benchmark5k={m.recent5kSeconds}s"
+                if m.recent5kSeconds is not None
                 else ""
             )
         )
-    lines.append(f"- Duração por sessão: ~{request.sessionDurationMinutes} min")
-    lines.append(f"- Revisar após: {request.reviewAfterWeeks} semanas")
+    lines.append("")
     lines.append(
         "Distribua as sessões pelos dias da semana (seg=1 ... dom=7), permitindo "
-        "mais de uma sessão no mesmo dia. Corrida usa distância/pace (não reps); "
+        "mais de uma sessão no mesmo dia como `day`s separados. Cada `day` tem "
+        "apenas uma modalidade. Corrige usa distância/duração/RPE (não reps); "
         "mobilidade usa duração; musculação usa reps/peso. Retorne APENAS o JSON válido."
     )
     return "\n".join(lines)
@@ -494,8 +574,10 @@ async def generate_workout(request: GenerateRequest):
 
     if is_hybrid:
         user_prompt = build_hybrid_user_prompt(request)
+        system_prompt = SYSTEM_PROMPT_HYBRID
     else:
         user_prompt = build_user_prompt(request)
+        system_prompt = SYSTEM_PROMPT
 
     if SENSENOVA_API_KEY:
         try:
@@ -509,7 +591,7 @@ async def generate_workout(request: GenerateRequest):
                     json={
                         "model": MODEL_ID,
                         "messages": [
-                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
                         ],
                         "response_format": {"type": "json_object"},
@@ -535,6 +617,8 @@ async def generate_workout(request: GenerateRequest):
 
             workout = WorkoutPlanDTO(**raw_plan)
             workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
+            if is_hybrid:
+                workout_data = normalize_hybrid_plan(workout_data)
             source = "ai"
             model_used = MODEL_ID
         except Exception as exc:
@@ -545,6 +629,7 @@ async def generate_workout(request: GenerateRequest):
     if workout_data is None:
         if is_hybrid:
             workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
+            workout_data = normalize_hybrid_plan(workout_data)
         else:
             workout_data = build_local_plan(request, EXERCISE_CATALOG)
 

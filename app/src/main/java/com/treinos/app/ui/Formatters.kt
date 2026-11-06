@@ -129,7 +129,7 @@ fun estimateRunBlockDurationMinutes(
     return (seconds / 60.0).coerceAtLeast(0.0).toLong()
 }
 
-private fun formatMinuteSecond(totalSeconds: Long): String =
+fun formatMinuteSecond(totalSeconds: Long): String =
     "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
 
 // Agrupamento fixo em ponto: o histórico é exibido em pt-BR independente do

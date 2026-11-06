@@ -1,7 +1,10 @@
 package com.treinos.app.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RunMetricsTest {
@@ -17,17 +20,49 @@ class RunMetricsTest {
 
     @Test
     fun calcula_duracao_do_bloco() {
-        // 5 x 1 km a 330 s/km = 5 * 1 * 330 = 1650 s = 27 min
         assertEquals(27, estimateRunBlockDurationMinutes(5, 1_000.0, 330))
-        // 1 x 5 km a 360 s/km = 1800 s = 30 min
         assertEquals(30, estimateRunBlockDurationMinutes(1, 5_000.0, 360))
-        // Sem distância → 0
         assertEquals(0, estimateRunBlockDurationMinutes(5, 0.0, 330))
     }
 
     @Test
     fun sem_benchmark_usa_rpe() {
-        // Sem distância registrada não há pace: o app usa RPE para corrida.
         assertNull(formatPacePerKm(1_500L, null))
+    }
+
+    @Test
+    fun pace_calculado_na_finalizacao() {
+        val result = validateRunLog(
+            RunLogInput(durationSeconds = 1_500L, distanceMeters = 5_000.0, rpe = null),
+        )
+        assertTrue(result.valid)
+        assertEquals(300, result.paceSecondsPerKm)
+    }
+
+    @Test
+    fun distancia_zero_nao_gera_pace() {
+        val result = validateRunLog(
+            RunLogInput(durationSeconds = 1_500L, distanceMeters = 0.0, rpe = null),
+        )
+        assertTrue(result.valid)
+        assertNull(result.paceSecondsPerKm)
+    }
+
+    @Test
+    fun duracao_invalida_bloqueia_registro() {
+        val result = validateRunLog(
+            RunLogInput(durationSeconds = 0L, distanceMeters = null, rpe = null),
+        )
+        assertFalse(result.valid)
+        assertNotNull(result.error)
+    }
+
+    @Test
+    fun rpe_fora_de_faixa_bloqueia_registro() {
+        val result = validateRunLog(
+            RunLogInput(durationSeconds = 600L, distanceMeters = null, rpe = 11.0),
+        )
+        assertFalse(result.valid)
+        assertNotNull(result.error)
     }
 }

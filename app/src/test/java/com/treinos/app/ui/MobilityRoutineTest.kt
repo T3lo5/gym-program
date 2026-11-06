@@ -49,4 +49,28 @@ class MobilityRoutineTest {
         val empty = MobilityRoutine("empty", "Empty", "test", "test", emptyList())
         assertFalse(MobilityRoutineTemplates.isValidTemplate(empty))
     }
+
+    @Test
+    fun foco_back_escolhe_back_10() {
+        val routine = MobilityRoutineTemplates.routineForFocus("back", 10)
+        assertEquals("back_10", routine.id)
+    }
+
+    @Test
+    fun foco_hips_escolhe_hips_10() {
+        val routine = MobilityRoutineTemplates.routineForFocus("hips", 10)
+        assertEquals("hips_10", routine.id)
+    }
+
+    @Test
+    fun foco_post_run_escolhe_post_run_8() {
+        val routine = MobilityRoutineTemplates.routineForFocus("post_run", 8)
+        assertEquals("post_run_8", routine.id)
+    }
+
+    @Test
+    fun foco_desconhecido_usa_full_body() {
+        val routine = MobilityRoutineTemplates.routineForFocus("qualquer_coisa", 15)
+        assertEquals("full_15", routine.id)
+    }
 }

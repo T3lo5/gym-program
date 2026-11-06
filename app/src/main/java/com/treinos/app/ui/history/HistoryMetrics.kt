@@ -2,6 +2,7 @@ package com.treinos.app.ui.history
 
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.ui.SessionKind
 import com.treinos.app.ui.muscleLabel
 import java.time.Instant
 import java.time.LocalDate
@@ -21,11 +22,23 @@ data class HistoryMetrics(
     val totalVolumeKg: Double = 0.0,
     val totalDurationSeconds: Long = 0L,
     val volumeByMuscle: Map<String, Double> = emptyMap(),
+    /** Distância total (m) das sessões de corrida concluídas no período. */
+    val runDistanceMeters: Double = 0.0,
+    /** Duração total (s) das sessões de corrida concluídas no período. */
+    val runDurationSeconds: Long = 0L,
+    /** Duração total (s) das sessões de mobilidade concluídas no período. */
+    val mobilityDurationSeconds: Long = 0L,
+    /** Séries totais apenas de sessões de musculação. */
+    val strengthSets: Int = 0,
+    /** Volume (kg) apenas de sessões de musculação. */
+    val strengthVolumeKg: Double = 0.0,
 )
 
 /**
- * Séries, reps, volume e duração somam apenas sessões concluídas; [sessionCount] é o
- * total do período (inclui as em andamento) e [completedCount] o que entra nas somas.
+ * Séries, reps e volume somam apenas sessões de musculação concluídas;
+ * corrida soma distância e duração; mobilidade soma duração.
+ * [sessionCount] é o total do período (inclui as em andamento) e
+ * [completedCount] o que entra nas somas.
  */
 fun buildHistoryMetrics(
     sessions: List<SessionWithExercises>,
@@ -43,21 +56,41 @@ fun buildHistoryMetrics(
     var totalReps = 0
     var totalVolumeKg = 0.0
     var totalDurationSeconds = 0L
+    var runDistanceMeters = 0.0
+    var runDurationSeconds = 0L
+    var mobilityDurationSeconds = 0L
+    var strengthSets = 0
+    var strengthVolumeKg = 0.0
     val volumeByMuscle = linkedMapOf<String, Double>()
 
     completed.forEach { session ->
+        val kind = SessionKind.fromModality(session.session.modality)
         totalDurationSeconds += session.session.totalDurationSeconds
-        session.exercises.forEach { exercise ->
-            val muscles = muscleKeysFor(exercise.exercise.exerciseId, muscleByExerciseId)
-            exercise.sets.filter { it.countsAsMetric() }.forEach { set ->
-                totalSets += 1
-                totalReps += set.reps ?: 0
-                val volume = set.volumeKg()
-                totalVolumeKg += volume
-                if (volume > 0.0) {
-                    val share = volume / muscles.size
-                    muscles.forEach { muscle ->
-                        volumeByMuscle[muscle] = (volumeByMuscle[muscle] ?: 0.0) + share
+
+        when (kind) {
+            SessionKind.RUN -> {
+                runDistanceMeters += session.session.totalDistanceMeters ?: 0.0
+                runDurationSeconds += session.session.totalDurationSeconds
+            }
+            SessionKind.MOBILITY -> {
+                mobilityDurationSeconds += session.session.totalDurationSeconds
+            }
+            SessionKind.STRENGTH -> {
+                session.exercises.forEach { exercise ->
+                    exercise.sets.filter { it.countsAsMetric() }.forEach { set ->
+                        totalSets += 1
+                        strengthSets += 1
+                        totalReps += set.reps ?: 0
+                        val volume = set.volumeKg()
+                        totalVolumeKg += volume
+                        strengthVolumeKg += volume
+                        if (volume > 0.0) {
+                            val muscles = muscleKeysFor(exercise.exercise.exerciseId, muscleByExerciseId)
+                            val share = volume / muscles.size
+                            muscles.forEach { muscle ->
+                                volumeByMuscle[muscle] = (volumeByMuscle[muscle] ?: 0.0) + share
+                            }
+                        }
                     }
                 }
             }
@@ -72,6 +105,11 @@ fun buildHistoryMetrics(
         totalVolumeKg = totalVolumeKg,
         totalDurationSeconds = totalDurationSeconds,
         volumeByMuscle = volumeByMuscle,
+        runDistanceMeters = runDistanceMeters,
+        runDurationSeconds = runDurationSeconds,
+        mobilityDurationSeconds = mobilityDurationSeconds,
+        strengthSets = strengthSets,
+        strengthVolumeKg = strengthVolumeKg,
     )
 }
 

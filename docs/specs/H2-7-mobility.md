@@ -9,6 +9,7 @@
 | Spec aprovada em | `2026-11-05` |
 | Implementação | `concluída` (`c2830cd feat: H2-7 mobilidade e alongamento`) |
 | Depende de | H1-6 (campos `modality`/`metricType`/`targetDurationSeconds`) |
+| Correção de escopo | **H3-11**: a mobilidade planejada no plano híbrido abre a rotina correspondente com timer e grava sessão vinculada ao `planId`/`dayId`; as rotinas livres continuam iguais |
 
 ## Objetivo
 

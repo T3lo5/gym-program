@@ -135,4 +135,63 @@ class ContractTest {
         // Limpar a seleção volta a ser "campo ausente", não texto vazio.
         assertFalse(json.encodeToString(GeneratePlanRequest.serializer(), request.copy(sex = null)).contains("\"sex\""))
     }
+
+    @Test
+    fun request_com_environment_e_duracao_por_modalidade() {
+        val request = GeneratePlanRequest(
+            deviceId = "d1",
+            environment = "gym",
+            modalities = listOf(
+                ModalityDto(
+                    type = "strength",
+                    sessionsPerWeek = 3,
+                    sessionDurationMinutes = 60,
+                ),
+                ModalityDto(
+                    type = "run",
+                    sessionsPerWeek = 2,
+                    sessionDurationMinutes = 40,
+                ),
+                ModalityDto(
+                    type = "mobility",
+                    sessionsPerWeek = 2,
+                    sessionDurationMinutes = 10,
+                ),
+            ),
+        )
+
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), request)
+
+        assertTrue(encoded.contains("\"environment\":\"gym\""))
+        assertTrue(encoded.contains("\"sessionDurationMinutes\":60"))
+        assertTrue(encoded.contains("\"sessionDurationMinutes\":40"))
+        assertTrue(encoded.contains("\"sessionDurationMinutes\":10"))
+
+        val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
+        assertEquals("gym", decoded.environment)
+        assertEquals(3, decoded.modalities.size)
+        assertEquals(60, decoded.modalities.first { it.type == "strength" }.sessionDurationMinutes)
+        assertEquals(40, decoded.modalities.first { it.type == "run" }.sessionDurationMinutes)
+        assertEquals(10, decoded.modalities.first { it.type == "mobility" }.sessionDurationMinutes)
+    }
+
+    @Test
+    fun request_sem_environment_valor_padrao_nulo() {
+        val request = GeneratePlanRequest(deviceId = "d1")
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), request)
+        assertFalse(encoded.contains("environment"))
+
+        val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
+        assertNull(decoded.environment)
+    }
+
+    @Test
+    fun modality_sem_duracao_valor_padrao_60() {
+        val modality = ModalityDto(type = "strength", sessionsPerWeek = 3)
+        val encoded = json.encodeToString(ModalityDto.serializer(), modality)
+        assertTrue(encoded.contains("\"sessionDurationMinutes\":60"))
+
+        val decoded = json.decodeFromString(ModalityDto.serializer(), encoded)
+        assertEquals(60, decoded.sessionDurationMinutes)
+    }
 }

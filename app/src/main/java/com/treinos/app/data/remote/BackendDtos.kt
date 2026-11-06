@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class GeneratePlanRequest(
     val deviceId: String,
     val goal: String = "hypertrophy",
+    val environment: String? = null,
     val daysPerWeek: Int = 4,
     val availableEquipment: List<String> = emptyList(),
     val targetMuscles: List<String> = emptyList(),
@@ -30,6 +31,7 @@ data class ModalityDto(
     val targetMuscles: List<String> = emptyList(),
     val focus: String? = null,
     val recent5kSeconds: Int? = null,
+    val sessionDurationMinutes: Int = 60,
 )
 
 @Serializable

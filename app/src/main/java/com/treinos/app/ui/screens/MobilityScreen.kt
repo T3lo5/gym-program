@@ -37,7 +37,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun MobilityScreen(
     onBack: () -> Unit,
-    onFinishMobility: (String, Long) -> Unit,
+    onFinishMobility: (planId: Long, dayId: Long, routineId: String, elapsedSeconds: Long) -> Unit = { _, _, _, _ -> },
+    planId: Long = 0L,
+    dayId: Long = 0L,
+    presetRoutineId: String? = null,
 ) {
     var selectedRoutine by remember { mutableStateOf<MobilityRoutine?>(null) }
     var currentMovementIndex by remember { mutableStateOf(0) }
@@ -46,6 +49,20 @@ fun MobilityScreen(
     var isPaused by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableStateOf(0L) }
     var showSafety by remember { mutableStateOf(false) }
+
+    val plannedRoutine = presetRoutineId?.let { MobilityRoutineTemplates.getRoutine(it) }
+
+    LaunchedEffect(presetRoutineId, selectedRoutine == null, plannedRoutine) {
+        if (presetRoutineId != null && selectedRoutine == null && plannedRoutine != null) {
+            selectedRoutine = plannedRoutine
+            currentMovementIndex = 0
+            val first = plannedRoutine.movements[0]
+            timeRemaining = first.durationSeconds
+            elapsedSeconds = 0L
+            isRunning = true
+            isPaused = false
+        }
+    }
 
     if (selectedRoutine == null) {
         Scaffold(
@@ -257,7 +274,7 @@ fun MobilityScreen(
                                 // Finalizar
                                 isRunning = false
                                 val duration = elapsedSeconds
-                    onFinishMobility(routine.id, elapsedSeconds)
+                                onFinishMobility(planId, dayId, routine.id, elapsedSeconds)
                                 selectedRoutine = null
                             }
                         },
@@ -271,7 +288,7 @@ fun MobilityScreen(
                     onClick = {
                         isRunning = false
                         val duration = elapsedSeconds
-                    onFinishMobility(routine.id, elapsedSeconds)
+                        onFinishMobility(planId, dayId, routine.id, elapsedSeconds)
                         selectedRoutine = null
                     },
                     modifier = Modifier.fillMaxWidth(),
