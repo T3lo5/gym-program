@@ -114,6 +114,16 @@ STRENGTH_EXERCISE_COUNT = {
 
 MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
 
+# Split de força tradicional aplicado ciclo entre as sessões da semana:
+# A = empurrar (peito/ombros/tríceps), B = puxar (costas/bíceps/traps),
+# C = pernas e core (quadriceps/isquiotibiais/glutos/panturrilha/abdomen).
+# Quando o usuário treina 3x força, cada sessão cai em um split diferente.
+STRENGTH_SPLITS: List[List[str]] = [
+    ["chest", "shoulders", "triceps"],      # A — empurrar
+    ["lats", "middle back", "biceps", "traps"],  # B — puxar
+    ["quadriceps", "hamstrings", "glutes", "calves", "abdominals"],  # C — pernas/core
+]
+
 # IDs sintéticos que a IA costuma devolver com nomes próximos. Mapeia para o
 # ID estável usado pelos templates e pelo normalize_hybrid_plan.
 RUN_MOBILITY_SYNONYMS: Dict[str, str] = {
@@ -563,12 +573,16 @@ def build_strength_session(
     rng: random.Random,
     used: set,
     day_order: int,
+    focus_muscles: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Constrói uma única sessão de musculação com 4 a 8 exercícios.
 
     Filtra o pool por categoria de força (ignora stretching/cardio), respeita o
     ambiente (academia/home/bodyweight) e o nível, e nunca repete o mesmo
     exerciseId dentro da sessão.
+
+    `focus_muscles`, quando fornecido, sobrepõe `target_muscles` para aplicar
+    split por sessão (ex.: apenas empurrar, apenas puxar, apenas pernas/core).
     """
     count = strength_exercise_count(duration_minutes)
     selected_equipment = {item.strip().lower() for item in getattr(modality_cfg, "availableEquipment", []) or [] if item.strip()}
@@ -593,7 +607,7 @@ def build_strength_session(
             if not strength_pool:
                 strength_pool = list(pool)
 
-    muscles = list(getattr(modality_cfg, "targetMuscles", []) or target_muscles)
+    muscles = list(focus_muscles) if focus_muscles else list(getattr(modality_cfg, "targetMuscles", []) or target_muscles)
     if not muscles:
         muscles = ["chest", "lats", "quadriceps"]
 
@@ -900,6 +914,8 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
             else:
                 # strength
                 strength_session_index += 1
+                # Aplica split tradicional em ciclo: push -> pull -> legs -> push...
+                focus_muscles = STRENGTH_SPLITS[(strength_session_index - 1) % len(STRENGTH_SPLITS)]
                 session = build_strength_session(
                     pool,
                     m,
@@ -911,6 +927,7 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
                     rng,
                     set(),
                     strength_session_index - 1,
+                    focus_muscles,
                 )
                 if session is None:
                     continue
