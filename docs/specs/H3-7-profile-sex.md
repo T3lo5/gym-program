@@ -6,9 +6,31 @@
 |---|---|
 | Item do roadmap | `H3-7` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente` (proposta de 2026-11-05) |
-| Implementação | `pendente` |
-| Depende de | H1-5 (peso e altura); H3-6 se o perfil for ao backup |
+| Spec aprovada em | `2026-11-06` (proposta de 2026-11-05; aprovada pelo dono do projeto com o escopo das decisões acima) |
+| Implementação | `concluída` em 2026-11-06 — gate `./scripts/verify.sh` verde |
+| Depende de | H1-5 (peso e altura); H3-6 (perfil no backup v3) |
+
+## Decisões de execução (registradas na implementação)
+
+- **Backup incluído.** A tabela de arquivos não listava `BackupDtos.kt`,
+  `BackupValidator.kt`, `WorkoutRepository.kt` nem `RestoreContracts.kt`
+  (`ProfileStore`), mas a regra 11 e a verificação manual 5 exigem `sex` no
+  bloco `profile` com rejeição de valor fora do enum. Esses 4 arquivos entraram.
+- **`sex` só no `build_user_prompt`.** O caminho que o app usa hoje (`modalities`
+  preenchidas) cai em `build_hybrid_user_prompt`, que já não leva peso/altura/IMC
+  desde a H1-5. Mudar isso seria escopo além da spec; fica como follow-up
+  candidato (o campo viaja no request, mas não alcança a IA no plano híbrido).
+- **Rótulo "Outro" em vez de "Outro / prefiro escrever".** A regra 3 proíbe
+  texto livre; um rótulo que promete "prefiro escrever" mentiria para a UI.
+  `normalizeSex` aceita as duas grafias.
+- **Semântica de import.** `profile` de v3 sem a chave `sex` decodifica como
+  `null` e, como peso/altura na H3-6, é lido como "não informado" — o valor
+  salvo é limpo. Distinguir chave ausente de `null` explícito exigiria mexer no
+  decoder; o custo (reaparecer dado sensível que o usuário apagou) seria pior.
+- **`undisclosed` vai no prompt** como "prefiro não informar" (leitura literal da
+  regra da spec: a linha aparece quando `sex` existir).
+- **Sem texto interpretando a escolha** na UI, além do resumo "Sexo: <rótulo>"
+  que repete a seleção salva (critério 9).
 
 ## Objetivo
 
@@ -150,15 +172,31 @@ como estão.
 9. **Dado** que o usuário escolhe "Prefiro não informar", **quando** gera, **então**
    `sex = "undisclosed"` e a UI não mostra nenhum texto interpretando a escolha.
 
-## Testes a criar
+## Testes criados
 
 | Arquivo | Testes |
 |---|---|
 | `app/src/test/java/com/treinos/app/ui/ProfileValidatorTest.kt` | `normaliza_rotulos_de_sexo`, `sexo_vazio_vira_null`, `rotulo_desconhecido_vira_null`, `sexo_nao_invalida_peso_ou_altura`, `perfil_sem_sexo_continua_valido` |
 | `back/tests/test_profile_adjustments.py` | `test_sexo_ignorado_no_plano_local`, `test_prompt_inclui_sexo`, `test_prompt_omite_sexo_null`, `test_sexo_fora_do_enum_da_422` |
 | `app/src/test/java/com/treinos/app/data/remote/ContractTest.kt` | `request_sem_sexo_decode_ok`, `request_com_sexo_serializa` |
+| `app/src/test/java/com/treinos/app/data/backup/BackupValidatorTest.kt` | `aceita_v3_com_sexo_valido`, `rejeita_sexo_fora_do_enum_no_perfil`, `aceita_v3_sem_sexo_informado` (regra 11) |
+| `app/src/test/java/com/treinos/app/data/backup/BackupSerializationTest.kt` | `v3_round_trip_preserva_sexo`, `v3 sem chave sex decodifica null (sem bump de versao)` (regra 11) |
+| `app/src/test/java/com/treinos/app/data/backup/BackupImportTest.kt` | `importa backup v3 restaura sexo do perfil`, `sexo invalido no backup e rejeitado sem alterar perfil` (verificação manual 5) |
+
+`test_sexo_ignorado_no_plano_local` também afirma que `sex` não é parâmetro de
+`profile_adjustments` nem de `suggest_initial_load`: se alguém calibrar carga por
+sexo depois, o teste quebra em vez de virar promessa silenciosa.
 
 ## Verificação manual
+
+**Status da implementação:** os 5 passos abaixo precisam de aparelho/emulador e
+**não foram executados**. O que se pode provar sem dispositivo ficou nos testes
+acima: 1 e 3 em `ContractTest`/`ProfileValidatorTest`, 4 e 5 no backend
+(`test_sexo_ignorado_no_plano_local`, `test_sexo_fora_do_enum_da_422`), 2 na
+chave de preferência lida por `GenerateScreen` (`savedSex`) + `BackupImportTest`,
+5 (backup) em `BackupValidatorTest`/`BackupImportTest`. Falta conferir no
+aparelho: persistência visual da seleção depois de reiniciar (critério 2) e o
+comportamento 9 ("Prefiro não informar" sem texto interpretando).
 
 1. Gere com "Feminino" + 82,5 kg/178 cm; confira o request no log do backend
    (`docker compose logs`) sem expor o valor — só a presença da chave.

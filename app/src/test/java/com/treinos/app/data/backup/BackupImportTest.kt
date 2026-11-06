@@ -137,6 +137,37 @@ class BackupImportTest {
     }
 
     @Test
+    fun `importa backup v3 restaura sexo do perfil`() = runTest {
+        seedWorkout()
+        preferences.bodyWeightKg = 82.5
+        preferences.heightCm = 178
+        preferences.sex = "female"
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+        val profileStore = FakeProfileStore(bodyWeightKg = null, heightCm = null)
+
+        repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+
+        assertEquals("female", profileStore.sex)
+    }
+
+    @Test
+    fun `sexo invalido no backup e rejeitado sem alterar perfil`() = runTest {
+        seedWorkout()
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+            .copy(profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178, sex = "qualquer-coisa"))
+        val profileStore = FakeProfileStore(bodyWeightKg = 70.0, heightCm = 170, sex = "male")
+
+        val failure = runCatching {
+            repository.importBackup(payload, FakeDeviceIdStore("id-deste-app"), profileStore)
+        }.exceptionOrNull()
+
+        assertNotNull(failure)
+        assertEquals(70.0, profileStore.bodyWeightKg)
+        assertEquals(170, profileStore.heightCm)
+        assertEquals("male", profileStore.sex)
+    }
+
+    @Test
     fun `backup sem perfil no arquivo mantem perfil local`() = runTest {
         seedWorkout()
         val payload = backupFromCurrentData(deviceId = "celular-antigo").copy(profile = null)
@@ -185,6 +216,7 @@ class BackupImportTest {
     private class FakeProfileStore(
         override var bodyWeightKg: Double?,
         override var heightCm: Int?,
+        override var sex: String? = null,
     ) : ProfileStore
 
     private class UnusedBackend : BackendApi {

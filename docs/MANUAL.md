@@ -368,7 +368,8 @@ agora**, o banco do backend não recebe nenhum dado do app.
 - **Restaurar do backend** baixa o snapshot do `deviceId` exibido em Ajustes e
   **substitui** o banco local. Use antes de limpar os dados ou reinstalar.
 - **Exportar backup** gera um arquivo JSON com planos, sessões, séries e o
-  perfil (peso e altura). Você escolhe o destino na tela de arquivos do sistema,
+  perfil (peso, altura e sexo, quando informados). Você escolhe o destino na
+  tela de arquivos do sistema,
   inclusive uma pasta do Google Drive, OneDrive ou Dropbox.
 - **Importar backup** lê o arquivo e substitui os dados locais, depois reescreve
   o perfil. A operação é destrutiva: exporte antes de importar.
@@ -1243,16 +1244,21 @@ docker compose up -d --build
   Desinstalar o app apaga esses dados. Use **Exportar backup** em Ajustes para
   gerar um JSON e **Importar backup** para restaurá-lo depois — inclusive num
   aparelho recém-formatado. O arquivo (formato `schemaVersion = 3`) contém
-  planos, dias, exercícios, séries, sessões, o `deviceId` **e o seu perfil: peso
-  e altura**. Qualquer pessoa com o arquivo lê isso; não compartilhe o JSON como
+  planos, dias, exercícios, séries, sessões, o `deviceId` **e o seu perfil: peso,
+  altura e sexo**. Qualquer pessoa com o arquivo lê isso; não compartilhe o JSON como
   quem compartilha uma foto.
   - Arquivos acima de 25 MB são recusados **antes** da leitura, com mensagem de
     tamanho. Isso vale também para backup importado direto do Google Drive,
     OneDrive ou Dropbox — o app abre esses provedores pela mesma tela de arquivos
     do sistema, sem conta nem SDK de nuvem.
   - Backups antigos (`schemaVersion` 1 ou 2) continuam importando. Como eles não
-    falam de perfil, o peso e a altura **que já estão no aparelho são mantidos** —
-    restaurar um backup velho não apaga seu perfil.
+    falam de perfil, o peso, a altura e o sexo **que já estão no aparelho são
+    mantidos** — restaurar um backup velho não apaga seu perfil. Um `profile` de
+    v3 sem a chave `sex` significa "não informado" e limpa só o sexo (arquivo
+    escrito antes da H3-7 não conhece o campo).
+  - `sex` fora dos valores conhecidos (`male`, `female`, `other`,
+    `undisclosed`) faz o import **rejeitar o arquivo inteiro**, sem tocar nos
+    dados nem no perfil salvos.
   - A importação é **destrutiva**: ela substitui todo o banco local. Exporte antes.
   - Também é possível usar **Restaurar do backend**, desde que você já tenha
     sincronizado o `deviceId`.
@@ -1304,6 +1310,19 @@ pip install -r requirements.txt
 
 ## 7. Segurança e privacidade
 
+- **O que sai do aparelho ao gerar um treino.** Além dos parâmetros da semana
+  (objetivo, dias, equipamentos, foco, nível, duração), o request leva os campos
+  que você preencheu em **Seu perfil (opcional)**: **peso**, **altura** e
+  **sexo**. Eles viram texto no prompt que o backend envia à SenseNova, e o
+  backend guarda o request na tabela `generations` do banco dele.
+  - **O padrão é não informar.** Deixe o campo de sexo vazio e nada sobre isso
+    sai do aparelho; o mesmo valendo para peso e altura.
+  - **"Prefiro não informar"** é uma opção legítima do seletor, ao lado de
+    Feminino, Masculino e Outro. Nenhum deles gera erro nem altera as regras
+    numéricas do app: descanso, RPE, séries e cargas continuam calculados só
+    por IMC, sem coeficiente por sexo.
+  - Peso, altura e sexo **não** vão em `/v1/sync` nem para o relógio, e você
+    pode limpar a seleção a qualquer momento na tela de geração.
 - **A chave da SenseNova fica apenas no backend.** Ela não é enviada para o
   APK.
 - **Nunca commite `back/.env`.** O arquivo já está no `.gitignore`.

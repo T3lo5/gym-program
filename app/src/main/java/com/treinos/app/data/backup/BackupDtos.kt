@@ -13,11 +13,12 @@ data class BackupFile(
     val profile: BackupProfile? = null,
 )
 
-/** Perfil local (H1-5). Ausente em backups v1/v2. */
+/** Perfil local (H1-5). Ausente em backups v1/v2. `sex` entrou no bloco v3 sem novo bump (H3-7). */
 @Serializable
 data class BackupProfile(
     val bodyWeightKg: Double? = null,
     val heightCm: Int? = null,
+    val sex: String? = null,
 )
 
 @Serializable

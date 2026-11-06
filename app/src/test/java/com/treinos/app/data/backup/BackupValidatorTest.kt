@@ -298,6 +298,33 @@ class BackupValidatorTest {
     }
 
     @Test
+    fun aceita_v3_com_sexo_valido() {
+        for (value in listOf("male", "female", "other", "undisclosed")) {
+            val file = validFile(schemaVersion = 3)
+                .copy(profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178, sex = value))
+
+            assertTrue("sexo '$value' deveria ser aceito", BackupValidator.validate(file).valid)
+        }
+    }
+
+    @Test
+    fun rejeita_sexo_fora_do_enum_no_perfil() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(sex = "qualquer-coisa"))
+
+        val result = BackupValidator.validate(file)
+
+        assertFalse(result.valid)
+        assertTrue(result.message?.contains("Sexo") == true)
+    }
+
+    @Test
+    fun aceita_v3_sem_sexo_informado() {
+        val file = validFile(schemaVersion = 3).copy(profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178))
+
+        assertTrue(BackupValidator.validate(file).valid)
+    }
+
+    @Test
     fun rejeita_modality_invalida() {
         val dia = validDay(id = 10, planId = 1).copy(modality = "danca")
         val plano = validPlan(id = 1, days = listOf(dia))

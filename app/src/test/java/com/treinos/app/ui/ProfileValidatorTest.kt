@@ -90,4 +90,74 @@ class ProfileValidatorTest {
         assertFalse(result.valid)
         assertEquals("Altura inválida.", result.error)
     }
+
+    @Test
+    fun normaliza_rotulos_de_sexo() {
+        assertEquals("female", ProfileValidator.normalizeSex("Feminino"))
+        assertEquals("male", ProfileValidator.normalizeSex("Masculino"))
+        assertEquals("other", ProfileValidator.normalizeSex("Outro"))
+        assertEquals("other", ProfileValidator.normalizeSex("Outro / prefiro escrever"))
+        assertEquals("undisclosed", ProfileValidator.normalizeSex("Prefiro não informar"))
+        // A UI guarda o valor de contrato no estado do campo.
+        assertEquals("female", ProfileValidator.normalizeSex("female"))
+        assertTrue(ProfileValidator.SEX_VALUES.containsAll(listOf("male", "female", "other", "undisclosed")))
+    }
+
+    @Test
+    fun sexo_vazio_vira_null() {
+        assertNull(ProfileValidator.normalizeSex(null))
+        assertNull(ProfileValidator.normalizeSex(""))
+        assertNull(ProfileValidator.normalizeSex("   "))
+
+        val result = ProfileValidator.validate("70", "170", null)
+        assertTrue(result.valid)
+        assertNull(result.sex)
+    }
+
+    @Test
+    fun rotulo_desconhecido_vira_null() {
+        assertNull(ProfileValidator.normalizeSex("qualquer-coisa"))
+        assertNull(ProfileValidator.normalizeSex("sexo"))
+        // O recorte é só do rótulo, não de um prefixo de outro valor.
+        assertNull(ProfileValidator.normalizeSex("femininoX"))
+        // Nunca vira erro de peso/altura (regra 2).
+        val result = ProfileValidator.validate("70", "170", "qualquer-coisa")
+        assertTrue(result.valid)
+        assertNull(result.error)
+        assertNull(result.sex)
+    }
+
+    @Test
+    fun sexo_nao_invalida_peso_ou_altura() {
+        val invalido = ProfileValidator.validate("abc", "170", "female")
+        assertFalse(invalido.valid)
+        assertEquals("Peso inválido.", invalido.error)
+        assertEquals("female", invalido.sex)
+
+        val faixa = ProfileValidator.validate("400", "170", "male")
+        assertFalse(faixa.valid)
+        assertEquals("Peso fora da faixa permitida (30–300 kg).", faixa.error)
+
+        // Sexo nunca produz erro dele mesmo, nem limpa os outros campos (regra 4).
+        val valido = ProfileValidator.validate("82,5", "178", "undisclosed")
+        assertTrue(valido.valid)
+        assertEquals(82.5, valido.bodyWeightKg!!, 0.001)
+        assertEquals(178, valido.heightCm)
+        assertEquals("undisclosed", valido.sex)
+    }
+
+    @Test
+    fun perfil_sem_sexo_continua_valido() {
+        val semPerfil = ProfileValidator.validate("", "")
+        assertTrue(semPerfil.valid)
+        assertNull(semPerfil.bodyWeightKg)
+        assertNull(semPerfil.heightCm)
+        assertNull(semPerfil.sex)
+
+        val soPesoEAltura = ProfileValidator.validate("82,5", "178")
+        assertTrue(soPesoEAltura.valid)
+        assertEquals(82.5, soPesoEAltura.bodyWeightKg!!, 0.001)
+        assertEquals(178, soPesoEAltura.heightCm)
+        assertNull(soPesoEAltura.sex)
+    }
 }

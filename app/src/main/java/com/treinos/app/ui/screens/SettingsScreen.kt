@@ -552,9 +552,9 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        text = "Exporte seus planos, treinos, séries e o perfil (peso e altura) para um " +
+                        text = "Exporte seus planos, treinos, séries e o perfil (peso, altura e sexo) para um " +
                             "arquivo JSON. Restaure depois, mesmo após desinstalar o app. Quem tiver o " +
-                            "arquivo lê esses dados — inclua peso e altura.",
+                            "arquivo lê esses dados — inclua peso, altura e sexo.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

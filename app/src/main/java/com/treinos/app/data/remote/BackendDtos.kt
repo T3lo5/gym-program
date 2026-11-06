@@ -16,6 +16,7 @@ data class GeneratePlanRequest(
     val reviewAfterWeeks: Int = 4,
     val bodyWeightKg: Double? = null,
     val heightCm: Int? = null,
+    val sex: String? = null,
     val modalities: List<ModalityDto> = emptyList(),
 )
 

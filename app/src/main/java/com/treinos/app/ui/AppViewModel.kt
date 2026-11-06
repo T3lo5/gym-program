@@ -276,6 +276,9 @@ class AppViewModel(
     private val _heightCm = MutableStateFlow(preferences.heightCm)
     val heightCm: StateFlow<Int?> = _heightCm.asStateFlow()
 
+    private val _sex = MutableStateFlow(preferences.sex)
+    val sex: StateFlow<String?> = _sex.asStateFlow()
+
     private val _wearState = MutableStateFlow<WearWorkoutState?>(null)
     val wearState: StateFlow<WearWorkoutState?> = _wearState.asStateFlow()
 
@@ -460,12 +463,13 @@ class AppViewModel(
         reviewWeeks: Int,
         bodyWeightKgText: String,
         heightCmText: String,
+        sexChoice: String?,
     ) {
         if (_isGenerating.value) return
         viewModelScope.launch {
             _isGenerating.value = true
             try {
-                val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText)
+                val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText, sexChoice)
                 if (!validation.valid) {
                     _message.value = validation.error ?: "Perfil inválido."
                     return@launch
@@ -479,6 +483,9 @@ class AppViewModel(
                     preferences.heightCm = validation.heightCm
                     _heightCm.value = preferences.heightCm
                 }
+                // O campo nasce com a seleção salva, então null aqui é escolha explícita.
+                preferences.sex = validation.sex
+                _sex.value = preferences.sex
                 val response = repository.generatePlan(
                     GeneratePlanRequest(
                         deviceId = preferences.deviceId,
@@ -491,6 +498,7 @@ class AppViewModel(
                         reviewAfterWeeks = reviewWeeks,
                         bodyWeightKg = validation.bodyWeightKg,
                         heightCm = validation.heightCm,
+                        sex = validation.sex,
                         modalities = modalities,
                     )
                 )

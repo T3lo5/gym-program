@@ -22,6 +22,7 @@ object BackupValidator {
     private val METRIC_TYPES = setOf("reps_weight", "duration", "distance_duration")
     private val POOL_LENGTHS = setOf(25, 50)
     private val STROKES = setOf("crawl", "costas", "peito", "borboleta", "misto", "outro")
+    private val SEX_VALUES = setOf("male", "female", "other", "undisclosed")
 
     fun validateSize(fileSizeBytes: Long): BackupValidationResult =
         if (fileSizeBytes > MAX_FILE_BYTES) {
@@ -68,6 +69,14 @@ object BackupValidator {
                 return BackupValidationResult(
                     valid = false,
                     message = "Altura do perfil fora da faixa permitida (120–250 cm).",
+                    preview = null,
+                )
+            }
+            val sex = profile.sex
+            if (sex != null && sex !in SEX_VALUES) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Sexo do perfil com valor não reconhecido.",
                     preview = null,
                 )
             }

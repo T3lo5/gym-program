@@ -159,6 +159,38 @@ class BackupSerializationTest {
     }
 
     @Test
+    fun v3_round_trip_preserva_sexo() {
+        val file = sampleFile().copy(
+            schemaVersion = 3,
+            profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178, sex = "female"),
+        )
+
+        val decoded = json.decodeFromString(BackupFile.serializer(), json.encodeToString(BackupFile.serializer(), file))
+
+        assertEquals("female", decoded.profile?.sex)
+    }
+
+    @Test
+    fun `v3 sem chave sex decodifica null (sem bump de versao)`() {
+        // Arquivo escrito pelo app da H3-6: v3, perfil presente, nenhuma chave `sex`.
+        val escritoPeloAppAntigo = backupExportEncoder
+            .encodeToString(
+                BackupFile.serializer(),
+                sampleFile().copy(schemaVersion = 3, profile = BackupProfile(bodyWeightKg = 82.5, heightCm = 178)),
+            )
+            .replace(",\"sex\":null", "")
+
+        assertTrue(escritoPeloAppAntigo.contains("\"heightCm\":178"))
+        assertTrue(!escritoPeloAppAntigo.contains("\"sex\""))
+
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), escritoPeloAppAntigo)
+
+        assertNull(decoded.profile?.sex)
+        assertEquals(82.5, decoded.profile?.bodyWeightKg)
+        assertEquals(178, decoded.profile?.heightCm)
+    }
+
+    @Test
     fun decoder_de_producao_ignora_chave_desconhecida() {
         val escritoPeloExport = backupExportEncoder.encodeToString(
             BackupFile.serializer(),

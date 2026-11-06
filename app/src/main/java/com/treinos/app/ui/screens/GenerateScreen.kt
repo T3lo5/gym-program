@@ -83,6 +83,14 @@ private val muscleOptions = listOf(
 private val durationOptions = listOf(30, 45, 60, 90)
 private val reviewOptions = listOf(2, 4, 6, 8)
 
+/** Rótulos pt-BR → valores de contrato (H3-7); o valor escolhido é o que viaja no request. */
+private val sexOptions = listOf(
+    "female" to "Feminino",
+    "male" to "Masculino",
+    "other" to "Outro",
+    "undisclosed" to "Prefiro não informar",
+)
+
 /** Rascunho de uma modalidade da semana híbrida antes de gerar. */
 data class ModalityDraft(
     val included: Boolean = false,
@@ -105,6 +113,7 @@ fun GenerateScreen(
     onBack: () -> Unit,
     savedBodyWeightKg: Double? = null,
     savedHeightCm: Int? = null,
+    savedSex: String? = null,
     onGenerate: (
         modalities: List<ModalityDto>,
         goal: String,
@@ -116,6 +125,7 @@ fun GenerateScreen(
         reviewWeeks: Int,
         bodyWeightKgText: String,
         heightCmText: String,
+        sexChoice: String?,
     ) -> Unit,
 ) {
     var goal by remember { mutableStateOf("hypertrophy") }
@@ -127,6 +137,7 @@ fun GenerateScreen(
     var reviewWeeks by remember { mutableStateOf(4) }
     var bodyWeightKgText by remember { mutableStateOf(savedBodyWeightKg?.toString() ?: "") }
     var heightCmText by remember { mutableStateOf(savedHeightCm?.toString() ?: "") }
+    var sexChoice by remember { mutableStateOf(savedSex) }
     var profileError by remember { mutableStateOf<String?>(null) }
 
     // Um draft por tipo de modalidade.
@@ -387,6 +398,28 @@ fun GenerateScreen(
                     )
                 }
             }
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Sexo (opcional)",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ChipGroup(
+                        options = sexOptions,
+                        selected = sexChoice?.let { setOf(it) } ?: emptySet(),
+                        onToggle = { value -> sexChoice = if (value == sexChoice) null else value },
+                    )
+                    Text(
+                        text = "Omitir é o padrão. Você pode limpar a seleção quando quiser.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             profileError?.let { error ->
                 item {
                     Text(
@@ -397,7 +430,7 @@ fun GenerateScreen(
                     )
                 }
             }
-            if (savedBodyWeightKg != null || savedHeightCm != null) {
+            if (savedBodyWeightKg != null || savedHeightCm != null || savedSex != null) {
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -420,6 +453,12 @@ fun GenerateScreen(
                             savedHeightCm?.let {
                                 Text(text = "Altura: $it cm", style = MaterialTheme.typography.bodyMedium)
                             }
+                            savedSex?.let { value ->
+                                val label = sexOptions.firstOrNull { it.first == value }?.second
+                                if (label != null) {
+                                    Text(text = "Sexo: $label", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
                             if (savedBodyWeightKg != null && savedHeightCm != null) {
                                 val bmi = savedBodyWeightKg / ((savedHeightCm / 100.0) * (savedHeightCm / 100.0))
                                 Text(text = "IMC: ${"%.1f".format(bmi)}", style = MaterialTheme.typography.bodyMedium)
@@ -435,7 +474,7 @@ fun GenerateScreen(
             item {
                 Button(
                     onClick = {
-                        val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText)
+                        val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText, sexChoice)
                         if (!validation.valid) {
                             profileError = validation.error
                             return@Button
@@ -459,6 +498,7 @@ fun GenerateScreen(
                             reviewWeeks,
                             bodyWeightKgText,
                             heightCmText,
+                            sexChoice,
                         )
                     },
                     enabled = !isGenerating && hasModalities,

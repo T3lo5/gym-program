@@ -152,6 +152,7 @@ def test_prompt_inclui_perfil():
         injuriesOrLimitations = ""
         bodyWeightKg = 82.5
         heightCm = 178
+        sex = None
 
     prompt = build_user_prompt(Req())
     assert "- Peso corporal: 82.5 kg" in prompt
@@ -173,6 +174,7 @@ def test_prompt_sem_perfil_nao_menciona_peso():
         injuriesOrLimitations = ""
         bodyWeightKg = None
         heightCm = None
+        sex = None
 
     prompt = build_user_prompt(Req())
     assert "Peso corporal" not in prompt
@@ -192,3 +194,79 @@ def test_limites_de_validacao():
     r = GenerateRequest(bodyWeightKg=300.0, heightCm=250)
     assert r.bodyWeightKg == 300.0
     assert r.heightCm == 250
+
+
+# ---------------- Sexo opcional (H3-7) ----------------
+
+
+def _prompt_request(**kwargs):
+    defaults = {
+        "goal": "hypertrophy",
+        "daysPerWeek": 3,
+        "availableEquipment": ["barbell"],
+        "targetMuscles": ["chest"],
+        "currentLevel": "intermediate",
+        "sessionDurationMinutes": 60,
+        "preferredSplit": None,
+        "injuriesOrLimitations": "",
+        "bodyWeightKg": None,
+        "heightCm": None,
+        "sex": None,
+    }
+    defaults.update(kwargs)
+
+    class Req:
+        pass
+
+    req = Req()
+    for key, value in defaults.items():
+        setattr(req, key, value)
+    return req
+
+
+def test_sexo_ignorado_no_plano_local():
+    """H3-7 decisão de escopo: sexo não pode alterar nenhum número do plano local."""
+    import inspect
+
+    from app.main import GenerateRequest
+
+    # O campo existe no contrato, mas com default None: request antigo continua válido.
+    assert "sex" in GenerateRequest.model_fields
+    assert GenerateRequest(deviceId="d1").sex is None
+
+    # A única função que ajusta descanso/RPE/séries não recebe o campo.
+    assert "sex" not in inspect.signature(profile_adjustments).parameters
+    assert "sex" not in inspect.signature(suggest_initial_load).parameters
+
+    com_sexo = GenerateRequest(bodyWeightKg=82.5, heightCm=178, sex="female")
+    sem_sexo = GenerateRequest(bodyWeightKg=82.5, heightCm=178)
+    assert profile_adjustments(_base_plan(), com_sexo.bodyWeightKg, com_sexo.heightCm) == profile_adjustments(
+        _base_plan(), sem_sexo.bodyWeightKg, sem_sexo.heightCm
+    )
+    # Sexo informado sem peso/altura também não muda nada.
+    assert profile_adjustments(_base_plan(), None, None) == _base_plan()
+
+
+def test_prompt_inclui_sexo():
+    prompt = build_user_prompt(_prompt_request(bodyWeightKg=82.5, heightCm=178, sex="female"))
+
+    assert "- Sexo biológico: feminino" in prompt
+    assert "- Peso corporal: 82.5 kg" in prompt
+    assert "- Altura: 178 cm" in prompt
+    assert "- IMC: 26.0" in prompt
+
+
+def test_prompt_omite_sexo_null():
+    assert "Sexo" not in build_user_prompt(_prompt_request(sex=None))
+    assert "Sexo" not in build_user_prompt(_prompt_request(bodyWeightKg=82.5, heightCm=178))
+
+
+def test_sexo_fora_do_enum_da_422():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        response = client.post("/v1/generate-workout", json={"deviceId": "d1", "sex": "qualquer-coisa"})
+
+    assert response.status_code == 422

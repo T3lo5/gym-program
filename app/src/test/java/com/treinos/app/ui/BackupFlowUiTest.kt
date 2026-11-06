@@ -245,7 +245,7 @@ class BackupFlowUiTest {
     fun card_de_backup_avisa_que_o_arquivo_contem_o_perfil() {
         render(mutableStateOf<BackupImportState>(BackupImportState.Idle))
 
-        composeRule.onNodeWithText("perfil (peso e altura)", substring = true)
+        composeRule.onNodeWithText("perfil (peso, altura e sexo)", substring = true)
             .performScrollTo()
             .assertExists()
     }

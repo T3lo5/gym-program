@@ -213,6 +213,7 @@ class GenerateRequest(BaseModel):
     reviewAfterWeeks: int = Field(ge=1, le=12, default=4)
     bodyWeightKg: Optional[float] = Field(default=None, ge=30.0, le=300.0)
     heightCm: Optional[int] = Field(default=None, ge=120, le=250)
+    sex: Optional[Literal["male", "female", "other", "undisclosed"]] = None
     modalities: Optional[List[Dict[str, Any]]] = Field(
         default_factory=list,
         description="Lista de modalidades da semana híbrida (strength/run/mobility). "
@@ -401,6 +402,15 @@ async def health():
     }
 
 
+# Rótulos em pt-BR para o prompt (H3-7). O valor de contrato nunca muda.
+SEX_LABELS_PT = {
+    "female": "feminino",
+    "male": "masculino",
+    "other": "outro",
+    "undisclosed": "prefiro não informar",
+}
+
+
 def build_user_prompt(request: GenerateRequest) -> str:
     """Monta o prompt do usuário para a IA, incluindo perfil quando disponível."""
     equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
@@ -417,6 +427,11 @@ def build_user_prompt(request: GenerateRequest) -> str:
 
 O treino deve ser progressivo, balanceado e usar apenas exercícios do catálogo fornecido.
 Retorne APENAS o JSON válido."""
+
+    if request.sex is not None:
+        prompt += f"""
+
+- Sexo biológico: {SEX_LABELS_PT[request.sex]}"""
 
     if request.bodyWeightKg is not None and request.heightCm is not None:
         bmi = request.bodyWeightKg / ((request.heightCm / 100.0) ** 2)

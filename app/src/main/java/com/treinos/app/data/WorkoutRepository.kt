@@ -581,6 +581,7 @@ class WorkoutRepository(
             profile = BackupProfile(
                 bodyWeightKg = preferences.bodyWeightKg,
                 heightCm = preferences.heightCm,
+                sex = preferences.sex,
             ),
         )
 
@@ -637,6 +638,7 @@ class WorkoutRepository(
             payload.profile?.let { profile ->
                 profileStore.bodyWeightKg = profile.bodyWeightKg
                 profileStore.heightCm = profile.heightCm
+                profileStore.sex = profile.sex
             }
         }
 

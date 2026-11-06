@@ -67,6 +67,16 @@ class AppPreferences private constructor(
             }
         }
 
+    override var sex: String?
+        get() = prefs.getString(KEY_SEX, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_SEX).apply()
+            } else {
+                prefs.edit().putString(KEY_SEX, value).apply()
+            }
+        }
+
     fun isRecentCommand(commandId: String): Boolean {
         val ids = prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()
         return CommandDedupe.isRecent(ids, commandId)
@@ -87,6 +97,7 @@ class AppPreferences private constructor(
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
         private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"
         private const val KEY_HEIGHT_CM = "height_cm"
+        private const val KEY_SEX = "sex"
         private const val KEY_WEAR_RECENT_COMMANDS = "wear_recent_commands"
     }
 }

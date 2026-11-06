@@ -70,6 +70,7 @@ fun TreinosApp(viewModel: AppViewModel) {
     val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
     val bodyWeightKg by viewModel.bodyWeightKg.collectAsStateWithLifecycle()
     val heightCm by viewModel.heightCm.collectAsStateWithLifecycle()
+    val sex by viewModel.sex.collectAsStateWithLifecycle()
     val exerciseMedia by viewModel.exerciseMedia.collectAsStateWithLifecycle()
     val selectedExerciseId by viewModel.selectedExerciseId.collectAsStateWithLifecycle()
     val isUpdatingCatalog by viewModel.isUpdatingCatalog.collectAsStateWithLifecycle()
@@ -200,6 +201,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onBack = viewModel::goHome,
                     savedBodyWeightKg = bodyWeightKg,
                     savedHeightCm = heightCm,
+                    savedSex = sex,
                     onGenerate = viewModel::generatePlan,
                 )
 
