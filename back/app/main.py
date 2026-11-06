@@ -586,7 +586,7 @@ async def generate_workout(request: GenerateRequest):
 
     if SENSENOVA_API_KEY:
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=85.0) as client:
                 response = await client.post(
                     f"{SENSENOVA_BASE_URL}/chat/completions",
                     headers={
