@@ -627,7 +627,15 @@ async def generate_workout(request: GenerateRequest):
             source = "ai"
             model_used = MODEL_ID
         except Exception as exc:
-            print(f"AI generation failed; using local fallback: {exc}")
+            raw = ""
+            try:
+                raw = response.text
+            except Exception:
+                raw = "<sem resposta>"
+            print(
+                "AI generation failed; using local fallback: "
+                f"{exc} | resposta bruta da IA: {raw[:500]}"
+            )
     else:
         print("SENSENOVA_API_KEY not set; using local fallback")
 
