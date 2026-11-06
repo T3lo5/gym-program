@@ -26,8 +26,7 @@ class AppPreferences private constructor(
         get() = prefs.getString(KEY_BACKEND_URL, null)?.takeIf { it.isNotBlank() }
             ?: DEFAULT_BACKEND_URL
         set(value) {
-            val normalized = value.trim().trimEnd('/')
-            prefs.edit().putString(KEY_BACKEND_URL, normalized).apply()
+            prefs.edit().putString(KEY_BACKEND_URL, normalizeBackendUrl(value)).apply()
         }
 
     override var deviceId: String
@@ -91,6 +90,20 @@ class AppPreferences private constructor(
     companion object {
         /** Emulador Android acessa o host em 10.0.2.2. */
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000"
+
+        /**
+         * Aceita o endereço com ou sem esquema ("192.168.1.16:3000" é o formato
+         * sugerido na tela de Ajustes). Sem esquema o OkHttp recusa a URL antes
+         * de tentar a conexão, então assume HTTP — o backend da LAN não tem TLS.
+         */
+        internal fun normalizeBackendUrl(raw: String): String {
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) return ""
+            val hasScheme = trimmed.startsWith("http://", ignoreCase = true) ||
+                trimmed.startsWith("https://", ignoreCase = true)
+            val withScheme = if (hasScheme) trimmed else "http://$trimmed"
+            return withScheme.trimEnd('/')
+        }
 
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"

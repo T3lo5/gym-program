@@ -133,6 +133,15 @@ Testes de `NsdManager` exigem device/emulador; a verificação é manual.
 > **Status (2026-11-04):** o gate passou, mas os passos abaixo exigem celular +
 > backend nativo na mesma Wi-Fi e **não** foram executados. A entrega está
 > verificada por código/teste, não por smoke test em device.
+>
+> **Correção pós-entrega (2026-11-06):** o `network_security_config.xml` listava
+> faixas CIDR (`192.168.0.0/16` etc.) em `<domain>`. O Android não interpreta
+> CIDR ali — é nome de host exato/sufixo —, então todo IP da LAN caía no
+> `base-config` com `cleartextTrafficPermitted="false"` e o app respondia
+> "Não foi possível falar com o backend" mesmo com o backend no ar. O cleartext
+> passou para o `base-config` (não há como enumerar a LAN) e a URL manual agora
+> aceita o formato sem esquema (`192.168.1.16:3000`), que é o que a tela sugere.
+> Falta o smoke test em device descrito abaixo.
 
 1. Rode o backend sem Docker: `cd back && uvicorn app.main:app --host 0.0.0.0 --port 3000` com `MDNS_ENABLED=true`.
 2. No celular, mesma Wi-Fi, abra Ajustes → “Buscar backends”.

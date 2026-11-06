@@ -536,7 +536,7 @@ número não reprova o build: o gate falha por teste quebrado, não por percentu
 | Play Protect bloqueia | APK fora da Play Store | **Mais detalhes → Instalar mesmo assim** |
 | Não abre a opção de instalar | Permissão de fontes desconhecidas desativada | Ative para o navegador/gerenciador de arquivos |
 | App abre e fecha | Versão incompatível ou APK corrompido | Confira Android 8.0+, reinstale e envie o log se persistir |
-| "Não foi possível falar com o backend" | Backend desligado ou URL errada | Confira `curl http://localhost:3000/health`, o IP e a mesma rede Wi-Fi |
+| "Não foi possível falar com o backend" | Backend desligado, URL errada ou APK antigo (cleartext da LAN bloqueado) | Confira `curl http://IP:3000/health` no PC **e** no navegador do celular, use `http://IP:3000` e a mesma Wi-Fi; se o navegador abre e o app não, atualize o APK |
 | Treino gerado não aparece | Resposta do backend falhou antes de salvar | Toque em **Testar conexão** em Ajustes e gere de novo |
 | Sincronizou, mas o backend parece vazio | URL aponta para outro banco ou outro dispositivo | Confira `GET /v1/sync/status?deviceId=...` e o arquivo `back/data/treinos.db` |
 | Não atualiza | Assinatura diferente | Desinstale e instale de novo (apaga dados) |

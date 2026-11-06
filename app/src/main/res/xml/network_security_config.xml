@@ -1,25 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Local network ranges -->
-        <domain includeSubdomains="true">10.0.0.0/8</domain>
-        <domain includeSubdomains="true">172.16.0.0/12</domain>
-        <domain includeSubdomains="true">192.168.0.0/16</domain>
-        <domain includeSubdomains="true">169.254.0.0/16</domain>
-        <!-- Localhost for adb reverse -->
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <!-- mDNS local domains -->
-        <domain includeSubdomains="true">*.local</domain>
-    </domain-config>
-    
-    <!-- Allow HTTPS everywhere -->
-    <domain-config>
-        <domain includeSubdomains="true">token.sensenova.ai</domain>
-        <domain includeSubdomains="true">platform.sensenova.ai</domain>
-    </domain-config>
-    
-    <base-config cleartextTrafficPermitted="false">
+    <!--
+        O destino HTTP é escolhido pelo usuário: IP da LAN, host *.local ou
+        localhost (adb reverse). O Android não aceita faixas CIDR em <domain>
+        (um <domain> é nome de host exato ou sufixo), então listar
+        "192.168.0.0/16" não liberava nada e todo IP da LAN caía no
+        base-config antigo, que proibia cleartext — daí o
+        "Não foi possível falar com o backend" com o backend no ar.
+
+        Como não há como enumerar a rede local, o cleartext é liberado no
+        base-config. O único tráfego HTTP do app é o backend configurado pelo
+        usuário; chamadas de IA passam por ele, não direto do aparelho.
+    -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
