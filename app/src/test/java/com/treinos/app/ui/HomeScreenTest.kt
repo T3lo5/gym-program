@@ -1,14 +1,23 @@
 package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import com.treinos.app.data.local.SessionExerciseEntity
+import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutPlanEntity
+import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.SessionKind
@@ -38,9 +47,27 @@ class HomeScreenTest {
                 daysPerWeek = 7,
             ),
             days = listOf(
-                day(weekday = 1, dayOrder = 0, modality = "strength", exercises = 5),
-                day(weekday = 1, dayOrder = 1, modality = "run"),
-                day(weekday = 2, dayOrder = 0, modality = "mobility"),
+                day(
+                    weekday = 1,
+                    dayOrder = 0,
+                    modality = "strength",
+                    exercises = listOf(
+                        exercise(id = "Barbell_Bench_Press", name = "Supino reto", order = 0),
+                        exercise(id = "Barbell_Squat", name = "Agachamento", order = 1),
+                    ),
+                ),
+                day(
+                    weekday = 1,
+                    dayOrder = 1,
+                    modality = "run",
+                    exercises = listOf(exercise(id = "run_easy_30", name = "Corrida leve 30 min", order = 0)),
+                ),
+                day(
+                    weekday = 2,
+                    dayOrder = 0,
+                    modality = "mobility",
+                    exercises = listOf(exercise(id = "mobility_spine", name = "Mobilidade de coluna", order = 0)),
+                ),
             ),
         )
     }
@@ -108,15 +135,103 @@ class HomeScreenTest {
         assertEquals(2, plan.days.filter { it.day.weekday == 1 }.size)
     }
 
+    @Test
+    fun card_de_exercicio_exibe_imagem_quando_disponivel() {
+        composeRule.setContent {
+            HomeScreen(
+                plan = plan,
+                inProgressSession = null,
+                exerciseMedia = mapOf(
+                    "Barbell_Bench_Press" to ExerciseMedia(
+                        id = "Barbell_Bench_Press",
+                        name = "Supino reto",
+                        primaryMuscles = listOf("chest"),
+                        equipment = "barbell",
+                        instructions = emptyList(),
+                        imageUrl = "https://example.test/bench.jpg",
+                    ),
+                ),
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onAllNodes(hasText("Academia") and hasClickAction()).onFirst().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Supino reto", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        assertTrue(
+            composeRule.onAllNodesWithContentDescription(
+                "Imagem do exercício Supino reto",
+                useUnmergedTree = true,
+            ).fetchSemanticsNodes().isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun corrida_sem_imagem_nao_quebra_card() {
+        val runPlan = WorkoutPlanWithDetails(
+            plan = WorkoutPlanEntity(id = 2, name = "Plano corrida", daysPerWeek = 1),
+            days = listOf(
+                day(
+                    weekday = 3,
+                    dayOrder = 0,
+                    modality = "run",
+                    exercises = listOf(
+                        exercise(id = "run_easy_30", name = "Corrida leve 30 min", order = 0),
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            HomeScreen(
+                plan = runPlan,
+                inProgressSession = null,
+                exerciseMedia = emptyMap(),
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onAllNodes(hasText("Corrida") and hasClickAction()).onFirst().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Corrida leve 30 min", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    private fun exercise(id: String, name: String, order: Int): WorkoutPlanExerciseEntity =
+        WorkoutPlanExerciseEntity(
+            id = order.toLong(),
+            dayId = 0,
+            exerciseId = id,
+            exerciseName = name,
+            exerciseOrder = order,
+            sets = 3,
+            targetReps = "8-12",
+        )
+
     private fun day(
         weekday: Int,
         dayOrder: Int,
         modality: String,
-        exercises: Int = 1,
+        exercises: List<WorkoutPlanExerciseEntity>,
     ): WorkoutDayWithExercises =
         WorkoutDayWithExercises(
             day = WorkoutDayEntity(
-                id = 0,
+                id = weekday.toLong() * 10 + dayOrder,
                 planId = 0,
                 name = when (modality) {
                     "strength" -> "Treino A"
@@ -128,14 +243,6 @@ class HomeScreenTest {
                 weekday = weekday,
                 modality = modality,
             ),
-            exercises = List(exercises) { i ->
-                WorkoutPlanExerciseEntity(
-                    id = i.toLong(),
-                    dayId = 0,
-                    exerciseId = "ex$i",
-                    exerciseOrder = i,
-                    sets = 3,
-                )
-            },
+            exercises = exercises,
         )
 }

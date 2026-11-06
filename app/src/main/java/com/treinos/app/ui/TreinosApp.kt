@@ -186,6 +186,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     sessions = sessions,
                     planCycle = planCycle,
                     showDeloadNotice = planCycle?.isDeloadSuggested == true && !isDeloadNoticeDismissed,
+                    exerciseMedia = exerciseMedia,
                     onDismissDeloadNotice = { isDeloadNoticeDismissed = true },
                     onGenerate = viewModel::openGenerate,
                     onHistory = viewModel::openHistory,

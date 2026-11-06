@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-14` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-06` (aprovada pelo usuário no chat) |
+| Implementação | `em andamento` |
 | Depende de | H1-3 (imagens dos exercícios — catálogo e media já existem), H3-11 (geração híbrida por sessão) |
 
 ## Objetivo
@@ -25,9 +25,9 @@ Cada exercício do plano gerado exibe sua imagem (do catálogo, via Coil) ao lad
 | Arquivo | Mudança |
 |---|---|
 | `app/src/main/java/com/treinos/app/ui/screens/HomeScreen.kt` | Card de sessão exibe imagem de cada exercício (via `ExerciseImage` + `exerciseMedia` map) |
-| `app/src/main/java/com/treinos/app/ui/screens/GenerateScreen.kt` | Ao visualizar o plano gerado, cada exercício exibe imagem |
-| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | Garantir que `exerciseMedia` é carregado e passado para as telas de plano (já existe `loadExerciseMedia`) |
-| `app/src/main/java/com/treinos/app/ui/screens/WorkoutScreen.kt` | Confirmar que já exibe imagem dos exercícios (já faz via `exerciseMedia` param) |
+| `app/src/main/java/com/treinos/app/ui/screens/GenerateScreen.kt` | N/A nesta entrega: a tela é o formulário de geração e não renderiza cards de exercícios do plano; o plano gerado é visualizado na Home |
+| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | Sem mudança: `exerciseMedia` e `loadExerciseMedia` já existiam (H1-3); fluxo confirmado |
+| `app/src/main/java/com/treinos/app/ui/screens/WorkoutScreen.kt` | Confirmado: já exibe via `exerciseMedia`/`ExerciseImage` (H1-3) |
 | `app/src/main/java/com/treinos/app/ui/screens/MobilityScreen.kt` | Não aplicar (mobilidade não tem imagem de catálogo) |
 | `app/src/test/java/com/treinos/app/ui/HomeScreenTest.kt` | Teste: card de exercício exibe imagem quando disponível |
 

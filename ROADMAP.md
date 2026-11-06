@@ -99,6 +99,8 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-7 | Sexo opcional no perfil | `AppPreferences.sex` (chave `sex`) + `interface ProfileStore` com `sex`; `ProfileValidator.SEX_VALUES`/`normalizeSex` e `Result.sex` (rótulo não reconhecido vira `null`, nunca erro de peso/altura); seletor de 4 rótulos (`Feminino`/`Masculino`/`Outro`/`Prefiro não informar`) sem texto livre em "Seu perfil (opcional)" de `GenerateScreen` + linha no card "Perfil salvo"; `AppViewModel.generatePlan` persiste (incluindo limpar) e envia `GeneratePlanRequest.sex`; backend `GenerateRequest.sex: Optional[Literal[...]]` (fora do enum → 422) e linha `- Sexo biológico:` apenas quando o campo vem, em `build_user_prompt`; `plan_builder.py` **intocado** — `profile_adjustments`/`suggest_initial_load` não recebem `sex` (regressão zero); `sex` no bloco `profile` do backup sem bump de `schemaVersion` (v3 sem a chave decodifica `null`, valor inválido rejeita o arquivo inteiro); `MANUAL.md` §7 nomeia peso, altura e sexo como os campos que saem do aparelho; testes `ProfileValidatorTest` (5), `ContractTest` (2), `BackupValidatorTest` (3), `BackupSerializationTest` (2), `BackupImportTest` (2) e `test_profile_adjustments.py` (4); [spec](docs/specs/H3-7-profile-sex.md) |
 | H3-11 | Geração híbrida por sessão e abas por modalidade | Modalidades podem continuar no mesmo dia, mas cada uma vira uma sessão independente, com início, execução e aba próprios: musculação com 4–8 exercícios e equipamento de academia, corrida e mobilidade com telas próprias; a resposta da IA é normalizada antes de salvar. `SessionKind`/`ModalityTab`, `groupSessionsByModality`, `defaultModalityTab`, `planVolumeLabel`, `sessionsOnWeekday`, `RunLogInput`/`RunLogValidation`/`validateRunLog`, `RunWorkoutScreen`, `MobilityScreen` modo rotina planejada; backend `build_strength_session`, `assign_weekdays`, `normalize_hybrid_plan`, `template_for`, `profile_adjustments` só `reps_weight`, `resolve_plan_ids` ignora corrida/mobilidade, `SYSTEM_PROMPT_HYBRID`, `ExerciseDTO.sets` até 20; testes `test_hybrid_plan.py`, `test_run_templates.py`, `test_profile_adjustments.py`, `test_contract_v2.py`, `WeeklyScheduleTest`, `SessionModeTest`, `RunMetricsTest`, `MobilityRoutineTest`, `WorkoutRepositorySessionTest`, `HistoryMetricsTest`, `HomeScreenTest`; [spec](docs/specs/H3-11-hybrid-sessions.md) |
 | H3-6 | Perfil no backup JSON + guarda de tamanho | `BackupProfile` (`bodyWeightKg`/`heightCm`) dentro de `BackupFile.profile` e `schemaVersion = 3` no export, com `SUPPORTED_VERSIONS = setOf(1, 2, 3)` e faixas validadas (30–300 kg, 120–250 cm, NaN/Infinity rejeitados); `interface ProfileStore` em `RestoreContracts.kt`, implementada por `AppPreferences`; `importBackup(payload, deviceIdStore, profileStore)` só escreve o perfil quando `profile != null` — v1/v2 restauram planos e mantêm peso/altura locais, v3 com campo `null` limpa; nada é escrito se a validação ou `replaceAllData` falhar; `BackupCodec.kt` (`backupExportEncoder` com `encodeDefaults`, `backupImportDecoder` com `ignoreUnknownKeys`) colocado em produção para que os testes usem exatamente os `Json` do app; `BackupSizeGuard.readLimited` + `documentSize` (`OpenableColumns.SIZE`) em `TreinosApp.importLauncher` recusam 25 MB+ **antes** do decode, inclusive quando o provedor de nuvem não informa o tamanho; texto de Ajustes avisa que o arquivo contém peso e altura; testes `BackupSizeGuardTest` (9), `BackupValidatorTest` (v3/v4/faixas/NaN), `BackupSerializationTest` (round-trip, `null` explícito, chave desconhecida) e `BackupImportTest` (perfil restaurado, v2 não altera, falha não toca nas preferências); sexo **não** entrou — é a H3-7; [spec](docs/specs/H3-6-profile-in-backup.md) |
+| H3-12 | Séries/reps visíveis em cada exercício | `planVolumeLabel` em `WeeklySchedule.kt` expõe `sets × targetReps` (ou só séries/reps quando um dos lados falta) para o app; `HomeScreen.kt` mostra o volume de cada exercício no card da sessão (incluindo “X séries” quando não há alvo) — corrida/mobilidade só exibem reps quando o alvo existir; teste `WeeklyScheduleTest.card_de_sessao_inclui_volume_de_series_reps`; commit `7a99520`; [spec](docs/specs/H3-12-series-reps-visiveis.md) |
+| H3-13 | Título da sessão varia conforme o split | Backend `plan_builder.py` nomeia sessões de força pelo split aplicado (`Treino A — Empurrar`, `Treino B — Puxar`, `Treino C — Pernas e Core`, ciclo repetido pela ordem das sessões de força) em vez do nome genérico; corrida/mobilidade mantêm templates; testes em `back/tests/test_hybrid_plan.py`; Home exibe o `name` recebido; commit `3793b6f`; [spec](docs/specs/H3-13-titulo-sessao-split.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -113,22 +115,20 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
-| H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
-| H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
 | H3-10 | Regras de backup do Android ligadas | **S** | `allowBackup="true"` sem `fullBackupContent`/`dataExtractionRules`: os XMLs existem mas estão inertes, e apontam para `treinos_database` quando o banco real é `treinos.db` (`AppDatabase.kt:55`). Ligar como estão excluiria o banco em silêncio. | Referenciar as duas rules, policy explícita por domínio (nuvem fora de banco e prefs; transferência de aparelho mantém prefs) e teste que compara o nome do banco com as rules. | 0,5 dia | nada; **pré-requisito da H3-4** | [H3-10](docs/specs/H3-10-android-backup-rules.md) |
-| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
 | H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
-| H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
-| H3-10 | Regras de backup do Android ligadas | **S** | `allowBackup="true"` sem `fullBackupContent`/`dataExtractionRules`: os XMLs existem mas estão inertes, e apontam para `treinos_database` quando o banco real é `treinos.db` (`AppDatabase.kt:55`). Ligar como estão excluiria o banco em silêncio. | Referenciar as duas rules, policy explícita por domínio (nuvem fora de banco e prefs; transferência de aparelho mantém prefs) e teste que compara o nome do banco com as rules. | 0,5 dia | nada; **pré-requisito da H3-4** | [H3-10](docs/specs/H3-10-android-backup-rules.md) |
-| H3-12 | Séries/reps visíveis em cada exercício | **M** | O usuário não vê quantas séries e repetições cada exercício pede (ex: peito 4x10) ao abrir o plano; só aparece o nome genérico. | Mostrar `sets` + `targetReps` em cada card/exercício do plano gerado e na tela de execução; backend já carrega esses campos, expor na UI. | 1 dia | H2-6, H3-11 | [H3-12](docs/specs/H3-12-series-reps-visiveis.md) |
-| H3-13 | Título da sessão varia conforme o split | **M** | Todas as sessões de força se chamam "Academia A — Superiores", mesmo quando são push/pull/legs diferentes. | Nomear cada sessão conforme o split aplicado (Empurrar/Puxar/Pernas) e o índice (A, B, C...), ex: "Treino A — Empurrar", "Treino B — Puxar". | 0,5 dia | H3-11 | [H3-13](docs/specs/H3-13-titulo-sessao-split.md) |
 | H3-14 | Imagens dos exercícios no plano | **C** | O plano não exibe imagem dos exercícios; usuário que não conhece o nome não sabe o que fazer. | Ligar `ExerciseMedia`/`Coil` nos cards de exercício do plano e da tela de execução (já existe H1-3, expor na UI de geração/home). | 1 dia | H1-3 | [H3-14](docs/specs/H3-14-imagens-exercicios.md) |
+| H3-15 | Múltiplos planos coexistindo na Home | **M** | Gerar um treino extra (abdômen, casa) desativa o plano de academia na UI; o usuário "perde" o treino principal. | Room v3 com `kind` (main/extra), seletor de planos na Home, geração complementar sem desativar nada, restore preservando múltiplos ativos; backup/sync já viajam com todos os planos. | 2–3 dias | H1-6, H3-11 | [H3-15](docs/specs/H3-15-planos-multiplos.md) |
+| H3-16 | Geração complementar: foco exclusivo e casa/peso corporal | **M** | `targetMuscles` só adiciona grupos ao split e o filtro de equipamento pode ser ignorado; "só abdômen" ou "só peso corporal" é inalcançável. | `focusMuscles` exclusivo no contrato, filtro estrito de equipamento no fallback, normalização pós-IA, sessões curtas (15–45 min, 1–6 dias) só de força. | 2 dias | **H3-15**, H3-13 (títulos) | [H3-16](docs/specs/H3-16-geracao-complementar.md) |
+| H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
+| H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
 
-H3-1..H3-3, H3-5, **H3-6**, **H3-7** e **H3-11** estão concluídos e listados em
-§4.1 — com H3-6, restaurar um backup deixou de apagar o perfil; com H3-7, o perfil
-ganhou o sexo opcional sem tocar nas regras numéricas; com H3-11, a geração híbrida
-de cada modalidade vira uma sessão independente com abas próprias (H2-6/H2-7).
+H3-1..H3-3, H3-5, **H3-6**, **H3-7**, **H3-11**, **H3-12** e **H3-13** estão
+concluídos e listados em §4.1 — com H3-6, restaurar um backup deixou de apagar o
+perfil; com H3-7, o perfil ganhou o sexo opcional sem tocar nas regras numéricas;
+com H3-11, a geração híbrida de cada modalidade vira uma sessão independente com
+abas próprias (H2-6/H2-7); com H3-12, o volume (`sets × reps`) aparece nos cards
+da Home; com H3-13, o título de cada sessão de força reflete o split aplicado.
 H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 
 ---
@@ -138,16 +138,15 @@ H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | Backend na nuvem (H3-4) |
-| Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Progressão automática de carga (H3-5) ✅ |
-| Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Export CSV/Sheets |
-| Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | Nuvem via SAF (H3-8) | Widget/complicação do relógio |
-| Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | Backup automático (H3-9) |
+| Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Export CSV/Sheets |
+| Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Widget/complicação do relógio |
+| Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | Nuvem via SAF (H3-8) | Backup automático (H3-9) |
+| Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | Imagens dos exercícios (H3-14) | |
 | Perfil no backup (H3-6) ✅ | Sexo opcional no perfil (H3-7) ✅ | | |
-| Correção híbrida por sessão (H3-11) ✅ | Regras de backup do Android (H3-10) | Séries/reps visíveis (H3-12) | Backend na nuvem (H3-4) |
-|                                        | Título varia conforme split (H3-13) | Imagens dos exercícios (H3-14) | Progressão automática de carga (H3-5) ✅ |
-|                                        |                                       |                                | Export CSV/Sheets |
-|                                        |                                       |                                | Widget/complicação do relógio |
-|                                        |                                       |                                | Backup automático (H3-9) |
+| Correção híbrida por sessão (H3-11) ✅ | Regras de backup do Android (H3-10) | | |
+| Séries/reps visíveis (H3-12) ✅ | | | |
+| Título varia conforme split (H3-13) ✅ | | | |
+| Múltiplos planos (H3-15) | Geração complementar (H3-16) | | |
 
 ---
 
@@ -156,24 +155,20 @@ H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 ```
 Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1..H2-7
             (Wear, download, descoberta LAN, histórico, registro avulso,
-            plano híbrido, mobilidade) + H3-1/H3-2/H3-3 (testes de UI/Room/
-            contrato, polimento e acessibilidade) + H3-5 (progressão de carga)
-            + H3-6 (perfil no backup v3 e guarda de tamanho)
-            + H3-7 (sexo opcional no perfil, sem regressão nas regras numéricas)
-Agora:      H3-11 (correção da geração híbrida) — concluída
+            plano híbrido, mobilidade) + H3-1/H3-2/H3-3/H3-5/H3-6/H3-7/H3-11/
+            H3-12/H3-13 (qualidade, progressão, perfil no backup/sexo, sessões
+            híbridas por modalidade, volume visível e títulos por split)
+Agora:      H3-15/H3-16 (múltiplos planos + geração complementar) — specs
+            propostas, aguardando aprovação
 Próximo:    H3-10 (rules do Android ligadas), pré-requisito da H3-4
-Depois:     H3-8 (nuvem via SAF — validar/documentar)
+Depois:     H3-8 (nuvem via SAF — validar/documentar), H3-14 (imagens no plano)
 Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar)
 ```
 
-**Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → **H3-11**.
-O próximo elo de **qualidade** é **H3-11**: concluído — a H2-6 entregou o plano
-híbrido, mas a H3-11 transformou cada modalidade em uma sessão independente com
-abas próprias. Depois dele, **H3-10**: sem as rules do Android ligadas
-(e com o nome do banco correto), o backup de plataforma continua inerte e a H3-4
-não pode ser exposta.
-**H3-7** entrou em paralelo como previsto — o campo `sex` foi no
-`BackupProfile` da H3-6 sem novo bump de versão.
+**Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → **H3-15** → **H3-16**.
+O elo de **qualidade/plataforma** é **H3-10** (proposta, aguarda aprovação): sem
+as rules do Android ligadas (e com o nome do banco correto), o backup de
+plataforma continua inerte e a H3-4 não pode ser exposta.
 O gate (`./scripts/verify.sh`) roda em todo commit e, desde H3-1, também enxerga
 UI (Compose no Robolectric), Room em memória, migração e o contrato app↔backend;
 os testes instrumentados compilam no gate e rodam fora dele com
@@ -215,36 +210,28 @@ os testes instrumentados compilam no gate e rodam fora dele com
 
 ## 9. Próximo passo imediato
 
-Horizons 1 e 2 estão concluídos (H1-1..H1-7, H2-1..H2-7), com a ressalva de que
-a **qualidade da geração híbrida da H2-6** foi corrigida na **H3-11** (concluída):
-cada modalidade vira uma sessão independente — musculação de academia com
-4–8 exercícios, corrida e mobilidade com execução e abas próprias — em vez de
-um único dia/sequência que junta tudo.
+Horizons 1 e 2 estão concluídos (H1-1..H1-7, H2-1..H2-7). Na sequência, H3-1..H3-3,
+H3-5..H3-7, H3-11..H3-13 também estão entregues: qualidade/testes, progressão,
+perfil completo no backup (peso/altura/sexo), geração híbrida por sessão com abas,
+volume (`sets × reps`) visível nos cards e título de força por split.
 
-O próximo passo é **H3-10 (regras de backup do Android)**: os dois XMLs existem,
-não estão referenciados no manifest e apontam para `treinos_database` quando o
-banco real é `treinos.db` — ligar como estão excluiria o banco em silêncio. É
-também o pré-requisito de **H3-4**. **H3-7 (sexo opcional no perfil)** foi
-implementada como previsto: campo novo em `AppPreferences`/`GenerateScreen`/prompt
-da IA, sem regressão na tabela de IMC nem nos coeficientes de carga, e entrou no
-`BackupProfile` criado pela H3-6 sem novo bump de versão. O que ficou de fora, e
-vale saber: o sexo ainda **não** alcança a IA no caminho híbrido (o app sempre
-manda `modalities`, e `build_hybrid_user_prompt` já não leva peso/altura desde a
-H1-5) — a **H3-11** corrigiu esse prompt para levar perfil, equipamentos, split e
-duração por modalidade.
+**Produto (Must, specs propostas — aguardam aprovação):** **H3-15** (múltiplos
+planos coexistindo na Home) e **H3-16** (geração complementar com foco exclusivo e
+casa/peso corporal), nesta ordem porque H3-16 depende da H3-15.
 
-Sobre nuvem do usuário: **H3-8** não é SDK nem OAuth — o SAF já lista Drive,
-OneDrive e Dropbox, então o item é validar e documentar o caminho (a H3-6 já fez
-o arquivo ser completo o suficiente para isso valer a pena). **H3-4** (backend na
-nuvem com token) e **H3-9** (backup automático) continuam **Won't now** até
-priorização explícita.
+**Qualidade/plataforma (Should, spec proposta):** **H3-10** (regras de backup do
+Android) — os XMLs existem, não estão referenciados no manifest e apontam para
+`treinos_database` quando o banco real é `treinos.db`; ligar como estão excluiria
+o banco em silêncio. É pré-requisito da H3-4.
 
-As specs **H3-8, H3-9 e H3-10** estão propostas e **aguardam aprovação**; nenhuma
-foi implementada. As da **H3-6**, **H3-7** e **H3-11** estão concluídas.
+**Could:** **H3-8** (validar/documentar SAF com Drive/OneDrive/Dropbox — sem SDK)
+e **H3-14** (imagens dos exercícios expostas nos cards do plano/execução; H1-3 já
+existe). **Won't now:** H3-4 (backend na nuvem com token) e H3-9 (backup
+automático).
 
-Para iniciar qualquer item, leia a spec correspondente em
-[docs/specs/](docs/specs/); se não existir ou estiver pendente de aprovação,
-crie/ajuste a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md) e
+Nenhuma das specs acima listadas como propostas está aprovada para execução. Para
+iniciar qualquer item, leia a spec em [docs/specs/](docs/specs/); se estiver
+pendente, ajuste a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md) e
 confirme antes de implementar.
 
 ---
@@ -273,11 +260,15 @@ confirme antes de implementar.
 - [H3-5 — Progressão de carga](docs/specs/H3-5-progression.md) — concluída
 - [H3-6 — Perfil no backup e guarda de tamanho](docs/specs/H3-6-profile-in-backup.md) — concluída
 - [H3-7 — Sexo opcional no perfil](docs/specs/H3-7-profile-sex.md) — concluída
-- [H3-11 — Correção da geração híbrida](docs/specs/H3-11-hybrid-plan-fix.md) — concluída
+- [H3-11 — Geração híbrida por sessão e abas por modalidade](docs/specs/H3-11-hybrid-sessions.md) — concluída
+- [H3-12 — Séries/reps visíveis em cada exercício](docs/specs/H3-12-series-reps-visiveis.md) — concluída
 - [H3-13 — Título da sessão varia conforme split](docs/specs/H3-13-titulo-sessao-split.md) — concluída
+- [H3-14 — Imagens dos exercícios no plano](docs/specs/H3-14-imagens-exercicios.md) — proposta, aguardando aprovação
 - [H3-8 — Backup na nuvem do usuário via SAF](docs/specs/H3-8-cloud-saf-backup.md) — proposta, aguardando aprovação
 - [H3-9 — Backup automático no destino escolhido](docs/specs/H3-9-auto-cloud-backup.md) — proposta (Won't now)
 - [H3-10 — Regras de backup do Android](docs/specs/H3-10-android-backup-rules.md) — proposta, aguardando aprovação
+- [H3-15 — Múltiplos planos coexistindo na Home](docs/specs/H3-15-planos-multiplos.md) — proposta, aguardando aprovação
+- [H3-16 — Geração complementar: foco exclusivo e casa/peso corporal](docs/specs/H3-16-geracao-complementar.md) — proposta, aguardando aprovação (depende da H3-15)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

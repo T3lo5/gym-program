@@ -6,7 +6,7 @@
 |---|---|
 | Item do roadmap | `H3-13` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente` |
+| Spec aprovada em | `2026-11-06` (retroativa, implementada em `3793b6f`) |
 | Implementação | `concluída` |
 | Depende de | H3-11 (geração híbrida por sessão e abas por modalidade) |
 
