@@ -1,11 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Regras de extração de dados (Android 12+), lidas em vez de fullBackupContent.
+
+  Política (spec H3-10):
+  - cloud-backup (Google One): sem banco Room (WAL corrompe restore) e sem
+    treinos_prefs.xml (deviceId/backendUrl/perfil não vão para nuvem de
+    terceiro).
+  - device-transfer (migração iniciada pelo usuário): prefs vão — é como o
+    deviceId/perfil acompanham o aparelho novo; o deviceId repetido em dois
+    aparelhos vivos é escolha documentada (MANUAL §7), não bug.
+
+  Os nomes devem bater com AppDatabase.DATABASE_NAME ("treinos.db") e
+  AppPreferences.PREFS_NAME ("treinos_prefs") — BackupRulesTest confere.
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="database" path="treinos_database" />
-        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="treinos.db" />
+        <exclude domain="database" path="treinos.db-wal" />
+        <exclude domain="database" path="treinos.db-shm" />
+        <exclude domain="sharedpref" path="treinos_prefs.xml" />
     </cloud-backup>
     <device-transfer>
-        <include domain="database" path="treinos_database" />
-        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="treinos.db" />
+        <exclude domain="database" path="treinos.db-wal" />
+        <exclude domain="database" path="treinos.db-shm" />
     </device-transfer>
 </data-extraction-rules>

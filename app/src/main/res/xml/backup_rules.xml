@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Regras de backup automático do Android (Android 11 e anterior).
+
+  Política (spec H3-10): o caminho oficial de restore do app é o backup JSON
+  (H1-4/H1-7) e o snapshot do backend (H2-3) — não o BackupAgent do sistema.
+  Banco Room com WAL em backup automático é caminho clássico de restauração
+  corrompida, então ele fica fora; prefs (deviceId, backendUrl, perfil) não
+  sobem para nuvem de terceiro. Prefere-se <exclude> a <include>: um include
+  com caminho errado excluiria tudo em silêncio.
+
+  Os nomes devem bater com AppDatabase.DATABASE_NAME ("treinos.db") e
+  AppPreferences.PREFS_NAME ("treinos_prefs") — BackupRulesTest confere.
+-->
 <full-backup-content>
-    <include domain="database" path="treinos_database" />
-    <include domain="sharedpref" path="." />
+    <exclude domain="database" path="treinos.db" />
+    <exclude domain="database" path="treinos.db-wal" />
+    <exclude domain="database" path="treinos.db-shm" />
+    <exclude domain="sharedpref" path="treinos_prefs.xml" />
 </full-backup-content>

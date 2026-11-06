@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-10` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente` (proposta de 2026-11-05) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-06` (aprovada pelo usuário; política cloud-backup/device-transfer confirmada) |
+| Implementação | `concluída (2026-11-06)` |
 | Depende de | nada — e é **pré-requisito** da H3-4 |
 
 ## Objetivo

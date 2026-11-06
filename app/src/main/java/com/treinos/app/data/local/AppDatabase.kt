@@ -23,6 +23,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
 
     companion object {
+        /** Nome do arquivo SQLite; backup_rules.xml/data_extraction_rules.xml dependem dele. */
+        const val DATABASE_NAME = "treinos.db"
+
         @Volatile
         private var instance: AppDatabase? = null
 
@@ -58,7 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "treinos.db",
+                    DATABASE_NAME,
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()

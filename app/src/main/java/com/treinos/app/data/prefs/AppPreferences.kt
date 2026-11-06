@@ -19,7 +19,7 @@ class AppPreferences private constructor(
 ) : DeviceIdStore, BackendUrlStore, ProfileStore {
 
     constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences("treinos_prefs", Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     )
 
     override var backendUrl: String
@@ -88,6 +88,9 @@ class AppPreferences private constructor(
     }
 
     companion object {
+        /** Nome do arquivo de prefs (vira treinos_prefs.xml no disco; rules de backup o citam). */
+        const val PREFS_NAME = "treinos_prefs"
+
         /** Emulador Android acessa o host em 10.0.2.2. */
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000"
 

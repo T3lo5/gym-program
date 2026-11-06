@@ -1266,6 +1266,9 @@ docker compose up -d --build
   planos, dias, exercícios, séries, sessões, o `deviceId` **e o seu perfil: peso,
   altura e sexo**. Qualquer pessoa com o arquivo lê isso; não compartilhe o JSON como
   quem compartilha uma foto.
+  - O backup automático do Android (Google One) **não** cobre esses dados — o
+    app exclui banco e preferências dele de propósito (veja §7). O JSON e o
+    snapshot do backend são os caminhos oficiais de restore.
   - Arquivos acima de 25 MB são recusados **antes** da leitura, com mensagem de
     tamanho. Isso vale também para backup importado direto do Google Drive,
     OneDrive ou Dropbox — o app abre esses provedores pela mesma tela de arquivos
@@ -1353,6 +1356,21 @@ pip install -r requirements.txt
   remoto, use Tailscale, WireGuard ou um túnel com autenticação.
 - O APK é um build de debug de teste. Para distribuição real, configure uma
   chave de release própria.
+- **O backup automático do Android não é caminho oficial de restore.** Desde a
+  H3-10, o app declara regras próprias (`backup_rules.xml` /
+  `data_extraction_rules.xml`): o banco (`treinos.db`) e as preferências
+  (`treinos_prefs.xml`, onde moram `deviceId`, URL do backend e perfil) **não
+  sobem** para o backup na nuvem do Google, e o banco também não vai na
+  transferência de aparelho. Isso é de propósito: Room com WAL em backup
+  automático é caminho clássico de restauração corrompida, e os caminhos
+  oficiais — **Exportar/Importar backup JSON** (§6.4) e **Restaurar do
+  backend** — já cobrem o restore com validação. Na prática: ao reinstalar em
+  aparelho novo, o app abre vazio e com `deviceId` novo; use um dos caminhos
+  oficiais para trazer seus dados de volta.
+  - Exceção: na **transferência de aparelho** (migração para aparelho novo do
+    próprio Android) as preferências **vão** junto. O `deviceId` pode então
+    existir em dois aparelhos vivos; se você usar "Restaurar do backend" nos
+    dois, o snapshot mais recente vence. É escolha da H3-10, não bug.
 
 ---
 

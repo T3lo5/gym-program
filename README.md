@@ -10,7 +10,7 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 > [docs/specs/](docs/specs/) (como cada item deve ser feito). O plano antigo em
 > [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) é histórico.
 >
-> ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**; o botão **Restaurar do backend** traz o snapshot de volta. O backup JSON está implementado na lógica (H1-4); a ligação dos botões de exportar/importar e a restauração atômica são o H1-7.
+> ✅ **Estado atual:** o app cria o plano sob demanda no backend (IA ou fallback local), salva tudo no SQLite do aparelho, executa o treino registrando cada série e mostra o histórico. O backend devolve também a data de revisão do plano. Os dados só vão para o banco do backend quando você toca em **Sincronizar agora**; o botão **Restaurar do backend** traz o snapshot de volta. O backup JSON está implementado na lógica (H1-4); a ligação dos botões de exportar/importar e a restauração atômica são o H1-7. O backup automático do Android fica deliberadamente **fora** do banco e das preferências (H3-10): o restore oficial segue sendo o JSON/snapshot.
 
 ---
 
@@ -26,6 +26,7 @@ App Android + Wear OS para musculação, 100% offline, com geração de treinos 
 | 🔄 Sincronização manual app → backend | ✅ Snapshot de planos, treinos e séries |
 | ♻️ Restauração por `deviceId` | ✅ Confirmação, validação antes de escrever e `deviceId` só após sucesso (H1-7) |
 | 💾 Backup JSON manual | ✅ Exportar/importar ligados aos file pickers, com pré-visualização (H1-4 + H1-7) |
+| 🔒 Backup automático do Android | ✅ Excluído por regras (H3-10): banco e prefs não sobem para a nuvem do Google — restore oficial é o JSON/snapshot |
 | 🔗 Descoberta LAN (mDNS) | ✅ Ajustes → "Buscar backends" conecta com 1 toque; IP manual segue como fallback (H2-1) |
 | ⏱ Timer de descanso no relógio | ✅ MVP junto com H2-2 |
 | 🏃 Corrida, natação e mobilidade | 🟡 Registro avulso de natação/corrida pronto (H2-5); plano híbrido e mobilidade em H2-6/H2-7 |
