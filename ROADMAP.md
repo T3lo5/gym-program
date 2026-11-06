@@ -121,6 +121,9 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 | H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
 | H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
 | H3-10 | Regras de backup do Android ligadas | **S** | `allowBackup="true"` sem `fullBackupContent`/`dataExtractionRules`: os XMLs existem mas estão inertes, e apontam para `treinos_database` quando o banco real é `treinos.db` (`AppDatabase.kt:55`). Ligar como estão excluiria o banco em silêncio. | Referenciar as duas rules, policy explícita por domínio (nuvem fora de banco e prefs; transferência de aparelho mantém prefs) e teste que compara o nome do banco com as rules. | 0,5 dia | nada; **pré-requisito da H3-4** | [H3-10](docs/specs/H3-10-android-backup-rules.md) |
+| H3-12 | Séries/reps visíveis em cada exercício | **M** | O usuário não vê quantas séries e repetições cada exercício pede (ex: peito 4x10) ao abrir o plano; só aparece o nome genérico. | Mostrar `sets` + `targetReps` em cada card/exercício do plano gerado e na tela de execução; backend já carrega esses campos, expor na UI. | 1 dia | H2-6, H3-11 | [H3-12](docs/specs/H3-12-series-reps-visiveis.md) |
+| H3-13 | Título da sessão varia conforme o split | **M** | Todas as sessões de força se chamam "Academia A — Superiores", mesmo quando são push/pull/legs diferentes. | Nomear cada sessão conforme o split aplicado (Empurrar/Puxar/Pernas) e o índice (A, B, C...), ex: "Treino A — Empurrar", "Treino B — Puxar". | 0,5 dia | H3-11 | [H3-13](docs/specs/H3-13-titulo-sessao-split.md) |
+| H3-14 | Imagens dos exercícios no plano | **C** | O plano não exibe imagem dos exercícios; usuário que não conhece o nome não sabe o que fazer. | Ligar `ExerciseMedia`/`Coil` nos cards de exercício do plano e da tela de execução (já existe H1-3, expor na UI de geração/home). | 1 dia | H1-3 | [H3-14](docs/specs/H3-14-imagens-exercicios.md) |
 
 H3-1..H3-3, H3-5, **H3-6**, **H3-7** e **H3-11** estão concluídos e listados em
 §4.1 — com H3-6, restaurar um backup deixou de apagar o perfil; com H3-7, o perfil
@@ -140,7 +143,11 @@ H3-4 e H3-9 continuam **Won't now** até priorização explícita.
 | Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | Nuvem via SAF (H3-8) | Widget/complicação do relógio |
 | Execução por séries (H1-2) ✅ | Mídia dos exercícios (H1-3) ✅ | | Backup automático (H3-9) |
 | Perfil no backup (H3-6) ✅ | Sexo opcional no perfil (H3-7) ✅ | | |
-| Correção híbrida por sessão (H3-11) ✅ | Regras de backup do Android (H3-10) | | |
+| Correção híbrida por sessão (H3-11) ✅ | Regras de backup do Android (H3-10) | Séries/reps visíveis (H3-12) | Backend na nuvem (H3-4) |
+|                                        | Título varia conforme split (H3-13) | Imagens dos exercícios (H3-14) | Progressão automática de carga (H3-5) ✅ |
+|                                        |                                       |                                | Export CSV/Sheets |
+|                                        |                                       |                                | Widget/complicação do relógio |
+|                                        |                                       |                                | Backup automático (H3-9) |
 
 ---
 
