@@ -381,4 +381,32 @@ class BackupSerializationTest {
         assertEquals("crawl", decoded.sessions[0].stroke)
         assertEquals(7.0, decoded.sessions[0].sessionRpe!!, 0.0)
     }
+
+    @Test
+    fun kind_round_trip() {
+        val file = sampleFile().copy(
+            schemaVersion = 3,
+            plans = sampleFile().plans.map { it.copy(kind = "extra") },
+        )
+
+        val encoded = backupExportEncoder.encodeToString(BackupFile.serializer(), file)
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), encoded)
+
+        assertEquals(3, decoded.schemaVersion)
+        assertEquals("extra", decoded.plans.single().kind)
+    }
+
+    @Test
+    fun kind_ausente_vira_main() {
+        // Arquivo escrito antes da H3-15: v3, nenhuma chave `kind` no plano.
+        val escritoPeloAppAntigo = backupExportEncoder
+            .encodeToString(BackupFile.serializer(), sampleFile().copy(schemaVersion = 3))
+            .replace(",\"kind\":\"main\"", "")
+
+        assertTrue(!escritoPeloAppAntigo.contains("\"kind\""))
+
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), escritoPeloAppAntigo)
+
+        assertEquals("main", decoded.plans.single().kind)
+    }
 }

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS synced_plans (
     next_review_at TEXT,
     review_after_weeks INTEGER NOT NULL DEFAULT 4,
     source TEXT NOT NULL DEFAULT 'local',
+    kind TEXT NOT NULL DEFAULT 'main',
     synced_at TEXT NOT NULL,
     UNIQUE(device_id, local_id)
 );
@@ -199,6 +200,13 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
         _ensure_columns(
             conn,
+            "synced_plans",
+            {
+                "kind": "TEXT NOT NULL DEFAULT 'main'",
+            },
+        )
+        _ensure_columns(
+            conn,
             "synced_plan_days",
             {
                 "modality": "TEXT NOT NULL DEFAULT 'strength'",
@@ -269,8 +277,8 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
         INSERT INTO synced_plans (
             device_id, local_id, name, description, goal, days_per_week,
             is_active, generated_by_ai, created_at, updated_at, version,
-            next_review_at, review_after_weeks, source, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            next_review_at, review_after_weeks, source, kind, synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(device_id, local_id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
@@ -284,6 +292,7 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
             next_review_at = excluded.next_review_at,
             review_after_weeks = excluded.review_after_weeks,
             source = excluded.source,
+            kind = excluded.kind,
             synced_at = excluded.synced_at
         """,
         (
@@ -301,6 +310,7 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
             plan.get("nextReviewAt"),
             int(plan.get("reviewAfterWeeks", 4)),
             plan.get("source", "local"),
+            plan.get("kind", "main"),
             synced_at,
         ),
     )
@@ -563,7 +573,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
             """
             SELECT id, local_id, name, description, goal, days_per_week, is_active,
                    generated_by_ai, created_at, updated_at, version, next_review_at,
-                   review_after_weeks, source, synced_at
+                   review_after_weeks, source, kind, synced_at
             FROM synced_plans WHERE device_id = ?
             """,
             (device_id,),
@@ -676,6 +686,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
                 "nextReviewAt": row["next_review_at"],
                 "reviewAfterWeeks": row["review_after_weeks"],
                 "source": row["source"],
+                "kind": row["kind"],
                 "syncedAt": row["synced_at"],
             }
             for row in plan_rows

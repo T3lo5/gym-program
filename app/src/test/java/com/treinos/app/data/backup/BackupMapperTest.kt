@@ -75,6 +75,21 @@ class BackupMapperTest {
     }
 
     @Test
+    fun kind_mapeado_dto_entity() {
+        val extra = WorkoutPlanEntity(id = 2, name = "Abdômen", kind = "extra")
+
+        val dto = BackupMapper.toDto(extra, days = emptyList())
+        assertEquals("extra", dto.kind)
+
+        val volta = BackupMapper.toEntity(dto)
+        assertEquals("extra", volta.kind)
+
+        val main = WorkoutPlanEntity(id = 1, name = "Principal")
+        assertEquals("main", BackupMapper.toDto(main, days = emptyList()).kind)
+        assertEquals("main", BackupMapper.toEntity(BackupMapper.toDto(main, days = emptyList())).kind)
+    }
+
+    @Test
     fun listasPlanasPreservamRelacoes() {
         val plan = WorkoutPlanEntity(
             id = 1,

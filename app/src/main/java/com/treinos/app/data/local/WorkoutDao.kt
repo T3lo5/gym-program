@@ -12,8 +12,11 @@ interface WorkoutDao {
 
     // ---------- Planos ----------
 
-    @Query("SELECT * FROM workout_plans WHERE isActive = 1 ORDER BY updatedAt DESC LIMIT 1")
-    fun observeActivePlanEntity(): Flow<WorkoutPlanEntity?>
+    @Query(
+        "SELECT * FROM workout_plans WHERE isActive = 1 " +
+            "ORDER BY CASE kind WHEN 'main' THEN 0 ELSE 1 END, updatedAt DESC"
+    )
+    fun observeActivePlanEntities(): Flow<List<WorkoutPlanEntity>>
 
     @Query("SELECT * FROM workout_days ORDER BY dayOrder")
     fun observeAllDays(): Flow<List<WorkoutDayEntity>>
@@ -39,8 +42,8 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_plan_exercises WHERE dayId = :dayId ORDER BY exerciseOrder")
     suspend fun getExercisesForDay(dayId: Long): List<WorkoutPlanExerciseEntity>
 
-    @Query("UPDATE workout_plans SET isActive = 0")
-    suspend fun deactivateAll()
+    @Query("UPDATE workout_plans SET isActive = 0 WHERE kind = :kind")
+    suspend fun deactivateByKind(kind: String)
 
     @Query("UPDATE workout_plans SET isActive = 1 WHERE id = :planId")
     suspend fun updatePlanActive(planId: Long)
@@ -67,8 +70,9 @@ interface WorkoutDao {
     suspend fun insertPlanExercisesBatch(exercises: List<WorkoutPlanExerciseEntity>)
 
     /**
-     * Desativa o plano anterior e grava plano, dias e exercícios em uma única
-     * transação para evitar que a tela veja um plano pela metade.
+     * Desativa os planos anteriores do mesmo `kind` e grava plano, dias e
+     * exercícios em uma única transação para evitar que a tela veja um plano
+     * pela metade. Extras não desativam nada: use [insertPlanWithDays].
      */
     @Transaction
     suspend fun replaceActivePlan(
@@ -76,7 +80,17 @@ interface WorkoutDao {
         days: List<WorkoutDayEntity>,
         exercisesByDay: List<List<WorkoutPlanExerciseEntity>>,
     ): Long {
-        deactivateAll()
+        deactivateByKind(plan.kind)
+        return insertPlanWithDays(plan, days, exercisesByDay)
+    }
+
+    /** Grava plano, dias e exercícios sem desativar nenhum plano existente. */
+    @Transaction
+    suspend fun insertPlanWithDays(
+        plan: WorkoutPlanEntity,
+        days: List<WorkoutDayEntity>,
+        exercisesByDay: List<List<WorkoutPlanExerciseEntity>>,
+    ): Long {
         val planId = insertPlan(plan)
         days.forEachIndexed { index, day ->
             val dayId = insertDay(day.copy(planId = planId))
@@ -89,6 +103,10 @@ interface WorkoutDao {
         }
         return planId
     }
+
+    /** Apaga o plano; dias e exercícios caem em CASCADE. Sessões não têm FK e ficam. */
+    @Query("DELETE FROM workout_plans WHERE id = :planId")
+    suspend fun deletePlan(planId: Long)
 
     // ---------- Sessões ----------
 

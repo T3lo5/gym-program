@@ -25,6 +25,8 @@ data class WorkoutPlanEntity(
     val nextReviewAt: String? = null,
     val reviewAfterWeeks: Int = 4,
     val source: String = "local",
+    @ColumnInfo(defaultValue = "main")
+    val kind: String = "main",
 )
 
 @Entity(

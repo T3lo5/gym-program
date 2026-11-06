@@ -165,32 +165,55 @@ class RestoreDownloadTest {
     }
 
     @Test
-    fun `restauracao deixa um plano ativo`() = runTest {
+    fun restore_preserva_multiplos_ativos() = runTest {
         val snapshot = SyncDownloadDto(
             deviceId = "outro",
             plans = listOf(
-                planDto(localId = 7, name = "Sem ativo", isActive = false),
-                planDto(localId = 8, name = "Também sem ativo", isActive = false),
+                planDto(localId = 9, name = "Principal"),
+                planDto(localId = 10, name = "Extra 1", kind = "extra"),
+                planDto(localId = 11, name = "Extra 2", kind = "extra"),
             ),
         )
-        val repository = repositoryWith(dao, snapshot)
 
-        repository.downloadSync("outro")
+        repositoryWith(dao, snapshot).downloadSync("outro")
 
-        val activePlans = dao.getAllPlanEntities().filter { it.isActive }
-        assertEquals(1, activePlans.size)
-        assertEquals(7L, activePlans.single().id)
+        val ativos = dao.getAllPlanEntities().filter { it.isActive }
+        assertEquals(listOf(9L, 10L, 11L), ativos.map { it.id }.sorted())
+        assertEquals(listOf("main", "extra", "extra"), ativos.sortedBy { it.id }.map { it.kind })
+    }
 
-        // Snapshot com dois ativos fica com exatamente um.
-        val duplicated = SyncDownloadDto(
+    @Test
+    fun restore_sem_ativo_ativa_primeiro_main() = runTest {
+        val snapshot = SyncDownloadDto(
             deviceId = "outro",
             plans = listOf(
-                planDto(localId = 9, name = "Ativo 1"),
-                planDto(localId = 10, name = "Ativo 2"),
+                planDto(localId = 7, name = "Extra sem ativo", isActive = false, kind = "extra"),
+                planDto(localId = 8, name = "Main sem ativo", isActive = false),
             ),
         )
-        repositoryWith(dao, duplicated).downloadSync("outro")
-        assertEquals(listOf(9L), dao.getAllPlanEntities().filter { it.isActive }.map { it.id })
+
+        repositoryWith(dao, snapshot).downloadSync("outro")
+
+        val ativos = dao.getAllPlanEntities().filter { it.isActive }
+        assertEquals(listOf(8L), ativos.map { it.id })
+    }
+
+    @Test
+    fun restore_snapshot_antigo_sem_kind() = runTest {
+        // Snapshot de app/backend antigo: um único ativo, sem campo kind.
+        val snapshot = SyncDownloadDto(
+            deviceId = "outro",
+            plans = listOf(
+                planDto(localId = 7, name = "Ativo"),
+                planDto(localId = 8, name = "Inativo", isActive = false),
+            ),
+        )
+
+        repositoryWith(dao, snapshot).downloadSync("outro")
+
+        val plans = dao.getAllPlanEntities().sortedBy { it.id }
+        assertEquals(listOf("main", "main"), plans.map { it.kind })
+        assertEquals(listOf(7L), plans.filter { it.isActive }.map { it.id })
     }
 
     @Test
@@ -248,8 +271,8 @@ class RestoreDownloadTest {
         assertEquals("Plano local", dao.getAllPlanEntities().single().name)
     }
 
-    private fun planDto(localId: Long, name: String = "Plano", isActive: Boolean = true) =
-        SyncDownloadPlanDto(localId = localId, name = name, isActive = isActive)
+    private fun planDto(localId: Long, name: String = "Plano", isActive: Boolean = true, kind: String = "main") =
+        SyncDownloadPlanDto(localId = localId, name = name, isActive = isActive, kind = kind)
 
     private fun dayDto(
         id: Long,

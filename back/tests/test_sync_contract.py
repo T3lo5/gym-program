@@ -483,6 +483,7 @@ def test_migracao_aditiva_preserva_dados():
     assert row is not None and row[0] == "P"
 
     expected_columns = {
+        "synced_plans": {"kind"},
         "synced_plan_days": {"modality", "weekday"},
         "synced_plan_exercises": {
             "metric_type",
@@ -518,6 +519,73 @@ def test_migracao_aditiva_preserva_dados():
     session = conn.execute(
         "SELECT modality, source, title FROM synced_sessions WHERE local_id = 50"
     ).fetchone()
+    plan_kind = conn.execute(
+        "SELECT kind FROM synced_plans WHERE device_id = 'old' AND local_id = 1"
+    ).fetchone()
     assert day == ("strength",)
     assert session == ("strength", "plan", "")
+    assert plan_kind == ("main",)
     conn.close()
+
+
+def _plan_payload(local_id: int, name: str, kind=None, is_active=True):
+    plan = {
+        "localId": local_id,
+        "name": name,
+        "description": "",
+        "goal": "hypertrophy",
+        "daysPerWeek": 3,
+        "isActive": is_active,
+        "generatedByAi": False,
+        "createdAt": 1,
+        "updatedAt": 2,
+        "version": 1,
+        "nextReviewAt": None,
+        "reviewAfterWeeks": 4,
+        "source": "local",
+        "days": [],
+    }
+    if kind is not None:
+        plan["kind"] = kind
+    return plan
+
+
+def test_kind_round_trip():
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = {
+        "deviceId": "d-kind",
+        "syncedAt": "2026-11-06T00:00:00Z",
+        "plans": [
+            _plan_payload(1, "Principal", kind="main"),
+            _plan_payload(2, "Abdômen", kind="extra"),
+        ],
+        "sessions": [],
+    }
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-kind"})
+    assert d.status_code == 200
+    plans = {p["localId"]: p for p in d.json()["plans"]}
+    assert plans[1]["kind"] == "main"
+    assert plans[2]["kind"] == "extra"
+    assert plans[1]["isActive"] is True
+    assert plans[2]["isActive"] is True
+
+
+def test_snapshot_sem_kind_vira_main():
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = {
+        "deviceId": "d-sem-kind",
+        "syncedAt": "2026-11-06T00:00:00Z",
+        "plans": [_plan_payload(1, "Plano antigo")],
+        "sessions": [],
+    }
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-sem-kind"})
+    assert d.status_code == 200
+    assert d.json()["plans"][0]["kind"] == "main"

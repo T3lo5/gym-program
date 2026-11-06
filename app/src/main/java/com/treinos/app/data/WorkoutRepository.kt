@@ -62,17 +62,13 @@ class WorkoutRepository(
     private val preferences: AppPreferences,
 ) : SnapshotDownloader {
 
-    fun observeActivePlan(): Flow<WorkoutPlanWithDetails?> = combine(
-        dao.observeActivePlanEntity(),
+    fun observeActivePlans(): Flow<List<WorkoutPlanWithDetails>> = combine(
+        dao.observeActivePlanEntities(),
         dao.observeAllDays(),
         dao.observeAllPlanExercises(),
-    ) { plan, days, exercises ->
-        plan?.let { buildPlanDetails(it, days, exercises) }
+    ) { plans, days, exercises ->
+        plans.map { buildPlanDetails(it, days, exercises) }
     }
-
-    /** Dias do plano ativo, ordenados, para a visão da semana híbrida. */
-    fun observeWeek(): Flow<List<WorkoutDayWithExercises>> =
-        observeActivePlan().map { it?.days ?: emptyList() }
 
     suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
         backendClient.reviewPlan(request)
@@ -92,14 +88,17 @@ class WorkoutRepository(
 
     // ---------------- Geração sob demanda ----------------
 
-    suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse {
+    suspend fun generatePlan(request: GeneratePlanRequest, kind: String = "main"): GeneratePlanResponse {
         val response = backendClient.generatePlan(request)
-        saveGeneratedPlan(response)
+        saveGeneratedPlan(response, kind)
         return response
     }
 
-    /** Salva o plano gerado (genérico: geração ou revisão aceita). */
-    suspend fun saveGeneratedPlan(response: GeneratePlanResponse): Long =
+    /**
+     * Salva o plano gerado (genérico: geração ou revisão aceita). `main`
+     * substitui o main anterior; `extra` só insere, sem desativar nada.
+     */
+    suspend fun saveGeneratedPlan(response: GeneratePlanResponse, kind: String = "main"): Long =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
             val dto = response.workout
@@ -142,25 +141,35 @@ class WorkoutRepository(
                     }
             }
 
-            dao.replaceActivePlan(
-                plan = WorkoutPlanEntity(
-                    serverPlanId = response.planId,
-                    name = dto.name,
-                    description = dto.description,
-                    goal = dto.goal,
-                    daysPerWeek = dto.daysPerWeek,
-                    isActive = true,
-                    generatedByAi = response.source == "ai",
-                    createdAt = now,
-                    updatedAt = now,
-                    nextReviewAt = response.nextReviewAt,
-                    reviewAfterWeeks = response.reviewAfterWeeks,
-                    source = response.source,
-                ),
-                days = days,
-                exercisesByDay = exercisesByDay,
+            val plan = WorkoutPlanEntity(
+                serverPlanId = response.planId,
+                name = dto.name,
+                description = dto.description,
+                goal = dto.goal,
+                daysPerWeek = dto.daysPerWeek,
+                isActive = true,
+                generatedByAi = response.source == "ai",
+                createdAt = now,
+                updatedAt = now,
+                nextReviewAt = response.nextReviewAt,
+                reviewAfterWeeks = response.reviewAfterWeeks,
+                source = response.source,
+                kind = kind,
             )
+            if (kind == "main") {
+                dao.replaceActivePlan(plan, days, exercisesByDay)
+            } else {
+                dao.insertPlanWithDays(plan, days, exercisesByDay)
+            }
         }
+
+    /** Exclui um plano complementar; o histórico (sem FK) é preservado. */
+    suspend fun deleteExtraPlan(planId: Long) = withContext(Dispatchers.IO) {
+        val plan = dao.getPlan(planId)
+            ?: error("Plano não encontrado no aparelho.")
+        require(plan.kind == "extra") { "Só planos complementares podem ser excluídos." }
+        dao.deletePlan(planId)
+    }
 
     // ---------------- Revisão do plano (H3-5) ----------------
 
@@ -393,12 +402,21 @@ class WorkoutRepository(
                 reviewAfterWeeks = dto.reviewAfterWeeks,
                 source = dto.source,
                 version = dto.version,
+                kind = dto.kind,
             )
         }
 
-        val activeIndex = plans.indexOfFirst { it.isActive }.takeIf { it >= 0 } ?: 0
-        val normalizedPlans = plans.mapIndexed { index, plan ->
-            plan.copy(isActive = index == activeIndex)
+        // H3-15: vários planos podem voltar ativos (1 main + N extras). Só quando
+        // nenhum vem ativo o primeiro main é ativado, para a Home não ficar vazia.
+        val normalizedPlans = if (plans.none { it.isActive }) {
+            val firstMain = plans.indexOfFirst { it.kind == "main" }
+            if (firstMain >= 0) {
+                plans.mapIndexed { index, plan -> plan.copy(isActive = index == firstMain) }
+            } else {
+                plans
+            }
+        } else {
+            plans
         }
         val planIds = normalizedPlans.mapTo(mutableSetOf()) { it.id }
 
@@ -771,6 +789,7 @@ class WorkoutRepository(
         nextReviewAt = plan.nextReviewAt,
         reviewAfterWeeks = plan.reviewAfterWeeks,
         source = plan.source,
+        kind = plan.kind,
         days = days
             .sortedBy { it.day.dayOrder }
             .map { it.toSyncDto() },

@@ -23,6 +23,7 @@ object BackupValidator {
     private val POOL_LENGTHS = setOf(25, 50)
     private val STROKES = setOf("crawl", "costas", "peito", "borboleta", "misto", "outro")
     private val SEX_VALUES = setOf("male", "female", "other", "undisclosed")
+    private val PLAN_KINDS = setOf("main", "extra")
 
     fun validateSize(fileSizeBytes: Long): BackupValidationResult =
         if (fileSizeBytes > MAX_FILE_BYTES) {
@@ -95,6 +96,13 @@ object BackupValidator {
                 return BackupValidationResult(
                     valid = false,
                     message = "daysPerWeek inválido no plano '${plan.name}'.",
+                    preview = null,
+                )
+            }
+            if (plan.kind !in PLAN_KINDS) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "kind inválido no plano '${plan.name}' (esperado main ou extra).",
                     preview = null,
                 )
             }

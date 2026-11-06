@@ -75,6 +75,23 @@ class BackupValidatorTest {
     }
 
     @Test
+    fun kind_invalido_rejeita_arquivo() {
+        val plano = validPlan(id = 1).copy(kind = "qualquer-coisa")
+        val result = BackupValidator.validate(validFile(plans = listOf(plano)))
+        assertFalse(result.valid)
+        assertTrue(result.message!!.contains("kind"))
+    }
+
+    @Test
+    fun kind_extra_e_valido() {
+        val main = validPlan(id = 1)
+        val extra = validPlan(id = 2, name = "Complementar").copy(kind = "extra")
+        val result = BackupValidator.validate(validFile(plans = listOf(main, extra), schemaVersion = 3))
+        assertTrue(result.valid)
+        assertEquals(2, result.preview?.plans)
+    }
+
+    @Test
     fun rejeitaIdDuplicado() {
         val planoDuplicado = validPlan(id = 1)
         val planoDuplicado2 = validPlan(id = 1)

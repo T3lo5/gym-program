@@ -44,6 +44,7 @@ data class BackupPlan(
     val nextReviewAt: String?,
     val reviewAfterWeeks: Int,
     val source: String,
+    val kind: String = "main",
     val days: List<BackupDay>,
 )
 

@@ -25,6 +25,7 @@ object BackupMapper {
             nextReviewAt = plan.nextReviewAt,
             reviewAfterWeeks = plan.reviewAfterWeeks,
             source = plan.source,
+            kind = plan.kind,
             days = days,
         )
 
@@ -136,6 +137,7 @@ object BackupMapper {
             nextReviewAt = dto.nextReviewAt,
             reviewAfterWeeks = dto.reviewAfterWeeks,
             source = dto.source,
+            kind = dto.kind,
         )
 
     fun toEntity(dto: BackupDay, planId: Long): WorkoutDayEntity =

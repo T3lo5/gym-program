@@ -128,8 +128,10 @@ fun GenerateScreen(
         heightCmText: String,
         sexChoice: String?,
         environment: String?,
+        kind: String,
     ) -> Unit,
 ) {
+    var planKind by remember { mutableStateOf("main") }
     var goal by remember { mutableStateOf("hypertrophy") }
     var daysPerWeek by remember { mutableStateOf(4) }
     var level by remember { mutableStateOf("intermediate") }
@@ -194,6 +196,29 @@ fun GenerateScreen(
                         modifier = Modifier.padding(16.dp),
                     )
                 }
+            }
+
+            item { SectionTitle("O que gerar") }
+            item {
+                ChipGroup(
+                    options = listOf(
+                        "main" to "Substituir meu plano principal",
+                        "extra" to "Adicionar plano complementar",
+                    ),
+                    selected = setOf(planKind),
+                    onToggle = { planKind = it },
+                )
+            }
+            item {
+                Text(
+                    text = if (planKind == "extra") {
+                        "O plano complementar aparece ao lado do principal na Home; nada é desativado."
+                    } else {
+                        "O plano principal anterior é desativado; planos complementares continuam ativos."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             item { SectionTitle("Modalidades da semana") }
@@ -516,6 +541,7 @@ fun GenerateScreen(
                             heightCmText,
                             sexChoice,
                             environment,
+                            planKind,
                         )
                     },
                     enabled = !isGenerating && hasModalities,

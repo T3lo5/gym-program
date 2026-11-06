@@ -132,6 +132,44 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migration2To3_preserva_planos_e_ativo() {
+        helper.createDatabase(testDb, 2).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source) " +
+                    "VALUES (2,'Antigo','d','hypertrophy',3,0,0,1,1,1,NULL,4,'local')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_days (id, planId, name, dayOrder, notes, isRestDay, modality, weekday) " +
+                    "VALUES (10,1,'A',0,'',0,'strength',1)"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 3, true, AppDatabase.MIGRATION_2_3)
+
+        assertEquals(2, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_days"))
+        migrated.query("SELECT id, kind, isActive FROM workout_plans ORDER BY id").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+            assertEquals("main", cursor.getString(1))
+            assertEquals(1, cursor.getInt(2))
+            assertTrue(cursor.moveToNext())
+            assertEquals(2, cursor.getInt(0))
+            assertEquals("main", cursor.getString(1))
+            assertEquals(0, cursor.getInt(2))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

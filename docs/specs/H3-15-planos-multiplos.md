@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-15` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-06` |
+| Implementação | `concluída` |
 
 ## Objetivo
 

@@ -106,8 +106,41 @@ class AppViewModel(
     private val _discoveryMessage = MutableStateFlow<String?>(null)
     val discoveryMessage: StateFlow<String?> = _discoveryMessage.asStateFlow()
 
-    val activePlan: StateFlow<WorkoutPlanWithDetails?> = repository.observeActivePlan()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val activePlans: StateFlow<List<WorkoutPlanWithDetails>> = repository.observeActivePlans()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _selectedPlanId = MutableStateFlow<Long?>(null)
+    val selectedPlanId: StateFlow<Long?> = _selectedPlanId.asStateFlow()
+
+    /** Plano selecionado na Home; consumidores existentes seguem lendo `activePlan`. */
+    val activePlan: StateFlow<WorkoutPlanWithDetails?> = combine(
+        activePlans,
+        _selectedPlanId,
+    ) { plans, selectedId ->
+        resolveSelectedPlan(plans, selectedId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun selectPlan(planId: Long) {
+        _selectedPlanId.value = planId
+    }
+
+    fun deleteExtraPlan(planId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deleteExtraPlan(planId)
+                if (_selectedPlanId.value == planId) {
+                    _selectedPlanId.value = null
+                }
+                _message.value = "Plano complementar excluído. O histórico foi preservado."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível excluir o plano."
+            }
+        }
+    }
+
+    /** A revisão por IA continua apontando para o plano principal (H3-15). */
+    private fun mainPlan(): WorkoutPlanWithDetails? =
+        activePlans.value.firstOrNull { it.plan.kind == "main" }
 
     val sessions: StateFlow<List<SessionWithExercises>> = repository.observeSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -466,6 +499,7 @@ class AppViewModel(
         heightCmText: String,
         sexChoice: String?,
         environment: String? = null,
+        kind: String = "main",
     ) {
         if (_isGenerating.value) return
         viewModelScope.launch {
@@ -503,7 +537,8 @@ class AppViewModel(
                         sex = validation.sex,
                         modalities = modalities,
                         environment = environment,
-                    )
+                    ),
+                    kind = kind,
                 )
                 _screen.value = Screen.Home
                 val source = if (response.source == "ai") "com IA" else "local"
@@ -524,7 +559,7 @@ class AppViewModel(
     // ---------------- Revisão de plano (H2-6) ----------------
 
     fun reviewPlan() {
-        val plan = activePlan.value ?: run {
+        val plan = mainPlan() ?: run {
             _message.value = "Nenhum plano ativo para revisar."
             return
         }
@@ -577,14 +612,16 @@ class AppViewModel(
         val response = pendingReview ?: return
         viewModelScope.launch {
             try {
+                val main = mainPlan()?.plan
                 repository.saveGeneratedPlan(
                     GeneratePlanResponse(
                         workout = response.workout,
                         source = response.source,
-                        nextReviewAt = activePlan.value?.plan?.nextReviewAt
-                            ?: nextReviewAt(activePlan.value?.plan?.reviewAfterWeeks ?: 4),
-                        reviewAfterWeeks = activePlan.value?.plan?.reviewAfterWeeks ?: 4,
-                    )
+                        nextReviewAt = main?.nextReviewAt
+                            ?: nextReviewAt(main?.reviewAfterWeeks ?: 4),
+                        reviewAfterWeeks = main?.reviewAfterWeeks ?: 4,
+                    ),
+                    kind = "main",
                 )
                 pendingReview = null
                 _reviewChanges.value = emptyList()

@@ -444,6 +444,7 @@ class SyncPlan(BaseModel):
     nextReviewAt: Optional[str] = None
     reviewAfterWeeks: int = 4
     source: str = "local"
+    kind: str = "main"
     days: List[SyncDay] = Field(default_factory=list)
 
 

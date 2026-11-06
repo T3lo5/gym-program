@@ -115,6 +115,7 @@ data class SyncPlanDto(
     val nextReviewAt: String? = null,
     val reviewAfterWeeks: Int = 4,
     val source: String = "local",
+    val kind: String = "main",
     val days: List<SyncDayDto> = emptyList(),
 )
 
@@ -235,6 +236,7 @@ data class SyncDownloadPlanDto(
     val nextReviewAt: String? = null,
     val reviewAfterWeeks: Int = 4,
     val source: String = "local",
+    val kind: String = "main",
     val syncedAt: String? = null,
 )
 

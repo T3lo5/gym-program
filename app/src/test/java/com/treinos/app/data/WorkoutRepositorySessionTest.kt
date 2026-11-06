@@ -141,4 +141,62 @@ class WorkoutRepositorySessionTest {
         assertEquals("completed", session?.status)
         assertTrue(dao.getAllSessionExercises().isEmpty())
     }
+
+    private fun generatedResponse(name: String) = GeneratePlanResponse(
+        workout = com.treinos.app.data.remote.WorkoutPlanDto(
+            name = name,
+            goal = "hypertrophy",
+            daysPerWeek = 3,
+            days = listOf(com.treinos.app.data.remote.WorkoutDayDto(name = "A", dayOrder = 0)),
+        ),
+        nextReviewAt = "2026-12-01",
+    )
+
+    @Test
+    fun gerar_extra_nao_toca_no_main() = runTest {
+        val mainId = repository.saveGeneratedPlan(generatedResponse("Principal"), kind = "main")
+
+        val extraId = repository.saveGeneratedPlan(generatedResponse("Abdômen"), kind = "extra")
+
+        assertEquals(true, dao.getPlan(mainId)?.isActive)
+        assertEquals("main", dao.getPlan(mainId)?.kind)
+        assertEquals(true, dao.getPlan(extraId)?.isActive)
+        assertEquals("extra", dao.getPlan(extraId)?.kind)
+        assertEquals(2, dao.getAllPlanEntities().size)
+    }
+
+    @Test
+    fun gerar_main_mantem_extras() = runTest {
+        val mainAntigo = repository.saveGeneratedPlan(generatedResponse("Principal antigo"), kind = "main")
+        val extraId = repository.saveGeneratedPlan(generatedResponse("Abdômen"), kind = "extra")
+
+        val mainNovo = repository.saveGeneratedPlan(generatedResponse("Principal novo"), kind = "main")
+
+        assertEquals(false, dao.getPlan(mainAntigo)?.isActive)
+        assertEquals(true, dao.getPlan(mainNovo)?.isActive)
+        assertEquals(true, dao.getPlan(extraId)?.isActive)
+    }
+
+    @Test
+    fun excluir_plano_main_e_rejeitado() = runTest {
+        val mainId = repository.saveGeneratedPlan(generatedResponse("Principal"), kind = "main")
+
+        val falhou = runCatching { repository.deleteExtraPlan(mainId) }.isFailure
+
+        assertTrue(falhou)
+        assertNotNull(dao.getPlan(mainId))
+    }
+
+    @Test
+    fun excluir_extra_preserva_historico() = runTest {
+        val extraId = repository.saveGeneratedPlan(generatedResponse("Abdômen"), kind = "extra")
+        val dayId = dao.getAllDayEntities().single { it.planId == extraId }.id
+        val sessionId = repository.startSession(extraId, dayId)
+        repository.finishSession(sessionId)
+
+        repository.deleteExtraPlan(extraId)
+
+        assertNull(dao.getPlan(extraId))
+        assertEquals("Abdômen", dao.getSession(sessionId)?.planName)
+    }
 }

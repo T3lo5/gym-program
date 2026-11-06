@@ -3,6 +3,7 @@ package com.treinos.app.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,6 +67,77 @@ class WorkoutDaoTest {
         assertEquals("Plano Teste", dao.getPlan(planId)?.name)
         assertEquals(listOf(planId), dao.getAllDayEntities().map { it.planId })
         assertEquals(listOf("Barbell_Bench_Press"), dao.getExercisesForDay(dayId).map { it.exerciseId })
+    }
+
+    @Test
+    fun multiplos_planos_ativos() = runTest {
+        dao.insertPlan(plano(id = 1, name = "Principal"))
+        dao.insertPlan(plano(id = 2, name = "Extra").copy(kind = "extra", updatedAt = System.currentTimeMillis() + 10_000))
+
+        val ativos = dao.observeActivePlanEntities().first()
+
+        // Main primeiro, mesmo com o extra mais recente.
+        assertEquals(listOf(1L, 2L), ativos.map { it.id })
+        assertEquals(listOf("main", "extra"), ativos.map { it.kind })
+    }
+
+    @Test
+    fun replace_desativa_so_mesmo_kind() = runTest {
+        dao.insertPlan(plano(id = 1, name = "Main antigo"))
+        dao.insertPlan(plano(id = 2, name = "Extra").copy(kind = "extra"))
+
+        dao.replaceActivePlan(
+            plan = plano(id = 3, name = "Main novo"),
+            days = listOf(dia(id = 30, planId = 0, name = "A")),
+            exercisesByDay = listOf(emptyList()),
+        )
+
+        assertEquals(false, dao.getPlan(1)?.isActive)
+        assertEquals(true, dao.getPlan(2)?.isActive)
+        assertEquals(true, dao.getPlan(3)?.isActive)
+        assertEquals(listOf(3L, 2L), dao.observeActivePlanEntities().first().map { it.id })
+    }
+
+    @Test
+    fun insert_extra_nao_desativa() = runTest {
+        dao.insertPlan(plano(id = 1, name = "Principal"))
+
+        val extraId = dao.insertPlanWithDays(
+            plan = plano(id = 0, name = "Abdômen").copy(kind = "extra"),
+            days = listOf(dia(id = 0, planId = 0, name = "Core")),
+            exercisesByDay = listOf(listOf(exercicioPlano(id = 0, dayId = 0, exerciseId = "Crunch"))),
+        )
+
+        assertEquals(true, dao.getPlan(1)?.isActive)
+        assertEquals(true, dao.getPlan(extraId)?.isActive)
+        assertEquals("extra", dao.getPlan(extraId)?.kind)
+        assertEquals(listOf("Crunch"), dao.getExercisesForDay(dao.getAllDayEntities().last().id).map { it.exerciseId })
+    }
+
+    @Test
+    fun delete_extra_preserva_sessoes() = runTest {
+        dao.insertPlan(plano(id = 1, name = "Principal"))
+        dao.insertPlan(plano(id = 2, name = "Extra").copy(kind = "extra"))
+        dao.insertDay(dia(id = 20, planId = 2, name = "Core"))
+        dao.insertPlanExercises(listOf(exercicioPlano(id = 200, dayId = 20, exerciseId = "Crunch")))
+        dao.insertSession(
+            WorkoutSessionEntity(id = 50, planId = 2, dayId = 20, planName = "Extra", dayName = "Core", status = "completed")
+        )
+        dao.insertSessionExercises(
+            listOf(SessionExerciseEntity(id = 500, sessionId = 50, exerciseId = "Crunch", plannedSets = 3))
+        )
+        dao.insertSetLog(SetLogEntity(id = 5000, exerciseLogId = 500, setNumber = 1, reps = 15))
+
+        dao.deletePlan(2)
+
+        assertNull(dao.getPlan(2))
+        assertNull(dao.getDay(20))
+        assertTrue(dao.getExercisesForDay(20).isEmpty())
+        assertEquals(true, dao.getPlan(1)?.isActive)
+        // Histórico sem FK: sessão, exercício e série continuam com o nome do plano.
+        assertEquals("Extra", dao.getSession(50)?.planName)
+        assertEquals(1, dao.getAllSessionExercises().size)
+        assertEquals(1, dao.getAllSetLogs().size)
     }
 
     @Test

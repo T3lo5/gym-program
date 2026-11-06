@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 fun TreinosApp(viewModel: AppViewModel) {
     val screen by viewModel.screen.collectAsStateWithLifecycle()
     val plan by viewModel.activePlan.collectAsStateWithLifecycle()
+    val plans by viewModel.activePlans.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
     val inProgressSession by viewModel.inProgressSession.collectAsStateWithLifecycle()
     val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
@@ -196,6 +197,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onLogActivity = viewModel::openLogActivity,
                     onOpenMobility = viewModel::openMobility,
                     onPostponeReview = { planId -> viewModel.postponeReview(planId) },
+                    plans = plans,
+                    onSelectPlan = viewModel::selectPlan,
+                    onDeletePlan = viewModel::deleteExtraPlan,
                 )
 
                 Screen.Generate -> GenerateScreen(
