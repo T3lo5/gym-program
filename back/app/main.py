@@ -112,8 +112,13 @@ SYSTEM_PROMPT_HYBRID = f"""Você é um gerador de planos de treino híbrido (mus
 
 REGRAS OBRIGATÓRIAS:
 1. Use APENAS exercícios do catálogo acima (IDs exatos) para musculação.
-2. Corrige usa IDs sintéticos: `run_interval`, `run_tempo`, `run_long`, `run_easy`, `run_walk` e `mobility_*` (não existem no catálogo, são válidos).
-3. Um `day` = uma sessão = uma única modalidade. Nunca misture musculação, corrida e mobilidade no mesmo `day`.
+2. Corrida use EXATAMENTE um destes IDs sintéticos (não existem no catálogo, são válidos):
+   `run_easy`, `run_walk`, `run_interval`, `run_tempo`, `run_long`.
+3. Mobilidade use EXATAMENTE um destes IDs sintéticos: `mobility_full`,
+   `mobility_back`, `mobility_hips`, `mobility_post_run` (não existem no catálogo, são válidos).
+4. Nunca invente outro ID para corrida ou mobilidade (ex.: não use `Run_5K_Easy`,
+   `Pigeon_Pose`, `Hip_Flexor_Stretch`).
+5. Um `day` = uma sessão = uma única modalidade. Nunca misture musculação, corrida e mobilidade no mesmo `day`.
 4. Musculação: 4 a 8 exercícios por `day`, todos `metricType = "reps_weight"`, categoria de força, sem alongamento/cardio.
 5. Corrida: exatamente 1 bloco por `day`, `metricType = "distance_duration"`, com `targetDistanceMeters` e/ou `targetRpe`; `sets` até 20.
 6. Mobilidade: exatamente 1 bloco por `day`, `metricType = "duration"`, `targetDurationSeconds` entre 300 e 900.

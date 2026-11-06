@@ -114,6 +114,30 @@ STRENGTH_EXERCISE_COUNT = {
 
 MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
 
+# IDs sintéticos que a IA costuma devolver com nomes próximos. Mapeia para o
+# ID estável usado pelos templates e pelo normalize_hybrid_plan.
+RUN_MOBILITY_SYNONYMS: Dict[str, str] = {
+    "run_easy": "run_easy",
+    "run_5k_easy": "run_easy",
+    "run_easy_5k": "run_easy",
+    "run_walk": "run_walk",
+    "run_interval": "run_interval",
+    "run_intervals": "run_interval",
+    "run_intervals_400m": "run_interval",
+    "run_interval_400m": "run_interval",
+    "run_tempo": "run_tempo",
+    "run_5k_tempo": "run_tempo",
+    "run_tempo_5k": "run_tempo",
+    "run_long": "run_long",
+    "run_long_run": "run_long",
+    "mobility_full": "mobility_full",
+    "mobility_full_body": "mobility_full",
+    "mobility_hips": "mobility_hips",
+    "mobility_back": "mobility_back",
+    "mobility_post_run": "mobility_post_run",
+    "mobility_postrun": "mobility_post_run",
+}
+
 
 def strength_exercise_count(duration_minutes: int) -> int:
     """Retorna o número de exercícios de musculação para a duração (sempre 4-8)."""
@@ -291,8 +315,12 @@ def resolve_plan_ids(
             if not raw:
                 continue
 
-            # IDs sintéticos não existem no catálogo: aceitar como estão.
-            if raw.startswith("run_") or raw.startswith("mobility_"):
+            # IDs sintéticos de corrida/mobilidade não existem no catálogo:
+            # aceitar como estão (case-insensitive) e mapear variantes próximas
+            # da IA para o ID estável (ex.: Run_5K_Easy → run_easy).
+            low = raw.lower()
+            if low.startswith("run_") or low.startswith("mobility_"):
+                exercise["exerciseId"] = RUN_MOBILITY_SYNONYMS.get(low, low)
                 continue
 
             if raw in by_id:
