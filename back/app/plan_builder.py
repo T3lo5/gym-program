@@ -377,10 +377,14 @@ def enrich_plan(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> Dict[str
                 exercise["exerciseName"] = source.get("name", exercise.get("exerciseId", ""))
                 exercise["primaryMuscles"] = source.get("primaryMuscles", [])
                 exercise["equipment"] = source.get("equipment") or "body only"
+                exercise["instructions"] = source.get("instructions", [])
+                exercise["images"] = source.get("images", [])
             else:
                 exercise.setdefault("exerciseName", exercise.get("exerciseId", ""))
                 exercise.setdefault("primaryMuscles", [])
                 exercise.setdefault("equipment", "body only")
+                exercise.setdefault("instructions", [])
+                exercise.setdefault("images", [])
     return plan
 
 

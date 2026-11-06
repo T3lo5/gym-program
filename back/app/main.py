@@ -303,6 +303,8 @@ class ExerciseDTO(BaseModel):
     exerciseName: str = ""
     primaryMuscles: List[str] = Field(default_factory=list)
     equipment: str = ""
+    instructions: List[str] = Field(default_factory=list)
+    images: List[str] = Field(default_factory=list)
     metricType: str = "reps_weight"
     targetDurationSeconds: Optional[int] = None
     targetDistanceMeters: Optional[float] = None

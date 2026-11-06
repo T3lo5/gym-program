@@ -91,7 +91,7 @@ object BackupValidator {
                     preview = null,
                 )
             }
-            if (plan.daysPerWeek < 0 || plan.daysPerWeek > 7) {
+            if (plan.daysPerWeek < 0 || plan.daysPerWeek > 21) {
                 return BackupValidationResult(
                     valid = false,
                     message = "daysPerWeek inválido no plano '${plan.name}'.",
