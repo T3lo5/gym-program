@@ -118,6 +118,15 @@ MODALITY_RANK = {"strength": 0, "run": 1, "mobility": 2}
 # A = empurrar (peito/ombros/tríceps), B = puxar (costas/bíceps/traps),
 # C = pernas e core (quadriceps/isquiotibiais/glutos/panturrilha/abdomen).
 # Quando o usuário treina 3x força, cada sessão cai em um split diferente.
+# Foco de mobilidade rotacionado quando o usuário não especifica um.
+MOBILITY_FOCUS_ROTATION: List[str] = [
+    "full", "back", "hips", "post_run",
+]
+
+# Split de força tradicional aplicado ciclo entre as sessões da semana:
+# A = empurrar (peito/ombros/tríceps), B = puxar (costas/bíceps/traps),
+# C = pernas e core (quadriceps/isquiotibiais/glutos/panturrilha/abdomen).
+# Quando o usuário treina 3x força, cada sessão cai em um split diferente.
 STRENGTH_SPLITS: List[List[str]] = [
     ["chest", "shoulders", "triceps"],      # A — empurrar
     ["lats", "middle back", "biceps", "traps"],  # B — puxar
@@ -886,6 +895,12 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
                 mob_cfg = m
                 focus = getattr(mob_cfg, "focus", None)
                 mobility_session_index += 1
+                # Quando o usuário não especifica foco, rota entre focos para não
+                # repetir sempre "corpo inteiro".
+                if not focus:
+                    focus = MOBILITY_FOCUS_ROTATION[
+                        (mobility_session_index - 1) % len(MOBILITY_FOCUS_ROTATION)
+                    ]
                 sessions.append({
                     "name": f"Mobilidade — {focus or 'corpo inteiro'}",
                     "dayOrder": len(sessions),
