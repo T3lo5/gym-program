@@ -139,15 +139,33 @@ implementada separadamente.
 
 | ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|----------|------------------|---------|------------|------|
-| H3-17 | Alvo de reps e última série no pulso | **M** | Relógio mostra "Alvo: " vazio e ignora a última carga/reps. | Mapper usa o `targetReps` do exercício e a tela mostra a última série. | 0,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
-| H3-18 | Timer de descanso contando no pulso | **M** | `WearTimer` existe com testes, mas não está ligado na tela; o número é estático. | Ligar o reducer à tela (tick, reset, skip). | 0,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
-| H3-19 | Corrida e mobilidade no relógio | **M** | Sessões sem exercícios (H3-11) viram tela vazia no relógio. | Relógio distingue o tipo da sessão e mostra estado coerente. | 1 dia | H3-11 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
-| H3-20 | Robustez de conexão do relógio | **S** | Sem selo "Sem conexão", sem debounce e fila offline guarda só IDs. | Selo + debounce 2 s + fila real reenviada ao reconectar. | 1–1,5 dia | H2-2 | a criar ([_TEMPLATE](docs/specs/_TEMPLATE.md)) |
+| H3-17 | Alvo de reps e última série no pulso | **M** | Relógio mostra "Alvo: " vazio e ignora a última carga/reps. | Causa de fundo: a sessão não persiste o alvo — Room v5 aditiva (`session_exercises.target_reps`), `startSession` copia do plano, mapper usa o campo e a tela mostra o alvo + a última série. | 0,5 dia | H2-2 | [H3-17](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md) (proposta) |
+| H3-18 | Timer de descanso contando no pulso | **M** | `WearTimer` existe com testes, mas não está ligado à tela; o número é estático. | Ligar o reducer à tela (tick, reset por chave do descanso, skip) e corrigir o celular: `startRest` síncrono e `skipRest` publicando estado. | 0,5 dia | H2-2 | [H3-18](docs/specs/H3-18-timer-descanso-pulso.md) (proposta) |
+| H3-19 | Corrida e mobilidade no relógio | **M** | Sessões sem exercícios (H3-11) viram tela vazia no relógio. | Campo aditivo `modality` no `:protocol`; relógio distingue o tipo da sessão e mostra estado coerente (nome + "Em andamento" + finalizar). | 1 dia | H3-11 | [H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md) (proposta) |
+| H3-20 | Robustez de conexão do relógio | **S** | Sem selo "Sem conexão", sem debounce e fila offline guarda só IDs. | Selo via capability + debounce 2 s + fila real de comandos reenviada ao reconectar. | 1–1,5 dia | H2-2 | [H3-20](docs/specs/H3-20-robustez-conexao-relogio.md) (proposta) |
 | H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
 | H3-14 | ~~Imagens dos exercícios no plano~~ **substituída pela H3-24** | **C** | Coberta pela H3-24 (mídia do plano + catálogo resiliente). | Não implementar separadamente. | — | H1-3 | [H3-24](docs/specs/H3-24-midia-exercicio-plano.md) |
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
 | H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
 | H3-25 | Seleção de exercícios por nome com resolução determinística | **C** | Exigir IDs exatos do catálogo é atrito: LLMs erram menos nomes do que IDs sintéticos, e o pool completo (H3-22) cresce o prompt. | O prompt passa a aceitar seleção por nome canônico; o backend resolve nome→ID com o índice existente (normalização + fuzzy do `resolve_plan_ids`); nome não resolvível segue o salvamento parcial da H3-22. Contrato de saída não muda (`exerciseId` continua preenchido na resposta). | 1 dia | H3-22 | [H3-25](docs/specs/H3-25-selecao-por-nome.md) |
+| H3-26 | Loop do descanso: avisar, ficar visível e contar tempo real | **M** | O timer rola para fora da tela, não avisa quando acaba (sem som/vibração), a tela apaga, não pausa nem estende, morre no processo morto e conta por tick (atrasa em Doze); registrar série custa 2 toques mesmo sem mudar a carga. | Vibração/beep ao zerar (regra por ringer), faixa fixa com Pular/+15 s/Pausar, `keepScreenOn` na sessão, wall-clock com deadline persistido, háptico ao salvar série e botão "Repetir última série" de 1 toque. | 1,5–2 dias | — | [H3-26](docs/specs/H3-26-loop-descanso.md) (proposta) |
+| H3-27 | Integridade do registro | **M** | Carga inválida vira `null` silencioso, série não pode ser corrigida, "Finalizar treino" é destrutivo em 1 toque, não há "abandonar treino" e a mobilidade cria sessão `in_progress` que nunca fecha (fantasma eterno na Home). | Validar carga/reps/RPE no diálogo, editar/excluir série, confirmar finalizar, abandonar com confirmação e fechar a sessão de mobilidade existente (passar `planId`/`dayId`). | 1,5 dia | — | [H3-27](docs/specs/H3-27-integridade-registro.md) (proposta) |
+| H3-28 | Home do dia e histórico escaneável | **M** | O treino de hoje fica abaixo da dobra (~700 dp de cards antes), nada marca "hoje", a aba inicial cai no amanhã em dia de descanso, e no histórico a lista filtrada fica ~1 tela abaixo dos filtros. | Card-herói "Hoje" com "Iniciar" direto, badge "Hoje", aba preferindo hoje, ações secundárias compactas, rodapé só sem plano, destrutivo no overflow e chips do histórico logo após o calendário. | 1 dia | — | [H3-28](docs/specs/H3-28-home-do-dia-historico.md) (proposta) |
+| H3-29 | Estados e erros padronizados | **M** | Home/Histórico mostram "vazio falso" antes do Room emitir, todo erro é snackbar de ~4 s sem retry e com o mesmo visual de sucesso, e corpo HTTP cru chega à UI. | `UiState` Loading/Empty/Content, erro persistente na tela de origem com "Tentar de novo", mensagens acionáveis com detalhe só no Logcat. | 1 dia | — | [H3-29](docs/specs/H3-29-estados-erros.md) (proposta) |
+| H3-30 | Geração sem atrito | **M** | Primeiro treino exige formulário de ~14 seções com CTA no fundo e nada pré-selecionado; geração = spinner de 18 dp por até 90 s sem cancelar; fallback chega como snackbar fugaz; goal do chip pode ser ignorado. | Pré-incluir Musculação/última config, CTA fixo, "Mais opções" colapsável, seções de força condicionais, overlay com tempo + Cancelar e motivo do fallback persistido. | 1 dia | — | [H3-30](docs/specs/H3-30-geracao-sem-atrito.md) (proposta) |
+| H3-31 | Estado sobrevive a rotação e processo | **M** | Zero `rememberSaveable`: rotação apaga diálogo de série, corrida, registro avulso e a rotina de mobilidade inteira; corrida não mostra o alvo do plano e pede metros. | `rememberSaveable`/`Saver` nos formulários, estado de mobilidade no ViewModel, transição de 5 s entre movimentos, alvo do plano e km na corrida. | 1 dia | H3-27 | [H3-31](docs/specs/H3-31-estado-sobrevive.md) (proposta) |
+| H3-32 | Componentes e consistência visual | **S** | "Botão ocupado" copiado ~10 vezes, sucesso e falha na mesma cor, 7 ícones no app inteiro, imagem sem placeholder/erro e cantos/espaçamentos inconsistentes. | `BusyButton` e `StatusText` em Common.kt, ícones no player e na ação principal, "Em andamento" fora do vermelho, `ExerciseImage` resiliente, `spacedBy(12.dp)` e ellipsis/FlowRow. | 1 dia | — | [H3-32](docs/specs/H3-32-componentes-consistencia.md) (proposta) |
+| H3-33 | Tema, motion e formatação | **S** | Flash branco ao abrir no dark mode (sem `values-night`), `Motion.kt` é código morto e números dependem do locale do aparelho (mistura "7,5" e "7.5"). | `values-night`, dynamic color em SDK ≥ 31 com fallback verde, `transitionSpec` ligado ao Motion existente e formatadores com locale fixo + teste. | 1 dia | — | [H3-33](docs/specs/H3-33-tema-motion-formatters.md) (proposta) |
+| H3-34 | Acessibilidade dinâmica e contraste real | **S** | Só 1 `liveRegion` no app (o dinamismo do treino não é anunciado), checkbox sem rótulo no TalkBack, rótulo com alpha 0.75 falha WCAG AA fora do ContrastTest e telas de execução não rolam com teclado/fonte 2x. | `liveRegion` no descanso/série/mobilidade/Ajustes, `toggleable` no Row, `supportingText` no campo, cores sólidas e `ContrastTest` estendido aos pares reais. | 1 dia | H3-26 | [H3-34](docs/specs/H3-34-acessibilidade-dinamica.md) (proposta) |
+| H3-35 | Ajustes organizados e copy do usuário | **S** | 6 cards flat de infraestrutura, o import destrutivo é a única ação crítica sem diálogo, dica de emulador vazou para a UI e jargão (backend/deviceId/_treinos._tcp/5 km em segundos/RPE) exposto. | Seções colapsáveis, AlertDialog no import, copy em linguagem do usuário, 5 km aceita mm:ss, helper de RPE e shortcut "Retomar treino". | 1 dia | — | [H3-35](docs/specs/H3-35-ajustes-copy.md) (proposta) |
+| H3-36 | Catálogo bilíngue PT/EN (mesmos IDs) | **M** | Nomes e instruções de exercícios só em inglês; o dataset PT-BR (fork CC0 do free-exercise-db) tem 873/876 IDs idênticos e não é aproveitado. | Catálogo com `namePt`/`instructionsPt` aditivos (merge por ID via script validado), `GenerateRequest.language` (ausente ⇒ `en`), mismatch tolerante a nome PT e app resolvendo mídia por idioma. | 1 dia | — | [H3-36](docs/specs/H3-36-catalogo-bilingue.md) (proposta) |
+| H3-37 | Idioma do app (PT/EN) com seletor | **S** | Toda a UI é hardcoded em português (zero `stringResource`) — impossível atender usuário em inglês. | Extrair strings para `values/` (PT) + `values-en/`, `AppCompatActivity` + per-app locale com seletor em Ajustes, em fases com gate verde. | 2–3 dias | H3-36, H3-33 | [H3-37](docs/specs/H3-37-idioma-app.md) (proposta) |
+| H3-38 | Navegação em pilha e retomada | **M** | "Voltar" sempre vai para Home (salvar edição vinda do Histórico abandona o usuário lá), Histórico/Ajustes são TextButtons no topo (pior zona de alcance) e não há como retomar o treino em 1 toque. | Pilha mínima origem→destino no ViewModel, bottom bar Treinar/Histórico/Ajustes nos hubs e shortcut dinâmico de retomada. | 1 dia | — | [H3-38](docs/specs/H3-38-navegacao-pilha.md) (proposta) |
+
+> H3-26..H3-38 nasceram da auditoria UX/UI de 2026-11-07
+> ([docs/auditoria-ux-ui-2026-11-07.md](docs/auditoria-ux-ui-2026-11-07.md)) e do
+> pedido de app bilíngue PT/EN — todas as specs estão em `pendente de
+> aprovação` e nenhuma entra em execução antes da aprovação.
 
 H3-1..H3-3, H3-5, **H3-6**, **H3-7**, **H3-10**, **H3-11**, **H3-12**, **H3-13**, **H3-15**
 e **H3-16** estão concluídos e listados em §4.1 — com H3-6, restaurar um backup
@@ -182,10 +200,11 @@ H3-9) são detalhes futuros do **celular**; as **correções de geração e míd
 | H3-20 | Robustez de conexão do relógio | **S** | Bordas da H2-2 que ficaram de fora: sem selo "Sem conexão" (borda 3), sem debounce de 2 s no botão (borda 5 — o dedupe por `commandId` não protege de toque duplo) e a "fila" em `WearStateStore` guarda só IDs, nada reenvia (borda 6). | Selo de conexão na tela, botão desabilitado 2 s após o toque e fila real de comandos reenviada em `onPeerConnected`, aplicada uma única vez. | 1–1,5 dia | H2-2 |
 
 Os quatro itens são pequenos e de alto valor: H3-17/H3-18/H3-20 não mudam o
-contrato `:protocol` (os campos já existem); a H3-19 pode exigir um campo
-aditivo, que é seguro porque os dois lados decodificam com
-`ignoreUnknownKeys`. Cada um entra só com spec aprovada em `docs/specs/`,
-criada a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md).
+contrato `:protocol` (os campos já existem); a H3-19 exige um campo aditivo
+(`modality`), que é seguro porque os dois lados decodificam com
+`ignoreUnknownKeys`. As quatro specs foram escritas em 2026-11-07 a partir de
+[_TEMPLATE.md](docs/specs/_TEMPLATE.md) e aguardam aprovação — nenhuma entra em
+execução antes disso.
 
 **Depois do MVP (Won't now — nenhuma entra sem spec aprovada):** tiles,
 complicações e widget; modo standalone (treinar sem o celular por uma sessão
@@ -295,8 +314,12 @@ casa/peso corporal.
 **Agora (Must — MVP do relógio):** **H3-17** (alvo de reps e última série no
 pulso), **H3-18** (timer de descanso contando no relógio), **H3-19**
 (corrida/mobilidade com tela coerente) e **H3-20** (selo de conexão, debounce
-e fila offline real). Nenhuma tem spec ainda: criar a partir de
-[_TEMPLATE.md](docs/specs/_TEMPLATE.md) e aprovar antes de implementar.
+e fila offline real). As quatro specs foram escritas em 2026-11-07
+([H3-17](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md),
+[H3-18](docs/specs/H3-18-timer-descanso-pulso.md),
+[H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md) e
+[H3-20](docs/specs/H3-20-robustez-conexao-relogio.md)) e aguardam aprovação
+antes de implementar.
 **Correções prioritárias concluídas:** H3-21 (diagnóstico do fallback da IA),
 H3-22 (robustez da geração por IA), H3-23 (foco muscular no plano principal) e
 H3-24 (imagens e descrição do exercício vindas do plano + catálogo resiliente;
@@ -353,10 +376,23 @@ confirme antes de implementar.
 - [H3-24 — Imagens e descrição: plano como fonte + catálogo resiliente](docs/specs/H3-24-midia-exercicio-plano.md) — concluída (**substitui a H3-14**)
 - [H3-25 — Seleção de exercícios por nome com resolução determinística](docs/specs/H3-25-selecao-por-nome.md) — proposta, aguardando aprovação (evolução da geração por IA; depende da H3-22)
 - [H3-14 — Imagens dos exercícios no plano](docs/specs/H3-14-imagens-exercicios.md) — **substituída pela H3-24** (não implementar separadamente)
-- H3-17 — Alvo de reps e última série no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
-- H3-18 — Timer de descanso contando no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
-- H3-19 — Corrida e mobilidade no relógio — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
-- H3-20 — Robustez de conexão do relógio — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
+- [H3-17 — Alvo de reps e última série no pulso](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md) — proposta, aguardando aprovação (Room v5 aditiva; contrato `:protocol` intocado)
+- [H3-18 — Timer de descanso contando no pulso](docs/specs/H3-18-timer-descanso-pulso.md) — proposta, aguardando aprovação (liga o `WearTimer` à tela; ajusta `startRest`/`skipRest` no celular)
+- [H3-19 — Corrida e mobilidade no relógio](docs/specs/H3-19-corrida-mobilidade-relogio.md) — proposta, aguardando aprovação (campo aditivo `modality` no `:protocol`)
+- [H3-20 — Robustez de conexão do relógio](docs/specs/H3-20-robustez-conexao-relogio.md) — proposta, aguardando aprovação (capability + debounce + fila real)
+- [H3-26 — Loop do descanso](docs/specs/H3-26-loop-descanso.md) — proposta, aguardando aprovação (vibração/beep, faixa fixa, keepScreenOn, wall-clock, repetir última série)
+- [H3-27 — Integridade do registro](docs/specs/H3-27-integridade-registro.md) — proposta, aguardando aprovação (validação de série, editar/excluir, confirmar finalizar, abandonar, sessão fantasma da mobilidade)
+- [H3-28 — Home do dia e histórico escaneável](docs/specs/H3-28-home-do-dia-historico.md) — proposta, aguardando aprovação (card-herói "Hoje", badge, chips do histórico)
+- [H3-29 — Estados e erros padronizados](docs/specs/H3-29-estados-erros.md) — proposta, aguardando aprovação (`UiState`, erro com retry, mensagens acionáveis)
+- [H3-30 — Geração sem atrito](docs/specs/H3-30-geracao-sem-atrito.md) — proposta, aguardando aprovação (defaults, CTA fixo, overlay com cancelar, fallback persistido)
+- [H3-31 — Estado sobrevive a rotação e processo](docs/specs/H3-31-estado-sobrevive.md) — proposta, aguardando aprovação (`rememberSaveable`, mobilidade no ViewModel, corrida em km)
+- [H3-32 — Componentes e consistência visual](docs/specs/H3-32-componentes-consistencia.md) — proposta, aguardando aprovação (`BusyButton`, `StatusText`, ícones, `ExerciseImage`)
+- [H3-33 — Tema, motion e formatação](docs/specs/H3-33-tema-motion-formatters.md) — proposta, aguardando aprovação (`values-night`, dynamic color, ligar o Motion, locale fixo)
+- [H3-34 — Acessibilidade dinâmica e contraste real](docs/specs/H3-34-acessibilidade-dinamica.md) — proposta, aguardando aprovação (`liveRegion`, `toggleable`, `ContrastTest` estendido)
+- [H3-35 — Ajustes organizados e copy do usuário](docs/specs/H3-35-ajustes-copy.md) — proposta, aguardando aprovação (seções colapsáveis, AlertDialog no import, 5 km em mm:ss, shortcut)
+- [H3-36 — Catálogo bilíngue PT/EN](docs/specs/H3-36-catalogo-bilingue.md) — proposta, aguardando aprovação (`namePt`/`instructionsPt` aditivos, `GenerateRequest.language`)
+- [H3-37 — Idioma do app (PT/EN) com seletor](docs/specs/H3-37-idioma-app.md) — proposta, aguardando aprovação (extração de strings + per-app locale; depende da H3-36)
+- [H3-38 — Navegação em pilha e retomada](docs/specs/H3-38-navegacao-pilha.md) — proposta, aguardando aprovação (pilha origem→destino, bottom bar, shortcut de retomada)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

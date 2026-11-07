@@ -54,6 +54,7 @@ fun TreinosApp(viewModel: AppViewModel) {
     val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
     val restRemaining by viewModel.restRemaining.collectAsStateWithLifecycle()
     val restTotal by viewModel.restTotal.collectAsStateWithLifecycle()
+    val restPaused by viewModel.restPaused.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
@@ -222,6 +223,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onSkipRest = viewModel::skipRest,
                     onFinish = viewModel::finishWorkout,
                     hasInProgressSession = inProgressSession != null,
+                    restPaused = restPaused,
+                    onPauseRest = viewModel::pauseRest,
+                    onResumeRest = viewModel::resumeRest,
+                    onExtendRest = { viewModel.extendRest() },
                     exerciseMedia = exerciseMedia,
                     progressionSuggestions = progressionSuggestions,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },

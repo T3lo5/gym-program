@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
 import com.treinos.app.ui.RunLogValidation
 import com.treinos.app.ui.formatRunPace
@@ -48,6 +49,9 @@ fun RunWorkoutScreen(
     var rpe by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var pace by remember { mutableStateOf<String?>(null) }
+
+    // Sessão de corrida em andamento mantém a tela acesa (H3-26).
+    KeepScreenOnEffect(enabled = session != null)
 
     fun compute() {
         val dur = durationMinutes.toIntOrNull() ?: 0

@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.MobilityRoutine
 import com.treinos.app.ui.MobilityRoutineTemplates
 import com.treinos.app.ui.components.ScreenTopBar
@@ -63,6 +64,9 @@ fun MobilityScreen(
             isPaused = false
         }
     }
+
+    // Rotina de mobilidade em andamento mantém a tela acesa (H3-26).
+    KeepScreenOnEffect(enabled = selectedRoutine != null)
 
     if (selectedRoutine == null) {
         Scaffold(

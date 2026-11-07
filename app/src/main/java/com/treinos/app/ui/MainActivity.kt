@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
                         exerciseMediaRepository = container.exerciseMediaRepository,
                         discoveryManager = container.discoveryManager,
                         wearSyncRepository = container.wearSyncRepository,
+                        restFeedback = container.restFeedback,
                     )
                 )
                 TreinosApp(viewModel)

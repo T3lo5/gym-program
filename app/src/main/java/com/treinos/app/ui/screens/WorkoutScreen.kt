@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -55,7 +57,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
@@ -79,11 +83,18 @@ fun WorkoutScreen(
     onSkipRest: () -> Unit,
     onFinish: () -> Unit,
     hasInProgressSession: Boolean,
+    restPaused: Boolean = false,
+    onPauseRest: () -> Unit = {},
+    onResumeRest: () -> Unit = {},
+    onExtendRest: () -> Unit = {},
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
 ) {
     var exerciseToLog by remember { mutableStateOf<SessionExerciseWithSets?>(null) }
+
+    // Sessão ativa mantém a tela acesa (H3-26); ao sair da tela a flag é liberada.
+    KeepScreenOnEffect(enabled = session != null)
 
     Scaffold(
         topBar = {
@@ -94,14 +105,28 @@ fun WorkoutScreen(
         },
         bottomBar = {
             if (session != null) {
-                Surface(tonalElevation = 3.dp) {
-                    Button(
-                        onClick = onFinish,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                    ) {
-                        Text("Finalizar treino")
+                Column {
+                    // Faixa fixa acima do botão de finalizar: o timer continua
+                    // visível em qualquer ponto da rolagem (H3-26).
+                    if (restRemaining != null && restTotal != null) {
+                        RestBar(
+                            remaining = restRemaining,
+                            total = restTotal,
+                            paused = restPaused,
+                            onSkip = onSkipRest,
+                            onExtend = onExtendRest,
+                            onTogglePause = if (restPaused) onResumeRest else onPauseRest,
+                        )
+                    }
+                    Surface(tonalElevation = 3.dp) {
+                        Button(
+                            onClick = onFinish,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        ) {
+                            Text("Finalizar treino")
+                        }
                     }
                 }
             }
@@ -183,21 +208,14 @@ fun WorkoutScreen(
                     }
                 }
 
-                if (restRemaining != null && restTotal != null) {
-                    item {
-                        RestCard(
-                            remaining = restRemaining,
-                            total = restTotal,
-                            onSkip = onSkipRest,
-                        )
-                    }
-                }
-
                 items(current.exercises.sortedBy { it.exercise.exerciseOrder }, key = { it.exercise.id }) { exercise ->
                     ExerciseCard(
                         exercise = exercise,
                         media = exerciseMedia[exercise.exercise.exerciseId],
                         onLogSet = { exerciseToLog = exercise },
+                        onRepeatLastSet = { reps, weight, rpe ->
+                            onLogSet(exercise, reps, weight, rpe)
+                        },
                         onOpenDetail = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
                     )
                 }
@@ -229,22 +247,44 @@ fun WorkoutScreen(
     }
 }
 
+/**
+ * Faixa fixa de descanso (H3-26): vive fora da lista rolável, então o timer
+ * continua visível em qualquer ponto da rolagem. Ao zerar entra em destaque
+ * visual e o anúncio para leitor de tela é repetido.
+ */
 @Composable
-private fun RestCard(remaining: Int, total: Int, onSkip: () -> Unit) {
+private fun RestBar(
+    remaining: Int,
+    total: Int,
+    paused: Boolean,
+    onSkip: () -> Unit,
+    onExtend: () -> Unit,
+    onTogglePause: () -> Unit,
+) {
     val announce = timerShouldAnnounce(remaining)
-    val message = if (remaining > 0) {
-        "Descanso: ${formatSeconds(remaining)}"
-    } else {
-        "Descanso concluído. Bora para a próxima série."
+    val finished = remaining <= 0
+    val message = when {
+        finished -> "Descanso concluído. Bora para a próxima série."
+        paused -> "Descanso pausado: ${formatSeconds(remaining)}"
+        else -> "Descanso: ${formatSeconds(remaining)}"
     }
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = if (finished) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
         ),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp).semantics(mergeDescendants = true) {
-                stateDescription = if (remaining > 0) restStateDescription(remaining, total) else "Descanso concluído"
+                stateDescription = when {
+                    finished -> "Descanso concluído"
+                    paused -> "Descanso pausado"
+                    else -> restStateDescription(remaining, total)
+                }
                 if (announce) liveRegion = LiveRegionMode.Polite
             },
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -254,7 +294,7 @@ private fun RestCard(remaining: Int, total: Int, onSkip: () -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            if (remaining > 0) {
+            if (!finished) {
                 LinearProgressIndicator(
                     progress = { if (total > 0) (total - remaining).toFloat() / total else 0f },
                     modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
@@ -264,11 +304,29 @@ private fun RestCard(remaining: Int, total: Int, onSkip: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            OutlinedButton(
-                onClick = onSkip,
-                modifier = Modifier.minimumInteractiveComponentSize(),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Pular descanso")
+                OutlinedButton(
+                    onClick = onSkip,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Pular")
+                }
+                if (!finished) {
+                    OutlinedButton(
+                        onClick = onExtend,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
+                        Text("+15 s")
+                    }
+                    OutlinedButton(
+                        onClick = onTogglePause,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
+                        Text(if (paused) "Continuar" else "Pausar")
+                    }
+                }
             }
         }
     }
@@ -279,6 +337,7 @@ private fun ExerciseCard(
     exercise: SessionExerciseWithSets,
     media: ExerciseMedia?,
     onLogSet: () -> Unit,
+    onRepeatLastSet: (Int?, Double?, Double?) -> Unit,
     onOpenDetail: () -> Unit,
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
@@ -371,6 +430,23 @@ private fun ExerciseCard(
                 }
             }
 
+            // "Repetir última série" em 1 toque (H3-26): grava com carga/reps/RPE
+            // da última série e dispara o descanso, sem abrir o diálogo.
+            val lastSet = sets.maxByOrNull { it.setNumber }
+            if (lastSet != null) {
+                val haptics = LocalHapticFeedback.current
+                OutlinedButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRepeatLastSet(lastSet.reps, lastSet.weightKg, lastSet.rpe)
+                    },
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                ) {
+                    val label = lastSetLabel(lastSet)
+                    Text(if (label == null) "Repetir última série" else "Repetir última série ($label)")
+                }
+            }
+
             Button(
                 onClick = onLogSet,
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
@@ -379,6 +455,14 @@ private fun ExerciseCard(
             }
         }
     }
+}
+
+/** Rótulo da última série: "60 kg × 10", "10 reps" ou "60 kg"; `null` sem dados. */
+private fun lastSetLabel(set: SetLogEntity): String? = when {
+    set.weightKg != null && set.reps != null -> "${formatWeight(set.weightKg)} kg × ${set.reps}"
+    set.reps != null -> "${set.reps} reps"
+    set.weightKg != null -> "${formatWeight(set.weightKg)} kg"
+    else -> null
 }
 
 @Composable
@@ -399,12 +483,15 @@ private fun AddSetDialog(
     }
     var rpe by remember { mutableStateOf(last?.rpe?.let { formatWeight(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    val haptics = LocalHapticFeedback.current
     val suggestionText = suggestionLabel(suggestion)
     fun submit() {
         val parsedReps = reps.toIntOrNull()
         if (reps.isNotBlank() && parsedReps == null) {
             error = "Informe as repetições como número inteiro."
         } else {
+            // Háptico curto ao confirmar "Salvar série" (H3-26).
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             onConfirm(parsedReps, parseDecimal(weight), parseDecimal(rpe))
         }
     }

@@ -108,6 +108,7 @@ class AppViewModel(
     private val discoveryManager: BackendDiscoveryManager? = null,
     private val healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
     private val wearSyncRepository: WearSyncRepository? = null,
+    private val restFeedback: RestFeedbackPlayer? = null,
 ) : ViewModel() {
 
     private val backendConnector = BackendConnector(healthChecker, preferences)
@@ -348,6 +349,21 @@ class AppViewModel(
     private val _restTotal = MutableStateFlow<Int?>(null)
     val restTotal: StateFlow<Int?> = _restTotal.asStateFlow()
 
+    /** `true` enquanto o descanso está pausado (H3-26); a contagem fica congelada. */
+    private val _restPaused = MutableStateFlow(false)
+    val restPaused: StateFlow<Boolean> = _restPaused.asStateFlow()
+
+    /** Segundos congelados pela pausa; usado pela retomada para recalcular o deadline. */
+    private var pausedRemainingSeconds = 0
+
+    /**
+     * Job do tick de UI do descanso. Declarado junto do estado do descanso e
+     * **antes** do `init`: a restauração do deadline persistido roda no init e
+     * preenche este handle — se fosse declarado depois, o inicializador
+     * `= null` sobrescreveria o job restaurado.
+     */
+    private var restJob: Job? = null
+
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
 
@@ -390,6 +406,7 @@ class AppViewModel(
         viewModelScope.launch {
             loadExerciseMedia(false)
         }
+        restorePersistedRest()
         if (wearSyncRepository != null) {
             viewModelScope.launch {
                 wearSyncRepository!!.commands.collect { command ->
@@ -510,8 +527,6 @@ class AppViewModel(
             .flatMap { it.days }
             .flatMap { it.exercises }
             .firstOrNull { it.exerciseId == exerciseId }
-
-    private var restJob: Job? = null
 
     private val _deviceId = MutableStateFlow(preferences.deviceId)
     val deviceId: StateFlow<String> = _deviceId.asStateFlow()
@@ -1009,26 +1024,119 @@ class AppViewModel(
 
     // ---------------- Descanso ----------------
 
+    /**
+     * Descanso por deadline em wall-clock (H3-26): o deadline é persistido em
+     * preferências e `remaining` é derivado de `deadline - now` a cada tick —
+     * o tick de 1 s só atualiza a UI, então Doze/tela apagada não atrasam o
+     * fim. `seconds <= 0` não inicia descanso: não grava estado, não mostra card.
+     */
     private fun startRest(seconds: Int) {
         restJob?.cancel()
+        restJob = null
         val duration = seconds.coerceAtLeast(0)
+        val deadline = RestTimer.start(duration, System.currentTimeMillis())
+        if (deadline == null) {
+            clearRestState()
+            return
+        }
         _restTotal.value = duration
-        restJob = viewModelScope.launch {
-            var remaining = duration
-            while (remaining > 0) {
-                _restRemaining.value = remaining
-                delay(1_000)
-                remaining--
+        _restPaused.value = false
+        pausedRemainingSeconds = 0
+        preferences.restDeadlineAtMillis = deadline
+        preferences.restTotalSeconds = duration
+        restJob = viewModelScope.launch { tickRest() }
+    }
+
+    /**
+     * Loop de UI do descanso: recalcula `remaining` do deadline persistido a
+     * cada iteração (assim "+15 s" feito por outro caminho é pego no próximo
+     * tick) e, ao chegar a 0, limpa o deadline em disco e toca o feedback.
+     */
+    private suspend fun tickRest() {
+        while (true) {
+            val deadline = preferences.restDeadlineAtMillis
+            if (deadline <= 0L) return
+            val now = System.currentTimeMillis()
+            val remaining = RestTimer.remainingSeconds(deadline, now)
+            _restRemaining.value = remaining
+            if (remaining <= 0) {
+                preferences.restDeadlineAtMillis = 0L
+                restFeedback?.onRestFinished()
+                return
             }
-            _restRemaining.value = 0
+            val millisToZero = deadline - now
+            delay(minOf(1_000L, maxOf(50L, millisToZero + 50L)))
         }
     }
 
     fun skipRest() {
         restJob?.cancel()
         restJob = null
+        clearRestState()
+    }
+
+    /** Congela a contagem; a retomada recalcula o deadline a partir do restante. */
+    fun pauseRest() {
+        if (_restPaused.value) return
+        val remaining = _restRemaining.value ?: return
+        if (remaining <= 0) return
+        restJob?.cancel()
+        restJob = null
+        pausedRemainingSeconds = remaining
+        _restPaused.value = true
+        // Pausa não sobrevive a processo morto: sem deadline em disco, o app
+        // reaberto não restaura um descanso que o usuário congelou.
+        preferences.restDeadlineAtMillis = 0L
+    }
+
+    fun resumeRest() {
+        if (!_restPaused.value) return
+        val remaining = pausedRemainingSeconds
+        _restPaused.value = false
+        val deadline = RestTimer.resume(remaining, System.currentTimeMillis()) ?: return
+        preferences.restDeadlineAtMillis = deadline
+        restJob = viewModelScope.launch { tickRest() }
+    }
+
+    /** "+15 s" sem teto: empurra o deadline (ou o restante congelado, se pausado). */
+    fun extendRest(seconds: Int = REST_EXTEND_SECONDS) {
+        if (seconds <= 0) return
+        if (_restPaused.value) {
+            pausedRemainingSeconds += seconds
+        } else {
+            val deadline = preferences.restDeadlineAtMillis
+            if (deadline <= 0L) return
+            preferences.restDeadlineAtMillis = RestTimer.extend(deadline, seconds)
+        }
+        val total = (preferences.restTotalSeconds + seconds).coerceAtLeast(0)
+        preferences.restTotalSeconds = total
+        _restTotal.value = total
+    }
+
+    private fun clearRestState() {
         _restRemaining.value = null
         _restTotal.value = null
+        _restPaused.value = false
+        pausedRemainingSeconds = 0
+        preferences.restDeadlineAtMillis = 0L
+    }
+
+    /**
+     * Processo morto com descanso em curso: deadline no futuro restaura o
+     * descanso restante; no passado, é limpo (sem card fantasma).
+     */
+    private fun restorePersistedRest() {
+        val deadline = preferences.restDeadlineAtMillis
+        if (deadline <= 0L) return
+        val now = System.currentTimeMillis()
+        val total = preferences.restTotalSeconds
+        if (deadline <= now || total <= 0) {
+            preferences.restDeadlineAtMillis = 0L
+            return
+        }
+        _restTotal.value = total
+        _restRemaining.value = RestTimer.remainingSeconds(deadline, now)
+        restJob = viewModelScope.launch { tickRest() }
     }
 
     // ---------------- Navegacao por exercicio (fluxo nao-circuito) ----------------
@@ -1299,6 +1407,9 @@ class AppViewModel(
     }
 
     companion object {
+        /** "+15 s" padrão da faixa de descanso (H3-26). */
+        const val REST_EXTEND_SECONDS = 15
+
         fun factory(
             repository: WorkoutRepository,
             preferences: AppPreferences,
@@ -1306,6 +1417,7 @@ class AppViewModel(
             discoveryManager: BackendDiscoveryManager? = null,
             healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
             wearSyncRepository: WearSyncRepository? = null,
+            restFeedback: RestFeedbackPlayer? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -1316,6 +1428,7 @@ class AppViewModel(
                     discoveryManager,
                     healthChecker,
                     wearSyncRepository,
+                    restFeedback,
                 ) as T
             }
         }

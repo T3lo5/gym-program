@@ -76,6 +76,23 @@ class AppPreferences private constructor(
             }
         }
 
+    /**
+     * Deadline do descanso em epoch millis (H3-26); 0 = sem descanso ativo.
+     * Wall-clock: sobrevive a processo morto e Doze não atrasa a contagem.
+     */
+    var restDeadlineAtMillis: Long
+        get() = prefs.getLong(KEY_REST_DEADLINE_AT, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_REST_DEADLINE_AT, value).apply()
+        }
+
+    /** Duração total do descanso em curso, em segundos (0 = nenhuma). */
+    var restTotalSeconds: Int
+        get() = prefs.getInt(KEY_REST_TOTAL, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_REST_TOTAL, value).apply()
+        }
+
     fun isRecentCommand(commandId: String): Boolean {
         val ids = prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()
         return CommandDedupe.isRecent(ids, commandId)
@@ -111,6 +128,8 @@ class AppPreferences private constructor(
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_REST_DEADLINE_AT = "rest_deadline_at"
+        private const val KEY_REST_TOTAL = "rest_total"
         private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"
         private const val KEY_HEIGHT_CM = "height_cm"
         private const val KEY_SEX = "sex"

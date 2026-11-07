@@ -10,6 +10,7 @@ import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 import com.treinos.app.data.wear.WearCommandListenerService
 import com.treinos.app.data.wear.WearSyncRepository
+import com.treinos.app.ui.RestFeedbackPlayer
 
 /**
  * Container manual de dependências (sem Hilt).
@@ -44,6 +45,9 @@ class AppContainer(context: Context) {
         context = context,
         preferences = preferences,
     )
+
+    /** Vibração/beep do fim do descanso (H3-26); regra por ringer em `Feedback.kt`. */
+    val restFeedback: RestFeedbackPlayer = RestFeedbackPlayer(context)
 
     init {
         WearCommandListenerService.WearSyncRepositoryHolder.instance = wearSyncRepository
