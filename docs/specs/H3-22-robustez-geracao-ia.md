@@ -47,7 +47,7 @@ no código, não os sintomas.
 
 | Arquivo | Mudança |
 |---|---|
-| `back/app/plan_builder.py` | Nova `catalog_summary_for_request(request, catalog) -> str`: resumo por músculo com **cap 20 por grupo**, ordenado por relevância (grupos de `targetMuscles`/`focusMuscles` primeiro), só exercícios de força (`_is_strength_exercise`) do pool de equipamento/nível do request |
+| `back/app/plan_builder.py` | Nova `catalog_summary_for_request(request, catalog) -> str`: **pool completo do request, sem cap por grupo** — todos os exercícios de força (`_is_strength_exercise`) do filtro de equipamento/nível, um por linha (`ID (nome, equipamento)`), ordenados por relevância (grupos de `targetMuscles`/`focusMuscles` primeiro). Diretriz do usuário (2026-11-07): expor todos os IDs, porque treino "morre por padrão" quando o ID correto não foi exposto |
 | `back/app/plan_builder.py` | `resolve_plan_ids` passa a retornar também `dropped: List[str]`; **não** é mais fatal — exercício não resolvível é removido do dia |
 | `back/app/main.py` | Prompt usa `catalog_summary_for_request`; regra 1 reescrita: "prefira sempre os IDs listados; IDs desconhecidos serão descartados e a sessão completada localmente" |
 | `back/app/main.py` | Salvamento parcial após `resolve_plan_ids`: dia de força com < 3 exercícios é reconstruído com `build_strength_session` (mesmas restrições); fallback total só quando **nada** aproveitável sobrar |
@@ -74,7 +74,17 @@ Comportamental:
 - Dia de força reconstruído localmente usa o pool do request (equipamento +
   nível + foco), nunca exercício fora do filtro de equipamento.
 - `catalog_summary_for_request` nunca lista exercício de equipamento que o
-  usuário não informou (senão a IA passa a usá-lo).
+  usuário não informou (senão a IA passa a usá-lo) — é a exceção explícita da
+  diretriz: só o que o usuário marcou entra no resumo.
+- Grupos musculares no resumo: no **complementar** (`focusMuscles`), só os
+  grupos do foco (foco exclusivo, coerente com H3-16); no **principal**, os
+  grupos de `targetMuscles` vêm primeiro e os demais grupos do split continuam
+  listados, porque o plano principal ainda se apoia no split (H3-23 mantém
+  isso). **Decisão em aberto para aprovação:** filtrar estritamente os grupos
+  no principal também é mudança de uma linha, mas deixaria a IA sem IDs para
+  completar o split além do foco.
+- Sem cap por grupo: a IA recebe todos os IDs do pool filtrado — fim dos
+  "treinos que morrem por padrão" porque o ID correto não foi exposto.
 - Retry: no máximo 1; só em `json_parse`, HTTP 5xx e 429; 4xx de
   autenticação/parametro não repete (falha determinística).
 - Timeout total da geração continua abaixo do read timeout do app (60 s +
@@ -82,8 +92,11 @@ Comportamental:
   o retry só vale para `json_parse` (resposta já recebida) e o retry de rede
   usa timeout de 30 s; pior caso ≈ 60 + 30 = 90 s. Documentar o limite no
   código; se estourar, o app mostra erro de conexão e o usuário repete).
-- Prompt novo medido antes do merge: ≤ ~6k tokens de catálogo; se estourar,
-  reduzir cap por músculo antes de mudar de abordagem.
+- Prompt novo medido antes do merge: o pool completo cresce o resumo
+  (~800+ linhas); medir tokens reais com o formato compacto de uma linha por
+  exercício. Se estourar o contexto do flash-lite, aplicar cap documentado
+  como **exceção** (não default) — a diretriz manda expor tudo; o cap só
+  volta com evidência de limite técnico.
 - `normalize_hybrid_plan` continua rodando depois do salvamento parcial
   (invariantes de sessão por modalidade preservados).
 
@@ -93,14 +106,14 @@ Comportamental:
 2. **Dado** uma resposta com 1 ID inventado entre 6 exercícios de força, **quando** o endpoint processa, **então** o plano é aceito com 5 exercícios, o ID inválido é removido e o log registra `dropped_ids`.
 3. **Dado** uma sessão que fica com 2 exercícios após a remoção, **quando** o salvamento parcial roda, **então** a sessão é reconstruída localmente com ≥ 3 exercícios do pool do request.
 4. **Dado** uma resposta em que **todos** os exercícios de força têm ID inválido, **quando** o endpoint processa, **então** fallback total com `fallbackReason = "unresolved_ids"`.
-5. **Dado** o resumo do prompt, **quando** o request tem `targetMuscles = ["abs"]`, **então** os grupos do foco aparecem primeiro e cada grupo lista até 20 IDs (não 8).
+5. **Dado** o resumo do prompt, **quando** o request tem `targetMuscles = ["abs"]`, **então** o grupo focado aparece primeiro e cada grupo lista **todos** os IDs do pool do request (não 8, nem 20).
 6. **Dado** um HTTP 429 na primeira tentativa, **quando** o endpoint gera, **então** há exatamente 1 retry e, se a segunda tentativa passar, `source = "ai"`.
 
 ## Testes a criar
 
 | Arquivo | Testes |
 |---|---|
-| `back/tests/test_ai_robustez.py` | `test_parse_remove_cercas_de_codigo`, `test_parse_extrai_objeto_balanceado`, `test_id_invalido_e_removido_e_sessao_mantida`, `test_sessao_com_menos_de_tres_e_reconstruida`, `test_todos_invalidos_vira_fallback_total`, `test_resumo_prioriza_foco_e_cap_vinte`, `test_resumo_nao_lista_equipamento_fora_do_request`, `test_retry_unico_em_429` |
+| `back/tests/test_ai_robustez.py` | `test_parse_remove_cercas_de_codigo`, `test_parse_extrai_objeto_balanceado`, `test_id_invalido_e_removido_e_sessao_mantida`, `test_sessao_com_menos_de_tres_e_reconstruida`, `test_todos_invalidos_vira_fallback_total`, `test_resumo_prioriza_foco_e_lista_pool_completo`, `test_resumo_nao_lista_equipamento_fora_do_request`, `test_retry_unico_em_429` |
 | `back/tests/test_hybrid_plan.py` | regressão do fallback local (existente, sem mudança) |
 
 ## Verificação manual
@@ -118,7 +131,8 @@ Comportamental:
 ## Riscos e rollback
 
 - Prompt maior pode degradar a latência do flash-lite: medir `generationTimeMs`
-  antes/depois; rollback = voltar o cap para 8 por músculo (um commit).
+  antes/depois; rollback = voltar o cap por músculo (um commit), mantendo o
+  filtro de equipamento/grupo da diretriz.
 - Salvamento parcial pode produzir sessões "costuradas" (IA + local) com
   desequilíbrio de volume: a reconstrução usa o mesmo pool e o mesmo nº alvo
   por duração; teste cobre o caso limite.
