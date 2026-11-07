@@ -409,6 +409,17 @@ fun GenerateScreen(
                     },
                 )
             }
+            if (!isComplementary && muscles.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Os grupos escolhidos entram em todas as sessões de força. " +
+                            "Para um plano APENAS de um grupo (ex.: só abdômen), use " +
+                            "\"Adicionar plano complementar\".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             item { SectionTitle("Duração da sessão") }
             item {

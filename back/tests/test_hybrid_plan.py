@@ -16,6 +16,7 @@ from app.plan_builder import (
     build_hybrid_plan,
     resolve_plan_ids,
     normalize_hybrid_plan,
+    STRENGTH_SPLITS,
 )
 
 
@@ -428,3 +429,129 @@ def test_natacao_nao_vira_plano():
     result = review_plan(plan, history)
     assert all(d["modality"] != "swim" for d in result["workout"]["days"])
     assert any("Natação" in c for c in result["changes"]), result["changes"]
+
+
+# ---------------- Foco muscular no plano principal (H3-23) ----------------
+
+
+def _hybrid_payload_com_foco(**overrides):
+    payload = _hybrid_payload()
+    payload["targetMuscles"] = ["abs"]
+    payload.update(overrides)
+    return payload
+
+
+def _muscles_do_dia(day):
+    return {
+        str(m).lower()
+        for ex in day.get("exercises", [])
+        for m in ex.get("primaryMuscles", [])
+    }
+
+
+def test_foco_principal_garante_grupo_em_cada_sessao():
+    """H3-23: 'Abdômen' no plano principal entra em TODAS as sessões de força.
+
+    Antes: o fallback sobrescrevia o targetMuscles com o split do ciclo
+    (Empurrar/Puxar/Pernas) e o grupo pedido era ignorado em silêncio.
+    """
+    client = _client()
+    r = client.post("/v1/generate-workout", json=_hybrid_payload_com_foco())
+    assert r.status_code == 200, r.text
+    workout = r.json()["workout"]
+    strength_days = [d for d in workout["days"] if d["modality"] == "strength"]
+    assert len(strength_days) == 3
+    for day in strength_days:
+        assert "abdominals" in _muscles_do_dia(day), day["name"]
+
+
+def test_foco_com_dois_grupos_garante_os_dois():
+    """H3-23: dois grupos pedidos ⇒ os dois garantidos em cada sessão (academia)."""
+    payload = _hybrid_payload_com_foco(environment="gym", targetMuscles=["abs", "glutes"])
+    payload["modalities"][0]["availableEquipment"] = [
+        "barbell", "dumbbell", "machine", "cable"
+    ]
+    client = _client()
+    r = client.post("/v1/generate-workout", json=payload)
+    assert r.status_code == 200, r.text
+    workout = r.json()["workout"]
+    strength_days = [d for d in workout["days"] if d["modality"] == "strength"]
+    assert len(strength_days) == 3
+    for day in strength_days:
+        muscles = _muscles_do_dia(day)
+        assert "abdominals" in muscles, day["name"]
+        assert "glutes" in muscles, day["name"]
+
+
+def test_sem_foco_mantem_split_atual():
+    """H3-23 (regressão): sem targetMuscles, as sessões seguem o split do ciclo."""
+    payload = _hybrid_payload()
+    payload["environment"] = "gym"
+    payload["modalities"][0]["availableEquipment"] = [
+        "barbell", "dumbbell", "machine", "cable"
+    ]
+    client = _client()
+    r = client.post("/v1/generate-workout", json=payload)
+    assert r.status_code == 200, r.text
+    workout = r.json()["workout"]
+    strength_days = sorted(
+        [d for d in workout["days"] if d["modality"] == "strength"],
+        key=lambda d: d["dayOrder"],
+    )
+    assert len(strength_days) == 3
+    for i, day in enumerate(strength_days):
+        expected = {str(g).lower() for g in STRENGTH_SPLITS[i % len(STRENGTH_SPLITS)]}
+        for ex in day["exercises"]:
+            muscles = {str(m).lower() for m in ex.get("primaryMuscles", [])}
+            assert muscles & expected, (day["name"], ex.get("exerciseId"), muscles)
+
+
+def _exercicio_sintetico(exercise_id, muscles, equipment):
+    return {
+        "id": exercise_id,
+        "name": exercise_id.replace("_", " "),
+        "category": "strength",
+        "level": "intermediate",
+        "primaryMuscles": muscles,
+        "equipment": equipment,
+    }
+
+
+def _request_principal(**overrides):
+    data = {
+        "deviceId": "d1",
+        "environment": "gym",
+        "daysPerWeek": 2,
+        "sessionDurationMinutes": 60,
+        "availableEquipment": ["barbell"],
+        "targetMuscles": ["abs"],
+        "goal": "hypertrophy",
+        "currentLevel": "intermediate",
+        "modalities": [{"type": "strength", "sessionsPerWeek": 2}],
+    }
+    data.update(overrides)
+    return main.GenerateRequest(**data)
+
+
+def test_grupo_sem_candidato_nao_quebra_sessao():
+    """H3-23: grupo pedido sem candidato no pool ⇒ sessão segue com o split.
+
+    O grupo não consome slot com exercício aleatório e a sessão não quebra.
+    """
+    catalog = [
+        _exercicio_sintetico(f"Peito_{i}", ["chest"], "barbell") for i in range(8)
+    ]
+    plan = build_hybrid_plan(_request_principal(), catalog)
+    strength_days = sorted(
+        [d for d in plan["days"] if d["modality"] == "strength"],
+        key=lambda d: d["dayOrder"],
+    )
+    assert len(strength_days) == 2
+    for day in strength_days:
+        assert 4 <= len(day["exercises"]) <= 8, day["name"]
+        for ex in day["exercises"]:
+            muscles = {str(m).lower() for m in ex.get("primaryMuscles", [])}
+            assert "abdominals" not in muscles, (day["name"], ex.get("exerciseId"))
+    # O split do ciclo continua nomeando as sessões (A — Empurrar, B — Puxar).
+    assert strength_days[0]["name"] == "Treino A — Empurrar"
+    assert strength_days[1]["name"] == "Treino B — Puxar"

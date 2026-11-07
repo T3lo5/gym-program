@@ -648,6 +648,16 @@ def build_hybrid_user_prompt(request: GenerateRequest) -> str:
         "",
         "Modalidades (cada uma gera sessões próprias, nunca misturadas num único dia):",
     ]
+    if request.targetMuscles and not is_complementary_request(request):
+        # H3-23: no plano principal, foco muscular é prioridade (não
+        # exclusividade) — a regra explícita evita a semana genérica sem o
+        # grupo pedido. No complementar a regra vale a exclusividade (H3-16).
+        lines.insert(
+            4,
+            'Regra de prioridade: cada sessão de força deve incluir pelo menos '
+            '1 exercício de cada grupo em "Foco muscular global" (quando existir '
+            'no catálogo); o restante da sessão completa com o split do ciclo.',
+        )
     if is_complementary_request(request):
         # Plano complementar (H3-16): foco exclusivo e equipamento estrito
         # entram no prompt para a IA não responder fora das restrições.

@@ -898,6 +898,7 @@ def build_strength_session(
     day_order: int,
     focus_muscles: Optional[List[str]] = None,
     complementary: bool = False,
+    user_target_muscles: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Constrói uma única sessão de musculação com 4 a 8 exercícios.
 
@@ -911,6 +912,11 @@ def build_strength_session(
     `complementary=True` (H3-16): foco EXCLUSIVO — só exercícios cujos
     primaryMuscles intersectam o foco, nº de exercícios pela duração (3 a 6) e
     pool insuficiente devolve None (o endpoint converte em 422).
+
+    `user_target_muscles` (H3-23): grupos pedidos pelo usuário no PLANO
+    PRINCIPAL. Foco ali é PRIORIDADE, não exclusividade: os grupos pedidos
+    entram primeiro em cada sessão (≥ 1 exercício por grupo, quando existir no
+    pool) e o split do ciclo completa o restante. No complementar não se aplica.
     """
     selected_equipment = {item.strip().lower() for item in getattr(modality_cfg, "availableEquipment", []) or [] if item.strip()}
 
@@ -926,6 +932,17 @@ def build_strength_session(
         muscles = ["chest", "lats", "quadriceps"]
 
     groups = _expand_muscles(muscles) if muscles else ["chest", "lats", "quadriceps"]
+
+    # H3-23: no plano principal, o foco do usuário é PRIORIDADE — os grupos
+    # pedidos entram primeiro na sessão e o split do ciclo completa o restante.
+    # Dedup mantendo a ordem: pedidos primeiro, depois os grupos do split.
+    user_groups: List[str] = []
+    if not complementary and focus_muscles and user_target_muscles:
+        user_groups = [
+            g for g in _expand_muscles(list(user_target_muscles)) if g not in groups
+        ]
+        if user_groups:
+            groups = user_groups + groups
 
     if complementary:
         # Foco exclusivo: interseção com o foco é obrigatória; sem fallback para
@@ -961,10 +978,13 @@ def build_strength_session(
 
     # 1) Garante pelo menos 1 exercício por grupo muscular solicitado, se houver
     #    no pool. Assim o usuário recebe peito, costas e pernas (e não só peito).
-    for group in groups:
+    #    H3-23: grupo do usuário sem candidato no pool não consome slot — a
+    #    sessão segue com o split, sem inventar exercício fora do catálogo.
+    for idx, group in enumerate(groups):
         if len(exercises) >= count:
             break
-        candidate = _pick_exercise(strength_pool, group, rng, used, strict=complementary)
+        strict = complementary or idx < len(user_groups)
+        candidate = _pick_exercise(strength_pool, group, rng, used, strict=strict)
         if candidate is None:
             continue
         exercise_id = candidate.get("id")
@@ -974,12 +994,20 @@ def build_strength_session(
         exercises.append(_build_strength_exercise_dict(candidate, exercise_id, len(exercises), goal))
 
     # 2) Preenche o restante ciclando pelos grupos, sem repetir IDs.
+    #    H3-23: grupos do usuário também são estritos aqui — sem candidato, a
+    #    vez deles não consome slot com exercício aleatório.
     group_idx = 0
     while len(exercises) < count and attempts < count * 6:
         attempts += 1
         group = groups[group_idx % len(groups)]
         group_idx += 1
-        candidate = _pick_exercise(strength_pool, group, rng, used, strict=complementary)
+        candidate = _pick_exercise(
+            strength_pool,
+            group,
+            rng,
+            used,
+            strict=complementary or group in user_groups,
+        )
         if candidate is None:
             continue
         exercise_id = candidate.get("id")
@@ -1419,6 +1447,8 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
                         )
                 else:
                     # Aplica split tradicional em ciclo: push -> pull -> legs -> push...
+                    # H3-23: o foco do usuário (targetMuscles) é prioridade em
+                    # cada sessão — os grupos pedidos entram antes do split.
                     focus_muscles = STRENGTH_SPLITS[(strength_session_index - 1) % len(STRENGTH_SPLITS)]
                     session = build_strength_session(
                         pool,
@@ -1432,6 +1462,7 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
                         set(),
                         strength_session_index - 1,
                         focus_muscles,
+                        user_target_muscles=_expand_muscles(muscles),
                     )
                 if session is None:
                     continue

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import database as db
 from app import main
-from app.plan_builder import enforce_complementary_plan
+from app.plan_builder import enforce_complementary_plan, build_hybrid_plan
 
 
 def setup_test_db():
@@ -356,3 +356,23 @@ def test_sem_foco_comportamento_inalterado():
     names = " | ".join(day["name"] for day in strength_days)
     for label in ("Empurrar", "Puxar", "Pernas e Core"):
         assert label in names, names
+
+
+def test_complementar_continua_exclusivo():
+    """H3-23 (regressão): no complementar, `targetMuscles` não vira prioridade.
+
+    O foco EXCLUSIVO da H3-16 continua intacto mesmo que o request carregue
+    `targetMuscles` (o app não envia os dois juntos, mas o contrato permite):
+    `user_target_muscles` só se aplica ao plano principal.
+    """
+    request = _abs_request(
+        targetMuscles=["chest"],
+        modalities=[{"type": "strength", "sessionsPerWeek": 2}],
+    )
+    plan = build_hybrid_plan(request, main.EXERCISE_CATALOG)
+    days = _strength_days(plan)
+    assert len(days) == 2
+    for day in days:
+        for ex in day["exercises"]:
+            muscles = {str(m).lower() for m in ex.get("primaryMuscles", [])}
+            assert muscles <= {"abdominals"}, (day["name"], ex.get("exerciseId"), muscles)

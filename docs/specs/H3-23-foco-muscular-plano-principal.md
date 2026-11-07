@@ -6,11 +6,11 @@
 |---|---|
 | Item do roadmap | `H3-23` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-07` (decisão: foco = prioridade no principal; exclusivo só no complementar) |
+| Implementação | `concluída` |
 
-**Decisão de produto a aprovar antes de implementar** (ver "Decisão" abaixo):
-no plano principal, foco muscular passa a significar **prioridade**, não
+**Decisão de produto aprovada em 2026-11-07** (ver "Decisão" abaixo):
+no plano principal, foco muscular significa **prioridade**, não
 exclusividade. Exclusividade continua sendo o plano complementar (H3-16).
 
 ## Objetivo
@@ -37,7 +37,7 @@ ignorada em silêncio.
 - **H3-16 decidiu** (2026-11-06): foco EXCLUSIVO é do complementar; o
   principal é semana completa multi-modalidade. Esta spec não reverte isso.
 
-## Decisão de produto (a aprovar)
+## Decisão de produto (aprovada em 2026-11-07)
 
 1. **Plano principal + músculos selecionados = prioridade:** cada sessão de
    força garante ≥ 1 exercício de cada grupo pedido (quando existir no pool)
