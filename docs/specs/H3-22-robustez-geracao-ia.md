@@ -76,13 +76,13 @@ Comportamental:
 - `catalog_summary_for_request` nunca lista exercício de equipamento que o
   usuário não informou (senão a IA passa a usá-lo) — é a exceção explícita da
   diretriz: só o que o usuário marcou entra no resumo.
-- Grupos musculares no resumo: no **complementar** (`focusMuscles`), só os
-  grupos do foco (foco exclusivo, coerente com H3-16); no **principal**, os
-  grupos de `targetMuscles` vêm primeiro e os demais grupos do split continuam
-  listados, porque o plano principal ainda se apoia no split (H3-23 mantém
-  isso). **Decisão em aberto para aprovação:** filtrar estritamente os grupos
-  no principal também é mudança de uma linha, mas deixaria a IA sem IDs para
-  completar o split além do foco.
+- Grupos musculares no resumo (decisão aprovada pelo usuário em 2026-11-07):
+  no **complementar** (`focusMuscles`), só os grupos do foco (foco exclusivo,
+  coerente com H3-16); no **principal**, os grupos de `targetMuscles` vêm
+  primeiro e os demais grupos do split continuam listados, porque o plano
+  principal ainda se apoia no split (H3-23 mantém isso). Filtro estrito de
+  grupos no principal ficou descartado: deixaria a IA sem IDs para completar
+  o split além do foco.
 - Sem cap por grupo: a IA recebe todos os IDs do pool filtrado — fim dos
   "treinos que morrem por padrão" porque o ID correto não foi exposto.
 - Retry: no máximo 1; só em `json_parse`, HTTP 5xx e 429; 4xx de
