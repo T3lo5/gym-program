@@ -40,5 +40,6 @@
   "nextReviewAt": "2026-12-01",
   "reviewAfterWeeks": 4,
   "source": "local",
+  "fallbackReason": "no_api_key",
   "changes": []
 }

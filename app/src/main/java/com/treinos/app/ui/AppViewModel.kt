@@ -79,6 +79,25 @@ enum class Screen {
     Mobility,
 }
 
+/**
+ * Rótulo em português do motivo do fallback local (H3-21).
+ *
+ * Os códigos são os valores fechados do contrato (`fallbackReason`):
+ * `no_api_key`, `http_error`, `timeout`, `json_parse`, `unresolved_ids`,
+ * `schema_validation` e `unknown`. Retorna null quando não há motivo —
+ * plano veio da IA (`source == "ai"`) ou o backend é antigo sem o campo.
+ */
+fun fallbackReasonLabel(reason: String?): String? = when (reason) {
+    null, "" -> null
+    "no_api_key" -> "chave da IA não configurada"
+    "http_error" -> "a API de IA respondeu com erro"
+    "timeout" -> "tempo limite ou erro de rede na IA"
+    "json_parse" -> "resposta da IA sem JSON válido"
+    "unresolved_ids" -> "resposta da IA sem IDs válidos"
+    "schema_validation" -> "resposta da IA fora do formato esperado"
+    else -> "motivo desconhecido ($reason)"
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(
     private val repository: WorkoutRepository,
@@ -578,8 +597,10 @@ class AppViewModel(
                 _screen.value = Screen.Home
                 val source = if (response.source == "ai") "com IA" else "local"
                 val review = formatReviewDate(response.nextReviewAt) ?: response.nextReviewAt
-                _message.value =
-                    "Treino gerado $source e salvo no aparelho. Revisar em $review."
+                val base = "Treino gerado $source e salvo no aparelho. Revisar em $review."
+                // H3-21: quando o plano veio do fallback local, a mensagem diz o porquê.
+                _message.value = fallbackReasonLabel(response.fallbackReason)
+                    ?.let { motivo -> "$base Motivo: $motivo." } ?: base
             } catch (error: Exception) {
                 _message.value = error.message ?: "Não foi possível gerar o treino."
             } finally {

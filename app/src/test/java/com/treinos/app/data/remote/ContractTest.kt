@@ -96,6 +96,28 @@ class ContractTest {
     }
 
     @Test
+    fun fixture_de_resposta_com_fallback_reason_decodifica() {
+        // H3-21: o campo aditivo do contrato decodifica nos dois lados.
+        val response = json.decodeFromString(GeneratePlanResponse.serializer(), loadFixture())
+
+        assertEquals("no_api_key", response.fallbackReason)
+        assertEquals("local", response.source)
+    }
+
+    @Test
+    fun resposta_sem_fallback_reason_decodifica_null() {
+        // Backend antigo sem o campo: decodifica null e a UI omite o motivo.
+        val semCampo = loadFixture().replace(",\n  \"fallbackReason\": \"no_api_key\"", "")
+        assertFalse(
+            "Preparação do teste deveria ter removido fallbackReason do fixture",
+            semCampo.contains("fallbackReason"),
+        )
+        val response = json.decodeFromString(GeneratePlanResponse.serializer(), semCampo)
+
+        assertNull(response.fallbackReason)
+    }
+
+    @Test
     fun request_sem_sexo_decode_ok() {
         val request = json.decodeFromString(
             GeneratePlanRequest.serializer(),

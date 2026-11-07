@@ -420,6 +420,9 @@ class GenerateResponse(BaseModel):
     nextReviewAt: str
     reviewAfterWeeks: int = 4
     source: str = "local"
+    # Diagnóstico do fallback (H3-21): vazio quando source == "ai"; quando
+    # source == "local" carrega um dos códigos fechados em FALLBACK_REASONS.
+    fallbackReason: str = ""
 
 
 class GenerateReviewRequest(BaseModel):
@@ -658,13 +661,87 @@ def build_hybrid_user_prompt(request: GenerateRequest) -> str:
     return "\n".join(lines)
 
 
+# ----- Diagnóstico do fallback da IA (H3-21) -----
+
+# Códigos fechados de `fallbackReason` (contrato compartilhado com o app;
+# ver docs/specs/H3-21-diagnostico-fallback-ia.md).
+FALLBACK_REASONS = {
+    "no_api_key",         # SENSENOVA_API_KEY ausente
+    "http_error",         # API respondeu != 200 (detail traz o status)
+    "timeout",            # httpx.TimeoutException / erro de rede
+    "json_parse",         # conteúdo não é JSON (inclui JSON truncado)
+    "unresolved_ids",     # IDs de musculação que não existem no catálogo
+    "schema_validation",  # WorkoutPlanDTO rejeitou a resposta
+    "unknown",            # qualquer outra exceção
+}
+
+
+class AiFailure(Exception):
+    """Falha conhecida da geração por IA, com código fechado de diagnóstico.
+
+    `reason` é um dos códigos em `FALLBACK_REASONS`; `detail` é texto curto
+    para o log e nunca contém a chave da API nem o prompt completo.
+    """
+
+    def __init__(self, reason: str, detail: str = ""):
+        if reason not in FALLBACK_REASONS:
+            raise ValueError(f"reason de fallback inválido: {reason}")
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail
+
+
+def parse_ai_plan(content: str, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Converte a resposta bruta da IA em plano validado — função pura, sem rede.
+
+    Cada tipo de falha vira um `AiFailure` com código fechado, para o endpoint
+    responder `fallbackReason` e o log registrar o porquê (H3-21): JSON
+    inválido/truncado ⇒ `json_parse`; IDs de musculação fora do catálogo ⇒
+    `unresolved_ids` (detail lista até 5); plano fora do schema ⇒
+    `schema_validation`.
+    """
+    try:
+        raw_plan = json.loads(content)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise AiFailure("json_parse", f"JSON inválido: {exc}") from exc
+    if not isinstance(raw_plan, dict):
+        raise AiFailure(
+            "json_parse", f"conteúdo não é um objeto JSON ({type(raw_plan).__name__})"
+        )
+
+    raw_plan, unresolved = resolve_plan_ids(raw_plan, catalog)
+    if unresolved:
+        raise AiFailure(
+            "unresolved_ids",
+            "IDs retornados pela IA não existem no catálogo: "
+            + ", ".join(unresolved[:5]),
+        )
+
+    try:
+        WorkoutPlanDTO(**raw_plan)
+    except Exception as exc:
+        raise AiFailure("schema_validation", f"plano rejeitado pelo schema: {exc}") from exc
+    return raw_plan
+
+
+def fallback_log_line(reason: str, detail: str) -> str:
+    """Linha única de log do fallback, com `detail` truncado em 300 chars.
+
+    Prefixo fixo `[fallback]` para facilitar o grep no servidor; quebras de
+    linha viram espaço para a linha continuar única e grep-ável.
+    """
+    safe = " ".join(str(detail or "").split())[:300]
+    return f"[fallback] reason={reason} detail={safe}"
+
+
 @app.post("/v1/generate-workout", response_model=GenerateResponse)
 async def generate_workout(request: GenerateRequest):
     """Gera um plano sob demanda.
 
     Tenta a IA primeiro. Se a IA falhar, demorar, não tiver chave ou devolver
     IDs inválidos, monta um plano local válido com o catálogo. A resposta
-    sempre informa a origem (`ai` ou `local`) e a data de revisão.
+    sempre informa a origem (`ai` ou `local`), o motivo do fallback quando
+    local (`fallbackReason`, H3-21) e a data de revisão.
     """
     if not EXERCISE_CATALOG:
         raise HTTPException(500, "Exercise catalog not loaded")
@@ -685,7 +762,13 @@ async def generate_workout(request: GenerateRequest):
         user_prompt = build_user_prompt(request)
         system_prompt = SYSTEM_PROMPT
 
-    if SENSENOVA_API_KEY:
+    fallback_reason = ""
+    fallback_detail = ""
+    if not SENSENOVA_API_KEY:
+        fallback_reason = "no_api_key"
+        fallback_detail = "SENSENOVA_API_KEY ausente"
+    else:
+        response = None
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -708,18 +791,13 @@ async def generate_workout(request: GenerateRequest):
                 )
 
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"SenseNova API error: {response.status_code} - {response.text}"
+                raise AiFailure(
+                    "http_error",
+                    f"SenseNova API error: {response.status_code} - {response.text[:200]}",
                 )
 
             content = response.json()["choices"][0]["message"]["content"]
-            raw_plan = json.loads(content)
-            raw_plan, unresolved = resolve_plan_ids(raw_plan, EXERCISE_CATALOG)
-            if unresolved:
-                raise ValueError(
-                    "IDs retornados pela IA não existem no catálogo: "
-                    + ", ".join(unresolved[:5])
-                )
+            raw_plan = parse_ai_plan(content, EXERCISE_CATALOG)
 
             workout = WorkoutPlanDTO(**raw_plan)
             workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
@@ -732,18 +810,17 @@ async def generate_workout(request: GenerateRequest):
                 workout_data = enforce_complementary_plan(workout_data, request, EXERCISE_CATALOG)
             source = "ai"
             model_used = MODEL_ID
+        except httpx.TimeoutException as exc:
+            fallback_reason, fallback_detail = "timeout", f"timeout da IA: {exc}"
+        except httpx.HTTPError as exc:
+            fallback_reason, fallback_detail = "timeout", f"erro de rede na chamada da IA: {exc}"
+        except AiFailure as exc:
+            fallback_reason, fallback_detail = exc.reason, exc.detail
         except Exception as exc:
-            raw = ""
-            try:
-                raw = response.text
-            except Exception:
-                raw = "<sem resposta>"
-            print(
-                "AI generation failed; using local fallback: "
-                f"{exc} | resposta bruta da IA: {raw[:500]}"
-            )
-    else:
-        print("SENSENOVA_API_KEY not set; using local fallback")
+            fallback_reason, fallback_detail = "unknown", f"{type(exc).__name__}: {exc}"
+
+    if fallback_reason:
+        print(fallback_log_line(fallback_reason, fallback_detail))
 
     if workout_data is None:
         try:
@@ -778,6 +855,11 @@ async def generate_workout(request: GenerateRequest):
 
     generation_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
 
+    # Invariante do contrato (H3-21): source == "local" ⇒ fallbackReason
+    # nunca vazio (no mínimo "unknown"); source == "ai" ⇒ sempre vazio.
+    if source == "local" and not fallback_reason:
+        fallback_reason = "unknown"
+
     return GenerateResponse(
         workout=WorkoutPlanDTO(**workout_data),
         generationTimeMs=generation_time,
@@ -786,6 +868,7 @@ async def generate_workout(request: GenerateRequest):
         nextReviewAt=next_review,
         reviewAfterWeeks=request.reviewAfterWeeks,
         source=source,
+        fallbackReason=fallback_reason,
     )
 
 

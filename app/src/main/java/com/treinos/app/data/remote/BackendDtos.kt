@@ -47,6 +47,11 @@ data class GeneratePlanResponse(
     val nextReviewAt: String,
     val reviewAfterWeeks: Int = 4,
     val source: String = "local",
+    // Motivo do fallback local (H3-21), com os códigos fechados do contrato:
+    // no_api_key, http_error, timeout, json_parse, unresolved_ids,
+    // schema_validation, unknown. Null quando o plano veio da IA ou quando o
+    // backend é antigo e não manda o campo (ignoreUnknownKeys).
+    val fallbackReason: String? = null,
 )
 
 @Serializable

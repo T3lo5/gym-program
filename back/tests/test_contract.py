@@ -42,6 +42,7 @@ FIXTURE = {
     "nextReviewAt": "2026-12-01",
     "reviewAfterWeeks": 4,
     "source": "local",
+    "fallbackReason": "no_api_key",
 }
 
 
@@ -49,8 +50,17 @@ def test_fixture_e_um_generate_response_valido():
     response = GenerateResponse.model_validate(FIXTURE)
     assert response.planId == 42
     assert response.source == "local"
+    assert response.fallbackReason == "no_api_key"
     assert response.workout.name == "Full Body A"
     assert response.workout.daysPerWeek == 2
+
+
+def test_fallback_reason_padrao_vazio():
+    # Campo aditivo (H3-21): sem a chave, o modelo usa "" — que é o valor
+    # esperado quando source == "ai".
+    data = {key: value for key, value in FIXTURE.items() if key != "fallbackReason"}
+    response = GenerateResponse.model_validate(data)
+    assert response.fallbackReason == ""
 
 
 def test_campos_obrigatorios_presentes():
