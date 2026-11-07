@@ -206,6 +206,68 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun update_set_log_preserva_sessao() = runTest {
+        // H3-27: editar a série atualiza reps/carga/RPE sem romper o vínculo
+        // com o exercício da sessão nem mudar o número da série.
+        dao.insertPlan(plano())
+        dao.insertDay(dia())
+        dao.insertPlanExercises(listOf(exercicioPlano()))
+        dao.insertSession(WorkoutSessionEntity(id = 50, planId = 1, dayId = 10, status = "in_progress"))
+        dao.insertSessionExercises(
+            listOf(SessionExerciseEntity(id = 500, sessionId = 50, exerciseId = "Barbell_Bench_Press", plannedSets = 3))
+        )
+        dao.insertSetLog(
+            SetLogEntity(id = 5000, exerciseLogId = 500, setNumber = 1, reps = 10, weightKg = 60.0)
+        )
+
+        dao.updateSetLog(
+            SetLogEntity(id = 5000, exerciseLogId = 500, setNumber = 1, reps = 8, weightKg = 62.5)
+        )
+
+        val editada = dao.getSetLog(5000)
+        assertEquals(8, editada?.reps)
+        assertEquals(62.5, editada?.weightKg ?: 0.0, 0.0001)
+        assertEquals(1, editada?.setNumber)
+        assertEquals(500L, editada?.exerciseLogId)
+        // A sessão continua no lugar, com o mesmo exercício filho.
+        assertEquals(50L, dao.getSessionExercise(500)?.sessionId)
+        assertEquals(1, dao.getAllSetLogs().size)
+    }
+
+    @Test
+    fun delete_set_log() = runTest {
+        // H3-27: excluir a série remove só ela e o contador do exercício volta
+        // a refletir as séries realmente gravadas.
+        dao.insertPlan(plano())
+        dao.insertDay(dia())
+        dao.insertPlanExercises(listOf(exercicioPlano()))
+        dao.insertSession(WorkoutSessionEntity(id = 50, planId = 1, dayId = 10, status = "in_progress"))
+        dao.insertSessionExercises(
+            listOf(
+                SessionExerciseEntity(
+                    id = 500,
+                    sessionId = 50,
+                    exerciseId = "Barbell_Bench_Press",
+                    plannedSets = 3,
+                    completedSets = 2,
+                )
+            )
+        )
+        dao.insertSetLog(SetLogEntity(id = 5000, exerciseLogId = 500, setNumber = 1, reps = 10, weightKg = 60.0))
+        dao.insertSetLog(SetLogEntity(id = 5001, exerciseLogId = 500, setNumber = 2, reps = 10, weightKg = 62.5))
+
+        dao.deleteSetLog(5000)
+        dao.recalculateCompletedSets(500)
+
+        assertNull(dao.getSetLog(5000))
+        assertEquals(1, dao.getAllSetLogs().size)
+        assertEquals(62.5, dao.getSetLog(5001)?.weightKg ?: 0.0, 0.0001)
+        assertEquals(1, dao.getSessionExercise(500)?.completedSets)
+        // A sessão permanece.
+        assertEquals("in_progress", dao.getSession(50)?.status)
+    }
+
+    @Test
     fun replace_all_data_preserva_ids() = runTest {
         dao.insertPlan(plano(id = 1, name = "Plano Antigo"))
         dao.insertDay(dia(id = 10, planId = 1, name = "Dia Antigo"))

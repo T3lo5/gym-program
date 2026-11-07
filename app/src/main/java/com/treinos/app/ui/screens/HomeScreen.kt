@@ -78,6 +78,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onStartDay: (Long) -> Unit,
     onResume: () -> Unit,
+    onAbandonWorkout: () -> Unit = {},
     onLogActivity: () -> Unit,
     onOpenMobility: () -> Unit = {},
     onPostponeReview: (Long) -> Unit = {},
@@ -120,7 +121,11 @@ fun HomeScreen(
         ) {
             if (inProgressSession != null) {
                 item {
-                    InProgressCard(session = inProgressSession, onResume = onResume)
+                    InProgressCard(
+                        session = inProgressSession,
+                        onResume = onResume,
+                        onAbandon = onAbandonWorkout,
+                    )
                 }
             }
 
@@ -490,8 +495,13 @@ private fun ModalityDayCard(
 }
 
 @Composable
-private fun InProgressCard(session: SessionWithExercises, onResume: () -> Unit) {
+private fun InProgressCard(
+    session: SessionWithExercises,
+    onResume: () -> Unit,
+    onAbandon: () -> Unit,
+) {
     val done = session.exercises.sumOf { it.sets.size }
+    var showAbandonConfirm by remember { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -518,7 +528,46 @@ private fun InProgressCard(session: SessionWithExercises, onResume: () -> Unit) 
             ) {
                 Text("Retomar treino")
             }
+            // H3-27: "Abandonar treino" também na Home, sempre com confirmação —
+            // a sessão some do aparelho junto com as séries registradas.
+            TextButton(
+                onClick = { showAbandonConfirm = true },
+                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+            ) {
+                Text(
+                    text = "Abandonar treino",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
+    }
+    if (showAbandonConfirm) {
+        AlertDialog(
+            onDismissRequest = { showAbandonConfirm = false },
+            title = { Text("Abandonar treino?") },
+            text = {
+                Text(
+                    "O treino em andamento e as séries já registradas serão excluídos do " +
+                        "aparelho. Essa ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAbandonConfirm = false
+                        onAbandon()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Abandonar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAbandonConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 

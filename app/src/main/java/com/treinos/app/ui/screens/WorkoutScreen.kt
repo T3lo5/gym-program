@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,12 +34,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -60,9 +64,13 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.KeepScreenOnEffect
+import com.treinos.app.ui.SetInputErrors
+import com.treinos.app.ui.SetInputValidation
+import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
+import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.formatDateTime
@@ -72,6 +80,7 @@ import com.treinos.app.ui.progressStateDescription
 import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
 import com.treinos.app.ui.timerShouldAnnounce
+import com.treinos.app.ui.validateSetInput
 
 @Composable
 fun WorkoutScreen(
@@ -90,17 +99,47 @@ fun WorkoutScreen(
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
+    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit = { _, _, _, _ -> },
+    onDeleteSet: (SetLogEntity) -> Unit = {},
+    onAbandon: () -> Unit = {},
+    onNextExercise: () -> Unit = {},
 ) {
     var exerciseToLog by remember { mutableStateOf<SessionExerciseWithSets?>(null) }
+    var editTarget by remember { mutableStateOf<Pair<SessionExerciseWithSets, SetLogEntity>?>(null) }
+    var setToDelete by remember { mutableStateOf<SetLogEntity?>(null) }
+    var showFinishConfirm by remember { mutableStateOf(false) }
+    var showAbandonConfirm by remember { mutableStateOf(false) }
+    var scrollTargetIndex by remember { mutableStateOf<Int?>(null) }
+    val listState = rememberLazyListState()
 
     // Sessão ativa mantém a tela acesa (H3-26); ao sair da tela a flag é liberada.
     KeepScreenOnEffect(enabled = session != null)
+
+    // "Exercício concluído — próximo" (H3-27): rola a lista até o próximo
+    // exercício com séries pendentes.
+    LaunchedEffect(scrollTargetIndex) {
+        scrollTargetIndex?.let { listState.animateScrollToItem(it) }
+        scrollTargetIndex = null
+    }
 
     Scaffold(
         topBar = {
             ScreenTopBar(
                 title = session?.session?.dayName?.ifBlank { "Treino" } ?: "Treino",
                 onBack = onLeave,
+                actions = {
+                    if (session != null) {
+                        TextButton(
+                            onClick = { showAbandonConfirm = true },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Text(
+                                text = "Abandonar",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                },
             )
         },
         bottomBar = {
@@ -120,7 +159,7 @@ fun WorkoutScreen(
                     }
                     Surface(tonalElevation = 3.dp) {
                         Button(
-                            onClick = onFinish,
+                            onClick = { showFinishConfirm = true },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
@@ -163,6 +202,7 @@ fun WorkoutScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
@@ -217,6 +257,19 @@ fun WorkoutScreen(
                             onLogSet(exercise, reps, weight, rpe)
                         },
                         onOpenDetail = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
+                        onEditSet = { set -> editTarget = exercise to set },
+                        onNextExercise = {
+                            // Rola até o primeiro exercício com séries pendentes;
+                            // o ViewModel alinha o índice usado pelo relógio.
+                            val sorted = current.exercises.sortedBy { it.exercise.exerciseOrder }
+                            val nextIndex = sorted.indexOfFirst { candidate ->
+                                !exerciseIsCompleted(candidate)
+                            }
+                            if (nextIndex >= 0) {
+                                scrollTargetIndex = nextIndex + 1 // item 0 é o card de resumo
+                            }
+                            onNextExercise()
+                        },
                     )
                 }
 
@@ -234,14 +287,134 @@ fun WorkoutScreen(
     }
 
     exerciseToLog?.let { exercise ->
-        AddSetDialog(
-            exercise = exercise,
+        val last = exercise.sets.maxByOrNull { it.setNumber }
+        SetDialog(
+            title = "Série ${exercise.sets.size + 1} — ${exercise.exercise.exerciseName}",
+            helper = "Planejado: ${exercise.exercise.plannedSets} séries. Preencha o que você fez.",
             suggestion = progressionSuggestions[exercise.exercise.exerciseId]
                 ?.takeIf { it.action != ProgressionAction.NONE },
+            initialReps = last?.reps?.toString().orEmpty(),
+            initialWeight = last?.weightKg?.let { formatWeight(it) }
+                ?: progressionSuggestions[exercise.exercise.exerciseId]
+                    ?.takeIf { it.action != ProgressionAction.NONE }
+                    ?.suggestedWeightKg
+                    ?.let { formatWeight(it) }
+                    .orEmpty(),
+            initialRpe = last?.rpe?.let { formatWeight(it) }.orEmpty(),
+            confirmLabel = "Salvar série",
+            onDelete = null,
             onDismiss = { exerciseToLog = null },
             onConfirm = { reps, weight, rpe ->
                 onLogSet(exercise, reps, weight, rpe)
                 exerciseToLog = null
+            },
+        )
+    }
+
+    editTarget?.let { (exercise, set) ->
+        SetDialog(
+            title = "Editar série ${set.setNumber} — ${exercise.exercise.exerciseName}",
+            helper = "Corrija o que você fez: a série já registrada é atualizada no lugar.",
+            suggestion = null,
+            initialReps = set.reps?.toString().orEmpty(),
+            initialWeight = set.weightKg?.let { formatWeight(it) }.orEmpty(),
+            initialRpe = set.rpe?.let { formatWeight(it) }.orEmpty(),
+            confirmLabel = "Salvar alterações",
+            onDelete = { setToDelete = set },
+            onDismiss = { editTarget = null },
+            onConfirm = { reps, weight, rpe ->
+                onUpdateSet(set, reps, weight, rpe)
+                editTarget = null
+            },
+        )
+    }
+
+    setToDelete?.let { set ->
+        AlertDialog(
+            onDismissRequest = { setToDelete = null },
+            title = { Text("Excluir série?") },
+            text = {
+                Text(
+                    "A série ${set.setNumber} será removida do treino e o progresso do " +
+                        "exercício será recalculado. Essa ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteSet(set)
+                        setToDelete = null
+                        editTarget = null
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { setToDelete = null }, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
+    if (showFinishConfirm) {
+        val done = session?.exercises?.sumOf { it.sets.size } ?: 0
+        val planned = session?.exercises?.sumOf { it.exercise.plannedSets } ?: 0
+        AlertDialog(
+            onDismissRequest = { showFinishConfirm = false },
+            title = { Text("Finalizar treino?") },
+            text = {
+                Text(
+                    "$done de $planned séries registradas. Finalizar encerra a sessão e " +
+                        "salva o treino no aparelho."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showFinishConfirm = false
+                        onFinish()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Finalizar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFinishConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
+    if (showAbandonConfirm) {
+        AlertDialog(
+            onDismissRequest = { showAbandonConfirm = false },
+            title = { Text("Abandonar treino?") },
+            text = {
+                Text(
+                    "O treino em andamento e as séries já registradas serão excluídos do " +
+                        "aparelho. Essa ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAbandonConfirm = false
+                        onAbandon()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Abandonar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAbandonConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("Cancelar")
+                }
             },
         )
     }
@@ -339,123 +512,157 @@ private fun ExerciseCard(
     onLogSet: () -> Unit,
     onRepeatLastSet: (Int?, Double?, Double?) -> Unit,
     onOpenDetail: () -> Unit,
+    onEditSet: (SetLogEntity) -> Unit,
+    onNextExercise: () -> Unit,
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
+    // H3-27: progresso derivado das séries gravadas — editar/excluir série
+    // reflete aqui sem agregado extra.
+    val completed = exerciseIsCompleted(exercise)
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .minimumInteractiveComponentSize()
-                    .semantics { role = Role.Button }
-                    .clickable(onClickLabel = "Abrir detalhes do exercício", onClick = onOpenDetail),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            // Exercício com as séries planejadas cumpridas fica atenuado (H3-27);
+            // o botão de ação fica fora do bloco, em contraste pleno.
+            Column(
+                modifier = Modifier.alpha(if (completed) 0.55f else 1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ExerciseImage(
-                    imageUrl = media?.imageUrl,
-                    exerciseName = name,
-                    contentDescription = decorativeContentDescription(),
-                    size = 72.dp,
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
+                        .semantics { role = Role.Button }
+                        .clickable(onClickLabel = "Abrir detalhes do exercício", onClick = onOpenDetail),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ExerciseImage(
+                        imageUrl = media?.imageUrl,
+                        exerciseName = name,
+                        contentDescription = decorativeContentDescription(),
+                        size = 72.dp,
                     )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
+                        )
+                        Text(
+                            text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
+                                "${exercise.exercise.restSeconds}s",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                val sets = exercise.sets.sortedBy { it.setNumber }
+                if (sets.isEmpty()) {
                     Text(
-                        text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
-                            "${exercise.exercise.restSeconds}s",
+                        text = "Nenhuma série registrada ainda.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                } else {
+                    sets.forEach { set ->
+                        HorizontalDivider()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .minimumInteractiveComponentSize()
+                                .semantics(mergeDescendants = true) {
+                                    stateDescription = setContentDescription(
+                                        set.setNumber,
+                                        set.reps,
+                                        set.weightKg,
+                                        set.rpe,
+                                    ) + ", série concluída"
+                                }
+                                .clickable(
+                                    onClickLabel = "Editar série ${set.setNumber}",
+                                    role = Role.Button,
+                                    onClick = { onEditSet(set) },
+                                ),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Série ${set.setNumber}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = buildString {
+                                    set.reps?.let { append("$it reps") }
+                                    set.weightKg?.let {
+                                        if (isNotEmpty()) append(" • ")
+                                        append("${formatWeight(it)} kg")
+                                    }
+                                    set.rpe?.let {
+                                        if (isNotEmpty()) append(" • ")
+                                        append("RPE ${formatWeight(it)}")
+                                    }
+                                    if (isEmpty()) append("registrada")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                 }
-            }
 
-            val sets = exercise.sets.sortedBy { it.setNumber }
-            if (sets.isEmpty()) {
-                Text(
-                    text = "Nenhuma série registrada ainda.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                sets.forEach { set ->
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics(mergeDescendants = true) {
-                                stateDescription = setContentDescription(
-                                    set.setNumber,
-                                    set.reps,
-                                    set.weightKg,
-                                    set.rpe,
-                                ) + ", série concluída"
-                            },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                // "Repetir última série" em 1 toque (H3-26): grava com carga/reps/RPE
+                // da última série e dispara o descanso, sem abrir o diálogo.
+                val lastSet = sets.maxByOrNull { it.setNumber }
+                if (lastSet != null) {
+                    val haptics = LocalHapticFeedback.current
+                    OutlinedButton(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRepeatLastSet(lastSet.reps, lastSet.weightKg, lastSet.rpe)
+                        },
+                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
-                        Text(
-                            text = "Série ${set.setNumber}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            text = buildString {
-                                set.reps?.let { append("$it reps") }
-                                set.weightKg?.let {
-                                    if (isNotEmpty()) append(" • ")
-                                    append("${formatWeight(it)} kg")
-                                }
-                                set.rpe?.let {
-                                    if (isNotEmpty()) append(" • ")
-                                    append("RPE ${formatWeight(it)}")
-                                }
-                                if (isEmpty()) append("registrada")
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+                        val label = lastSetLabel(lastSet)
+                        Text(if (label == null) "Repetir última série" else "Repetir última série ($label)")
                     }
                 }
             }
 
-            // "Repetir última série" em 1 toque (H3-26): grava com carga/reps/RPE
-            // da última série e dispara o descanso, sem abrir o diálogo.
-            val lastSet = sets.maxByOrNull { it.setNumber }
-            if (lastSet != null) {
-                val haptics = LocalHapticFeedback.current
-                OutlinedButton(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onRepeatLastSet(lastSet.reps, lastSet.weightKg, lastSet.rpe)
-                    },
-                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
-                ) {
-                    val label = lastSetLabel(lastSet)
-                    Text(if (label == null) "Repetir última série" else "Repetir última série ($label)")
-                }
-            }
-
             Button(
-                onClick = onLogSet,
+                onClick = if (completed) onNextExercise else onLogSet,
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             ) {
-                Text("Registrar série ${exercise.sets.size + 1}")
+                // H3-27: cumprido o planejado, o botão avança em vez de empilhar
+                // séries extras sem sinalizar.
+                Text(
+                    if (completed) {
+                        "Exercício concluído — próximo"
+                    } else {
+                        "Registrar série ${exercise.sets.size + 1}"
+                    }
+                )
             }
         }
     }
 }
+
+/** Verdadeiro quando as séries planejadas do exercício já foram registradas. */
+private fun exerciseIsCompleted(exercise: SessionExerciseWithSets): Boolean =
+    calculateProgress(
+        plannedSets = exercise.exercise.plannedSets,
+        completedSets = exercise.exercise.completedSets,
+        sets = exercise.sets.map { SetRecord(it.setNumber, it.reps, it.weightKg, it.rpe) },
+    ).isCompleted
 
 /** Rótulo da última série: "60 kg × 10", "10 reps" ou "60 kg"; `null` sem dados. */
 private fun lastSetLabel(set: SetLogEntity): String? = when {
@@ -466,48 +673,51 @@ private fun lastSetLabel(set: SetLogEntity): String? = when {
 }
 
 @Composable
-private fun AddSetDialog(
-    exercise: SessionExerciseWithSets,
+private fun SetDialog(
+    title: String,
+    helper: String?,
     suggestion: ProgressionSuggestion?,
+    initialReps: String,
+    initialWeight: String,
+    initialRpe: String,
+    confirmLabel: String,
+    onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
     onConfirm: (Int?, Double?, Double?) -> Unit,
 ) {
-    val last = exercise.sets.maxByOrNull { it.setNumber }
-    var reps by remember { mutableStateOf(last?.reps?.toString().orEmpty()) }
-    var weight by remember {
-        mutableStateOf(
-            last?.weightKg?.let { formatWeight(it) }
-                ?: suggestion?.suggestedWeightKg?.let { formatWeight(it) }
-                ?: "",
-        )
-    }
-    var rpe by remember { mutableStateOf(last?.rpe?.let { formatWeight(it) }.orEmpty()) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var reps by remember { mutableStateOf(initialReps) }
+    var weight by remember { mutableStateOf(initialWeight) }
+    var rpe by remember { mutableStateOf(initialRpe) }
+    var errors by remember { mutableStateOf(SetInputErrors()) }
     val haptics = LocalHapticFeedback.current
     val suggestionText = suggestionLabel(suggestion)
+
+    // H3-27: valor preenchido e inválido bloqueia o salvamento — nada é
+    // gravado com carga/reps/RPE `null` por falha de parse.
     fun submit() {
-        val parsedReps = reps.toIntOrNull()
-        if (reps.isNotBlank() && parsedReps == null) {
-            error = "Informe as repetições como número inteiro."
-        } else {
-            // Háptico curto ao confirmar "Salvar série" (H3-26).
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            onConfirm(parsedReps, parseDecimal(weight), parseDecimal(rpe))
+        when (val result = validateSetInput(repsText = reps, weightText = weight, rpeText = rpe)) {
+            is SetInputValidation.Invalid -> errors = result.errors
+            is SetInputValidation.Valid -> {
+                // Háptico curto ao confirmar o salvamento (H3-26).
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onConfirm(result.input.reps, result.input.weightKg, result.input.rpe)
+            }
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Série ${exercise.sets.size + 1} — ${exercise.exercise.exerciseName}")
+            Text(title)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Planejado: ${exercise.exercise.plannedSets} séries. " +
-                        "Preencha o que você fez.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                helper?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 suggestionText?.let {
                     Text(
                         text = it,
@@ -517,9 +727,15 @@ private fun AddSetDialog(
                 }
                 OutlinedTextField(
                     value = reps,
-                    onValueChange = { reps = it.filter(Char::isDigit); error = null },
+                    onValueChange = {
+                        reps = it.filter(Char::isDigit)
+                        errors = errors.copy(reps = null)
+                    },
                     label = { Text("Repetições") },
-                    supportingText = { Text(if (reps.isBlank()) "Opcional" else "Número inteiro") },
+                    supportingText = {
+                        Text(errors.reps ?: if (reps.isBlank()) "Opcional" else "Número inteiro, de 1 a 100")
+                    },
+                    isError = errors.reps != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
@@ -528,10 +744,11 @@ private fun AddSetDialog(
                     value = weight,
                     onValueChange = { value ->
                         weight = value.filter { it.isDigit() || it == ',' || it == '.' }
-                        error = null
+                        errors = errors.copy(weight = null)
                     },
                     label = { Text("Carga (kg)") },
-                    supportingText = { Text("Opcional. Use vírgula ou ponto.") },
+                    supportingText = { Text(errors.weight ?: "Opcional. Use vírgula ou ponto.") },
+                    isError = errors.weight != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
@@ -540,38 +757,41 @@ private fun AddSetDialog(
                     value = rpe,
                     onValueChange = { value ->
                         rpe = value.filter { it.isDigit() || it == ',' || it == '.' }
-                        error = null
+                        errors = errors.copy(rpe = null)
                     },
                     label = { Text("RPE (opcional)") },
-                    supportingText = { Text("Opcional, de 1 a 10.") },
+                    supportingText = { Text(errors.rpe ?: "Opcional, de 1 a 10.") },
+                    isError = errors.rpe != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
-                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                error?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
             }
         },
         confirmButton = {
             TextButton(onClick = ::submit, modifier = Modifier.minimumInteractiveComponentSize()) {
-                Text("Salvar série")
+                Text(confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onDelete != null) {
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        Text("Excluir série")
+                    }
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
+            }
         },
     )
 }
-
-private fun parseDecimal(value: String): Double? =
-    value.trim().replace(',', '.').toDoubleOrNull()
 
 /** Texto de apoio do motor de progressão; `null` quando não há o que sugerir. */
 private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {

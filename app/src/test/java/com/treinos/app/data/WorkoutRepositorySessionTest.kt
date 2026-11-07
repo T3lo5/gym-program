@@ -142,6 +142,60 @@ class WorkoutRepositorySessionTest {
         assertTrue(dao.getAllSessionExercises().isEmpty())
     }
 
+    @Test
+    fun mobilidade_planejada_fecha_sessao_unica() = runTest {
+        // H3-27: finalizar a mobilidade planejada fecha a sessão in_progress
+        // criada por startSession — não existe segunda sessão (fantasma).
+        val planId = dao.insertPlan(
+            WorkoutPlanEntity(id = 1, name = "Plano", goal = "general", daysPerWeek = 3, isActive = true)
+        )
+        val dayId = dao.insertDay(
+            WorkoutDayEntity(id = 10, planId = planId, name = "Mobilidade", dayOrder = 0, weekday = 1, modality = "mobility")
+        )
+        val sessionId = repository.startSession(planId, dayId)
+
+        repository.finishPlannedMobilitySession(sessionId, "back_10", 600L)
+
+        val sessions = dao.getAllSessionEntities()
+        assertEquals(1, sessions.size)
+        val session = sessions.single()
+        assertEquals(sessionId, session.id)
+        assertEquals("completed", session.status)
+        assertNotNull(session.endedAt)
+        assertEquals(600L, session.totalDurationSeconds)
+        assertEquals("back_10", session.title)
+        assertEquals("mobility", session.modality)
+        assertEquals("plan", session.source)
+    }
+
+    @Test
+    fun abandonar_remove_sessao() = runTest {
+        // H3-27: abandonar apaga a sessão, os exercícios e as séries dela;
+        // as demais sessões do histórico ficam intactas.
+        val planId = dao.insertPlan(
+            WorkoutPlanEntity(id = 1, name = "Plano", goal = "hypertrophy", daysPerWeek = 3, isActive = true)
+        )
+        val dayId = dao.insertDay(
+            WorkoutDayEntity(id = 10, planId = planId, name = "Treino A", dayOrder = 0, weekday = 1, modality = "strength")
+        )
+        dao.insertPlanExercises(
+            listOf(WorkoutPlanExerciseEntity(id = 100, dayId = dayId, exerciseId = "ex1", exerciseName = "Ex 1", sets = 3))
+        )
+        val sessionId = repository.startSession(planId, dayId)
+        val exerciseLogId = dao.getAllSessionExercises().single { it.sessionId == sessionId }.id
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 60.0, rpe = null)
+        val outraSessao = repository.startSession(planId, dayId)
+
+        repository.deleteSession(sessionId)
+
+        assertNull(dao.getSession(sessionId))
+        assertTrue(dao.getAllSessionExercises().none { it.sessionId == sessionId })
+        assertTrue(dao.getAllSetLogs().none { it.exerciseLogId == exerciseLogId })
+        // A outra sessão não foi tocada: sobrou 1 de 2.
+        assertNotNull(dao.getSession(outraSessao))
+        assertEquals(1, dao.getAllSessionEntities().size)
+    }
+
     private fun generatedResponse(name: String) = GeneratePlanResponse(
         workout = com.treinos.app.data.remote.WorkoutPlanDto(
             name = name,

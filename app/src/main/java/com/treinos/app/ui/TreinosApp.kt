@@ -195,6 +195,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onSettings = viewModel::openSettings,
                     onStartDay = viewModel::startWorkout,
                     onResume = viewModel::resumeWorkout,
+                    onAbandonWorkout = viewModel::abandonWorkout,
                     onLogActivity = viewModel::openLogActivity,
                     onOpenMobility = viewModel::openMobility,
                     onPostponeReview = { planId -> viewModel.postponeReview(planId) },
@@ -230,6 +231,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     exerciseMedia = exerciseMedia,
                     progressionSuggestions = progressionSuggestions,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
+                    onUpdateSet = viewModel::updateSet,
+                    onDeleteSet = viewModel::deleteSet,
+                    onAbandon = viewModel::abandonWorkout,
+                    onNextExercise = viewModel::nextExercise,
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(
@@ -270,12 +275,19 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDelete = { activityEditingId?.let(viewModel::deleteLogActivity) },
                 )
 
-                Screen.Mobility -> MobilityScreen(
-                    onBack = viewModel::goHome,
-                    onFinishMobility = { planId, dayId, routineId, elapsed ->
-                        viewModel.finishPlannedMobility(planId, dayId, routineId, elapsed)
-                    },
-                )
+                // H3-27: o planId/dayId da sessão ativa alimentam a mobilidade
+                // planejada — finalizar fecha a sessão aberta em vez de criar
+                // uma segunda sessão (fantasma eterno na Home).
+                Screen.Mobility -> {
+                    val mobilitySession = inProgressSession
+                        ?.takeIf { it.session.modality == "mobility" }
+                    MobilityScreen(
+                        onBack = viewModel::goHome,
+                        onFinishMobility = viewModel::finishPlannedMobility,
+                        planId = mobilitySession?.session?.planId ?: 0L,
+                        dayId = mobilitySession?.session?.dayId ?: 0L,
+                    )
+                }
 
                 Screen.Settings -> SettingsScreen(
                     backendUrl = backendUrl,

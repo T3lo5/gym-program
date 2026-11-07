@@ -1,15 +1,21 @@
 package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,7 +28,7 @@ class WorkoutScreenTest {
     val composeRule = createComposeRule()
 
     /** Sessão de força com um exercício e uma série 60 kg × 10 registrada. */
-    private fun sessao(comSets: Boolean = true): SessionWithExercises {
+    private fun sessao(comSets: Boolean = true, weightKg: Double = 60.0): SessionWithExercises {
         val sets = if (comSets) {
             listOf(
                 SetLogEntity(
@@ -30,7 +36,7 @@ class WorkoutScreenTest {
                     exerciseLogId = 100,
                     setNumber = 1,
                     reps = 10,
-                    weightKg = 60.0,
+                    weightKg = weightKg,
                     rpe = null,
                 ),
             )
@@ -70,6 +76,8 @@ class WorkoutScreenTest {
         restTotal: Int? = null,
         restPaused: Boolean = false,
         onLoggedSet: (Int?, Double?, Double?) -> Unit = { _, _, _ -> },
+        onFinished: () -> Unit = {},
+        onUpdatedSet: (Int?, Double?, Double?) -> Unit = { _, _, _ -> },
     ) {
         composeRule.setContent {
             WorkoutScreen(
@@ -79,12 +87,17 @@ class WorkoutScreenTest {
                 onLeave = { },
                 onLogSet = { _, reps, weight, rpe -> onLoggedSet(reps, weight, rpe) },
                 onSkipRest = { },
-                onFinish = { },
+                onFinish = onFinished,
                 hasInProgressSession = false,
                 restPaused = restPaused,
+                onUpdateSet = { _, reps, weight, rpe -> onUpdatedSet(reps, weight, rpe) },
             )
         }
     }
+
+    /** Campo de texto localizado pelo valor atual (o rótulo fica em outro nó). */
+    private fun campoDeTexto(valorAtual: String) =
+        composeRule.onNode(hasSetTextAction() and hasText(valorAtual), useUnmergedTree = true)
 
     @Test
     fun sem_serie_anterior_o_botao_repetir_nao_existe() {
@@ -111,6 +124,69 @@ class WorkoutScreenTest {
 
         composeRule.onNodeWithText("Descanso pausado: 00:45").assertIsDisplayed()
         composeRule.onNodeWithText("Continuar").assertIsDisplayed()
+    }
+
+    @Test
+    fun finalizar_exige_confirmacao() {
+        // H3-27: "Finalizar treino" mostra o resumo e pode ser cancelado sem
+        // efeito; só o "Finalizar" do diálogo encerra a sessão.
+        var finished = false
+        setContent(session = sessao(), onFinished = { finished = true })
+
+        composeRule.onNodeWithText("Finalizar treino").performClick()
+        composeRule.onNodeWithText("Finalizar treino?").assertIsDisplayed()
+        composeRule.onNodeWithText("1 de 3 séries registradas", substring = true).assertIsDisplayed()
+        assertFalse(finished)
+
+        composeRule.onNodeWithText("Cancelar").performClick()
+        composeRule.onNodeWithText("Finalizar treino?").assertDoesNotExist()
+        assertFalse(finished)
+
+        composeRule.onNodeWithText("Finalizar treino").performClick()
+        composeRule.onNodeWithText("Finalizar").performClick()
+        assertTrue(finished)
+    }
+
+    @Test
+    fun linha_de_serie_abre_edicao() {
+        // H3-27: tocar na linha registrada abre o diálogo pré-preenchido;
+        // salvar atualiza a mesma série (62,5 kg com vírgula).
+        var atualizada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(),
+            onUpdatedSet = { reps, weight, rpe -> atualizada = Triple(reps, weight, rpe) },
+        )
+
+        composeRule.onNodeWithText("Série 1").performClick()
+        composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
+
+        campoDeTexto("60").performTextReplacement("62,5")
+        composeRule.onNodeWithText("Salvar alterações").performClick()
+
+        assertEquals(Triple(10, 62.5, null), atualizada)
+    }
+
+    @Test
+    fun carga_invalida_bloqueia_salvamento() {
+        // H3-27: "6.0.5" mostra erro no diálogo e nada é gravado; corrigir
+        // para "61,5" salva de verdade.
+        var atualizada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(),
+            onUpdatedSet = { reps, weight, rpe -> atualizada = Triple(reps, weight, rpe) },
+        )
+
+        composeRule.onNodeWithText("Série 1").performClick()
+        composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
+        campoDeTexto("60").performTextReplacement("6.0.5")
+        composeRule.onNodeWithText("Salvar alterações").performClick()
+
+        composeRule.onNodeWithText("Informe a carga como número, usando vírgula ou ponto.").assertIsDisplayed()
+        assertNull(atualizada)
+
+        campoDeTexto("6.0.5").performTextReplacement("61,5")
+        composeRule.onNodeWithText("Salvar alterações").performClick()
+        assertEquals(Triple(10, 61.5, null), atualizada)
     }
 
 }

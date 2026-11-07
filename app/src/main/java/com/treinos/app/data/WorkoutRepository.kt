@@ -300,6 +300,63 @@ class WorkoutRepository(
         )
     }
 
+    /**
+     * Atualiza uma série já registrada pelo `id` (H3-27). O vínculo com o
+     * exercício da sessão e o número da série não mudam na edição — só
+     * reps/carga/RPE.
+     */
+    suspend fun updateSet(set: SetLogEntity) = withContext(Dispatchers.IO) {
+        val existing = dao.getSetLog(set.id)
+            ?: error("Série não encontrada no aparelho.")
+        dao.updateSetLog(
+            set.copy(
+                exerciseLogId = existing.exerciseLogId,
+                setNumber = existing.setNumber,
+            )
+        )
+    }
+
+    /**
+     * Exclui uma série pelo `id` (H3-27) e realinha o contador de séries
+     * concluídas do exercício ao número real de séries gravadas.
+     */
+    suspend fun deleteSet(setId: Long) = withContext(Dispatchers.IO) {
+        val existing = dao.getSetLog(setId) ?: return@withContext
+        dao.deleteSetLog(setId)
+        dao.recalculateCompletedSets(existing.exerciseLogId)
+    }
+
+    /**
+     * Exclui a sessão inteira ("Abandonar treino", H3-27). Exercícios e séries
+     * caem por CASCADE; o histórico das demais sessões fica intacto.
+     */
+    suspend fun deleteSession(sessionId: Long) = withContext(Dispatchers.IO) {
+        dao.deleteSession(sessionId)
+    }
+
+    /**
+     * Fecha a sessão de mobilidade planejada que já estava aberta (H3-27):
+     * UPDATE da sessão `in_progress` para `completed` — nunca insere uma
+     * segunda sessão, que ficaria como fantasma eterno na Home. O `title`
+     * passa a apontar a rotina, como em [logPlannedMobility].
+     */
+    suspend fun finishPlannedMobilitySession(
+        sessionId: Long,
+        routineId: String,
+        elapsedSeconds: Long,
+    ) = withContext(Dispatchers.IO) {
+        val session = dao.getSession(sessionId) ?: return@withContext
+        val now = System.currentTimeMillis()
+        dao.updateSession(
+            session.copy(
+                status = "completed",
+                endedAt = now,
+                totalDurationSeconds = elapsedSeconds.coerceAtLeast(0L),
+                title = routineId,
+            )
+        )
+    }
+
     /** Grava uma sessão de mobilidade planejada concluída, sem séries. */
     suspend fun logPlannedMobility(
         planId: Long,

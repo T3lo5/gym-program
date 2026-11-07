@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.discovery.BackendConnector
@@ -878,6 +879,63 @@ class AppViewModel(
         }
     }
 
+    /**
+     * Edita uma série já registrada (H3-27): o mesmo `id` é atualizado com
+     * reps/carga/RPE novos e o estado do relógio é reenviado.
+     */
+    fun updateSet(set: SetLogEntity, reps: Int?, weightKg: Double?, rpe: Double?) {
+        viewModelScope.launch {
+            try {
+                repository.updateSet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
+                syncWearState()
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível atualizar a série."
+            }
+        }
+    }
+
+    /**
+     * Exclui uma série registrada (H3-27); o progresso do exercício é
+     * recalculado no repositório e o relógio recebe o estado novo.
+     */
+    fun deleteSet(set: SetLogEntity) {
+        viewModelScope.launch {
+            try {
+                repository.deleteSet(set.id)
+                syncWearState()
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível excluir a série."
+            }
+        }
+    }
+
+    /**
+     * "Abandonar treino" (H3-27): apaga a sessão em andamento — exercícios e
+     * séries caem por CASCADE — e limpa descanso e estado do relógio. A UI
+     * pede confirmação antes de chamar este método.
+     */
+    fun abandonWorkout() {
+        val sessionId = inProgressSession.value?.session?.id
+            ?: _activeSessionId.value
+            ?: return
+        viewModelScope.launch {
+            try {
+                repository.deleteSession(sessionId)
+                _activeSessionId.value = null
+                // Estado do relógio limpo na hora: o `inProgressSession` ainda
+                // pode estar obsoleto aqui, então `syncWearState()` republicaria
+                // a sessão recém-apagada; o coletor do init confirma o `null`
+                // quando o flow do Room emitir.
+                _wearState.value = null
+                skipRest()
+                _screen.value = Screen.Home
+                _message.value = "Treino abandonado."
+            } catch (error: Exception) {
+                _message.value = error.message ?: "Não foi possível abandonar o treino."
+            }
+        }
+    }
+
     /** Finaliza uma sessão de corrida planejada. */
     fun finishRunWorkout(sessionId: Long, durationSeconds: Long, distanceMeters: Double?, rpe: Double?) {
         viewModelScope.launch {
@@ -892,11 +950,27 @@ class AppViewModel(
         }
     }
 
-    /** Finaliza uma sessão de mobilidade planejada. */
+    /**
+     * Finaliza uma sessão de mobilidade planejada (H3-27). Quando a sessão
+     * veio de um dia do plano (`planId != 0`), a sessão `in_progress` criada
+     * por [startWorkout] é **fechada** — nunca é inserida uma segunda sessão
+     * `completed`, que ficaria como fantasma eterno na Home. O atalho
+     * "Mobilidade" sem plano continua gravando a sessão avulsa de antes.
+     */
     fun finishPlannedMobility(planId: Long, dayId: Long, routineId: String, elapsedSeconds: Long) {
         viewModelScope.launch {
             try {
-                repository.logPlannedMobility(planId, dayId, routineId, elapsedSeconds)
+                val openSession = inProgressSession.value
+                    ?.takeIf { it.session.modality == "mobility" }
+                if (planId != 0L && openSession != null) {
+                    repository.finishPlannedMobilitySession(
+                        sessionId = openSession.session.id,
+                        routineId = routineId,
+                        elapsedSeconds = elapsedSeconds,
+                    )
+                } else {
+                    repository.logPlannedMobility(planId, dayId, routineId, elapsedSeconds)
+                }
                 _screen.value = Screen.Home
                 _message.value = "Mobilidade finalizada e salva no histórico."
             } catch (error: Exception) {

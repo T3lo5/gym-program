@@ -161,6 +161,28 @@ interface WorkoutDao {
     @Insert
     suspend fun insertSetLogs(setLogs: List<SetLogEntity>): List<Long>
 
+    @Query("SELECT * FROM set_logs WHERE id = :id")
+    suspend fun getSetLog(id: Long): SetLogEntity?
+
+    /** Edita a série pelo id (H3-27); `exerciseLogId` e `setNumber` vêm da entidade. */
+    @Update
+    suspend fun updateSetLog(setLog: SetLogEntity)
+
+    /** Exclui a série pelo id (H3-27); o resto da sessão permanece. */
+    @Query("DELETE FROM set_logs WHERE id = :setId")
+    suspend fun deleteSetLog(setId: Long)
+
+    /**
+     * Realinha `completedSets` ao número real de séries gravadas (H3-27):
+     * após excluir uma série, o contador persistido volta a ser derivado.
+     */
+    @Query(
+        "UPDATE session_exercises SET completedSets = " +
+            "(SELECT COUNT(*) FROM set_logs WHERE exerciseLogId = :exerciseLogId) " +
+            "WHERE id = :exerciseLogId"
+    )
+    suspend fun recalculateCompletedSets(exerciseLogId: Long)
+
     @Query("SELECT COALESCE(SUM(completedSets), 0) FROM session_exercises WHERE sessionId = :sessionId")
     suspend fun completedSetsForSession(sessionId: Long): Int
 
