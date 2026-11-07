@@ -300,8 +300,8 @@ def test_resolve_ids_ignora_corrida_e_mobilidade():
     catalog = [
         {"id": "Barbell_Bench_Press", "name": "Supino", "primaryMuscles": ["chest"], "equipment": "barbell", "category": "strength"}
     ]
-    result, unresolved = resolve_plan_ids(plan, catalog)
-    assert unresolved == [], f"IDs sintéticos não deveriam ser pendentes: {unresolved}"
+    result, dropped = resolve_plan_ids(plan, catalog)
+    assert dropped == [], f"IDs sintéticos não deveriam ser descartados: {dropped}"
 
 
 def test_sets_de_corrida_aceitam_intervalos_ate_20():

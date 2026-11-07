@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-22` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-07` (diretriz do usuário: expor todos IDs; plano B condicionado) |
+| Implementação | `concluída (aguardando gate verify.sh)` |
 
 **Depende da [H3-21](H3-21-diagnostico-fallback-ia.md)** (o motivo do fallback
 precisa estar visível para validar quais causas dominam no uso real).

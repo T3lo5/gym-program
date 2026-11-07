@@ -1,15 +1,18 @@
+import json
+import os
+import random
+import re
+import socket
+import threading
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
+
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Literal, Any, Dict
-import httpx
-import os
-import json
-import socket
-import threading
-from datetime import datetime
 from dotenv import load_dotenv
 from zeroconf import ServiceInfo, Zeroconf
 
@@ -22,8 +25,15 @@ from .plan_builder import (
     MUSCLE_ALIASES,
     build_local_plan,
     build_hybrid_plan,
+    build_strength_session,
+    catalog_summary_for_request,
+    complementary_exercise_count,
+    complementary_focus_label,
+    complementary_plan_name,
     enforce_complementary_plan,
     enrich_plan,
+    id_name_mismatches,
+    normalize,
     resolve_plan_ids,
     review_date,
     profile_adjustments,
@@ -32,6 +42,9 @@ from .plan_builder import (
     normalize_hybrid_plan,
     is_complementary_request,
     complementary_equipment_filter,
+    _build_pool,
+    _expand_muscles,
+    _is_strength_exercise,
 )
 from .run_templates import template_for
 
@@ -53,69 +66,12 @@ else:
     EXERCISE_CATALOG = []
     print(f"WARNING: Exercise catalog not found at {CATALOG_PATH}")
 
-# Build catalog summary for prompt
-CATALOG_SUMMARY = ""
-if EXERCISE_CATALOG:
-    # Group by muscle group for concise prompt
-    by_muscle = {}
-    for ex in EXERCISE_CATALOG:
-        for muscle in ex.get("primaryMuscles", []):
-            if muscle not in by_muscle:
-                by_muscle[muscle] = []
-            by_muscle[muscle].append(f"{ex['id']} ({ex['name']}, {ex.get('equipment', 'body only')})")
-    
-    CATALOG_SUMMARY = "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (use APENAS estes IDs):\n"
-    for muscle, exercises in sorted(by_muscle.items()):
-        CATALOG_SUMMARY += f"\n{muscle.upper()}:\n"
-        for ex in exercises[:8]:  # limit per muscle
-            CATALOG_SUMMARY += f"  - {ex}\n"
-        if len(exercises) > 8:
-            CATALOG_SUMMARY += f"  ... e mais {len(exercises) - 8} exercícios\n"
+SYSTEM_PROMPT_HYBRID_RULES = """Você é um gerador de planos de treino híbrido (musculação, corrida, mobilidade).
 
-SYSTEM_PROMPT = f"""Você é um gerador de treinos de musculação baseado em evidências.
-
-{CATALOG_SUMMARY}
+{catalog_summary}
 
 REGRAS OBRIGATÓRIAS:
-1. Use APENAS exercícios do catálogo acima (IDs exatos)
-2. Retorne JSON válido conforme schema WorkoutPlanDTO
-3. Não invente exercícios, não use IDs inexistentes
-4. Respeite equipamentos disponíveis do usuário
-5. Balanceie volume entre grupos musculares
-6. Inclua aquecimento e alongamento sugeridos
-
-FORMATO DE SAÍDA (JSON):
-{{
-  "name": "string",
-  "description": "string",
-  "goal": "hypertrophy|strength|endurance|power|fat_loss|general",
-  "daysPerWeek": 3-6,
-  "days": [
-    {{
-      "name": "string",
-      "dayOrder": 0,
-      "exercises": [
-        {{
-          "exerciseId": "string (ID EXATO do catálogo)",
-          "exerciseOrder": 0,
-          "sets": 3-5,
-          "targetReps": "string (ex: '8-12', '10', 'AMRAP')",
-          "targetRpe": 7.0-9.5,
-          "restSeconds": 60-180,
-          "notes": "string",
-          "isSupersetWithPrevious": false
-        }}
-      ]
-    }}
-  ]
-}}"""
-
-SYSTEM_PROMPT_HYBRID = f"""Você é um gerador de planos de treino híbrido (musculação, corrida, mobilidade).
-
-{CATALOG_SUMMARY}
-
-REGRAS OBRIGATÓRIAS:
-1. Use APENAS exercícios do catálogo acima (IDs exatos) para musculação.
+1. Prefira SEMPRE os IDs listados no catálogo. IDs desconhecidos serão descartados e a sessão completada localmente.
 2. Corrida use EXATAMENTE um destes IDs sintéticos (não existem no catálogo, são válidos):
    `run_easy`, `run_walk`, `run_interval`, `run_tempo`, `run_long`.
 3. Mobilidade use EXATAMENTE um destes IDs sintéticos: `mobility_full`,
@@ -123,12 +79,13 @@ REGRAS OBRIGATÓRIAS:
 4. Nunca invente outro ID para corrida ou mobilidade (ex.: não use `Run_5K_Easy`,
    `Pigeon_Pose`, `Hip_Flexor_Stretch`).
 5. Um `day` = uma sessão = uma única modalidade. Nunca misture musculação, corrida e mobilidade no mesmo `day`.
-4. Musculação: 4 a 8 exercícios por `day`, todos `metricType = "reps_weight"`, categoria de força, sem alongamento/cardio.
-5. Corrida: exatamente 1 bloco por `day`, `metricType = "distance_duration"`, com `targetDistanceMeters` e/ou `targetRpe`; `sets` até 20.
-6. Mobilidade: exatamente 1 bloco por `day`, `metricType = "duration"`, `targetDurationSeconds` entre 300 e 900.
-7. `weekday` 1..7. Várias sessões no mesmo `weekday` são `day`s separados com `dayOrder` diferente.
-8. Respeite equipamentos, nível, objetivo e duração informados por modalidade.
-9. Retorne JSON válido conforme schema WorkoutPlanDTO.
+6. Musculação: 4 a 8 exercícios por `day`, todos `metricType = "reps_weight"`, categoria de força, sem alongamento/cardio.
+7. Corrida: exatamente 1 bloco por `day`, `metricType = "distance_duration"`, com `targetDistanceMeters` e/ou `targetRpe`; `sets` até 20.
+8. Mobilidade: exatamente 1 bloco por `day`, `metricType = "duration"`, `targetDurationSeconds` entre 300 e 900.
+9. `weekday` 1..7. Várias sessões no mesmo `weekday` são `day`s separados com `dayOrder` diferente.
+10. Respeite equipamentos, nível, objetivo e duração informados por modalidade.
+11. Para cada exercício de musculação, informe `exerciseId` (ID exato do catálogo) e `exerciseName` (nome oficial do catálogo para esse ID).
+12. Retorne JSON válido conforme schema WorkoutPlanDTO.
 
 FORMATO DE SAÍDA (JSON):
 {{
@@ -146,6 +103,7 @@ FORMATO DE SAÍDA (JSON):
       "exercises": [
         {{
           "exerciseId": "string (ID EXATO do catálogo ou sintético run_*/mobility_*)",
+          "exerciseName": "string (nome oficial do catálogo para esse exerciseId)",
           "exerciseOrder": 0,
           "sets": 1-20,
           "targetReps": "string ou vazio para corrida/mobilidade",
@@ -158,6 +116,49 @@ FORMATO DE SAÍDA (JSON):
           "targetDistanceMeters": número ou null,
           "targetPaceSecondsPerKm": inteiro ou null,
           "targetHrZone": null
+        }}
+      ]
+    }}
+  ]
+}}"""
+
+SYSTEM_PROMPT_STRENGTH_RULES = """Você é um gerador de treinos de musculação baseado em evidências.
+
+{catalog_summary}
+
+REGRAS OBRIGATÓRIAS:
+1. Prefira SEMPRE os IDs listados no catálogo. IDs desconhecidos serão descartados e a sessão completada localmente.
+2. Retorne JSON válido conforme schema WorkoutPlanDTO
+3. Não invente IDs para corrida/mobilidade fora dos casos híbridos.
+4. Respeite equipamentos disponíveis do usuário
+5. Balanceie volume entre grupos musculares
+6. Inclua aquecimento e alongamento sugeridos nas notas quando fizer sentido
+7. Para cada exercício, informe `exerciseId` (ID exato do catálogo) e `exerciseName` (nome oficial do catálogo para esse ID).
+
+FORMATO DE SAÍDA (JSON):
+{{
+  "name": "string",
+  "description": "string",
+  "goal": "hypertrophy|strength|endurance|power|fat_loss|general",
+  "daysPerWeek": 1-6,
+  "days": [
+    {{
+      "name": "string",
+      "dayOrder": 0,
+      "weekday": 1-7,
+      "modality": "strength",
+      "isRestDay": false,
+      "exercises": [
+        {{
+          "exerciseId": "string (ID EXATO do catálogo)",
+          "exerciseName": "string (nome oficial do catálogo para esse exerciseId)",
+          "exerciseOrder": 0,
+          "sets": 1-20,
+          "targetReps": "string (ex: '8-12', '10', 'AMRAP')",
+          "targetRpe": 5.0-10.0,
+          "restSeconds": 0-300,
+          "notes": "string",
+          "isSupersetWithPrevious": false
         }}
       ]
     }}
@@ -179,11 +180,36 @@ RESTRIÇÕES DE PLANO COMPLEMENTAR (obrigatórias):
 """
 
 
+def system_prompt_for_request(request: "GenerateRequest") -> str:
+    """Prompt de sistema por request (H3-22): catálogo filtrado ao pool."""
+    summary = catalog_summary_for_request(request, EXERCISE_CATALOG)
+    modalities = getattr(request, "modalities", None) or []
+    if modalities or is_complementary_request(request):
+        base = SYSTEM_PROMPT_HYBRID_RULES.format(catalog_summary=summary)
+        if is_complementary_request(request):
+            base += COMPLEMENTARY_SYSTEM_RULES
+        return base
+    return SYSTEM_PROMPT_STRENGTH_RULES.format(catalog_summary=summary)
+
+
 def system_prompt_hybrid(complementary: bool = False) -> str:
-    """Prompt de sistema híbrido; com plano complementar, anexa as restrições."""
+    """Compatibilidade para callers legados; sem request usa catálogo vazio."""
+    # Evita prompt global enorme; chamadores novos devem usar system_prompt_for_request.
+    base = SYSTEM_PROMPT_HYBRID_RULES.format(
+        catalog_summary="(catálogo filtrado por request; use system_prompt_for_request)"
+    )
     if complementary:
-        return SYSTEM_PROMPT_HYBRID + COMPLEMENTARY_SYSTEM_RULES
-    return SYSTEM_PROMPT_HYBRID
+        base += COMPLEMENTARY_SYSTEM_RULES
+    return base
+
+
+# Compat: export legado ainda referenciado em testes antigos, se houver.
+SYSTEM_PROMPT = SYSTEM_PROMPT_STRENGTH_RULES.format(
+    catalog_summary="(catálogo filtrado por request; use system_prompt_for_request)"
+)
+SYSTEM_PROMPT_HYBRID = SYSTEM_PROMPT_HYBRID_RULES.format(
+    catalog_summary="(catálogo filtrado por request; use system_prompt_for_request)"
+)
 
 
 # mDNS/Zeroconf for LAN discovery
@@ -691,17 +717,60 @@ class AiFailure(Exception):
         self.detail = detail
 
 
-def parse_ai_plan(content: str, catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _strip_code_fences(content: str) -> str:
+    text = (content or "").strip()
+    if not text.startswith("```"):
+        return text
+    # Remove opening fence (```json / ```).
+    text = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def _extract_first_json_object(content: str) -> str:
+    """Extrai o primeiro objeto JSON balanceado; tolera texto ao redor (H3-22)."""
+    text = _strip_code_fences(content)
+    start = text.find("{")
+    if start == -1:
+        return text
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return text[start:]
+
+
+def parse_ai_plan(
+    content: str,
+    catalog: List[Dict[str, Any]],
+    request: Optional["GenerateRequest"] = None,
+) -> Dict[str, Any]:
     """Converte a resposta bruta da IA em plano validado — função pura, sem rede.
 
-    Cada tipo de falha vira um `AiFailure` com código fechado, para o endpoint
-    responder `fallbackReason` e o log registrar o porquê (H3-21): JSON
-    inválido/truncado ⇒ `json_parse`; IDs de musculação fora do catálogo ⇒
-    `unresolved_ids` (detail lista até 5); plano fora do schema ⇒
-    `schema_validation`.
+    H3-22: parse tolerante (cercas + objeto balanceado), resolve IDs com
+    salvamento parcial, remove pares ID↔nome divergentes e reconstrói dias de
+    força com < 3 exercícios. Falha total (`unresolved_ids`) só quando nada
+    aproveitável sobra. `schema_validation` continua rejeitando plano irrecuperável.
     """
     try:
-        raw_plan = json.loads(content)
+        raw_plan = json.loads(_extract_first_json_object(content))
     except (json.JSONDecodeError, TypeError) as exc:
         raise AiFailure("json_parse", f"JSON inválido: {exc}") from exc
     if not isinstance(raw_plan, dict):
@@ -709,19 +778,172 @@ def parse_ai_plan(content: str, catalog: List[Dict[str, Any]]) -> Dict[str, Any]
             "json_parse", f"conteúdo não é um objeto JSON ({type(raw_plan).__name__})"
         )
 
-    raw_plan, unresolved = resolve_plan_ids(raw_plan, catalog)
-    if unresolved:
+    original_strength_count = sum(
+        1
+        for day in raw_plan.get("days", [])
+        if str(day.get("modality", "strength")) == "strength" and not day.get("isRestDay")
+        for ex in day.get("exercises", [])
+        if str(ex.get("metricType", "reps_weight")) == "reps_weight" or not ex.get("metricType")
+    )
+
+    # Resolve IDs (remove inválidos) e registra drops.
+    raw_plan, dropped_ids = resolve_plan_ids(raw_plan, catalog)
+    dropped_reasons = [f"{ex_id}:unresolved_id" for ex_id in dropped_ids]
+
+    # Check ID↔nome divergente antes do enrich sobrescrever exerciseName.
+    for mismatch in id_name_mismatches(raw_plan, catalog):
+        ex_id = mismatch["exerciseId"]
+        dropped_reasons.append(f"{ex_id}:id_name_mismatch")
+        for day in raw_plan.get("days", []):
+            day["exercises"] = [
+                ex for ex in day.get("exercises", []) if ex.get("exerciseId") != ex_id
+            ]
+
+    if dropped_reasons:
+        print(
+            fallback_log_line(
+                "dropped_ids",
+                "; ".join(dropped_reasons[:12]),
+            )
+        )
+
+    surviving_strength_count = sum(
+        1
+        for day in raw_plan.get("days", [])
+        if str(day.get("modality", "strength")) == "strength" and not day.get("isRestDay")
+        for ex in day.get("exercises", [])
+        if str(ex.get("metricType", "reps_weight")) == "reps_weight" or not ex.get("metricType")
+    )
+    has_non_strength = any(
+        str(day.get("modality", "strength")) != "strength"
+        or any(
+            str(ex.get("metricType", "")) in {"distance_duration", "duration"}
+            for ex in day.get("exercises", [])
+        )
+        for day in raw_plan.get("days", [])
+    )
+    # Critério H3-22 #4: todos os exercícios de força inválidos => fallback total.
+    if original_strength_count > 0 and surviving_strength_count == 0 and not has_non_strength:
         raise AiFailure(
             "unresolved_ids",
             "IDs retornados pela IA não existem no catálogo: "
-            + ", ".join(unresolved[:5]),
+            + ", ".join(dropped_ids[:5]) if dropped_ids else "nenhum exercício aproveitável",
         )
+
+    # Enrich early? schema doesn't require metadata, but we need it for salvage
+    # decisions based on modality/metric; keep structure.
+    salvage_strength_days(raw_plan, catalog, request)
+
+    # Falha total: nenhum exercício aproveitável em nenhuma sessão de força.
+    strength_exercises = [
+        ex
+        for day in raw_plan.get("days", [])
+        if str(day.get("modality", "strength")) == "strength" and not day.get("isRestDay")
+        for ex in day.get("exercises", [])
+        if str(ex.get("metricType", "reps_weight")) == "reps_weight"
+        or not ex.get("metricType")
+    ]
+    if not strength_exercises and not has_non_strength:
+        raise AiFailure(
+            "unresolved_ids",
+            "nenhum exercício aproveitável após remoção de IDs inválidos/divergentes",
+        )
+
+    # Remove dias vazios de força; mantém run/mobility se tiverem bloco.
+    cleaned_days = []
+    for day in raw_plan.get("days", []):
+        if not day.get("exercises"):
+            continue
+        cleaned_days.append(day)
+    if not cleaned_days:
+        raise AiFailure(
+            "unresolved_ids",
+            "nenhum exercício aproveitável após salvamento parcial",
+        )
+    raw_plan["days"] = cleaned_days
+    raw_plan["daysPerWeek"] = raw_plan.get("daysPerWeek") or len(cleaned_days)
 
     try:
         WorkoutPlanDTO(**raw_plan)
     except Exception as exc:
         raise AiFailure("schema_validation", f"plano rejeitado pelo schema: {exc}") from exc
     return raw_plan
+
+
+def salvage_strength_days(
+    raw_plan: Dict[str, Any],
+    catalog: List[Dict[str, Any]],
+    request: Optional["GenerateRequest"],
+) -> None:
+    """Reconstrói dias de força com < 3 exercícios usando o pool do request (H3-22).
+
+    Mutação in-place. Corrida/mobilidade não são reconstruídas aqui. Sem request
+    (testes puros antigos), usa defaults conservadores.
+    """
+    if request is None:
+        return
+    for idx, day in enumerate(raw_plan.get("days", [])):
+        modality = str(day.get("modality", "strength"))
+        if modality != "strength" or day.get("isRestDay"):
+            continue
+        strength_exs = [
+            ex
+            for ex in day.get("exercises", [])
+            if str(ex.get("metricType", "reps_weight")) == "reps_weight"
+        ]
+        if len(strength_exs) >= 3:
+            day["exercises"] = strength_exs + [
+                ex
+                for ex in day.get("exercises", [])
+                if str(ex.get("metricType", "reps_weight")) != "reps_weight"
+            ]
+            continue
+
+        # Reconstrói a sessão de força localmente com o pool do request.
+        equipment = list(getattr(request, "availableEquipment", []) or [])
+        level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
+        goal = str(getattr(request, "goal", "general") or "general")
+        duration = int(getattr(request, "sessionDurationMinutes", 60) or 60)
+        muscles = list(getattr(request, "targetMuscles", []) or [])
+        environment = str(getattr(request, "environment", "") or "").strip().lower() or "bodyweight"
+        strict_equipment = complementary_equipment_filter(request)
+        pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+        used = {ex.get("exerciseId") for ex in strength_exs if ex.get("exerciseId")}
+        focus = _expand_muscles(list(getattr(request, "focusMuscles", []) or [])) or None
+        session = build_strength_session(
+            pool,
+            request,
+            goal,
+            level,
+            environment,
+            duration,
+            muscles,
+            random.Random(),
+            used,
+            idx,
+            focus,
+            complementary=is_complementary_request(request),
+        )
+        if session and session.get("exercises"):
+            rebuilt = session["exercises"]
+            # Mantém os válidos que sobraram no começo, completando sem duplicar.
+            existing_ids = {ex.get("exerciseId") for ex in strength_exs}
+            merged = list(strength_exs)
+            for ex in rebuilt:
+                if ex.get("exerciseId") in existing_ids:
+                    continue
+                merged.append(ex)
+                if len(merged) >= len(rebuilt):
+                    break
+            if len(merged) < 3:
+                merged = rebuilt
+            for i, ex in enumerate(merged):
+                ex["exerciseOrder"] = i
+            day["exercises"] = merged
+            day["modality"] = "strength"
+        elif strength_exs:
+            day["exercises"] = strength_exs
+        # se nada dá para reconstruir e nada sobrou, o caller remove o dia.
 
 
 def fallback_log_line(reason: str, detail: str) -> str:
@@ -757,10 +979,10 @@ async def generate_workout(request: GenerateRequest):
 
     if is_hybrid:
         user_prompt = build_hybrid_user_prompt(request)
-        system_prompt = system_prompt_hybrid(is_complementary)
+        system_prompt = system_prompt_for_request(request)
     else:
         user_prompt = build_user_prompt(request)
-        system_prompt = SYSTEM_PROMPT
+        system_prompt = system_prompt_for_request(request)
 
     fallback_reason = ""
     fallback_detail = ""
@@ -768,56 +990,69 @@ async def generate_workout(request: GenerateRequest):
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
     else:
-        response = None
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{SENSENOVA_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {SENSENOVA_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": MODEL_ID,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        "response_format": {"type": "json_object"},
-                        "max_tokens": 8192,
-                        "temperature": 0.3,
-                        "reasoning": {"effort": "none"},  # JSON mode
-                    },
-                )
+        # H3-22: 1 retry só em json_parse / HTTP 5xx / 429. Timeout 60s na 1ª
+        # tentativa e 30s no retry (pior caso ~90s, alinhado ao read timeout do app).
+        attempts = 2
+        for attempt in range(attempts):
+            attempt_timeout = 60.0 if attempt == 0 else 30.0
+            try:
+                async with httpx.AsyncClient(timeout=attempt_timeout) as client:
+                    response = await client.post(
+                        f"{SENSENOVA_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {SENSENOVA_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": MODEL_ID,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                            "response_format": {"type": "json_object"},
+                            "max_tokens": 8192,
+                            "temperature": 0.3,
+                            "reasoning": {"effort": "none"},  # JSON mode
+                        },
+                    )
 
-            if response.status_code != 200:
-                raise AiFailure(
-                    "http_error",
-                    f"SenseNova API error: {response.status_code} - {response.text[:200]}",
-                )
+                if response.status_code != 200:
+                    if attempt == 0 and response.status_code in (429, 500, 502, 503, 504):
+                        fallback_reason = "http_error"
+                        fallback_detail = f"SenseNova API error: {response.status_code} - {response.text[:200]}"
+                        continue
+                    raise AiFailure(
+                        "http_error",
+                        f"SenseNova API error: {response.status_code} - {response.text[:200]}",
+                    )
 
-            content = response.json()["choices"][0]["message"]["content"]
-            raw_plan = parse_ai_plan(content, EXERCISE_CATALOG)
+                content = response.json()["choices"][0]["message"]["content"]
+                raw_plan = parse_ai_plan(content, EXERCISE_CATALOG, request)
 
-            workout = WorkoutPlanDTO(**raw_plan)
-            workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
-            if is_hybrid:
-                workout_data = normalize_hybrid_plan(workout_data)
-            if is_complementary:
-                # Garantias do complementar valgem para a resposta da IA:
-                # remove o que saiu fora do foco/equipamento e reconstrói
-                # sessões insuficientes (H3-16).
-                workout_data = enforce_complementary_plan(workout_data, request, EXERCISE_CATALOG)
-            source = "ai"
-            model_used = MODEL_ID
-        except httpx.TimeoutException as exc:
-            fallback_reason, fallback_detail = "timeout", f"timeout da IA: {exc}"
-        except httpx.HTTPError as exc:
-            fallback_reason, fallback_detail = "timeout", f"erro de rede na chamada da IA: {exc}"
-        except AiFailure as exc:
-            fallback_reason, fallback_detail = exc.reason, exc.detail
-        except Exception as exc:
-            fallback_reason, fallback_detail = "unknown", f"{type(exc).__name__}: {exc}"
+                workout = WorkoutPlanDTO(**raw_plan)
+                workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
+                if is_hybrid:
+                    workout_data = normalize_hybrid_plan(workout_data)
+                if is_complementary:
+                    # Garantias do complementar valem para a resposta da IA:
+                    # remove o que saiu fora do foco/equipamento e reconstrói
+                    # sessões insuficientes (H3-16).
+                    workout_data = enforce_complementary_plan(workout_data, request, EXERCISE_CATALOG)
+                source = "ai"
+                model_used = MODEL_ID
+                fallback_reason = ""
+                fallback_detail = ""
+                break
+            except httpx.TimeoutException as exc:
+                fallback_reason, fallback_detail = "timeout", f"timeout da IA: {exc}"
+            except httpx.HTTPError as exc:
+                fallback_reason, fallback_detail = "timeout", f"erro de rede na chamada da IA: {exc}"
+            except AiFailure as exc:
+                fallback_reason, fallback_detail = exc.reason, exc.detail
+                if attempt == 0 and exc.reason == "json_parse":
+                    continue
+            except Exception as exc:
+                fallback_reason, fallback_detail = "unknown", f"{type(exc).__name__}: {exc}"
 
     if fallback_reason:
         print(fallback_log_line(fallback_reason, fallback_detail))

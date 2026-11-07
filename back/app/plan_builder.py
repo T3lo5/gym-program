@@ -431,12 +431,17 @@ def resolve_plan_ids(
     IDs sintéticos de corrida (`run_*`) e mobilidade (`mobility_*`) são aceitos
     como estão: não existem no catálogo e não devem ser resolvidos nem
     sinalizados como pendentes. Apenas exercícios de musculação são validados.
+
+    H3-22: exercício não resolvível é REMOVIDO do dia (salvamento parcial) e seu
+    ID original entra em `dropped`. Não é mais fatal — o chamador decide se o
+    plano ainda é aproveitável.
     """
     by_id, lookup = catalog_index(catalog)
-    unresolved: List[str] = []
+    dropped: List[str] = []
     lookup_keys = list(lookup.keys())
 
     for day in plan.get("days", []):
+        kept: List[Dict[str, Any]] = []
         for exercise in day.get("exercises", []):
             raw = str(exercise.get("exerciseId", "")).strip()
             if not raw:
@@ -448,9 +453,11 @@ def resolve_plan_ids(
             low = raw.lower()
             if low.startswith("run_") or low.startswith("mobility_"):
                 exercise["exerciseId"] = RUN_MOBILITY_SYNONYMS.get(low, low)
+                kept.append(exercise)
                 continue
 
             if raw in by_id:
+                kept.append(exercise)
                 continue
 
             normalized = normalize(raw)
@@ -469,10 +476,14 @@ def resolve_plan_ids(
 
             if candidate:
                 exercise["exerciseId"] = candidate
+                kept.append(exercise)
             else:
-                unresolved.append(raw)
+                dropped.append(raw)
+                # H3-22: remove o exercício inválido (salvamento parcial).
 
-    return plan, unresolved
+        day["exercises"] = kept
+
+    return plan, dropped
 
 
 def enrich_plan(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -494,6 +505,126 @@ def enrich_plan(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> Dict[str
                 exercise.setdefault("instructions", [])
                 exercise.setdefault("images", [])
     return plan
+
+
+def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> str:
+    """Resumo do catálogo para o prompt da IA, filtrado pelo request (H3-22).
+
+    Diretriz (2026-11-07): expor TODOS os IDs do pool do request — sem cap por
+    grupo — porque treino "morre por padrão" quando o ID correto não foi exposto.
+    Só entram exercícios de força que passam no filtro de equipamento/nível do
+    request (nunca equipamento que o usuário não informou). Ordenação: no
+    complementar, só os grupos de `focusMuscles`; no principal, `targetMuscles`
+    primeiro e os demais grupos do split depois.
+    """
+    equipment = list(getattr(request, "availableEquipment", []) or [])
+    level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
+    strict_equipment = complementary_equipment_filter(request)
+    pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+    strength_pool = [e for e in pool if _is_strength_exercise(e)]
+
+    focus = list(getattr(request, "focusMuscles", []) or [])
+    target = list(getattr(request, "targetMuscles", []) or [])
+    focus_groups = set(_expand_muscles(focus)) if focus else set()
+    target_groups = set(_expand_muscles(target))
+
+    # Agrupa por músculo primário (primeiro primaryMuscle relevante).
+    by_muscle: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for exercise in strength_pool:
+        primaries = [str(m).lower() for m in exercise.get("primaryMuscles", [])]
+        if not primaries:
+            by_muscle["other"].append(exercise)
+            continue
+        for muscle in primaries:
+            by_muscle[muscle].append(exercise)
+
+    if focus:
+        # Complementar (H3-16): foco exclusivo — só grupos do foco.
+        ordered_muscles = [m for m in _expand_muscles(focus) if m in by_muscle]
+    else:
+        # Principal: grupos do target/foco primeiro, demais grupos depois.
+        ordered_muscles: List[str] = []
+        for m in _expand_muscles(target):
+            if m in by_muscle and m not in ordered_muscles:
+                ordered_muscles.append(m)
+        for m in sorted(by_muscle.keys()):
+            if m not in ordered_muscles:
+                ordered_muscles.append(m)
+
+    lines = [
+        "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (IDs exatos; prefira sempre estes IDs):"
+    ]
+    for muscle in ordered_muscles:
+        exercises = by_muscle.get(muscle) or []
+        if not exercises:
+            continue
+        lines.append(f"\n{muscle.upper()}:")
+        for ex in exercises:
+            eq = (ex.get("equipment") or "body only").strip()
+            lines.append(f"  - {ex['id']} ({ex.get('name', ex['id'])}, {eq})")
+    return "\n".join(lines)
+
+
+def id_name_mismatches(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """Detecta pares exerciseId↔exerciseName divergentes (H3-22).
+
+    Para cada exercício com ID resolvido e nome declarado pela IA, confere o par
+    contra o catálogo. Só marca divergência quando o nome declarado NÃO
+    corresponde a nenhuma variação próxima do nome oficial do ID (mesma
+    normalização/fuzzy de `resolve_plan_ids`); nome abreviado/traduzido que faça
+    match tolerante não é divergência. Retorna lista de dicts com
+    `exerciseId`, `declared`, `official`, `reason=id_name_mismatch`.
+    IDs sintéticos run_/mobility_ são ignorados.
+    """
+    by_id, _ = catalog_index(catalog)
+    _, lookup = catalog_index(catalog)
+    lookup_keys = list(lookup.keys())
+    mismatches: List[Dict[str, str]] = []
+
+    for day in plan.get("days", []):
+        for exercise in day.get("exercises", []):
+            ex_id = str(exercise.get("exerciseId", "")).strip()
+            declared = str(exercise.get("exerciseName", "")).strip()
+            if not ex_id or not declared:
+                continue
+            low = ex_id.lower()
+            if low.startswith("run_") or low.startswith("mobility_"):
+                continue
+            source = by_id.get(ex_id)
+            if not source:
+                continue
+            official = str(source.get("name", "")).strip()
+            if not official:
+                continue
+
+            n_declared = normalize(declared)
+            n_official = normalize(official)
+            if not n_declared or not n_official:
+                continue
+            # Match tolerante: igual normalizado, contido, ou fuzzy próximo.
+            if n_declared == n_official or n_declared in n_official or n_official in n_declared:
+                continue
+            if get_close_matches(n_declared, [n_official], n=1, cutoff=0.72):
+                continue
+            # Também aceita se o nome declarado resolve para o MESMO ID no índice
+            # global (ex.: variação/tradução que o fuzzy do catálogo já conhece).
+            resolved_declared = lookup.get(n_declared)
+            if not resolved_declared and lookup_keys:
+                matches = get_close_matches(n_declared, lookup_keys, n=1, cutoff=0.72)
+                if matches:
+                    resolved_declared = lookup[matches[0]]
+            if resolved_declared == ex_id:
+                continue
+
+            mismatches.append(
+                {
+                    "exerciseId": ex_id,
+                    "declared": declared,
+                    "official": official,
+                    "reason": "id_name_mismatch",
+                }
+            )
+    return mismatches
 
 
 def review_date(review_after_weeks: int) -> str:
