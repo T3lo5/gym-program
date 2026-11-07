@@ -127,7 +127,7 @@ confirmam a causa real no backend do usuário antes de mexer no prompt/timeout
 
 | ID | Item | MoSCoW | Problema (evidência no código) | Solução prevista | Esforço | Depende de | Spec |
 |----|------|--------|-------------------------------|------------------|---------|------------|------|
-| H3-22 | Robustez da geração por IA | **M** | Prompt expõe **136 dos 876 IDs** (cap de 8 por músculo, `main.py` L57–73) mas exige IDs exatos; 1 ID inválido descarta o plano inteiro (L717–722); timeout 30 s; `json.loads` sem remover cercas de código; sem retry. | Resumo do prompt por request com o **pool completo** — todos os IDs do catálogo que passam no filtro de equipamento/grupo marcado (diretriz do usuário; sem cap arbitrário), foco primeiro; salvamento parcial (ID inválido é removido, sessão reconstruída localmente), parse tolerante, timeout 60 s e 1 retry. | 1–1,5 dia | H3-21 | [H3-22](docs/specs/H3-22-robustez-geracao-ia.md) |
+| H3-22 | Robustez da geração por IA | **M** | Prompt expõe **136 dos 876 IDs** (cap de 8 por músculo, `main.py` L57–73) mas exige IDs exatos; 1 ID inválido descarta o plano inteiro (L717–722); timeout 30 s; `json.loads` sem remover cercas de código; sem retry. | Resumo do prompt por request com o **pool completo** — todos os IDs do catálogo que passam no filtro de equipamento/grupo marcado (diretriz do usuário; sem cap arbitrário), foco primeiro; salvamento parcial (ID inválido é removido, sessão reconstruída localmente), parse tolerante, timeout 60 s, 1 retry e conferência ID↔nome (par divergente é descartado pelo mesmo salvamento parcial); menu em dois níveis documentado como plano B condicionado a medição. | 1–1,5 dia | H3-21 | [H3-22](docs/specs/H3-22-robustez-geracao-ia.md) |
 | H3-23 | Foco muscular respeitado no plano principal | **M** | `build_hybrid_plan` passa `focus_muscles = STRENGTH_SPLITS[...]` e `build_strength_session` o usa sempre (`plan_builder.py` L1291/L793): o `targetMuscles` do usuário é ignorado — pediu abdômen, recebe Empurrar/Puxar/Pernas. | Foco = **prioridade** no principal (≥ 1 exercício do grupo pedido em cada sessão de força, antes do split); regra explícita no prompt; UI explica que "APENAS o grupo" é o complementar (H3-16). | 0,5–1 dia | — | [H3-23](docs/specs/H3-23-foco-muscular-plano-principal.md) |
 | H3-24 | Imagens e descrição: plano como fonte + catálogo resiliente | **M** | O plano já vem com `instructions`/`images` (`enrich_plan` L488–489) mas o app ignora esses campos e o Room não os persiste; sem catálogo baixado, zero mídia; resposta vazia do catálogo é cacheada por 7 dias (`ExerciseMediaRepository.kt` L62–66/L78). | Usar a mídia do plano (catálogo como fonte preferencial), persistir no Room (v4 aditiva com teste), não cachear catálogo vazio, recarregar ao conectar, URL-encode. **Substitui a H3-14.** | 1–1,5 dia | — | [H3-24](docs/specs/H3-24-midia-exercicio-plano.md) |
 
@@ -147,6 +147,7 @@ separadamente.
 | H3-14 | ~~Imagens dos exercícios no plano~~ **substituída pela H3-24** | **C** | Coberta pela H3-24 (mídia do plano + catálogo resiliente). | Não implementar separadamente. | — | H1-3 | [H3-24](docs/specs/H3-24-midia-exercicio-plano.md) |
 | H3-4 | Backend na nuvem grátis (Oracle/Codespaces) | **W** | Backend só roda no PC local. | Deploy + Cloudflare Tunnel; toggle "Usar back remoto". Exige token antes de expor publicamente. | 2 dias | Backend Docker, `.env` seguro, **H3-10** | [H3-4](docs/specs/H3-4-cloud-backend.md) |
 | H3-9 | Backup automático no destino escolhido | **W** | Reenviar sem abrir o seletor de novo. | URI persistida (`takePersistableUriPermission`, zero ocorrências hoje) + WorkManager + último upload visível + desligar ao perder permissão. **Nunca** importar automaticamente: o import é destrutivo. | 3 dias | H3-6, H3-8 | [H3-9](docs/specs/H3-9-auto-cloud-backup.md) |
+| H3-25 | Seleção de exercícios por nome com resolução determinística | **C** | Exigir IDs exatos do catálogo é atrito: LLMs erram menos nomes do que IDs sintéticos, e o pool completo (H3-22) cresce o prompt. | O prompt passa a aceitar seleção por nome canônico; o backend resolve nome→ID com o índice existente (normalização + fuzzy do `resolve_plan_ids`); nome não resolvível segue o salvamento parcial da H3-22. Contrato de saída não muda (`exerciseId` continua preenchido na resposta). | 1 dia | H3-22 | [H3-25](docs/specs/H3-25-selecao-por-nome.md) |
 
 H3-1..H3-3, H3-5, **H3-6**, **H3-7**, **H3-10**, **H3-11**, **H3-12**, **H3-13**, **H3-15**
 e **H3-16** estão concluídos e listados em §4.1 — com H3-6, restaurar um backup
@@ -228,7 +229,8 @@ Agora:      Correções prioritárias H3-21 ✅ → H3-22 → H3-23 → H3-24 (g
             IA, foco muscular e mídia dos exercícios) — ANTES de qualquer
             feature, incluindo o MVP do relógio
 Depois:     MVP do relógio H3-17 → H3-18 → H3-19 → H3-20; H3-8 (nuvem via SAF)
-            continua Could, sem prioridade agora
+            e H3-25 (seleção por nome na geração) continuam Could, sem
+            prioridade agora
 Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar)
 ```
 
@@ -351,6 +353,7 @@ confirme antes de implementar.
 - [H3-22 — Robustez da geração por IA](docs/specs/H3-22-robustez-geracao-ia.md) — proposta, aguardando aprovação (próxima da fila)
 - [H3-23 — Foco muscular respeitado no plano principal](docs/specs/H3-23-foco-muscular-plano-principal.md) — proposta, aguardando aprovação (prioridade 3)
 - [H3-24 — Imagens e descrição: plano como fonte + catálogo resiliente](docs/specs/H3-24-midia-exercicio-plano.md) — proposta, aguardando aprovação (prioridade 4; **substitui a H3-14**)
+- [H3-25 — Seleção de exercícios por nome com resolução determinística](docs/specs/H3-25-selecao-por-nome.md) — proposta, aguardando aprovação (evolução da geração por IA; depende da H3-22)
 - [H3-14 — Imagens dos exercícios no plano](docs/specs/H3-14-imagens-exercicios.md) — **substituída pela H3-24** (não implementar separadamente)
 - H3-17 — Alvo de reps e última série no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
 - H3-18 — Timer de descanso contando no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar

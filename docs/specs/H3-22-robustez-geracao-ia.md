@@ -42,12 +42,17 @@ no código, não os sintomas.
 - Mudar o contrato de saída (`fallbackReason` é da H3-21).
 - Foco muscular no plano principal (H3-23) e mídia (H3-24).
 - Cache de respostas da IA.
+- Seleção por nome com resolução determinística — evolução própria, [H3-25](H3-25-selecao-por-nome.md).
+- Shortlist determinístico por sessão (40–80 candidatos): só ganha spec própria
+  se a H3-22 e a H3-25 não bastarem.
 
 ## Arquivos e símbolos que devem mudar
 
 | Arquivo | Mudança |
 |---|---|
 | `back/app/plan_builder.py` | Nova `catalog_summary_for_request(request, catalog) -> str`: **pool completo do request, sem cap por grupo** — todos os exercícios de força (`_is_strength_exercise`) do filtro de equipamento/nível, um por linha (`ID (nome, equipamento)`), ordenados por relevância (grupos de `targetMuscles`/`focusMuscles` primeiro). Diretriz do usuário (2026-11-07): expor todos os IDs, porque treino "morre por padrão" quando o ID correto não foi exposto |
+| `back/app/plan_builder.py` | Nova `id_name_mismatches(plan, catalog)`: para cada exercício com `exerciseId` resolvido e `exerciseName` declarado pela IA, confere o par contra o catálogo com a mesma normalização/fuzzy do `resolve_plan_ids`; só marca divergência quando o nome declarado **não** corresponde a nenhuma variação próxima do nome oficial do ID (evita falso positivo com nome abreviado/traduzido) |
+| `back/app/main.py` | `parse_ai_plan` remove o exercício com par ID↔nome divergente (mesmo caminho do salvamento parcial de ID inválido) e o log registra `dropped_ids` com o motivo `id_name_mismatch` |
 | `back/app/plan_builder.py` | `resolve_plan_ids` passa a retornar também `dropped: List[str]`; **não** é mais fatal — exercício não resolvível é removido do dia |
 | `back/app/main.py` | Prompt usa `catalog_summary_for_request`; regra 1 reescrita: "prefira sempre os IDs listados; IDs desconhecidos serão descartados e a sessão completada localmente" |
 | `back/app/main.py` | Salvamento parcial após `resolve_plan_ids`: dia de força com < 3 exercícios é reconstruído com `build_strength_session` (mesmas restrições); fallback total só quando **nada** aproveitável sobrar |
@@ -63,6 +68,8 @@ Comportamental:
   - resposta da IA com k IDs inválidos (k < total de exercícios de força)
     ⇒ plano com IA (source = "ai"), exercícios inválidos removidos,
     fallbackReason vazio, log registra dropped_ids;
+  - resposta da IA com par ID↔nome divergente ⇒ exercício removido pelo
+    mesmo salvamento parcial, log registra dropped_ids com id_name_mismatch;
   - resposta da IA sem nenhum exercício aproveitável
     ⇒ fallback total (source = "local"), fallbackReason = "unresolved_ids".
 ```
@@ -85,6 +92,13 @@ Comportamental:
   o split além do foco.
 - Sem cap por grupo: a IA recebe todos os IDs do pool filtrado — fim dos
   "treinos que morrem por padrão" porque o ID correto não foi exposto.
+- Par ID↔nome: a IA devolve `exerciseName` junto do `exerciseId`; divergência
+  clara (o nome declarado não bate com o nome do catálogo do ID resolvido, nem
+  com variação próxima pela mesma normalização/fuzzy do `resolve_plan_ids`)
+  vira exercício descartado — é o caso "ID válido, exercício errado"
+  (`Barbell_Bench_Press` no lugar de `Incline_Barbell_Bench_Press`), que a
+  validação de IDs sozinha não pega. Nome abreviado/traduzido que faça match
+  tolerante **não** é divergência.
 - Retry: no máximo 1; só em `json_parse`, HTTP 5xx e 429; 4xx de
   autenticação/parametro não repete (falha determinística).
 - Timeout total da geração continua abaixo do read timeout do app (60 s +
@@ -100,6 +114,23 @@ Comportamental:
 - `normalize_hybrid_plan` continua rodando depois do salvamento parcial
   (invariantes de sessão por modalidade preservados).
 
+## Plano B condicionado a medição (menu em dois níveis)
+
+Não é o default da H3-22; só entra em execução se um gatilho de medição
+disparar. Propriedade obrigatória: **nenhum ID elegível sai do prompt** — o
+que muda é o nível de detalhe, nunca a cobertura.
+
+- **Tier A (detalhado):** exercícios dos grupos marcados no request + seu
+  equipamento, com linhas completas (`ID (nome, equipamento)`).
+- **Tier B (índice):** todo o resto do pool elegível, só `ID` agrupado por
+  músculo (os IDs são auto-descritivos), com instrução explícita de preferir
+  o Tier A e usar o Tier B como menu de variedade/complemento do split.
+- **Gatilhos de ativação:** catálogo do prompt acima do limite confortável do
+  modelo (medido no merge da H3-22) ou queda de qualidade na verificação
+  manual (5 gerações com escolhas incoerentes). Ativação = emitir os dois
+  tiers dentro de `catalog_summary_for_request`; um commit, sem mudança de
+  contrato.
+
 ## Critérios de aceite
 
 1. **Dado** um conteúdo de IA embrulhado em ```json ... ```, **quando** o parse roda, **então** o plano é extraído sem fallback.
@@ -108,12 +139,14 @@ Comportamental:
 4. **Dado** uma resposta em que **todos** os exercícios de força têm ID inválido, **quando** o endpoint processa, **então** fallback total com `fallbackReason = "unresolved_ids"`.
 5. **Dado** o resumo do prompt, **quando** o request tem `targetMuscles = ["abs"]`, **então** o grupo focado aparece primeiro e cada grupo lista **todos** os IDs do pool do request (não 8, nem 20).
 6. **Dado** um HTTP 429 na primeira tentativa, **quando** o endpoint gera, **então** há exatamente 1 retry e, se a segunda tentativa passar, `source = "ai"`.
+7. **Dado** um par ID↔nome divergente na resposta da IA, **quando** o `parse_ai_plan` processa, **então** o exercício é removido, o log registra `id_name_mismatch` e o plano segue com IA se sobrar exercício aproveitável.
+8. **Dado** o prompt montado com o pool completo, **quando** o merge da H3-22, **então** o tamanho do catálogo em tokens fica registrado (log ou PR) com a folga/estouro do contexto do modelo — estouro ativa o plano B (dois níveis) antes de qualquer cap voltar.
 
 ## Testes a criar
 
 | Arquivo | Testes |
 |---|---|
-| `back/tests/test_ai_robustez.py` | `test_parse_remove_cercas_de_codigo`, `test_parse_extrai_objeto_balanceado`, `test_id_invalido_e_removido_e_sessao_mantida`, `test_sessao_com_menos_de_tres_e_reconstruida`, `test_todos_invalidos_vira_fallback_total`, `test_resumo_prioriza_foco_e_lista_pool_completo`, `test_resumo_nao_lista_equipamento_fora_do_request`, `test_retry_unico_em_429` |
+| `back/tests/test_ai_robustez.py` | `test_parse_remove_cercas_de_codigo`, `test_parse_extrai_objeto_balanceado`, `test_id_invalido_e_removido_e_sessao_mantida`, `test_sessao_com_menos_de_tres_e_reconstruida`, `test_todos_invalidos_vira_fallback_total`, `test_resumo_prioriza_foco_e_lista_pool_completo`, `test_resumo_nao_lista_equipamento_fora_do_request`, `test_retry_unico_em_429`, `test_par_id_nome_divergente_e_removido`, `test_nome_aproximado_nao_e_divergencia` |
 | `back/tests/test_hybrid_plan.py` | regressão do fallback local (existente, sem mudança) |
 
 ## Verificação manual
@@ -133,6 +166,9 @@ Comportamental:
 - Prompt maior pode degradar a latência do flash-lite: medir `generationTimeMs`
   antes/depois; rollback = voltar o cap por músculo (um commit), mantendo o
   filtro de equipamento/grupo da diretriz.
+- ID válido mas errado passa na validação de IDs: mitigado pelo check ID↔nome
+  (par divergente é descartado); falso positivo mitigado pela comparação
+  tolerante (mesma normalização/fuzzy do `resolve_plan_ids`).
 - Salvamento parcial pode produzir sessões "costuradas" (IA + local) com
   desequilíbrio de volume: a reconstrução usa o mesmo pool e o mesmo nº alvo
   por duração; teste cobre o caso limite.
