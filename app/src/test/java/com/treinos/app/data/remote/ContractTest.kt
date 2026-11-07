@@ -83,6 +83,32 @@ class ContractTest {
     }
 
     @Test
+    fun plano_com_midia_embutida_decodifica() {
+        // H3-24: o backend embute instructions/images no plano (enrich_plan);
+        // o app precisa ler esses campos para mostrar mídia sem o catálogo.
+        val jsonText = loadFixture().replace(
+            "\"exerciseId\": \"Barbell_Bench_Press\"",
+            "\"exerciseId\": \"Barbell_Bench_Press\", " +
+                "\"instructions\": [\"Lie down\", \"Press up\"], " +
+                "\"images\": [\"Barbell_Bench_Press/0.jpg\"]",
+        )
+        val response = json.decodeFromString(GeneratePlanResponse.serializer(), jsonText)
+
+        val exercise = response.workout.days.first().exercises.first()
+        assertEquals(listOf("Lie down", "Press up"), exercise.instructions)
+        assertEquals(listOf("Barbell_Bench_Press/0.jpg"), exercise.images)
+    }
+
+    @Test
+    fun plano_sem_midia_decodifica_listas_vazias() {
+        // Fixture original: sem as chaves, os campos nascem vazios (backend antigo).
+        val response = json.decodeFromString(GeneratePlanResponse.serializer(), loadFixture())
+        val exercise = response.workout.days.first().exercises.first()
+        assertTrue(exercise.instructions.isEmpty())
+        assertTrue(exercise.images.isEmpty())
+    }
+
+    @Test
     fun ignoraCampoNovoDesconhecido() {
         val jsonText = loadFixture()
         val comChaveNova = jsonText.replace(

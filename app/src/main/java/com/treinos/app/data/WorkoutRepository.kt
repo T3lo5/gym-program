@@ -139,6 +139,10 @@ class WorkoutRepository(
                             exerciseName = exercise.exerciseName.ifBlank { exercise.exerciseId },
                             primaryMuscles = exercise.primaryMuscles.joinToString(", "),
                             equipment = exercise.equipment,
+                            // H3-24: mídia que veio no plano (enrich_plan) é
+                            // persistida — o detalhe funciona sem o catálogo.
+                            instructions = exercise.instructions.joinToString("\n"),
+                            images = exercise.images.joinToString(","),
                             exerciseOrder = exercise.exerciseOrder,
                             sets = exercise.sets,
                             targetReps = exercise.targetReps,

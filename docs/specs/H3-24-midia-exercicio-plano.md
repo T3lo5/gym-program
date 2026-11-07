@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-24` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-07` |
+| Implementação | `concluída (2026-11-07, gate verde)` |
 
 **Substitui a [H3-14](H3-14-imagens-exercicios.md)** (proposta, nunca
 implementada): a H3-14 ligava as miniaturas nos cards; esta spec resolve a
@@ -140,3 +140,22 @@ Backup/sync: SEM mudança (mídia não viaja; catálogo recarrega do backend).
   única); tradução é item separado e não bloqueia este fix.
 - Tamanho do banco cresce pouco (texto dos passos + paths); sem impacto no
   backup, que não carrega os campos novos.
+
+## Notas da implementação (2026-11-07)
+
+- **Desvio necessário da tabela acima:** `WorkoutExerciseDto` (o DTO do plano
+  no app) **não** tinha `instructions`/`images` — só o `CatalogExerciseDto`
+  tinha. Sem os campos no DTO, o `ignoreUnknownKeys` descartava a mídia do
+  `enrich_plan` na decodificação. Os campos foram adicionados com default
+  vazio (o contrato nunca envia `null`: o fixture omite as chaves e o
+  `enrich_plan` sempre preenche listas). O backend tolera os campos no
+  review (`plan` é `Dict[str, Any]`); sync e backup continuam sem mídia.
+- A decisão de qual catálogo usar virou função pura `mergeCatalog` e a
+  resolução catálogo→plano virou `resolveExerciseMedia` (ambas no
+  `ExerciseMediaRepository.kt`, testadas em JVM sem Android).
+- `selectedMedia` é resolvida no `AppViewModel` (combina catálogo + mídia do
+  plano capturada em `openExerciseDetail`) e o `TreinosApp` apenas coleta o
+  estado — mesmo resultado da spec, testável sem Compose.
+- O cache do catálogo guarda o path **cru**: `imageUrlFor` codifica a cada
+  leitura e `imagesFromUrl` decodifica na gravação, evitando dupla
+  codificação (`%20` → `%2520`).

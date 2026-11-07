@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.discovery.BackendConnector
 import com.treinos.app.data.discovery.BackendDiscoveryManager
@@ -16,6 +17,7 @@ import com.treinos.app.data.discovery.HttpBackendHealthChecker
 import com.treinos.app.data.discovery.dedupeBackends
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.ExerciseMediaRepository
+import com.treinos.app.data.media.resolveExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.SyncDownloadResult
 import com.treinos.app.data.remote.GeneratePlanRequest
@@ -302,6 +304,38 @@ class AppViewModel(
     private val _selectedExerciseId = MutableStateFlow<String?>(null)
     val selectedExerciseId: StateFlow<String?> = _selectedExerciseId.asStateFlow()
 
+    /**
+     * H3-24: mídia embutida no plano para o exercício aberto no detalhe.
+     * Capturada na abertura a partir dos planos ativos; é o fallback quando o
+     * catálogo não tem o ID (ou não foi baixado).
+     */
+    private val _selectedPlanExercise = MutableStateFlow<WorkoutPlanExerciseEntity?>(null)
+
+    /**
+     * Mídia resolvida do detalhe aberto: catálogo primeiro, mídia do plano
+     * como fallback, null quando nenhuma das duas tem algo a mostrar.
+     */
+    val selectedMedia: StateFlow<ExerciseMedia?> = combine(
+        _exerciseMedia,
+        _selectedExerciseId,
+        _selectedPlanExercise,
+    ) { catalog, exerciseId, planExercise ->
+        if (exerciseId == null) return@combine null
+        resolveExerciseMedia(
+            catalog = catalog,
+            exerciseId = exerciseId,
+            planName = planExercise?.exerciseName.orEmpty(),
+            planPrimaryMuscles = planExercise?.primaryMuscles
+                ?.split(',')
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                .orEmpty(),
+            planEquipment = planExercise?.equipment.orEmpty(),
+            planInstructions = planExercise?.instructions.orEmpty(),
+            planImages = planExercise?.images.orEmpty(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val _isUpdatingCatalog = MutableStateFlow(false)
     val isUpdatingCatalog: StateFlow<Boolean> = _isUpdatingCatalog.asStateFlow()
 
@@ -460,12 +494,22 @@ class AppViewModel(
 
     fun openExerciseDetail(exerciseId: String?) {
         if (exerciseId.isNullOrBlank()) return
+        // H3-24: captura a mídia embutida no plano (fallback do catálogo) no
+        // momento da abertura; sem catálogo, o detalhe ainda tem imagem e passos.
+        _selectedPlanExercise.value = planExerciseById(exerciseId)
         _selectedExerciseId.value = exerciseId
     }
 
     fun closeExerciseDetail() {
         _selectedExerciseId.value = null
+        _selectedPlanExercise.value = null
     }
+
+    private fun planExerciseById(exerciseId: String): WorkoutPlanExerciseEntity? =
+        activePlans.value
+            .flatMap { it.days }
+            .flatMap { it.exercises }
+            .firstOrNull { it.exerciseId == exerciseId }
 
     private var restJob: Job? = null
 
@@ -1054,6 +1098,9 @@ class AppViewModel(
         _backendUrl.value = preferences.backendUrl
         _connectionMessage.value = null
         _syncMessage.value = null
+        // H3-24: URL salva, catálogo recarrega em fundo; se o backend não
+        // responder, o cache atual permanece (resposta vazia não envenena).
+        loadExerciseMedia(false)
     }
 
     fun testConnection() {
@@ -1230,6 +1277,9 @@ class AppViewModel(
                             "Conectado a ${outcome.backend.name} (${outcome.backend.endpoint}). " +
                             "Modelo: ${outcome.model.ifBlank { "—" }} • " +
                             "Catálogo: ${outcome.catalogSize} exercícios."
+                        // H3-24: backend novo conectado, catálogo recarrega em
+                        // fundo (sem bloquear a UI; sem forçar refresh).
+                        loadExerciseMedia(false)
                         stopDiscovery()
                     }
 

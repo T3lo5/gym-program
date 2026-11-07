@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SessionExerciseEntity::class,
         SetLogEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -56,6 +56,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H3-24: mídia do exercício do plano (passos e paths de imagem) passa a
+        // ser persistida. Colunas aditivas com default vazio, sem destruição —
+        // mesmo padrão das migrações 1→2 e 2→3.
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN instructions TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN images TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -63,7 +73,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

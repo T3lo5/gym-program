@@ -86,6 +86,10 @@ data class WorkoutExerciseDto(
     val exerciseName: String = "",
     val primaryMuscles: List<String> = emptyList(),
     val equipment: String = "",
+    // H3-24: mídia que o backend já embute no plano (enrich_plan). O catálogo
+    // continua sendo a fonte preferencial; estes campos são o fallback offline.
+    val instructions: List<String> = emptyList(),
+    val images: List<String> = emptyList(),
     val metricType: String = "reps_weight",
     val targetDurationSeconds: Int? = null,
     val targetDistanceMeters: Double? = null,

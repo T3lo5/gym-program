@@ -169,6 +169,43 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun exercicio_do_plano_persiste_instrucoes_e_imagens() = runTest {
+        // H3-24: mídia embutida no plano sobrevive ao reinício do app.
+        val planId = dao.insertPlan(plano())
+        val dayId = dao.insertDay(dia(planId = planId))
+        dao.insertPlanExercises(
+            listOf(
+                exercicioPlano(dayId = dayId).copy(
+                    instructions = "Deite no banco.\nSegure a barra.",
+                    images = "Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg",
+                ),
+            ),
+        )
+
+        val salvo = dao.getExercisesForDay(dayId).single()
+        assertEquals("Deite no banco.\nSegure a barra.", salvo.instructions)
+        assertEquals("Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg", salvo.images)
+
+        // Round-trip: os separadores voltam exatamente como entraram.
+        assertEquals(
+            listOf("Deite no banco.", "Segure a barra."),
+            salvo.instructions.split('\n'),
+        )
+        assertEquals(
+            listOf("Barbell_Bench_Press/0.jpg", "Barbell_Bench_Press/1.jpg"),
+            salvo.images.split(','),
+        )
+
+        // Exercício antigo (antes da migração) lê vazio, sem crash.
+        dao.insertPlanExercises(
+            listOf(exercicioPlano(id = 0, dayId = dayId, exerciseId = "Antigo")),
+        )
+        val antigo = dao.getExercisesForDay(dayId).last()
+        assertEquals("", antigo.instructions)
+        assertEquals("", antigo.images)
+    }
+
+    @Test
     fun replace_all_data_preserva_ids() = runTest {
         dao.insertPlan(plano(id = 1, name = "Plano Antigo"))
         dao.insertDay(dia(id = 10, planId = 1, name = "Dia Antigo"))

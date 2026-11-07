@@ -38,9 +38,11 @@ já funciona nesta versão:
 > SQLite do aparelho e mostra o histórico. O backend é chamado **somente**
 > quando você gera um treino novo ou toca em **Sincronizar**. A geração
 > devolve o plano e a data em que ele deve ser revisto; se a IA não estiver
-> disponível, o backend monta um plano válido com o catálogo local. A lógica de
-> backup JSON existe; a ligação dos botões de exportar/importar é concluída em
-> H1-7.
+> disponível, o backend monta um plano válido com o catálogo local. O detalhe
+> de cada exercício mostra imagem e instruções mesmo sem baixar o catálogo —
+> a mídia vem no plano e fica gravada no banco do aparelho (H3-24). A lógica
+> de backup JSON existe; a ligação dos botões de exportar/importar é concluída
+> em H1-7.
 
 ---
 

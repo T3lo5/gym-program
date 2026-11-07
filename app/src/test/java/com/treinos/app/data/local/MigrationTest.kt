@@ -170,6 +170,58 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migracao_3_4_preserva_linhas() {
+        // H3-24: v3 já tem `kind` (2→3) e as colunas de modalidade (1→2).
+        helper.createDatabase(testDb, 3).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source, kind) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local','main')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_days (id, planId, name, dayOrder, notes, isRestDay, modality, weekday) " +
+                    "VALUES (10,1,'A',0,'',0,'strength',1)"
+            )
+            db.execSQL(
+                "INSERT INTO workout_plan_exercises (id, dayId, exerciseId, exerciseName, " +
+                    "primaryMuscles, equipment, exerciseOrder, sets, targetReps, targetRpe, " +
+                    "restSeconds, notes, isSupersetWithPrevious, metricType) " +
+                    "VALUES (100,10,'Barbell_Bench_Press','Supino','peito','barra',0,3,'8-12',NULL,90,'',0,'reps_weight')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 4, true, AppDatabase.MIGRATION_3_4)
+
+        // Nada se perde na migração aditiva.
+        assertEquals(1, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_days"))
+        assertEquals(1, migrated.rowCount("workout_plan_exercises"))
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+
+        // Colunas novas nascem vazias (mídia do plano só em planos gerados de
+        // agora em diante) e os campos antigos continuam intactos.
+        migrated.query(
+            "SELECT exerciseId, exerciseName, sets, instructions, images " +
+                "FROM workout_plan_exercises WHERE id = 100"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Barbell_Bench_Press", cursor.getString(0))
+            assertEquals("Supino", cursor.getString(1))
+            assertEquals(3, cursor.getInt(2))
+            assertEquals("", cursor.getString(3))
+            assertEquals("", cursor.getString(4))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

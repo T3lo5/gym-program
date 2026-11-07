@@ -322,7 +322,9 @@ fun TreinosApp(viewModel: AppViewModel) {
         }
     }
 
-    val selectedMedia = selectedExerciseId?.let { exerciseMedia[it] }
+    // H3-24: mídia resolvida no ViewModel — catálogo primeiro, mídia do plano
+    // (persistida no Room) como fallback quando o catálogo não tem o ID.
+    val selectedMedia by viewModel.selectedMedia.collectAsStateWithLifecycle()
     if (selectedExerciseId != null) {
         ExerciseDetailSheet(
             media = selectedMedia,

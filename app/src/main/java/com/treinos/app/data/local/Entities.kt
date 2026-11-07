@@ -85,6 +85,13 @@ data class WorkoutPlanExerciseEntity(
     val targetDistanceMeters: Double? = null,
     val targetPaceSecondsPerKm: Int? = null,
     val targetHrZone: String? = null,
+    // H3-24: mídia embutida no plano, persistida para sobreviver ao reinício.
+    // `instructions` guarda os passos separados por '\n'; `images`, os paths
+    // relativos do catálogo separados por ','.
+    @ColumnInfo(defaultValue = "")
+    val instructions: String = "",
+    @ColumnInfo(defaultValue = "")
+    val images: String = "",
 )
 
 @Entity(tableName = "workout_sessions", indices = [Index("startedAt")])

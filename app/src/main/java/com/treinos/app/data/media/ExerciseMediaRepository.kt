@@ -10,6 +10,8 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URLDecoder
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 data class ExerciseMedia(
@@ -50,6 +52,35 @@ class ExerciseMediaRepository(
     companion object {
         const val IMAGE_BASE_URL =
             "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/"
+
+        /**
+         * Monta a URL da primeira imagem, codificando cada segmento do path
+         * (H3-24: espaço/acento não podem quebrar a URL; segmentos limpos saem
+         * iguais). Pura: resolve sem instância e sem Android.
+         */
+        fun imageUrlFor(images: List<String>): String? {
+            val first = images.firstOrNull() ?: return null
+            if (first.isBlank()) return null
+            val path = first.replace("\\", "/")
+            val encoded = path
+                .split('/')
+                .joinToString("/") { segment -> encodeSegment(segment) }
+            return IMAGE_BASE_URL + encoded
+        }
+
+        private fun encodeSegment(segment: String): String =
+            URLEncoder.encode(segment, Charsets.UTF_8.name()).replace("+", "%20")
+
+        /**
+         * Decisão pura de qual catálogo usar (H3-24): dados frescos do backend
+         * vencem; resposta vazia ou falha de rede mantém o cache existente; sem
+         * nenhuma das duas, o mapa fica vazio e a mídia do plano cobre na UI.
+         */
+        internal fun mergeCatalog(
+            cached: Map<String, ExerciseMedia>?,
+            fetched: Map<String, ExerciseMedia>?,
+        ): Map<String, ExerciseMedia> =
+            fetched?.takeIf { it.isNotEmpty() } ?: cached ?: emptyMap()
     }
 
     suspend fun load(forceRefresh: Boolean = false): Map<String, ExerciseMedia> =
@@ -60,22 +91,22 @@ class ExerciseMediaRepository(
             }
 
             val fetched = runCatching { fetchFromBackend() }.getOrNull()
-            if (fetched != null) {
-                writeCache(fetched)
-                return@withContext fetched
+            // H3-24: resposta vazia do catálogo chega como `null` e nunca vira
+            // cache — o mapa anterior permanece e um vazio não é gravado por
+            // 7 dias envenenando a resolução de mídia.
+            val merged = mergeCatalog(cached, fetched)
+            if (merged.isNotEmpty() && merged !== cached) {
+                writeCache(merged)
             }
-
-            if (cached != null) {
-                return@withContext cached
-            }
-
-            return@withContext emptyMap()
+            return@withContext merged
         }
 
     private suspend fun fetchFromBackend(): Map<String, ExerciseMedia>? {
         val response: CatalogResponseDto = backendClient.catalog()
         val exercises = response.exercises
-        if (exercises.isEmpty()) return emptyMap()
+        // Vazio não é um catálogo válido: devolve null para o `load` manter o
+        // cache anterior em vez de substituí-lo (ou gravá-lo) por vazio.
+        if (exercises.isEmpty()) return null
         return exercises.associate { exercise ->
             val imageUrl = imageUrlFor(exercise.images)
             exercise.id to ExerciseMedia(
@@ -87,13 +118,6 @@ class ExerciseMediaRepository(
                 imageUrl = imageUrl,
             )
         }
-    }
-
-    fun imageUrlFor(images: List<String>): String? {
-        val first = images.firstOrNull() ?: return null
-        if (first.isBlank()) return null
-        val encoded = first.replace("\\", "/")
-        return IMAGE_BASE_URL + encoded
     }
 
     private fun readCache(): Map<String, ExerciseMedia>? {
@@ -149,6 +173,55 @@ class ExerciseMediaRepository(
         if (url.isNullOrBlank()) return emptyList()
         if (!url.startsWith(IMAGE_BASE_URL)) return emptyList()
         val path = url.removePrefix(IMAGE_BASE_URL)
-        return listOf(path)
+        // O cache guarda o path cru: [imageUrlFor] codifica a cada leitura, e
+        // decodificar aqui evita dupla codificação (%20 viraria %2520).
+        val raw = path
+            .split('/')
+            .joinToString("/") { segment -> decodeSegment(segment) }
+        return listOf(raw)
     }
+
+    private fun decodeSegment(segment: String): String =
+        runCatching { URLDecoder.decode(segment, Charsets.UTF_8.name()) }
+            .getOrDefault(segment)
+}
+
+/**
+ * H3-24: resolução determinística da mídia de um exercício.
+ *
+ * Catálogo primeiro (fonte preferencial: tem músculos, equipamento e as
+ * instruções completas); sem entrada no catálogo, usa a mídia que veio no
+ * plano e foi persistida no Room. Sem nenhuma das duas, retorna null — a UI
+ * mantém o estado de hoje (letra + "Sem instruções disponíveis.").
+ *
+ * `planInstructions` chega com passos separados por '\n' e `planImages` com
+ * paths relativos separados por ',', exatamente como [com.treinos.app.data.local.WorkoutPlanExerciseEntity] persiste.
+ */
+fun resolveExerciseMedia(
+    catalog: Map<String, ExerciseMedia>,
+    exerciseId: String,
+    planName: String = "",
+    planPrimaryMuscles: List<String> = emptyList(),
+    planEquipment: String = "",
+    planInstructions: String = "",
+    planImages: String = "",
+): ExerciseMedia? {
+    catalog[exerciseId]?.let { return it }
+    val instructions = planInstructions
+        .split('\n')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+    val imagePaths = planImages
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+    if (instructions.isEmpty() && imagePaths.isEmpty()) return null
+    return ExerciseMedia(
+        id = exerciseId,
+        name = planName.ifBlank { exerciseId },
+        primaryMuscles = planPrimaryMuscles,
+        equipment = planEquipment,
+        instructions = instructions,
+        imageUrl = ExerciseMediaRepository.imageUrlFor(imagePaths),
+    )
 }

@@ -44,7 +44,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Sexo opcional no perfil | ✅ | Seletor em "Seu perfil (opcional)" com `Feminino`/`Masculino`/`Outro`/`Prefiro não informar`, salvo em `AppPreferences.sex` e enviado só quando preenchido; aparece no prompt da IA e **não** muda descanso, RPE, séries nem cargas (H3-7) |
 | Backup na nuvem do usuário | 🟡 | O SAF já lista Drive/OneDrive/Dropbox no seletor (nenhum SDK, nenhuma credencial); falta validar com provedores reais e escrever o texto de ajuda (H3-8) |
 | Backup automático do Android | ✅ | Rules ligadas no manifest (`fullBackupContent`/`dataExtractionRules`) com política de `<exclude>`: banco (`treinos.db`/`-wal`/`-shm`) fora de nuvem e transferência, `treinos_prefs.xml` fora da nuvem; `BackupRulesTest` confere os nomes contra as constantes de `AppDatabase`/`AppPreferences` (H3-10) |
-| Imagem/vídeo de exercício | 🟡/❌ | O catálogo tem 876 exercícios com imagem e instruções (H1-3) e a URL resolve, mas o app só usa a mídia se o catálogo foi baixado do backend — a mídia que **já vem no plano** é descartada, e uma resposta vazia envenena o cache por 7 dias; correção em H3-24 (substitui H3-14); vídeo não |
+| Imagem/vídeo de exercício | 🟡/❌ | A mídia que **já vem no plano** é usada e persistida no Room (v4), o catálogo é a fonte preferencial, resposta vazia não envenena mais o cache e o path é URL-encodado por segmento (H3-24, substituiu a H3-14); vídeo não |
 | Migrações Room | ✅ | Room v2 com `MIGRATION_1_2` + `MigrationTest` (1→2 preservando linhas); `fallbackToDestructiveMigration` removido (H1-6) |
 | Registro avulso (natação) | ✅ | `ActivityLog` valida e grava sessão manual (`source = "manual"`, `planId = dayId = 0`, zero exercícios); tela de registro/edição, card de atividade e filtro por modalidade no histórico, exclusão com confirmação (H2-5) |
 | Plano híbrido / revisão por IA | 🟡 | H2-6 entregue, mas a geração híbrida atual funde modalidades do mesmo dia em uma sequência única e gera musculação incompleta; correção proposta em H3-11 |
@@ -108,6 +108,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-21 | Diagnóstico do fallback da IA | `parse_ai_plan` pura em `back/app/main.py` lança `AiFailure(reason, detail)` com códigos fechados (`no_api_key`, `http_error`, `timeout`, `json_parse`, `unresolved_ids`, `schema_validation`, `unknown`); `GenerateResponse.fallbackReason` aditivo — vazio quando `source = "ai"`, nunca vazio no local (invariante no endpoint); log estruturado `[fallback] reason=... detail=≤300` no lugar do `except` único que só imprimia no stdout; app decodifica `GeneratePlanResponse.fallbackReason` (null em backend antigo, `ignoreUnknownKeys`) e a mensagem de geração cita o motivo via `fallbackReasonLabel` ("… Motivo: resposta da IA sem IDs válidos."); fixture `contracts/generate_response.json` com o campo validado dos dois lados; testes `test_fallback_diagnostics.py` (6, endpoint com cliente HTTP falso), `ContractTest` (+2) e `FallbackReasonLabelTest` (3); [spec](docs/specs/H3-21-diagnostico-fallback-ia.md) |
 | H3-22 | Robustez da geração por IA | `plan_builder.catalog_summary_for_request` monta prompt por request com pool completo de força filtrado por equipamento/nível (sem cap por grupo; complementar só foco), priorizando grupos do request; `plan_builder.id_name_mismatches` detecta par `exerciseId`↔`exerciseName` divergente (match tolerante por normalização/fuzzy/lookup de nome→ID); `resolve_plan_ids` agora remove IDs inválidos (salvamento parcial) e retorna `dropped`; `main.parse_ai_plan` passou a ser tolerante (remove cercas de código e extrai primeiro objeto JSON balanceado), aceita `request`, registra `dropped_ids` (`unresolved_id`/`id_name_mismatch`), reconstrói dias de força com < 3 exercícios via `build_strength_session` com pool/restrições do request, e só cai em `unresolved_ids` total quando todos os exercícios de força originais viram inválidos sem bloco não-força aproveitável; prompt por request (`system_prompt_for_request`) substitui o resumo global capado e instrui a IA a informar `exerciseName` + preferir IDs listados; endpoint `/v1/generate-workout` usa timeout 60s + 1 retry apenas para `json_parse` e HTTP 429/5xx (retry de rede com 30s); catálogo do prompt medido em smoke local (~13k chars / 228 linhas para request de abs+body only/dumbbell; plano B de dois níveis permanece condicionado a medição real de qualidade/contexto); `test_fallback_diagnostics.py` ajustado ao novo contrato de `resolve_plan_ids` (H3-21 preservado para fallback total), `test_hybrid_plan.py` regressão preservada e `test_ai_robustez.py` criado (10 testes puros/endpoint fake cobrindo parse tolerante, salvamento parcial, resumo, retry 429 e ID↔nome); [spec](docs/specs/H3-22-robustez-geracao-ia.md) |
 | H3-23 | Foco muscular respeitado no plano principal | `build_strength_session` ganha `user_target_muscles`: no caminho não complementar, os grupos da sessão passam a ser `grupos pedidos + grupos do split` (dedup, pedidos primeiro) — cada sessão de força garante ≥ 1 exercício de cada grupo pedido quando existir no pool (grupo sem candidato não consome slot, strict só para o pedido do usuário); `build_hybrid_plan` passa `user_target_muscles = _expand_muscles(targetMuscles)` em vez de descartá-lo; `build_hybrid_user_prompt` com a regra explícita de prioridade (só no principal); `GenerateScreen` mostra dica no modo principal com músculos selecionados ("APENAS o grupo" é o complementar); complementar H3-16 intocado (`test_complementar_continua_exclusivo`); testes `test_hybrid_plan.py` (+4: foco em cada sessão, dois grupos, split sem foco, grupo sem candidato) e `test_complementary_plan.py` (+1); [spec](docs/specs/H3-23-foco-muscular-plano-principal.md) |
+| H3-24 | Imagens e descrição: plano como fonte + catálogo resiliente | `WorkoutExerciseDto` passa a ler `instructions`/`images` que o `enrich_plan` já embute no plano; Room v4 aditiva com `WorkoutPlanExerciseEntity.instructions`/`.images` (schema `4.json` versionado, `MIGRATION_3_4` sem destruição), `WorkoutRepository.saveGeneratedPlan` persiste a mídia e `WorkoutDaoTest` cobre o round-trip; `ExerciseMediaRepository` não cacheia mais catálogo vazio (`fetchFromBackend` devolve `null` no vazio; decisão pura em `mergeCatalog` — resposta vazia ou falha mantém o cache anterior) e `imageUrlFor` codifica cada segmento do path (cache guarda o path cru, sem dupla codificação); `resolveExerciseMedia` pura resolve catálogo primeiro e mídia do plano como fallback; `AppViewModel.openExerciseDetail` captura a mídia embutida do plano e `selectedMedia` combina catálogo + plano; conectar ou salvar a URL do backend recarrega o catálogo em fundo; backup e sync sem mudança (mídia é derivável do `exerciseId`); testes `MigrationTest.migracao_3_4_preserva_linhas`, `ExerciseMediaTest` (+3: cache, URL-encode, fallback do plano), `WorkoutDaoTest` (+1) e `ContractTest` (+2); [spec](docs/specs/H3-24-midia-exercicio-plano.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -122,21 +123,17 @@ do horizonte 2 está fechada; o foco passa para qualidade/Horizon 3.
 
 Reportadas em uso real em 2026-11-07 e confirmadas no código. **Prioridade
 maior que qualquer feature listada neste roadmap, incluindo o MVP do relógio
-(H3-17–H3-20).** Ordem de execução = ordem da tabela. H3-21 (diagnóstico),
-H3-22 (robustez da IA) e H3-23 (foco no principal) estão entregues: o log
+(H3-17–H3-20).** Ordem de execução = ordem da tabela. **A fila está concluída:**
+H3-21 (diagnóstico do fallback), H3-22 (robustez da IA), H3-23 (foco no
+principal) e H3-24 (mídia do exercício) estão entregues — o log
 `[fallback] reason=...`, o `fallbackReason` no contrato, o pool completo no
-prompt e a prioridade de foco nas sessões de força confirmam e corrigem as
-causas reais; a próxima da fila é a H3-24.
+prompt, a prioridade de foco nas sessões de força e a mídia persistida com o
+catálogo resiliente confirmam e corrigem as causas reais.
 
-| ID | Item | MoSCoW | Problema (evidência no código) | Solução prevista | Esforço | Depende de | Spec |
-|----|------|--------|-------------------------------|------------------|---------|------------|------|
-| H3-24 | Imagens e descrição: plano como fonte + catálogo resiliente | **M** | O plano já vem com `instructions`/`images` (`enrich_plan` L488–489) mas o app ignora esses campos e o Room não os persiste; sem catálogo baixado, zero mídia; resposta vazia do catálogo é cacheada por 7 dias (`ExerciseMediaRepository.kt` L62–66/L78). | Usar a mídia do plano (catálogo como fonte preferencial), persistir no Room (v4 aditiva com teste), não cachear catálogo vazio, recarregar ao conectar, URL-encode. **Substitui a H3-14.** | 1–1,5 dia | — | [H3-24](docs/specs/H3-24-midia-exercicio-plano.md) |
+H3-21, H3-22, H3-23 e H3-24 estão concluídos e listados em §4.1.
 
-H3-21, H3-22 e H3-23 estão concluídos e listados em §4.1.
-
-A H3-24 é **Must** e entra antes de qualquer feature. A H3-14
-(proposta, Could) fica **substituída** pela H3-24 e não será implementada
-separadamente.
+A H3-14 (proposta, Could) continua **substituída** pela H3-24 e não será
+implementada separadamente.
 
 ### Horizon 3 — Depois (2-4 meses): evolução e qualidade
 
@@ -203,7 +200,7 @@ precisa para ser útil amanhã.
 
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
-| **Correções prioritárias: H3-21 ✅ H3-22 ✅ H3-23 ✅ — resta H3-24 (mídia), antes de tudo** | | | |
+| **Correções prioritárias: H3-21 ✅ H3-22 ✅ H3-23 ✅ H3-24 ✅ — fila concluída; segue o MVP do relógio** | | | |
 | Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | Backend na nuvem (H3-4) |
 | Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Export CSV/Sheets |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Widget/complicação do relógio |
@@ -227,20 +224,22 @@ Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1
             H3-11/H3-12/H3-13/H3-15/H3-16 (qualidade, progressão, perfil no
             backup/sexo, rules do Android ligadas, sessões híbridas por
             modalidade, volume visível, títulos por split, múltiplos planos na
-            Home e geração complementar) + H3-21/H3-22/H3-23 (diagnóstico do
-            fallback, robustez da IA e foco muscular priorizado no principal)
-Agora:      Correção prioritária H3-24 (mídia do exercício: plano como fonte +
-            catálogo resiliente) — ANTES de qualquer feature, incluindo o MVP do relógio
-Depois:     MVP do relógio H3-17 → H3-18 → H3-19 → H3-20; H3-8 (nuvem via SAF)
+            Home e geração complementar) + H3-21/H3-22/H3-23/H3-24 (diagnóstico do
+            fallback, robustez da IA, foco muscular priorizado no principal e
+            mídia do exercício com plano como fonte + catálogo resiliente)
+Agora:      MVP do relógio H3-17 → H3-18 → H3-19 → H3-20 (fila de correções
+            prioritárias H3-21–H3-24 concluída)
+Depois:     H3-8 (nuvem via SAF)
             e H3-25 (seleção por nome na geração) continuam Could, sem
             prioridade agora
 Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar)
 ```
 
-**Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅ → **H3-21 ✅ → H3-22 ✅ → H3-23 ✅ → H3-24**.
-O elo atual são as **correções prioritárias**: com H3-21/H3-22/H3-23 entregues
-(diagnóstico + robustez da IA + foco priorizado no principal), segue H3-24
-(mídia do exercício); o MVP do relógio (H3-17 → H3-18 → H3-19 → H3-20) vem logo depois.
+**Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅ → **H3-21 ✅ → H3-22 ✅ → H3-23 ✅ → H3-24 ✅**.
+O elo atual é o **MVP do relógio**: com as correções prioritárias
+H3-21/H3-22/H3-23/H3-24 entregues (diagnóstico + robustez da IA + foco
+priorizado no principal + mídia do exercício), segue H3-17 → H3-18 → H3-19 →
+H3-20.
 O elo de **qualidade/plataforma** estava em **H3-10** (concluída): com as rules
 do Android ligadas e o nome do banco conferido por teste, o backup de plataforma
 deixou de ser um caminho não escolhido — e a H3-4 perdeu seu pré-requisito.
@@ -293,19 +292,15 @@ com abas, volume (`sets × reps`) visível nos cards, título de força por spli
 múltiplos planos coexistindo na Home e geração complementar com foco exclusivo e
 casa/peso corporal.
 
-**Agora (Must — correções prioritárias, antes de qualquer feature):**
-**H3-21** (diagnóstico do fallback da IA — o app diz o porquê), **H3-22**
-(robustez da geração por IA — fim do fallback estrutural) e **H3-23** (foco
-muscular respeitado no plano principal — "abdômen" entra em todas as sessões
-de força como prioridade) estão entregues. Na fila: **H3-24** (imagens e
-descrição do exercício vindas do plano + catálogo resiliente; substitui a
-H3-14). Specs escritas em `docs/specs/`; as pendentes seguem aguardando
-aprovação antes de implementar.
-**Depois das correções (Must — MVP do relógio):** **H3-17** (alvo de reps e
-última série no pulso), **H3-18** (timer de descanso contando no relógio),
-**H3-19** (corrida/mobilidade com tela coerente) e **H3-20** (selo de conexão,
-debounce e fila offline real). Nenhuma tem spec ainda: criar a partir de
+**Agora (Must — MVP do relógio):** **H3-17** (alvo de reps e última série no
+pulso), **H3-18** (timer de descanso contando no relógio), **H3-19**
+(corrida/mobilidade com tela coerente) e **H3-20** (selo de conexão, debounce
+e fila offline real). Nenhuma tem spec ainda: criar a partir de
 [_TEMPLATE.md](docs/specs/_TEMPLATE.md) e aprovar antes de implementar.
+**Correções prioritárias concluídas:** H3-21 (diagnóstico do fallback da IA),
+H3-22 (robustez da geração por IA), H3-23 (foco muscular no plano principal) e
+H3-24 (imagens e descrição do exercício vindas do plano + catálogo resiliente;
+substitui a H3-14) — todas listadas em §4.1.
 **Could (specs prontas, sem prioridade agora):** **H3-8** (validar/documentar
 SAF com Drive/OneDrive/Dropbox — sem SDK).
 **Won't now:** H3-4 (backend na nuvem com token — pré-requisito H3-10 já
@@ -355,7 +350,7 @@ confirme antes de implementar.
 - [H3-21 — Diagnóstico do fallback da IA](docs/specs/H3-21-diagnostico-fallback-ia.md) — concluída
 - [H3-22 — Robustez da geração por IA](docs/specs/H3-22-robustez-geracao-ia.md) — concluída
 - [H3-23 — Foco muscular respeitado no plano principal](docs/specs/H3-23-foco-muscular-plano-principal.md) — concluída
-- [H3-24 — Imagens e descrição: plano como fonte + catálogo resiliente](docs/specs/H3-24-midia-exercicio-plano.md) — proposta, aguardando aprovação (próxima da fila de fixes; **substitui a H3-14**)
+- [H3-24 — Imagens e descrição: plano como fonte + catálogo resiliente](docs/specs/H3-24-midia-exercicio-plano.md) — concluída (**substitui a H3-14**)
 - [H3-25 — Seleção de exercícios por nome com resolução determinística](docs/specs/H3-25-selecao-por-nome.md) — proposta, aguardando aprovação (evolução da geração por IA; depende da H3-22)
 - [H3-14 — Imagens dos exercícios no plano](docs/specs/H3-14-imagens-exercicios.md) — **substituída pela H3-24** (não implementar separadamente)
 - H3-17 — Alvo de reps e última série no pulso — roadmap definido; **spec a criar** a partir de [_TEMPLATE.md](docs/specs/_TEMPLATE.md) antes de implementar
