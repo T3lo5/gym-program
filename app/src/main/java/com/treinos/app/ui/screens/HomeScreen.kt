@@ -76,7 +76,9 @@ import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
 import com.treinos.app.ui.todaySessionSelector
+import com.treinos.app.ui.UiState
 import com.treinos.app.ui.components.ExerciseImage
+import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 
@@ -99,9 +101,19 @@ fun HomeScreen(
     onPostponeReview: (Long) -> Unit = {},
     onDismissDeloadNotice: () -> Unit = {},
     plans: List<WorkoutPlanWithDetails> = emptyList(),
+    plansState: UiState<List<WorkoutPlanWithDetails>> = UiState.Content(emptyList()),
     onSelectPlan: (Long) -> Unit = {},
     onDeletePlan: (Long) -> Unit = {},
 ) {
+    // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
+    // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
+    // `activePlan` (um combine) ainda não convergiu com planos no banco, segue
+    // carregando em vez de piscar o empty state.
+    val loadedPlans = (plansState as? UiState.Content)?.data.orEmpty()
+    if (plansState is UiState.Loading || (plan == null && loadedPlans.isNotEmpty())) {
+        LoadingState(modifier = Modifier.fillMaxSize())
+        return
+    }
     val tabsByModality = remember(plan) {
         plan?.let { groupSessionsByModality(it.days) } ?: emptyMap()
     }

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,17 +34,73 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
 import com.treinos.app.ui.RunLogValidation
+import com.treinos.app.ui.UiState
 import com.treinos.app.ui.formatRunPace
 import com.treinos.app.ui.parseDraftNumber
 import com.treinos.app.ui.validateRunLog
+import com.treinos.app.ui.components.EmptyState
+import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 
+/**
+ * Corrida planejada (H3-29): a tela distingue carregando (antes do Room
+ * emitir), sessão inexistente (empty state com volta — nunca um formulário
+ * morto) e o formulário de registro.
+ */
 @Composable
 fun RunWorkoutScreen(
-    session: SessionWithExercises?,
+    state: UiState<SessionWithExercises?>,
     onLeave: () -> Unit,
-    onFinish: (RunLogInput) -> Unit,
+    onFinish: (sessionId: Long, input: RunLogInput) -> Unit,
+) {
+    when (val current = state) {
+        is UiState.Loading -> RunWorkoutLoading(onLeave)
+        is UiState.Empty -> RunWorkoutMissing(onLeave)
+        is UiState.Content -> {
+            val session = current.data
+            if (session == null) {
+                RunWorkoutMissing(onLeave)
+            } else {
+                RunWorkoutForm(session = session, onFinish = onFinish, onLeave = onLeave)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunWorkoutLoading(onLeave: () -> Unit) {
+    Scaffold(
+        topBar = { ScreenTopBar(title = "Corrida", onBack = onLeave) },
+    ) { padding ->
+        LoadingState(modifier = Modifier.fillMaxSize().padding(padding))
+    }
+}
+
+@Composable
+private fun RunWorkoutMissing(onLeave: () -> Unit) {
+    Scaffold(
+        topBar = { ScreenTopBar(title = "Corrida", onBack = onLeave) },
+    ) { padding ->
+        EmptyState(
+            title = "Sessão não encontrada",
+            description = "A corrida em andamento não foi encontrada no aparelho. " +
+                "Ela pode ter sido abandonada ou finalizada em outra tela.",
+            modifier = Modifier.fillMaxSize().padding(padding),
+            action = {
+                Button(onClick = onLeave, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("Voltar")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RunWorkoutForm(
+    session: SessionWithExercises,
+    onFinish: (sessionId: Long, input: RunLogInput) -> Unit,
+    onLeave: () -> Unit,
 ) {
     var durationMinutes by remember { mutableStateOf("") }
     var distanceMeters by remember { mutableStateOf("") }
@@ -51,7 +109,7 @@ fun RunWorkoutScreen(
     var pace by remember { mutableStateOf<String?>(null) }
 
     // Sessão de corrida em andamento mantém a tela acesa (H3-26).
-    KeepScreenOnEffect(enabled = session != null)
+    KeepScreenOnEffect(enabled = true)
 
     fun compute() {
         val dur = durationMinutes.toIntOrNull() ?: 0
@@ -70,15 +128,18 @@ fun RunWorkoutScreen(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = session?.session?.dayName?.ifBlank { "Corrida" } ?: "Corrida",
+                title = session.session.dayName.ifBlank { "Corrida" },
                 onBack = onLeave,
             )
         },
     ) { padding ->
+        // H3-29: rolagem no formulário — em telas pequenas o botão de finalizar
+        // fica alcançável em vez de cortado fora da tela.
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Card(
@@ -173,11 +234,12 @@ fun RunWorkoutScreen(
                         val dist = parseDraftNumber(distanceMeters)
                         val rpeVal = parseDraftNumber(rpe)
                         onFinish(
+                            session.session.id,
                             RunLogInput(
                                 durationSeconds = dur.toLong() * 60,
                                 distanceMeters = dist,
                                 rpe = rpeVal,
-                            )
+                            ),
                         )
                     }
                 },

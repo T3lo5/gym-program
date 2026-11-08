@@ -175,18 +175,33 @@ fun LoadingState(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Erro persistente e acionável (H3-29): título com a ação que falhou, mensagem
+ * curta e "Tentar de novo" quando a ação pode ser repetida. O visual é
+ * exclusivo de erro — sucesso continua no snackbar.
+ */
 @Composable
 fun ErrorState(
+    title: String,
     message: String,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
+        modifier = modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) { },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         onRetry?.let {
             Button(onClick = it, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Tentar de novo") }
         }

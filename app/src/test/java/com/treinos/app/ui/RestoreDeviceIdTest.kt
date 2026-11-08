@@ -5,6 +5,7 @@ import com.treinos.app.data.SnapshotDownloader
 import com.treinos.app.data.SyncDownloadResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
@@ -40,10 +41,11 @@ class RestoreDeviceIdTest {
 
         val outcome = restore("celular-da-esteira")
 
-        assertEquals(
-            RestoreOutcome.Failed("backend offline"),
-            outcome,
-        )
+        // H3-29: a falha continua Failed e o device id é preservado, mas a
+        // mensagem vira o texto acionável — o detalhe cru não chega à UI.
+        val failed = requireNotNull(outcome as? RestoreOutcome.Failed)
+        assertTrue(failed.message.contains("servidor"))
+        assertTrue(!failed.message.contains("backend offline"))
         assertEquals(listOf("celular-da-esteira"), downloader.calls)
         assertEquals("id-atual", devices.deviceId)
     }

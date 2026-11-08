@@ -1,5 +1,6 @@
 package com.treinos.app.data.remote
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -8,7 +9,25 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
+
+/**
+ * Exceções tipadas do backend (H3-29): a camada de dados diz **o que** falhou
+ * e a UI traduz para mensagem acionável (`uiErrorFrom`). O corpo HTTP cru
+ * nunca entra na mensagem — vai para o Logcat via `Log.w`.
+ */
+/** Sem conexão com o backend (DNS, rota, recusa de conexão). */
+class BackendConnectionException(message: String, cause: Throwable?) : IOException(message, cause)
+
+/** Tempo limite: o backend não respondeu dentro do timeout configurado. */
+class BackendTimeoutException(message: String, cause: Throwable?) : IOException(message, cause)
+
+/** Backend respondeu, mas com status de erro; [code] alimenta a mensagem da UI. */
+class BackendHttpException(val code: Int, message: String) : IOException(message)
+
+/** Backend respondeu 2xx, mas o corpo não é o JSON esperado. */
+class BackendResponseException(message: String, cause: Throwable?) : IOException(message, cause)
 
 /**
  * Cliente HTTP do backend de treinos.
@@ -62,12 +81,12 @@ class BackendClient(
     private inline fun <reified T> execute(request: Request): T {
         val response = try {
             client.newCall(request).execute()
+        } catch (error: SocketTimeoutException) {
+            Log.w(TAG, "Tempo limite ao chamar ${request.url.encodedPath}", error)
+            throw BackendTimeoutException("Tempo limite ao chamar o backend", error)
         } catch (error: IOException) {
-            throw IOException(
-                "Não foi possível falar com o backend (${baseUrlProvider()}). " +
-                    "Verifique se ele está ligado e se o endereço está correto.",
-                error,
-            )
+            Log.w(TAG, "Falha de rede ao chamar ${request.url.encodedPath}", error)
+            throw BackendConnectionException("Falha de rede ao chamar o backend", error)
         }
 
         response.use {
@@ -76,17 +95,28 @@ class BackendClient(
                 val detail = runCatching {
                     json.decodeFromString(ApiErrorDto.serializer(), body).detail
                 }.getOrNull()
-                throw IOException("Backend respondeu ${it.code}: ${detail ?: body.take(300)}")
+                // H3-29: o corpo cru (JSON/HTML) fica só no Logcat; a UI recebe
+                // mensagem curta e acionável via `uiErrorFrom`.
+                Log.w(TAG, "Backend HTTP ${it.code}: ${body.take(300)}")
+                throw BackendHttpException(
+                    code = it.code,
+                    message = detail?.takeIf { d -> d.isNotBlank() }
+                        ?.let { d -> "Backend HTTP ${it.code}: $d" }
+                        ?: "Backend HTTP ${it.code}",
+                )
             }
             return try {
                 json.decodeFromString<T>(body)
             } catch (error: Exception) {
-                throw IOException("Resposta inesperada do backend: ${body.take(300)}", error)
+                Log.w(TAG, "Resposta sem o JSON esperado: ${body.take(300)}", error)
+                throw BackendResponseException("Resposta sem o JSON esperado", error)
             }
         }
     }
 
     companion object {
+        private const val TAG = "BackendClient"
+
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         private fun defaultClient(): OkHttpClient = OkHttpClient.Builder()

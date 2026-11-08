@@ -40,7 +40,9 @@ import androidx.compose.ui.unit.dp
 import com.treinos.app.data.remote.ModalityDto
 import com.treinos.app.ui.ComplementaryValidator
 import com.treinos.app.ui.ProfileValidator
+import com.treinos.app.ui.UiError
 import com.treinos.app.ui.components.ChipGroup
+import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 
@@ -119,6 +121,9 @@ fun GenerateScreen(
     savedBodyWeightKg: Double? = null,
     savedHeightCm: Int? = null,
     savedSex: String? = null,
+    // H3-29: erro persistente na tela de origem, com "Tentar de novo".
+    error: UiError? = null,
+    onRetry: () -> Unit = {},
     onGenerate: (
         modalities: List<ModalityDto>,
         goal: String,
@@ -199,6 +204,18 @@ fun GenerateScreen(
                             "até você tocar em Sincronizar.",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+
+            // H3-29: o erro fica visível até o usuário tentar de novo ou voltar —
+            // não desaparece com o snackbar de ~4 s.
+            error?.let { uiError ->
+                item {
+                    ErrorState(
+                        title = uiError.title,
+                        message = uiError.message,
+                        onRetry = if (uiError.retryLabel != null) onRetry else null,
                     )
                 }
             }

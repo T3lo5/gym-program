@@ -1,5 +1,6 @@
 package com.treinos.app.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -62,6 +63,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -132,6 +134,15 @@ class AppViewModel(
     val activePlans: StateFlow<List<WorkoutPlanWithDetails>> = repository.observeActivePlans()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /**
+     * H3-29: estado de tela dos planos. `Loading` até o **primeiro** emit do
+     * Room — a Home só mostra o empty state quando o banco realmente está
+     * vazio, não nos primeiros frames ("vazio falso").
+     */
+    val plansState: StateFlow<UiState<List<WorkoutPlanWithDetails>>> = repository.observeActivePlans()
+        .map<List<WorkoutPlanWithDetails>, UiState<List<WorkoutPlanWithDetails>>> { UiState.Content(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
+
     private val _selectedPlanId = MutableStateFlow<Long?>(null)
     val selectedPlanId: StateFlow<Long?> = _selectedPlanId.asStateFlow()
 
@@ -156,7 +167,7 @@ class AppViewModel(
                 }
                 _message.value = "Plano complementar excluído. O histórico foi preservado."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível excluir o plano."
+                _message.value = uiErrorMessage(error, "Não foi possível excluir o plano.")
             }
         }
     }
@@ -167,6 +178,11 @@ class AppViewModel(
 
     val sessions: StateFlow<List<SessionWithExercises>> = repository.observeSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** H3-29: mesmo padrão de [plansState] — Loading até o primeiro emit do Room. */
+    val sessionsState: StateFlow<UiState<List<SessionWithExercises>>> = repository.observeSessions()
+        .map<List<SessionWithExercises>, UiState<List<SessionWithExercises>>> { UiState.Content(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
     val inProgressSession: StateFlow<SessionWithExercises?> = repository.observeSessions()
         .map { list -> list.firstOrNull { it.session.status == "in_progress" } }
@@ -179,6 +195,19 @@ class AppViewModel(
             if (id == null) flowOf(null) else repository.observeSession(id)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * H3-29: sessão ativa como estado de tela. A cada troca de `_activeSessionId`
+     * o estado volta a `Loading` até o Room emitir — a corrida nunca mostra
+     * "Sessão não encontrada" nos frames antes da emissão.
+     */
+    val activeSessionState: StateFlow<UiState<SessionWithExercises?>> = _activeSessionId
+        .flatMapLatest { id ->
+            val source = if (id == null) flowOf<SessionWithExercises?>(null) else repository.observeSession(id)
+            source.map<SessionWithExercises?, UiState<SessionWithExercises?>> { UiState.Content(it) }
+                .onStart { emit(UiState.Loading) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
     private val _exerciseIndex = MutableStateFlow(0)
     val exerciseIndex: StateFlow<Int> = _exerciseIndex.asStateFlow()
@@ -255,6 +284,16 @@ class AppViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    /**
+     * H3-29: erro persistente da geração — vive na GenerateScreen com
+     * "Tentar de novo" até o usuário repetir a ação ou voltar.
+     */
+    private val _generateError = MutableStateFlow<UiError?>(null)
+    val generateError: StateFlow<UiError?> = _generateError.asStateFlow()
+
+    /** Parâmetros da última geração, para o "Tentar de novo" reexecutá-la igual. */
+    private var lastGenerateArgs: GeneratePlanArgs? = null
+
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
@@ -288,6 +327,10 @@ class AppViewModel(
     private val _downloadMessage = MutableStateFlow<String?>(null)
     val downloadMessage: StateFlow<String?> = _downloadMessage.asStateFlow()
 
+    /** H3-29: erro persistente do download do backend, com "Tentar de novo" em Ajustes. */
+    private val _downloadError = MutableStateFlow<UiError?>(null)
+    val downloadError: StateFlow<UiError?> = _downloadError.asStateFlow()
+
     private val _isTesting = MutableStateFlow(false)
     val isTesting: StateFlow<Boolean> = _isTesting.asStateFlow()
 
@@ -299,6 +342,10 @@ class AppViewModel(
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    /** H3-29: erro persistente do envio ao backend, com "Tentar de novo" em Ajustes. */
+    private val _syncError = MutableStateFlow<UiError?>(null)
+    val syncError: StateFlow<UiError?> = _syncError.asStateFlow()
 
     private val _exerciseMedia = MutableStateFlow<Map<String, ExerciseMedia>>(emptyMap())
     val exerciseMedia: StateFlow<Map<String, ExerciseMedia>> = _exerciseMedia.asStateFlow()
@@ -492,7 +539,7 @@ class AppViewModel(
                 }
             } catch (error: Exception) {
                 if (forceRefresh) {
-                    _catalogMessage.value = error.message ?: "Não foi possível atualizar o catálogo."
+                    _catalogMessage.value = uiErrorMessage(error, "Não foi possível atualizar o catálogo.")
                 }
             } finally {
                 if (forceRefresh) {
@@ -540,6 +587,8 @@ class AppViewModel(
     // ---------------- Navegação ----------------
 
     fun openGenerate() {
+        // H3-29: entrar na tela é uma nova tentativa — erro antigo não volta.
+        _generateError.value = null
         _screen.value = Screen.Generate
     }
 
@@ -581,6 +630,23 @@ class AppViewModel(
         kind: String = "main",
     ) {
         if (_isGenerating.value) return
+        val args = GeneratePlanArgs(
+            modalities = modalities,
+            goal = goal,
+            daysPerWeek = daysPerWeek,
+            level = level,
+            equipment = equipment,
+            muscles = muscles,
+            sessionDuration = sessionDuration,
+            reviewWeeks = reviewWeeks,
+            bodyWeightKgText = bodyWeightKgText,
+            heightCmText = heightCmText,
+            sexChoice = sexChoice,
+            environment = environment,
+            kind = kind,
+        )
+        lastGenerateArgs = args
+        _generateError.value = null
         viewModelScope.launch {
             _isGenerating.value = true
             try {
@@ -662,11 +728,35 @@ class AppViewModel(
                 _message.value = fallbackReasonLabel(response.fallbackReason)
                     ?.let { motivo -> "$base Motivo: $motivo." } ?: base
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível gerar o treino."
+                Log.w(TAG, "Falha ao gerar o treino", error)
+                _generateError.value = uiErrorFrom(error, "gerar o treino")
             } finally {
                 _isGenerating.value = false
             }
         }
+    }
+
+    /**
+     * H3-29: "Tentar de novo" da GenerateScreen — reexecuta a última geração
+     * com exatamente os mesmos parâmetros.
+     */
+    fun retryGenerate() {
+        val args = lastGenerateArgs ?: return
+        generatePlan(
+            modalities = args.modalities,
+            goal = args.goal,
+            daysPerWeek = args.daysPerWeek,
+            level = args.level,
+            equipment = args.equipment,
+            muscles = args.muscles,
+            sessionDuration = args.sessionDuration,
+            reviewWeeks = args.reviewWeeks,
+            bodyWeightKgText = args.bodyWeightKgText,
+            heightCmText = args.heightCmText,
+            sexChoice = args.sexChoice,
+            environment = args.environment,
+            kind = args.kind,
+        )
     }
 
     private fun nextReviewAt(reviewAfterWeeks: Int): String =
@@ -717,7 +807,7 @@ class AppViewModel(
                         "Revisão proposta: ${response.changes.joinToString(" • ")}. Confirme para aplicar."
                     }
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível revisar o plano."
+                _message.value = uiErrorMessage(error, "Não foi possível revisar o plano.")
             } finally {
                 _isReviewing.value = false
             }
@@ -744,7 +834,7 @@ class AppViewModel(
                 _reviewMessage.value = null
                 _message.value = "Plano atualizado com a revisão."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível aplicar a revisão."
+                _message.value = uiErrorMessage(error, "Não foi possível aplicar a revisão.")
             }
         }
     }
@@ -768,7 +858,7 @@ class AppViewModel(
                 repository.postponeReview(planId, weeks)
                 _message.value = "Revisão adiada em $weeks semanas."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível adiar a revisão."
+                _message.value = uiErrorMessage(error, "Não foi possível adiar a revisão.")
             }
         }
     }
@@ -797,7 +887,7 @@ class AppViewModel(
                     SessionKind.STRENGTH -> _screen.value = Screen.Workout
                 }
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível iniciar o treino."
+                _message.value = uiErrorMessage(error, "Não foi possível iniciar o treino.")
             }
         }
     }
@@ -837,7 +927,7 @@ class AppViewModel(
                 startRest(exercise.restSeconds)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível salvar a série."
+                _message.value = uiErrorMessage(error, "Não foi possível salvar a série.")
             }
         }
     }
@@ -859,7 +949,7 @@ class AppViewModel(
                 startRest(exercise.restSeconds)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível salvar a série."
+                _message.value = uiErrorMessage(error, "Não foi possível salvar a série.")
             }
         }
     }
@@ -874,7 +964,7 @@ class AppViewModel(
                 _screen.value = Screen.Home
                 _message.value = "Treino finalizado e salvo no aparelho."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível finalizar o treino."
+                _message.value = uiErrorMessage(error, "Não foi possível finalizar o treino.")
             }
         }
     }
@@ -889,7 +979,7 @@ class AppViewModel(
                 repository.updateSet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível atualizar a série."
+                _message.value = uiErrorMessage(error, "Não foi possível atualizar a série.")
             }
         }
     }
@@ -904,7 +994,7 @@ class AppViewModel(
                 repository.deleteSet(set.id)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível excluir a série."
+                _message.value = uiErrorMessage(error, "Não foi possível excluir a série.")
             }
         }
     }
@@ -931,7 +1021,7 @@ class AppViewModel(
                 _screen.value = Screen.Home
                 _message.value = "Treino abandonado."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível abandonar o treino."
+                _message.value = uiErrorMessage(error, "Não foi possível abandonar o treino.")
             }
         }
     }
@@ -945,7 +1035,7 @@ class AppViewModel(
                 _screen.value = Screen.Home
                 _message.value = "Corrida registrada e salva no aparelho."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível finalizar a corrida."
+                _message.value = uiErrorMessage(error, "Não foi possível finalizar a corrida.")
             }
         }
     }
@@ -974,7 +1064,7 @@ class AppViewModel(
                 _screen.value = Screen.Home
                 _message.value = "Mobilidade finalizada e salva no histórico."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível salvar a mobilidade."
+                _message.value = uiErrorMessage(error, "Não foi possível salvar a mobilidade.")
             }
         }
     }
@@ -1040,7 +1130,7 @@ class AppViewModel(
                 _activityPrefill.value = null
                 _screen.value = Screen.Home
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível salvar a atividade."
+                _message.value = uiErrorMessage(error, "Não foi possível salvar a atividade.")
             } finally {
                 _isSavingActivity.value = false
             }
@@ -1058,7 +1148,7 @@ class AppViewModel(
                 }
                 _message.value = "Registro manual excluído."
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível excluir o registro."
+                _message.value = uiErrorMessage(error, "Não foi possível excluir o registro.")
             }
         }
     }
@@ -1090,7 +1180,7 @@ class AppViewModel(
                 _message.value = "Mobilidade finalizada e salva no histórico."
                 _screen.value = Screen.Home
             } catch (error: Exception) {
-                _message.value = error.message ?: "Não foi possível salvar a mobilidade."
+                _message.value = uiErrorMessage(error, "Não foi possível salvar a mobilidade.")
                 _screen.value = Screen.Home
             }
         }
@@ -1295,7 +1385,7 @@ class AppViewModel(
                     "Conectado. Modelo: ${health.model.ifBlank { "—" }} • " +
                     "Catálogo: ${health.catalogSize} exercícios."
             } catch (error: Exception) {
-                _connectionMessage.value = error.message ?: "Falha ao conectar."
+                _connectionMessage.value = uiErrorMessage(error, "Falha ao conectar.")
             } finally {
                 _isTesting.value = false
             }
@@ -1306,6 +1396,8 @@ class AppViewModel(
         if (_isSyncing.value) return
         viewModelScope.launch {
             _isSyncing.value = true
+            _syncError.value = null
+            _syncMessage.value = null
             try {
                 val result = repository.sync()
                 _lastSyncAt.value = preferences.lastSyncAt
@@ -1313,8 +1405,8 @@ class AppViewModel(
                     "Enviado: ${result.plans} plano(s), ${result.sessions} treino(s) " +
                     "e ${result.setLogs} série(s)."
             } catch (error: Exception) {
-                _syncMessage.value = error.message
-                    ?: "Não foi possível enviar ao backend."
+                Log.w(TAG, "Falha ao enviar ao backend", error)
+                _syncError.value = uiErrorFrom(error, "enviar ao backend")
             } finally {
                 _isSyncing.value = false
             }
@@ -1325,6 +1417,8 @@ class AppViewModel(
         if (_isDownloading.value) return
         viewModelScope.launch {
             _isDownloading.value = true
+            _downloadError.value = null
+            _downloadMessage.value = null
             try {
                 _downloadMessage.value = when (
                     val result = repository.downloadSync(preferences.deviceId)
@@ -1338,8 +1432,8 @@ class AppViewModel(
                         "Nenhum dado encontrado; seus dados locais foram mantidos."
                 }
             } catch (error: Exception) {
-                _downloadMessage.value = error.message
-                    ?: "Não foi possível baixar dados do backend."
+                Log.w(TAG, "Falha ao baixar dados do backend", error)
+                _downloadError.value = uiErrorFrom(error, "baixar dados do backend")
             } finally {
                 _isDownloading.value = false
             }
@@ -1391,7 +1485,7 @@ class AppViewModel(
                 _backupImportState.value = BackupImportState.Idle
                 pendingBackupPayload = null
             } catch (error: Exception) {
-                _backupImportState.value = BackupImportState.Error(error.message ?: "Não foi possível importar o backup.")
+                _backupImportState.value = BackupImportState.Error(uiErrorMessage(error, "Não foi possível importar o backup."))
             }
         }
     }
@@ -1481,6 +1575,8 @@ class AppViewModel(
     }
 
     companion object {
+        private const val TAG = "AppViewModel"
+
         /** "+15 s" padrão da faixa de descanso (H3-26). */
         const val REST_EXTEND_SECONDS = 15
 
@@ -1511,6 +1607,26 @@ class AppViewModel(
 
 /** Posição do plano ativo no ciclo; o aviso de deload não altera nada sozinho. */
 data class PlanCycle(val week: Int, val isDeloadSuggested: Boolean)
+
+/**
+ * Parâmetros da última chamada de geração (H3-29): guardados para o
+ * "Tentar de novo" reexecutar a mesma ação sem depender do formulário.
+ */
+private data class GeneratePlanArgs(
+    val modalities: List<ModalityDto>,
+    val goal: String,
+    val daysPerWeek: Int,
+    val level: String,
+    val equipment: List<String>,
+    val muscles: List<String>,
+    val sessionDuration: Int,
+    val reviewWeeks: Int,
+    val bodyWeightKgText: String,
+    val heightCmText: String,
+    val sexChoice: String?,
+    val environment: String?,
+    val kind: String,
+)
 
 sealed interface BackupImportState {
     object Idle : BackupImportState

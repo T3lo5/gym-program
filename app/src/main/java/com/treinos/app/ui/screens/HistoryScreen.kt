@@ -60,6 +60,7 @@ import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.KeyValueRow
+import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.MetricCard
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
@@ -84,6 +85,7 @@ import com.treinos.app.ui.history.sessionDates
 import com.treinos.app.ui.history.sessionDay
 import com.treinos.app.ui.history.weekDayLabels
 import com.treinos.app.ui.swimStrokeOptions
+import com.treinos.app.ui.UiState
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -92,6 +94,7 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(
     sessions: List<SessionWithExercises>,
+    sessionsState: UiState<List<SessionWithExercises>> = UiState.Content(emptyList()),
     onBack: () -> Unit,
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
@@ -100,6 +103,12 @@ fun HistoryScreen(
     muscleByExerciseId: Map<String, String> = emptyMap(),
     onGenerate: () -> Unit = {},
 ) {
+    // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
+    // treino registrado") só aparece quando o banco realmente está vazio.
+    if (sessionsState is UiState.Loading) {
+        LoadingState(modifier = Modifier.fillMaxSize())
+        return
+    }
     val today = remember { LocalDate.now() }
     var month by remember { mutableStateOf(YearMonth.from(today)) }
     var modalityFilter by remember { mutableStateOf<String?>(null) }

@@ -32,7 +32,8 @@ class RestoreByDeviceId(
             downloader.downloadSync(requested)
         } catch (error: Exception) {
             return RestoreOutcome.Failed(
-                error.message ?: "Não foi possível restaurar o backup do dispositivo $requested.",
+                // H3-29: mensagem acionável; o detalhe técnico fica no Logcat.
+                uiErrorMessage(error, "Não foi possível restaurar o backup do dispositivo $requested."),
             )
         }
 

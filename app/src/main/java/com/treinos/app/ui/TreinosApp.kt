@@ -49,9 +49,12 @@ fun TreinosApp(viewModel: AppViewModel) {
     val screen by viewModel.screen.collectAsStateWithLifecycle()
     val plan by viewModel.activePlan.collectAsStateWithLifecycle()
     val plans by viewModel.activePlans.collectAsStateWithLifecycle()
+    val plansState by viewModel.plansState.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
+    val sessionsState by viewModel.sessionsState.collectAsStateWithLifecycle()
     val inProgressSession by viewModel.inProgressSession.collectAsStateWithLifecycle()
     val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
+    val activeSessionState by viewModel.activeSessionState.collectAsStateWithLifecycle()
     val restRemaining by viewModel.restRemaining.collectAsStateWithLifecycle()
     val restTotal by viewModel.restTotal.collectAsStateWithLifecycle()
     val restPaused by viewModel.restPaused.collectAsStateWithLifecycle()
@@ -69,6 +72,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val generateError by viewModel.generateError.collectAsStateWithLifecycle()
+    val syncError by viewModel.syncError.collectAsStateWithLifecycle()
+    val downloadError by viewModel.downloadError.collectAsStateWithLifecycle()
     val backupImportState by viewModel.backupImportState.collectAsStateWithLifecycle()
     val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
     val bodyWeightKg by viewModel.bodyWeightKg.collectAsStateWithLifecycle()
@@ -116,7 +122,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                 output.use { out -> cacheFile.inputStream().use { it.copyTo(out) } }
                 viewModel.setBackupMessage("Backup exportado no arquivo escolhido.")
             } catch (error: Exception) {
-                viewModel.setBackupMessage(error.message ?: "Não foi possível exportar o backup.")
+                viewModel.setBackupMessage(uiErrorMessage(error, "Não foi possível exportar o backup."))
             }
         }
     }
@@ -200,6 +206,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onOpenMobility = viewModel::openMobility,
                     onPostponeReview = { planId -> viewModel.postponeReview(planId) },
                     plans = plans,
+                    plansState = plansState,
                     onSelectPlan = viewModel::selectPlan,
                     onDeletePlan = viewModel::deleteExtraPlan,
                 )
@@ -210,6 +217,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                     savedBodyWeightKg = bodyWeightKg,
                     savedHeightCm = heightCm,
                     savedSex = sex,
+                    error = generateError,
+                    onRetry = viewModel::retryGenerate,
                     onGenerate = viewModel::generatePlan,
                 )
 
@@ -238,10 +247,11 @@ fun TreinosApp(viewModel: AppViewModel) {
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(
-                    session = activeSession,
+                    state = activeSessionState,
                     onLeave = viewModel::leaveWorkout,
-                    onFinish = { input ->
-                        val sessionId = activeSession?.session?.id ?: return@RunWorkoutScreen
+                    // H3-29: o sessionId vem da sessão renderizada — "Finalizar"
+                    // sem sessão não existe mais como no-op silencioso.
+                    onFinish = { sessionId, input ->
                         viewModel.finishRunWorkout(
                             sessionId = sessionId,
                             durationSeconds = input.durationSeconds,
@@ -253,6 +263,7 @@ fun TreinosApp(viewModel: AppViewModel) {
 
                 Screen.History -> HistoryScreen(
                     sessions = sessions,
+                    sessionsState = sessionsState,
                     onBack = viewModel::goHome,
                     exerciseMedia = exerciseMedia,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
@@ -333,6 +344,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onStopSearch = viewModel::stopDiscovery,
                     onConnectBackend = viewModel::connectDiscoveredBackend,
                     onClearDiscoveryMessage = viewModel::clearDiscoveryMessage,
+                    syncError = syncError,
+                    onRetrySync = viewModel::syncNow,
+                    downloadError = downloadError,
+                    onRetryDownload = viewModel::downloadNow,
                 )
             }
             }

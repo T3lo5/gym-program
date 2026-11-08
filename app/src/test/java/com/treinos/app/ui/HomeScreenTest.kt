@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -22,6 +23,7 @@ import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.SessionKind
+import com.treinos.app.ui.UiState
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -301,6 +303,49 @@ class HomeScreenTest {
         composeRule.onNode(hasScrollAction())
             .performScrollToNode(hasText("Atividade avulsa", substring = true))
         composeRule.onNodeWithText("Atividade avulsa", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun loading_antes_do_primeiro_emit() {
+        // H3-29: com o banco ainda não emitido, a Home mostra carregando —
+        // nunca o empty state ("vazio falso").
+        composeRule.setContent {
+            HomeScreen(
+                plan = null,
+                inProgressSession = null,
+                plansState = UiState.Loading,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("Carregando").assertIsDisplayed()
+        composeRule.onNodeWithText("Nenhum treino ainda").assertDoesNotExist()
+    }
+
+    @Test
+    fun vazio_so_apos_emit() {
+        // H3-29: depois que o Room emitir vazio, o empty state aparece.
+        composeRule.setContent {
+            HomeScreen(
+                plan = null,
+                inProgressSession = null,
+                plansState = UiState.Content(emptyList()),
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Nenhum treino ainda").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Carregando").assertDoesNotExist()
     }
 
     /** Plano com sessão de musculação hoje e corrida amanhã, independente da data. */

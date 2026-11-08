@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-29` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-08` (aprovada pelo usuário antes da implementação) |
+| Implementação | `concluída em 2026-11-08` |
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P3.2, P3.3, P3.8 e inventário tela × estado).
 
@@ -45,6 +45,8 @@ persiste até o usuário decidir — em vez de snackbar de 4 s que some.
 | `app/src/main/java/com/treinos/app/ui/components/Common.kt` | `ErrorState` ganha ação de retry (já existe o esqueleto) |
 | `app/src/main/java/com/treinos/app/data/remote/BackendClient.kt` | mensagens PT curtas; detalhe técnico só em Logcat |
 | `app/src/main/java/com/treinos/app/ui/screens/*.kt` | consumir `UiState` (Home, History, RunWorkout) |
+| `app/src/main/java/com/treinos/app/ui/screens/SettingsScreen.kt` | erro de sync/download persistente com "Tentar de novo" (critério 2) |
+| `app/src/main/java/com/treinos/app/ui/RestoreByDeviceId.kt` | mensagem acionável no `RestoreOutcome.Failed` |
 
 ## Modelo de dados / contrato
 
@@ -88,9 +90,9 @@ mensagem já traduzida; o corpo cru vai para `Log.w` e nunca para a UI.
 
 | Arquivo | Testes |
 |---|---|
-| `app/src/test/java/.../UiErrorTest.kt` | `io_sem_rede_mensagem_acionavel`, `http_500_mensagem_curta_sem_corpo`, `timeout_distinto_de_sem_rede` |
+| `app/src/test/java/.../UiErrorTest.kt` | `io_sem_rede_mensagem_acionavel`, `http_500_mensagem_curta_sem_corpo`, `timeout_distinto_de_sem_rede`, `erro_local_mantem_o_texto_da_acao_no_snackbar` |
 | `app/src/test/java/.../HomeScreenTest.kt` (Robolectric) | `loading_antes_do_primeiro_emit`, `vazio_so_apos_emit` |
-| `app/src/test/java/.../RunWorkoutScreenTest.kt` (Robolectric) | `session_null_mostra_vazio` |
+| `app/src/test/java/.../RunWorkoutScreenTest.kt` (Robolectric) | `session_null_mostra_vazio`, `loading_antes_da_sessao_chegar`, `sessao_valida_mostra_formulario` |
 
 ## Verificação manual
 

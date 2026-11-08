@@ -43,6 +43,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
+import com.treinos.app.ui.UiError
+import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatIsoDateTime
 
@@ -88,6 +90,11 @@ fun SettingsScreen(
     onStopSearch: () -> Unit = {},
     onConnectBackend: (DiscoveredBackend) -> Unit = {},
     onClearDiscoveryMessage: () -> Unit = {},
+    // H3-29: erro persistente com "Tentar de novo" para envio e download.
+    syncError: UiError? = null,
+    onRetrySync: () -> Unit = {},
+    downloadError: UiError? = null,
+    onRetryDownload: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
@@ -398,6 +405,14 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
+                    // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
+                    syncError?.let { uiError ->
+                        ErrorState(
+                            title = uiError.title,
+                            message = uiError.message,
+                            onRetry = if (uiError.retryLabel != null) onRetrySync else null,
+                        )
+                    }
                     Button(
                         onClick = { showDownloadConfirm = true },
                         enabled = !isDownloading,
@@ -424,6 +439,14 @@ fun SettingsScreen(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
+                    downloadError?.let { uiError ->
+                        ErrorState(
+                            title = uiError.title,
+                            message = uiError.message,
+                            onRetry = if (uiError.retryLabel != null) onRetryDownload else null,
                         )
                     }
                 }
