@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
@@ -204,5 +205,57 @@ class HistoryScreenTest {
         val metricasY = composeRule.onNodeWithText("Treinos", useUnmergedTree = true)
             .fetchSemanticsNode().positionInRoot.y
         assertTrue("lista do dia deve vir antes das métricas", listaY < metricasY)
+    }
+
+    @Test
+    @Config(qualifiers = "w180dp-h1600dp")
+    fun chips_em_flowrow_nao_transbordam() {
+        // H3-32: em tela estreita os chips de modalidade quebram linha (FlowRow)
+        // em vez de sumir para fora da viewport (Row sem scroll).
+        val swim = SessionWithExercises(
+            session = WorkoutSessionEntity(
+                id = 3,
+                planName = "",
+                dayName = "Natação",
+                status = STATUS_COMPLETED,
+                startedAt = millisOf(today),
+                endedAt = millisOf(today) + 1_800_000L,
+                totalDurationSeconds = 1800,
+                modality = "swim",
+                source = MANUAL_SESSION_SOURCE,
+                title = "Natação",
+            ),
+            exercises = emptyList(),
+        )
+        val mobility = SessionWithExercises(
+            session = WorkoutSessionEntity(
+                id = 4,
+                planName = "",
+                dayName = "Mobilidade",
+                status = STATUS_COMPLETED,
+                startedAt = millisOf(today),
+                endedAt = millisOf(today) + 1_800_000L,
+                totalDurationSeconds = 1800,
+                modality = "mobility",
+                source = MANUAL_SESSION_SOURCE,
+                title = "Mobilidade",
+            ),
+            exercises = emptyList(),
+        )
+        composeRule.setContent {
+            HistoryScreen(
+                sessions = listOf(sessaoConcluida, atividadeAvulsa, swim, mobility),
+                onBack = { },
+            )
+        }
+
+        val rootWidth = composeRule.onRoot().fetchSemanticsNode().size.width
+        val labels = listOf("Todas", "Musculação", "Corrida", "Natação", "Mobilidade")
+        labels.forEach { label ->
+            val node = composeRule.onNodeWithText(label, useUnmergedTree = true)
+                .fetchSemanticsNode()
+            val right = node.positionInRoot.x + node.size.width
+            assertTrue("chip '$label' não pode transbordar a largura ($right > $rootWidth)", right <= rootWidth + 1)
+        }
     }
 }

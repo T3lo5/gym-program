@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-32` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-08` (proposta de 2026-11-07; troca de ícone adicionada nesta spec por decisão do dono) |
+| Implementação | `concluída em 2026-11-08 — gate ./scripts/verify.sh verde (VERIFICAÇÃO COMPLETA OK)` |
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P4.4–4.8, P3.4 e parte de P4.11).
 
@@ -109,3 +109,41 @@ Um conjunto pequeno de componentes compartilhados elimina as 10 cópias de
 
 - Substituição mecânica de 10 pontos: fazer por tela com gate entre passos.
   Rollback trivial (componentes novos sem outros chamadores).
+
+## Seção extra — troca do ícone do app (aprovada pelo dono em 2026-11-08)
+
+Escopo adicionado a esta spec (não é item novo do roadmap) por ser troca
+simples de recurso: substituir os PNGs placeholder 1×1 do launcher pela arte
+`treinos.jpeg` (2048×2048).
+
+- `mipmap-anydpi-v26/ic_launcher.xml` e `ic_launcher_round.xml`: foreground
+  aponta para `@mipmap/ic_launcher_foreground`; background
+  (`@drawable/ic_launcher_background`, verde `#2E7D32`) e tema **não** mudam.
+- `ic_launcher_foreground.png` nos 5 buckets (108/162/216/324/432 px):
+  arte centralizada na safe zone de 66% do canvas adaptativo; fundo branco
+  do JPEG removido (knockout para alfa) antes de recortar.
+- Legado colorido `ic_launcher.png` (48/72/96/144/192 px) e
+  `ic_launcher_round.png` (máscara circular) nos mesmos buckets.
+- `drawable/ic_launcher_vector.xml` (placeholder antigo) removido.
+
+## Mídia de alongamento (incluída na implementação)
+
+- `MobilityMovement.catalogId` passou a ter default derivado de
+  `catalogIdForMovement(name)` — mapa nome→ID real do catálogo
+  (`back/app/exercise_catalog.json`, 123 exercícios `category=stretching`).
+  19 movimentos mapeados; respiração/caminhada ficam `null` (fallback de
+  letra). Teste JVM garante que todo ID mapeado existe no catálogo stretching
+  e que toda rotina tem ao menos um movimento com mídia.
+- `exerciseMedia` agora chega ao `MobilityScreen` via `TreinosApp`; card do
+  movimento no player e capa da rotina na lista usam `ExerciseImage`.
+
+## Decisões de implementação
+
+- `Pause`/`SkipNext` não existem no `material-icons-core`; em vez de adicionar
+  `material-icons-extended` (release sem minify incharia o APK), vetores
+  locais em `ui/components/AppIcons.kt` (paths Material 24 dp).
+- Classificação sucesso/erro do `StatusText` por convenção da chamada:
+  `statusIsSuccess(message)` — whitelist de prefixos das mensagens do
+  ViewModel (`Common.kt`), sem mudar contrato do ViewModel.
+- Botão "Buscar backends" (descoberta) permanece `OutlinedButton` manual:
+  é toggle para parar a busca, não botão ocupado simples.

@@ -11,11 +11,41 @@ data class MobilityRoutine(
 )
 
 data class MobilityMovement(
-    val catalogId: String? = null,
     val name: String,
     val durationSeconds: Int,
     val side: String? = null,
     val cue: String,
+    val catalogId: String? = catalogIdForMovement(name),
+)
+
+/**
+ * H3-32: liga os movimentos curados a IDs reais do catálogo (free-exercise-db,
+ * categoria `stretching`) para que a tela de mobilidade mostre a imagem do
+ * exercício. Movimento sem correspondência fica `null` e cai no fallback de
+ * letra — nunca um quadrado vazio. Pura para poder ser testada em JVM.
+ */
+fun catalogIdForMovement(name: String): String? = MOVEMENT_CATALOG_IDS[name]
+
+private val MOVEMENT_CATALOG_IDS: Map<String, String> = mapOf(
+    "Gato-Camelo" to "Cat_Stretch",
+    "Rotação torácica em decúbito lateral" to "Torso_Rotation",
+    "Rotação torácica em 4 apoios" to "Torso_Rotation",
+    "Flexão do quadril em meia ponte" to "Pelvic_Tilt_Into_Bridge",
+    "Mobilização pélvica em ponte" to "Pelvic_Tilt_Into_Bridge",
+    "Mobilização pélvica relaxada" to "Pelvic_Tilt_Into_Bridge",
+    "Alongamento do piriforme sentado" to "Seated_Glute",
+    "Alongamento do piriforme" to "Lying_Glute",
+    "Alongamento dos isquiotibiais" to "Hamstring_Stretch",
+    "Alongamento dos isquiotibiais sentado" to "Seated_Hamstring",
+    "Relaxamento em posição fetal" to "Hug_Knees_To_Chest",
+    "Borboleta" to "Adductor_Groin",
+    "Alongamento do quadríceps" to "Quad_Stretch",
+    "Alongamento do flexor do quadril" to "Kneeling_Hip_Flexor",
+    "Mobilização cervical" to "Side_Neck_Stretch",
+    "Alongamento dos ombros" to "Shoulder_Stretch",
+    "Relaxamento" to "Childs_Pose",
+    "Alongamento dos panturrilhas" to "Standing_Gastrocnemius_Calf_Stretch",
+    "Mobilização de tornozelo" to "Ankle_Circles",
 )
 
 object MobilityRoutineTemplates {

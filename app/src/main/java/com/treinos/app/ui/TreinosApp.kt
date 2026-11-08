@@ -310,6 +310,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                         // H3-31: estado da rotina no ViewModel — rotação não
                         // devolve a tela para a lista nem perde o movimento.
                         state = mobilityState,
+                        exerciseMedia = exerciseMedia,
                         onBack = viewModel::goHome,
                         onFinishMobility = viewModel::finishPlannedMobility,
                         onStartRoutine = viewModel::startMobilityRoutine,

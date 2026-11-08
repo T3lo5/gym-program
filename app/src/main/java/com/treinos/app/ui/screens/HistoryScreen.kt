@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -92,6 +94,7 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HistoryScreen(
     sessions: List<SessionWithExercises>,
@@ -183,7 +186,7 @@ fun HistoryScreen(
                 // na área visível, sem rolar uma tela.
                 if (modalities.size > 1) {
                     item {
-                        Row(
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -638,7 +641,7 @@ private fun SessionCard(
                         text = if (completed) "Concluído" else "Em andamento",
                         style = MaterialTheme.typography.labelMedium,
                         color = if (completed) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error,
+                        else MaterialTheme.colorScheme.tertiary,
                     )
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp

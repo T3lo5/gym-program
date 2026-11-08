@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -54,6 +53,7 @@ import com.treinos.app.ui.GenerateConfig
 import com.treinos.app.ui.ModalityDraft
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.UiError
+import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
@@ -305,7 +305,10 @@ fun GenerateScreen(
                                 color = MaterialTheme.colorScheme.error,
                             )
                         }
-                        Button(
+                        BusyButton(
+                            busy = isGenerating,
+                            idleText = if (isComplementary) "Gerar plano complementar" else "Gerar semana híbrida",
+                            busyText = "Gerando…",
                             onClick = {
                                 val validation = ProfileValidator.validate(
                                     bodyWeightKgText,
@@ -315,12 +318,12 @@ fun GenerateScreen(
                                 if (!validation.valid) {
                                     profileError = validation.error
                                     showMoreOptions = true
-                                    return@Button
+                                    return@BusyButton
                                 }
                                 profileError = null
                                 if (!canGenerate) {
                                     profileError = generateHint
-                                    return@Button
+                                    return@BusyButton
                                 }
                                 val dtoList = if (isComplementary) {
                                     listOf(
@@ -356,15 +359,9 @@ fun GenerateScreen(
                                     currentConfig(),
                                 )
                             },
-                            enabled = !isGenerating && canGenerate,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .minimumInteractiveComponentSize(),
-                        ) {
-                            Text(
-                                if (isComplementary) "Gerar plano complementar" else "Gerar semana híbrida"
-                            )
-                        }
+                            enabled = canGenerate,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             },
@@ -374,7 +371,7 @@ fun GenerateScreen(
                     .fillMaxSize()
                     .padding(padding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
                     Card(

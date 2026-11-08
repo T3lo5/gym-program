@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -34,6 +37,9 @@ import com.treinos.app.ui.MobilityRoutine
 import com.treinos.app.ui.MobilityRoutineTemplates
 import com.treinos.app.ui.MobilityScreenState
 import com.treinos.app.ui.MobilitySessionState
+import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.components.AppIcons
+import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatDuration
 
@@ -46,6 +52,7 @@ import com.treinos.app.ui.formatDuration
 fun MobilityScreen(
     state: MobilityScreenState,
     onBack: () -> Unit,
+    exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     onFinishMobility: (planId: Long, dayId: Long, routineId: String, elapsedSeconds: Long) -> Unit = { _, _, _, _ -> },
     onStartRoutine: (MobilityRoutine) -> Unit = {},
     onStartPreset: (String) -> Unit = {},
@@ -77,6 +84,7 @@ fun MobilityScreen(
             showSafety = showSafety,
             onToggleSafety = { showSafety = !showSafety },
             onStartRoutine = onStartRoutine,
+            exerciseMedia = exerciseMedia,
         )
     } else {
         MobilityPlayer(
@@ -84,6 +92,7 @@ fun MobilityScreen(
             session = session,
             planId = planId,
             dayId = dayId,
+            exerciseMedia = exerciseMedia,
             onFinishMobility = onFinishMobility,
             onTogglePause = onTogglePause,
             onPreviousMovement = onPreviousMovement,
@@ -128,6 +137,7 @@ private fun MobilityRoutineList(
     showSafety: Boolean,
     onToggleSafety: () -> Unit,
     onStartRoutine: (MobilityRoutine) -> Unit,
+    exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
 ) {
     Scaffold(
         topBar = {
@@ -190,6 +200,16 @@ private fun MobilityRoutineList(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        val cover = routine.movements.firstOrNull { movement ->
+                            movement.catalogId?.let { exerciseMedia[it]?.imageUrl } != null
+                        }
+                        if (cover != null) {
+                            ExerciseImage(
+                                imageUrl = cover.catalogId?.let { exerciseMedia[it]?.imageUrl },
+                                exerciseName = cover.name,
+                                size = 56.dp,
+                            )
+                        }
                         Text(routine.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(routine.description, style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -216,6 +236,7 @@ private fun MobilityPlayer(
     session: MobilitySessionState,
     planId: Long,
     dayId: Long,
+    exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     onFinishMobility: (planId: Long, dayId: Long, routineId: String, elapsedSeconds: Long) -> Unit,
     onTogglePause: () -> Unit,
     onPreviousMovement: () -> Unit,
@@ -266,6 +287,12 @@ private fun MobilityPlayer(
                         Text(
                             movement.cue,
                             style = MaterialTheme.typography.bodyLarge,
+                        )
+                        ExerciseImage(
+                            imageUrl = movement.catalogId?.let { exerciseMedia[it]?.imageUrl },
+                            exerciseName = movement.name,
+                            size = 160.dp,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                     }
                     if (session.inTransition) {
@@ -329,6 +356,11 @@ private fun MobilityPlayer(
                     modifier = Modifier.weight(1f),
                     enabled = session.running,
                 ) {
+                    Icon(
+                        imageVector = if (session.running && !session.paused) AppIcons.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
                     Text(
                         when {
                             session.running && !session.paused -> "Pausar"
@@ -347,6 +379,13 @@ private fun MobilityPlayer(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
+                    if (session.inTransition || !isLast) {
+                        Icon(
+                            imageVector = AppIcons.SkipNext,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
+                    }
                     Text(
                         when {
                             session.inTransition -> "Pular"

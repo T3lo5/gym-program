@@ -3,9 +3,9 @@ package com.treinos.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,12 +19,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.equipmentLabel
+import com.treinos.app.ui.muscleLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,31 +68,43 @@ fun ExerciseDetailSheet(
             }
 
             val imageUrl = media?.imageUrl
-            if (!imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "Imagem do exercício ${media.name.ifBlank { "exercício" }}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .size(240.dp),
-                    contentScale = ContentScale.Fit,
+            val imageModifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(MaterialTheme.shapes.small)
+            if (imageUrl.isNullOrBlank()) {
+                ExerciseImageFallback(
+                    exerciseName = media?.name.orEmpty(),
+                    size = 240.dp,
+                    modifier = imageModifier,
                 )
             } else {
-                ExerciseImage(
-                    imageUrl = null,
-                    exerciseName = media?.name.orEmpty(),
+                val context = LocalContext.current
+                val request = remember(imageUrl) {
+                    ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build()
+                }
+                SubcomposeAsyncImage(
+                    model = request,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(),
-                    size = 240.dp,
+                    modifier = imageModifier.semantics {
+                        contentDescription =
+                            "Imagem do exercício ${media?.name.orEmpty().ifBlank { "exercício" }}"
+                    },
+                    contentScale = ContentScale.Crop,
+                    loading = { ExerciseImageFallback(media?.name.orEmpty(), 240.dp) },
+                    error = { ExerciseImageFallback(media?.name.orEmpty(), 240.dp) },
                 )
             }
 
-            val muscles = media?.primaryMuscles?.joinToString(", ").orEmpty()
+            val muscles = media?.primaryMuscles?.joinToString(", ") { muscleLabel(it) }.orEmpty()
             if (muscles.isNotBlank()) {
                 Text(text = "Músculos principais: $muscles", style = MaterialTheme.typography.bodyMedium)
             }
             if (media != null && !media.equipment.isNullOrBlank()) {
-                Text(text = "Equipamento: ${media.equipment}", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "Equipamento: ${equipmentLabel(media.equipment)}", style = MaterialTheme.typography.bodyMedium)
             }
 
             Text(text = "Instruções", style = MaterialTheme.typography.titleMedium)

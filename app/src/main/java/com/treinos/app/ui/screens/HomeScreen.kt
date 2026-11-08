@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionWithExercises
@@ -240,7 +241,7 @@ fun HomeScreen(
                                 FilterChip(
                                     selected = option.plan.id == plan.plan.id,
                                     onClick = { onSelectPlan(option.plan.id) },
-                                    label = { Text(option.plan.name, maxLines = 1) },
+                                    label = { Text(option.plan.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     modifier = Modifier.minimumInteractiveComponentSize(),
                                 )
                             }
@@ -525,7 +526,7 @@ private fun HomeQuickAction(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -573,7 +574,6 @@ private fun ModalityDayCard(
                         text = day.day.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
                     )
                     if (isToday) {
                         TodayBadge()
@@ -590,7 +590,7 @@ private fun ModalityDayCard(
                                 }.joinToString(" • "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
                         SessionKind.MOBILITY -> {
@@ -599,7 +599,7 @@ private fun ModalityDayCard(
                                 text = "${day.exercises.size} rotina(s) • ${duration ?: 0} min",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
                         SessionKind.STRENGTH -> {
@@ -607,7 +607,7 @@ private fun ModalityDayCard(
                                 text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -647,21 +647,20 @@ private fun ModalityDayCard(
                                         text = exercise.exerciseName,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
                                     )
                                     if (exercise.targetReps.isNotBlank()) {
                                         Text(
                                             text = "${exercise.sets} séries × ${exercise.targetReps}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     } else if (exercise.sets > 0) {
                                         Text(
                                             text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     }
                                 }
@@ -782,6 +781,7 @@ private fun ActivePlanCard(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
@@ -917,7 +917,6 @@ private fun DayCard(
                         text = day.day.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
                     )
                     if (isToday) {
                         TodayBadge()
@@ -926,7 +925,7 @@ private fun DayCard(
                         text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -964,21 +963,20 @@ private fun DayCard(
                                         text = exercise.exerciseName,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
                                     )
                                     if (exercise.targetReps.isNotBlank()) {
                                         Text(
                                             text = "${exercise.sets} séries × ${exercise.targetReps}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     } else if (exercise.sets > 0) {
                                         Text(
                                             text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     }
                                 }

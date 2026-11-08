@@ -8,16 +8,22 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.Modifier
@@ -234,4 +240,83 @@ fun EmptyState(
 }
 
 fun exerciseHeadingDescription(name: String): String = exerciseContentDescription(name)
+
+/**
+ * Botão ocupado padrão (H3-32): spinner de 18 dp na cor do conteúdo
+ * ([LocalContentColor]) e texto de progresso, desabilitado enquanto [busy].
+ * Substitui as cópias manuais de `Row + CircularProgressIndicator + Text`.
+ */
+@Composable
+fun BusyButton(
+    busy: Boolean,
+    idleText: String,
+    busyText: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !busy,
+        modifier = modifier.minimumInteractiveComponentSize(),
+    ) {
+        if (busy) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(busyText)
+        } else {
+            Text(idleText)
+        }
+    }
+}
+
+/**
+ * Mensagem de status com semântica visual (H3-32): sucesso em `primary` com
+ * check, erro em `error` com alerta — antes ambas eram idênticas em `primary`.
+ */
+@Composable
+fun StatusText(
+    text: String,
+    isSuccess: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val color = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Row(
+        modifier = modifier.semantics(mergeDescendants = true) { },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = if (isSuccess) Icons.Default.Check else Icons.Default.Warning,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+        )
+    }
+}
+
+/**
+ * Convenção de classificação das mensagens de Ajustes (H3-32): só os prefixos
+ * de sucesso conhecidos são verdes; qualquer outra mensagem (falha de rede,
+ * dado ausente, validação) é erro. Pura para poder ser testada em JVM.
+ */
+fun statusIsSuccess(message: String): Boolean =
+    SUCCESS_PREFIXES.any { message.startsWith(it) }
+
+private val SUCCESS_PREFIXES = listOf(
+    "Conectado",
+    "Enviado:",
+    "Restaurado:",
+    "Backup importado",
+    "Catálogo atualizado",
+)
 

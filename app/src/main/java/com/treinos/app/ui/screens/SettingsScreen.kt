@@ -44,8 +44,11 @@ import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.UiError
+import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
+import com.treinos.app.ui.components.StatusText
+import com.treinos.app.ui.components.statusIsSuccess
 import com.treinos.app.ui.formatIsoDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -205,31 +208,19 @@ fun SettingsScreen(
                         ) {
                             Text("Salvar")
                         }
-                        Button(
+                        BusyButton(
+                            busy = isTesting,
+                            idleText = "Testar conexão",
+                            busyText = "Testando…",
                             onClick = {
                                 onSaveUrl(url)
                                 onTest()
                             },
-                            enabled = !isTesting,
-                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                        ) {
-                            if (isTesting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                            } else {
-                                Text("Testar conexão")
-                            }
-                        }
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     connectionMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                     Text(
                         text = "ID deste aparelho: $deviceId",
@@ -324,30 +315,19 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                             } else {
-                                Button(
+                                BusyButton(
+                                    busy = isConnectingBackend,
+                                    idleText = "Conectar",
+                                    busyText = "Conectando…",
                                     onClick = { onConnectBackend(backend) },
-                                    enabled = !isConnectingBackend && !isDiscovering,
-                                ) {
-                                    if (isConnectingBackend) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                    } else {
-                                        Text("Conectar")
-                                    }
-                                }
+                                    enabled = !isDiscovering,
+                                )
                             }
                         }
                     }
 
                     discoveryMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                 }
             }
@@ -377,33 +357,15 @@ fun SettingsScreen(
                         text = "Último envio: ${formatIsoDateTime(lastSyncAt) ?: "nunca"}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(
+                    BusyButton(
+                        busy = isSyncing,
+                        idleText = "Enviar ao backend",
+                        busyText = "Enviando…",
                         onClick = onSync,
-                        enabled = !isSyncing,
-                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            if (isSyncing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                )
-                                Text("Enviando…")
-                            } else {
-                                Text("Enviar ao backend")
-                            }
-                        }
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     syncMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                     // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
                     syncError?.let { uiError ->
@@ -413,33 +375,15 @@ fun SettingsScreen(
                             onRetry = if (uiError.retryLabel != null) onRetrySync else null,
                         )
                     }
-                    Button(
+                    BusyButton(
+                        busy = isDownloading,
+                        idleText = "Restaurar do backend",
+                        busyText = "Baixando…",
                         onClick = { showDownloadConfirm = true },
-                        enabled = !isDownloading,
-                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            if (isDownloading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                )
-                                Text("Baixando…")
-                            } else {
-                                Text("Restaurar do backend")
-                            }
-                        }
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     downloadMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                     // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
                     downloadError?.let { uiError ->
@@ -486,33 +430,16 @@ fun SettingsScreen(
                         }),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Button(
+                    BusyButton(
+                        busy = isRestoring,
+                        idleText = "Restaurar",
+                        busyText = "Restaurando…",
                         onClick = { showRestoreConfirm = true },
-                        enabled = restoreDeviceId.isNotBlank() && !isRestoring,
-                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            if (isRestoring) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                )
-                                Text("Restaurando…")
-                            } else {
-                                Text("Restaurar")
-                            }
-                        }
-                    }
+                        enabled = restoreDeviceId.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     restoreMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                 }
             }
@@ -534,11 +461,7 @@ fun SettingsScreen(
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
                         catalogMessage?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                            StatusText(text = it, isSuccess = statusIsSuccess(it))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
@@ -584,36 +507,20 @@ fun SettingsScreen(
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Button(
+                        BusyButton(
+                            busy = backupImportState is BackupImportState.Importing,
+                            idleText = "Exportar backup",
+                            busyText = "Exportando…",
                             onClick = onExportBackup,
-                            enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                        ) {
-                            if (backupImportState is BackupImportState.Importing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                            } else {
-                                Text("Exportar backup")
-                            }
-                        }
-                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                        )
+                        BusyButton(
+                            busy = backupImportState is BackupImportState.Importing,
+                            idleText = "Importar backup",
+                            busyText = "Importando…",
                             onClick = onImportFileSelected,
-                            enabled = backupImportState !is BackupImportState.Importing,
-                            modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                        ) {
-                            if (backupImportState is BackupImportState.Importing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                            } else {
-                                Text("Importar backup")
-                            }
-                        }
+                            modifier = Modifier.weight(1f),
+                        )
                     }
 
                     when (val state = backupImportState) {
@@ -662,11 +569,7 @@ fun SettingsScreen(
                     }
 
                     backupMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        StatusText(text = it, isSuccess = statusIsSuccess(it))
                     }
                 }
             }

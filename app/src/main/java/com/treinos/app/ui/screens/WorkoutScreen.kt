@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -655,6 +656,14 @@ private fun ExerciseCard(
                 onClick = if (completed) onNextExercise else onLogSet,
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             ) {
+                // H3-32: ícone de add na ação principal de registrar série.
+                if (!completed) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
                 // H3-27: cumprido o planejado, o botão avança em vez de empilhar
                 // séries extras sem sinalizar.
                 Text(
