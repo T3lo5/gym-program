@@ -144,7 +144,7 @@ class HistoryScreenTest {
         cardSessao().performClick()
         composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Série 1", substring = true, useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("10 reps • 40 kg • RPE 8", substring = true, useUnmergedTree = true)
+        composeRule.onNodeWithText("10 reps • 40,0 kg • RPE 8,0", substring = true, useUnmergedTree = true)
             .assertExists()
 
         cardSessao().performClick()

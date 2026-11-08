@@ -1,12 +1,16 @@
 package com.treinos.app.ui
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -80,8 +84,15 @@ internal val TreinosShapes = Shapes(
 
 @Composable
 fun TreinosTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val colorScheme = when {
+        Build.VERSION.SDK_INT >= 31 && isSystemInDarkTheme() -> dynamicDarkColorScheme(context)
+        Build.VERSION.SDK_INT >= 31 -> dynamicLightColorScheme(context)
+        isSystemInDarkTheme() -> DarkColors
+        else -> LightColors
+    }
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = TreinosTypography,
         shapes = TreinosShapes,
         content = content,

@@ -36,7 +36,7 @@ import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
 import com.treinos.app.ui.RunPlanTarget
 import com.treinos.app.ui.UiState
-import com.treinos.app.ui.formatRunPace
+import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatRunPlanTarget
 import com.treinos.app.ui.parseDraftNumber
 import com.treinos.app.ui.parseDistanceKm
@@ -141,7 +141,7 @@ private fun RunWorkoutForm(
         } else {
             result.error
         }
-        pace = result.paceSecondsPerKm?.let { formatRunPace(it) }
+        pace = formatPacePerKm(dur.toLong() * 60, km?.let { it * 1000.0 })
     }
 
     Scaffold(

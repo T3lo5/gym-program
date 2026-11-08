@@ -173,3 +173,17 @@ fun formatVolumeKg(volumeKg: Double): String {
     val tonsTenths = (volumeKg / 100.0).roundToLong()
     return "${groupThousands(tonsTenths / 10)},${tonsTenths % 10} t"
 }
+
+/**
+ * Número decimal com locale fixo pt-BR: independente do locale do aparelho,
+ * sempre usa vírgula como separador decimal (ex.: `formatDecimal(7.5, 1)` = "7,5").
+ */
+fun formatDecimal(value: Double, casas: Int): String =
+    String.format(ptBr, "%." + casas + "f", value)
+
+/**
+ * Carga em kg com locale fixo pt-BR (ex.: `formatKg(62.5)` = "62,5 kg");
+ * `null` vira "—".
+ */
+fun formatKg(value: Double?): String =
+    value?.let { "${formatDecimal(it, 1)} kg" } ?: "—"

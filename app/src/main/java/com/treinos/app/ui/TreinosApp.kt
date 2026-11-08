@@ -1,5 +1,6 @@
 package com.treinos.app.ui
 
+import android.animation.ValueAnimator
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageInfo
@@ -9,6 +10,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -192,7 +198,41 @@ fun TreinosApp(viewModel: AppViewModel) {
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            AnimatedContent(targetState = screen, label = "screen") { targetScreen ->
+            AnimatedContent(
+                targetState = screen,
+                label = "screen",
+                transitionSpec = {
+                    val duration = motionDurationMillis(ValueAnimator.getDurationScale())
+                    val motion = if (initialState == null) {
+                        ScreenMotion.NONE
+                    } else {
+                        motionFor(initialState, targetState)
+                    }
+                    val enter = when (motion) {
+                        ScreenMotion.FORWARD -> slideIntoContainer(
+                            towards = SlideDirection.Right,
+                            animationSpec = tween(durationMillis = duration),
+                        )
+                        ScreenMotion.BACKWARD -> slideIntoContainer(
+                            towards = SlideDirection.Left,
+                            animationSpec = tween(durationMillis = duration),
+                        )
+                        ScreenMotion.NONE -> fadeIn(animationSpec = tween(durationMillis = duration))
+                    }
+                    val exit = when (motion) {
+                        ScreenMotion.FORWARD -> slideOutOfContainer(
+                            towards = SlideDirection.Left,
+                            animationSpec = tween(durationMillis = duration),
+                        )
+                        ScreenMotion.BACKWARD -> slideOutOfContainer(
+                            towards = SlideDirection.Right,
+                            animationSpec = tween(durationMillis = duration),
+                        )
+                        ScreenMotion.NONE -> fadeOut(animationSpec = tween(durationMillis = duration))
+                    }
+                    enter.togetherWith(exit)
+                },
+            ) { targetScreen ->
                 when (targetScreen) {
                 Screen.Home -> HomeScreen(
                     plan = plan,

@@ -76,6 +76,8 @@ import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.formatDecimal
+import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.progressStateDescription
@@ -307,13 +309,13 @@ fun WorkoutScreen(
             suggestion = progressionSuggestions[exercise.exercise.exerciseId]
                 ?.takeIf { it.action != ProgressionAction.NONE },
             initialReps = last?.reps?.toString().orEmpty(),
-            initialWeight = last?.weightKg?.let { formatWeight(it) }
+            initialWeight = last?.weightKg?.let { formatDecimal(it, 1) }
                 ?: progressionSuggestions[exercise.exercise.exerciseId]
                     ?.takeIf { it.action != ProgressionAction.NONE }
                     ?.suggestedWeightKg
-                    ?.let { formatWeight(it) }
+                    ?.let { formatDecimal(it, 1) }
                     .orEmpty(),
-            initialRpe = last?.rpe?.let { formatWeight(it) }.orEmpty(),
+            initialRpe = last?.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
             confirmLabel = "Salvar série",
             onDelete = null,
             onDismiss = { exerciseToLogId = null },
@@ -331,8 +333,8 @@ fun WorkoutScreen(
             helper = "Corrija o que você fez: a série já registrada é atualizada no lugar.",
             suggestion = null,
             initialReps = set.reps?.toString().orEmpty(),
-            initialWeight = set.weightKg?.let { formatWeight(it) }.orEmpty(),
-            initialRpe = set.rpe?.let { formatWeight(it) }.orEmpty(),
+            initialWeight = set.weightKg?.let { formatDecimal(it, 1) }.orEmpty(),
+            initialRpe = set.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
             confirmLabel = "Salvar alterações",
             onDelete = { setToDelete = set },
             onDismiss = { editSetId = null },
@@ -615,11 +617,11 @@ private fun ExerciseCard(
                                     set.reps?.let { append("$it reps") }
                                     set.weightKg?.let {
                                         if (isNotEmpty()) append(" • ")
-                                        append("${formatWeight(it)} kg")
+                                        append(formatKg(it))
                                     }
                                     set.rpe?.let {
                                         if (isNotEmpty()) append(" • ")
-                                        append("RPE ${formatWeight(it)}")
+                                        append("RPE ${formatDecimal(it, 1)}")
                                     }
                                     if (isEmpty()) append("registrada")
                                 },
@@ -688,9 +690,9 @@ private fun exerciseIsCompleted(exercise: SessionExerciseWithSets): Boolean =
 
 /** Rótulo da última série: "60 kg × 10", "10 reps" ou "60 kg"; `null` sem dados. */
 private fun lastSetLabel(set: SetLogEntity): String? = when {
-    set.weightKg != null && set.reps != null -> "${formatWeight(set.weightKg)} kg × ${set.reps}"
+    set.weightKg != null && set.reps != null -> "${formatKg(set.weightKg)} × ${set.reps}"
     set.reps != null -> "${set.reps} reps"
-    set.weightKg != null -> "${formatWeight(set.weightKg)} kg"
+    set.weightKg != null -> formatKg(set.weightKg)
     else -> null
 }
 
@@ -821,16 +823,10 @@ private fun SetDialog(
 /** Texto de apoio do motor de progressão; `null` quando não há o que sugerir. */
 private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
     if (suggestion == null || suggestion.action == ProgressionAction.NONE) return null
-    val weight = suggestion.suggestedWeightKg?.let { "${formatWeight(it)} kg" }
+    val weight = suggestion.suggestedWeightKg?.let { formatKg(it) }
     val reps = if (weight == null) suggestion.suggestedReps?.let { "$it repetições" } else null
     val target = weight ?: reps ?: return null
     return "Sugestão: $target — ${suggestion.reason}"
-}
-
-private fun formatWeight(value: Double): String {
-    val rounded = value.toLong()
-    return if (value == rounded.toDouble()) rounded.toString()
-    else String.format("%.1f", value)
 }
 
 private fun formatSeconds(seconds: Int): String {

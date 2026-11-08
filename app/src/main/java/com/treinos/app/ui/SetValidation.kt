@@ -89,7 +89,7 @@ private fun validateWeightText(weightText: String): String? {
     return if (weight > 0.0 && weight <= MAX_SET_WEIGHT_KG) {
         null
     } else {
-        "A carga deve ser maior que 0 e até ${formatKg(MAX_SET_WEIGHT_KG)} kg."
+        "A carga deve ser maior que 0 e até ${formatKg(MAX_SET_WEIGHT_KG)}."
     }
 }
 
@@ -107,7 +107,3 @@ private fun validateRpeText(rpeText: String): String? {
 /** Verdadeiro quando o texto tem mais de um dígito depois do separador. */
 private fun hasMoreThanOneDecimal(text: String): Boolean =
     text.trim().replace(',', '.').substringAfter('.', "").length > 1
-
-private fun formatKg(value: Double): String =
-    if (value == value.toLong().toDouble()) value.toLong().toString()
-    else String.format("%.1f", value)

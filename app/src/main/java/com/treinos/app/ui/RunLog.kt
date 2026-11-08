@@ -51,10 +51,6 @@ fun validateRunLog(input: RunLogInput): RunLogValidation {
     return RunLogValidation(valid = true, error = null, paceSecondsPerKm = pace)
 }
 
-fun formatRunPace(paceSecondsPerKm: Int?): String? = paceSecondsPerKm?.let {
-    "${it / 60}:${(it % 60).toString().padStart(2, '0')}/km"
-}
-
 /**
  * H3-31: o campo "Distância (km)" aceita vírgula ou ponto e no máximo uma
  * casa decimal. Vazio = sem distância (campo opcional); texto inválido,

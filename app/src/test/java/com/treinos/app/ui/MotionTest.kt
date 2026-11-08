@@ -27,6 +27,16 @@ class MotionTest {
     }
 
     @Test
+    fun forward_desliza_da_direita() {
+        assertEquals(ScreenMotion.FORWARD, motionFor(Screen.Home, Screen.History))
+    }
+
+    @Test
+    fun backward_desliza_da_esquerda() {
+        assertEquals(ScreenMotion.BACKWARD, motionFor(Screen.History, Screen.Home))
+    }
+
+    @Test
     fun escala_zero_desliga_animacao() {
         assertEquals(0, motionDurationMillis(0f))
     }

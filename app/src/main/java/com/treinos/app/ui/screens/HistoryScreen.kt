@@ -69,8 +69,10 @@ import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDateShort
+import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
+import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.formatMonthYear
 import com.treinos.app.ui.formatPacePer100m
 import com.treinos.app.ui.formatPacePerKm
@@ -531,7 +533,7 @@ private fun ActivityCard(
         add(formatDuration(session.totalDurationSeconds))
         distance?.let { add(it) }
         pace?.let { add(it) }
-        session.sessionRpe?.let { add("RPE ${trimNumber(it)}") }
+        session.sessionRpe?.let { add("RPE ${formatDecimal(it, 1)}") }
     }.joinToString(" • ")
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -710,8 +712,8 @@ private fun SessionCard(
                                             text = buildString {
                                                 append("Série ${set.setNumber}")
                                                 set.reps?.let { append(" • $it reps") }
-                                                set.weightKg?.let { append(" • ${trimNumber(it)} kg") }
-                                                set.rpe?.let { append(" • RPE ${trimNumber(it)}") }
+                                                set.weightKg?.let { append(" • ${formatKg(it)}") }
+                                                set.rpe?.let { append(" • RPE ${formatDecimal(it, 1)}") }
                                             },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -725,10 +727,4 @@ private fun SessionCard(
             }
         }
     }
-}
-
-private fun trimNumber(value: Double): String {
-    val rounded = value.toLong()
-    return if (value == rounded.toDouble()) rounded.toString()
-    else String.format("%.1f", value)
 }

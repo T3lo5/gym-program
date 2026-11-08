@@ -162,7 +162,7 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("Série 1").performClick()
         composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
 
-        campoDeTexto("60").performTextReplacement("62,5")
+        campoDeTexto("60,0").performTextReplacement("62,5")
         composeRule.onNodeWithText("Salvar alterações").performClick()
 
         assertEquals(Triple(10, 62.5, null), atualizada)
@@ -180,7 +180,7 @@ class WorkoutScreenTest {
 
         composeRule.onNodeWithText("Série 1").performClick()
         composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
-        campoDeTexto("60").performTextReplacement("6.0.5")
+        campoDeTexto("60,0").performTextReplacement("6.0.5")
         composeRule.onNodeWithText("Salvar alterações").performClick()
 
         composeRule.onNodeWithText("Informe a carga como número, usando vírgula ou ponto.").assertIsDisplayed()
@@ -208,7 +208,7 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("Série 2 — Supino reto").assertIsDisplayed()
 
         campoDeTexto("10").performTextReplacement("12")
-        campoDeTexto("60").performTextReplacement("62,5")
+        campoDeTexto("60,0").performTextReplacement("62,5")
 
         composeRule.onNodeWithText("12").assertIsDisplayed()
         composeRule.onNodeWithText("62,5").assertIsDisplayed()

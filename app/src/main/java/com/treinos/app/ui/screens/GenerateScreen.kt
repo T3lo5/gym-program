@@ -53,6 +53,7 @@ import com.treinos.app.ui.GenerateConfig
 import com.treinos.app.ui.ModalityDraft
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.UiError
+import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ErrorState
@@ -781,7 +782,7 @@ fun GenerateScreen(
                                 }
                                 if (savedBodyWeightKg != null && savedHeightCm != null) {
                                     val bmi = savedBodyWeightKg / ((savedHeightCm / 100.0) * (savedHeightCm / 100.0))
-                                    Text(text = "IMC: ${"%.1f".format(bmi)}", style = MaterialTheme.typography.bodyMedium)
+                                    Text(text = "IMC: ${formatDecimal(bmi, 1)}", style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
                         }

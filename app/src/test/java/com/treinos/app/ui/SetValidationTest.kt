@@ -72,7 +72,7 @@ class SetValidationTest {
         val result = valido(weight = "500,5")
 
         val errors = (result as SetInputValidation.Invalid).errors
-        assertEquals("A carga deve ser maior que 0 e até 500 kg.", errors.weight)
+        assertEquals("A carga deve ser maior que 0 e até 500,0 kg.", errors.weight)
         // Teto exato aceito.
         assertTrue(valido(weight = "500") is SetInputValidation.Valid)
     }
@@ -83,7 +83,7 @@ class SetValidationTest {
 
         assertTrue(result is SetInputValidation.Invalid)
         assertEquals(
-            "A carga deve ser maior que 0 e até 500 kg.",
+            "A carga deve ser maior que 0 e até 500,0 kg.",
             (result as SetInputValidation.Invalid).errors.weight,
         )
     }

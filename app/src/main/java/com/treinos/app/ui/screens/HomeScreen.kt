@@ -66,6 +66,7 @@ import com.treinos.app.ui.TodaySession
 import com.treinos.app.ui.defaultModalityTab
 import com.treinos.app.ui.groupSessionsByModality
 import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
 import com.treinos.app.ui.formatPacePerKm
@@ -1013,7 +1014,7 @@ private fun ActivitySummaryCard(session: SessionWithExercises) {
         add(formatDuration(session.session.totalDurationSeconds))
         distance?.let { add(it) }
         pace?.let { add(it) }
-        session.session.sessionRpe?.let { add("RPE ${trimNumber(it)}") }
+        session.session.sessionRpe?.let { add("RPE ${formatDecimal(it, 1)}") }
     }.joinToString(" • ")
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -1033,10 +1034,4 @@ private fun ActivitySummaryCard(session: SessionWithExercises) {
             )
         }
     }
-}
-
-private fun trimNumber(value: Double): String {
-    val rounded = value.toLong()
-    return if (value == rounded.toDouble()) rounded.toString()
-    else String.format("%.1f", value)
 }
