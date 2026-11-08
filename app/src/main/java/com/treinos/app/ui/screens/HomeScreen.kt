@@ -1,22 +1,34 @@
 package com.treinos.app.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -34,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -48,6 +61,7 @@ import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.SessionKind
+import com.treinos.app.ui.TodaySession
 import com.treinos.app.ui.defaultModalityTab
 import com.treinos.app.ui.groupSessionsByModality
 import com.treinos.app.ui.formatDateTime
@@ -61,6 +75,7 @@ import com.treinos.app.ui.planVolumeLabel
 import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
+import com.treinos.app.ui.todaySessionSelector
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
@@ -100,6 +115,11 @@ fun HomeScreen(
     }
     var selectedTab by remember(plan) { mutableStateOf<ModalityTab?>(defaultTab) }
     var showDeletePlanDialog by remember { mutableStateOf(false) }
+    var showPlanMenu by remember { mutableStateOf(false) }
+    // H3-28: o treino de hoje vem de um seletor puro (testável em JVM).
+    val todaySession = remember(plan, todayWeekday) {
+        plan?.let { todaySessionSelector(it.days, todayWeekday) }
+    }
 
     Scaffold(
         topBar = {
@@ -154,14 +174,51 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                item { HomeQuickActions(onGenerate, onLogActivity, onOpenMobility) }
+
+                // H3-28: os parágrafos de rodapé só fazem sentido no empty state.
+                item {
+                    Text(
+                        text = "Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                item {
+                    Text(
+                        text = "Rotinas curtas de mobilidade/alongamento para bem-estar e recuperação.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                item {
+                    Text(
+                        text = "Os treinos e as séries ficam salvos apenas neste aparelho. " +
+                            "O backend só recebe dados quando você toca em Sincronizar, em Ajustes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
-                if (plans.size > 1) {
+                // H3-28: herói do dia logo após o InProgressCard — o treino de
+                // hoje fica acima da dobra, com ação direta.
+                if (todaySession != null) {
+                    item { TodayHeroCard(todaySession, onStartDay) }
+                }
+
+                item { HomeQuickActions(onGenerate, onLogActivity, onOpenMobility) }
+
+                if (plans.size > 1 || plan.plan.kind == "extra") {
                     item {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             plans.forEach { option ->
                                 FilterChip(
@@ -171,25 +228,43 @@ fun HomeScreen(
                                     modifier = Modifier.minimumInteractiveComponentSize(),
                                 )
                             }
+                            // H3-28: ação destrutiva sai do corpo da lista e vai
+                            // para o overflow do seletor (a confirmação se mantém).
+                            if (plan.plan.kind == "extra") {
+                                Box {
+                                    IconButton(
+                                        onClick = { showPlanMenu = true },
+                                        modifier = Modifier.minimumInteractiveComponentSize(),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.MoreVert,
+                                            contentDescription = "Mais opções do plano",
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showPlanMenu,
+                                        onDismissRequest = { showPlanMenu = false },
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    "Excluir plano complementar",
+                                                    color = MaterialTheme.colorScheme.error,
+                                                )
+                                            },
+                                            onClick = {
+                                                showPlanMenu = false
+                                                showDeletePlanDialog = true
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
                 item { ActivePlanCard(plan) }
-
-                if (plan.plan.kind == "extra") {
-                    item {
-                        TextButton(
-                            onClick = { showDeletePlanDialog = true },
-                            modifier = Modifier.minimumInteractiveComponentSize(),
-                        ) {
-                            Text(
-                                text = "Excluir plano complementar",
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                }
 
                 if (reviewIsDue(plan.plan.nextReviewAt)) {
                     item {
@@ -237,6 +312,7 @@ fun HomeScreen(
                         ModalityDayCard(
                             day = day,
                             exerciseMedia = exerciseMedia,
+                            isToday = day.day.weekday == todayWeekday,
                             onStart = { onStartDay(day.day.id) },
                         )
                     }
@@ -246,6 +322,7 @@ fun HomeScreen(
                         DayCard(
                             day = day,
                             exerciseMedia = exerciseMedia,
+                            isToday = day.day.weekday == todayWeekday,
                             onStart = { onStartDay(day.day.id) },
                         )
                     }
@@ -261,66 +338,8 @@ fun HomeScreen(
                     }
                 }
 
-                item {
-                    OutlinedButton(
-                        onClick = onGenerate,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .minimumInteractiveComponentSize(),
-                    ) {
-                        Text("Gerar novo treino")
-                    }
-                }
-            }
-
-            item {
-                OutlinedButton(
-                    onClick = onLogActivity,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .minimumInteractiveComponentSize(),
-                ) {
-                    Text("Registrar atividade")
-                }
-            }
-
-            item {
-                OutlinedButton(
-                    onClick = onOpenMobility,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .minimumInteractiveComponentSize(),
-                ) {
-                    Text("Mobilidade e alongamento")
-                }
-            }
-
-            item {
-                Text(
-                    text = "Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            item {
-                Text(
-                    text = "Rotinas curtas de mobilidade/alongamento para bem-estar e recuperação.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            item {
-                Text(
-                    text = "Os treinos e as séries ficam salvos apenas neste aparelho. " +
-                        "O backend só recebe dados quando você toca em Sincronizar, em Ajustes.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+                // H3-28: com plano ativo, a Home termina na lista do dia —
+                // sem botões empilhados e sem parágrafos de rodapé.
             }
         }
     }
@@ -366,10 +385,157 @@ private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
     SessionKind.MOBILITY -> ModalityTab.MOBILITY
 }
 
+/** Resumo curto do herói "Hoje", por modalidade. */
+private fun todayHeroSubtitle(day: WorkoutDayWithExercises): String =
+    when (SessionKind.fromModality(day.day.modality)) {
+        SessionKind.RUN -> "Corrida • ${day.exercises.size} bloco(s)"
+        SessionKind.MOBILITY -> "Mobilidade • ${day.exercises.size} rotina(s)"
+        SessionKind.STRENGTH ->
+            "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}"
+    }
+
+/**
+ * H3-28: card-herói do dia. Com sessão hoje, mostra o nome e "Iniciar" direto;
+ * em dia de descanso, aponta a próxima sessão do plano.
+ */
+@Composable
+private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            when (today) {
+                is TodaySession.Today -> {
+                    Text(
+                        text = "Hoje — ${today.day.day.name}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = todayHeroSubtitle(today.day),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Button(
+                        onClick = { onStartDay(today.day.day.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Iniciar")
+                    }
+                }
+                is TodaySession.Next -> {
+                    Text(
+                        text = "Hoje é descanso",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = "Próximo: ${today.day.day.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                TodaySession.Rest -> Unit
+            }
+        }
+    }
+}
+
+/** H3-28: ações secundárias em uma única linha compacta (ícone + rótulo curto). */
+@Composable
+private fun HomeQuickActions(
+    onGenerate: () -> Unit,
+    onLogActivity: () -> Unit,
+    onOpenMobility: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HomeQuickAction(
+            label = "Novo treino",
+            icon = Icons.Default.Add,
+            onClick = onGenerate,
+            modifier = Modifier.weight(1f),
+        )
+        HomeQuickAction(
+            label = "Atividade",
+            icon = Icons.Default.Edit,
+            onClick = onLogActivity,
+            modifier = Modifier.weight(1f),
+        )
+        HomeQuickAction(
+            label = "Alongamento",
+            icon = Icons.Default.Favorite,
+            onClick = onOpenMobility,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun HomeQuickAction(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** H3-28: marca o card do dia de hoje na lista de sessões. */
+@Composable
+private fun TodayBadge() {
+    Box(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = "Hoje",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    }
+}
+
 @Composable
 private fun ModalityDayCard(
     day: WorkoutDayWithExercises,
     exerciseMedia: Map<String, ExerciseMedia>,
+    isToday: Boolean = false,
     onStart: () -> Unit,
 ) {
     val kind = SessionKind.fromModality(day.day.modality)
@@ -393,6 +559,9 @@ private fun ModalityDayCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                     )
+                    if (isToday) {
+                        TodayBadge()
+                    }
                     when (kind) {
                         SessionKind.RUN -> {
                             val distance = day.exercises.firstOrNull()?.targetDistanceMeters
@@ -583,9 +752,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
             .semantics(mergeDescendants = true) {
                 review?.let { stateDescription = reviewStateDescription(it, due) }
             },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+        // H3-28: card neutro — o destaque da tela passa a ser o herói de hoje.
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -605,7 +772,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
             Text(
                 text = if (entity.source == "ai") "Gerado com IA" else "Gerado localmente",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (review != null) {
                 Text(
@@ -617,7 +784,7 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = if (due) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onPrimaryContainer,
+                    else MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -704,6 +871,7 @@ private fun DeloadNoticeCard(week: Int, onDismiss: () -> Unit) {
 private fun DayCard(
     day: WorkoutDayWithExercises,
     exerciseMedia: Map<String, ExerciseMedia>,
+    isToday: Boolean = false,
     onStart: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -726,6 +894,9 @@ private fun DayCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                     )
+                    if (isToday) {
+                        TodayBadge()
+                    }
                     Text(
                         text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
                         style = MaterialTheme.typography.bodySmall,

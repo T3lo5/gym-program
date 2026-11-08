@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-28` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-08` |
+| Implementação | `concluída em 2026-11-08` |
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P2.1, P2.5 e P2.7).
 
@@ -19,14 +19,14 @@ histórico, filtro e resultado ficam visíveis juntos.
 ## Contexto (estado atual verificado)
 
 - Ordem fixa da Home: InProgress → chips de plano → ActivePlanCard → revisão
-  → deload → TabRow → só então os DayCards (`HomeScreen.kt:121-247`) — o
+  → deload → TabRow → só então os DayCards (`HomeScreen.kt:122-251`) — o
   primeiro "Iniciar" fica após ~700+dp; nada marca "hoje".
 - `defaultModalityTab` cai na aba de **amanhã** quando hoje é descanso
   (`WeeklySchedule.kt:41-44`).
 - Home acumula ~15 itens: 3 `OutlinedButton` empilhados + 3 parágrafos
-  permanentes de rodapé (`HomeScreen.kt:259-319`); "Excluir plano
-  complementar" (destrutivo) no corpo da lista (`:175-187`); ActivePlanCard é
-  o card mais destacado (`primaryContainer`) e não é acionável (`:526-576`).
+  permanentes de rodapé (`HomeScreen.kt:264-324`); "Excluir plano
+  complementar" (destrutivo) no corpo da lista (`:180-192`); ActivePlanCard é
+  o card mais destacado (`primaryContainer`) e não é acionável (`:574-625`).
 - Histórico: chips de modalidade e chip do dia vêm **depois** de calendário +
   4 métricas + volume (`HistoryScreen.kt:148-255`) — tocar num dia não muda
   nada na área visível.
@@ -46,17 +46,19 @@ histórico, filtro e resultado ficam visíveis juntos.
 
 ## Modelo de dados / contrato
 
-Sem mudança de dados. `todaySessionSelector(plan, weekday, tabKind)` puro
-retorna `Today` (dia/índice), `Next(day)` ou `Rest(nextDay)` — consumido pela
-Home e pela escolha de aba inicial.
+Sem mudança de dados. `todaySessionSelector(days, todayWeekday)` puro (em
+`WeeklySchedule.kt`) retorna `Today(day)`, `Next(day)` (próxima sessão futura,
+procurando dia a dia na semana com volta ao domingo) ou `Rest` (plano sem
+sessão em dia fixo) — consumido pela Home (herói) e por `defaultModalityTab`.
+Com `Rest` a Home não mostra herói: plano flexível não tem "hoje" para marcar.
 
 ## Regras e casos de borda
 
 - Card-herói "Hoje — <nome da sessão>" logo após o InProgressCard, com botão
   "Iniciar" direto; badge "Hoje" no DayCard correspondente.
-- Hoje é descanso → herói diz "Hoje é descanso — próximo: <dia>" (sem botão
-  de iniciar); `defaultModalityTab` passa a preferir a aba que contém hoje
-  quando hoje tem sessão; senão a próxima sessão futura.
+- Hoje é descanso → herói diz "Hoje é descanso" com "Próximo: <dia>" (sem
+  botão de iniciar); `defaultModalityTab` passa a preferir a aba que contém
+  hoje quando hoje tem sessão; senão a próxima sessão futura.
 - Ações secundárias ("Registrar atividade", "Mobilidade", "Gerar novo treino")
   em uma única Row de ações compactas (ícone + rótulo curto), no lugar dos 3
   botões empilhados.
@@ -89,7 +91,7 @@ Home e pela escolha de aba inicial.
 | Arquivo | Testes |
 |---|---|
 | `app/src/test/java/.../WeeklyScheduleTest.kt` | `aba_inicial_e_a_de_hoje`, `descanso_escolhe_proxima_sessao`, `heroi_hoje_descanso_com_proximo` |
-| `app/src/test/java/.../HomeScreenTest.kt` (Robolectric) | `heroi_hoje_visivel_sem_rolagem`, `badge_hoje_no_card`, `rodape_somente_sem_plano` |
+| `app/src/test/java/.../HomeScreenTest.kt` (Robolectric) | `heroi_hoje_visivel_sem_rolagem`, `badge_hoje_no_card`, `rodape_somente_sem_plano`, `rodape_no_empty_state` |
 | `app/src/test/java/.../HistoryScreenTest.kt` | `chips_antes_das_metricas`, `dia_selecionado_lista_primeiro` |
 
 ## Verificação manual

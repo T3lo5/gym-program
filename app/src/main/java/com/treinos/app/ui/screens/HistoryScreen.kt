@@ -169,26 +169,8 @@ fun HistoryScreen(
                     )
                 }
 
-                item {
-                    MetricsCards(metrics)
-                }
-
-                if (metrics.volumeByMuscle.isNotEmpty()) {
-                    item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            SectionTitle("Volume por músculo")
-                            metrics.volumeByMuscle.entries
-                                .sortedByDescending { it.value }
-                                .forEach { (muscle, volume) ->
-                                    KeyValueRow(label = muscle, value = formatVolumeKg(volume))
-                                }
-                        }
-                    }
-                }
-
+                // H3-28: chips logo após o calendário — filtrar muda o que está
+                // na área visível, sem rolar uma tela.
                 if (modalities.size > 1) {
                     item {
                         Row(
@@ -223,6 +205,15 @@ fun HistoryScreen(
                     }
                 }
 
+                if (selectedDate == null) {
+                    item {
+                        MetricsCards(metrics)
+                    }
+                    if (metrics.volumeByMuscle.isNotEmpty()) {
+                        item { VolumeByMuscle(metrics) }
+                    }
+                }
+
                 if (visible.isEmpty()) {
                     item {
                         Text(
@@ -239,22 +230,66 @@ fun HistoryScreen(
                 }
 
                 items(visible, key = { it.session.id }) { session ->
-                    if (session.session.source == MANUAL_SESSION_SOURCE) {
-                        ActivityCard(
-                            session = session.session,
-                            onEdit = { onEditActivity(session.session.id) },
-                            onDelete = { onDeleteActivity(session.session.id) },
-                        )
-                    } else {
-                        SessionCard(
-                            session = session,
-                            exerciseMedia = exerciseMedia,
-                            onOpenExerciseDetail = onOpenExerciseDetail,
-                        )
+                    HistorySessionRow(
+                        session = session,
+                        exerciseMedia = exerciseMedia,
+                        onOpenExerciseDetail = onOpenExerciseDetail,
+                        onEditActivity = onEditActivity,
+                        onDeleteActivity = onDeleteActivity,
+                    )
+                }
+
+                if (selectedDate != null) {
+                    // H3-28: com dia selecionado, a lista daquele dia vem antes
+                    // das métricas e do volume.
+                    item {
+                        MetricsCards(metrics)
+                    }
+                    if (metrics.volumeByMuscle.isNotEmpty()) {
+                        item { VolumeByMuscle(metrics) }
                     }
                 }
             }
         }
+    }
+}
+
+/** H3-28: ranking de volume por músculo, extraído para poder reordenar a tela. */
+@Composable
+private fun VolumeByMuscle(metrics: HistoryMetrics) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SectionTitle("Volume por músculo")
+        metrics.volumeByMuscle.entries
+            .sortedByDescending { it.value }
+            .forEach { (muscle, volume) ->
+                KeyValueRow(label = muscle, value = formatVolumeKg(volume))
+            }
+    }
+}
+
+@Composable
+private fun HistorySessionRow(
+    session: SessionWithExercises,
+    exerciseMedia: Map<String, ExerciseMedia>,
+    onOpenExerciseDetail: (String) -> Unit,
+    onEditActivity: (Long) -> Unit,
+    onDeleteActivity: (Long) -> Unit,
+) {
+    if (session.session.source == MANUAL_SESSION_SOURCE) {
+        ActivityCard(
+            session = session.session,
+            onEdit = { onEditActivity(session.session.id) },
+            onDelete = { onDeleteActivity(session.session.id) },
+        )
+    } else {
+        SessionCard(
+            session = session,
+            exerciseMedia = exerciseMedia,
+            onOpenExerciseDetail = onOpenExerciseDetail,
+        )
     }
 }
 

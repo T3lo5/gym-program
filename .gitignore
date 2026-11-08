@@ -113,6 +113,7 @@ scripts/*.log
 # ============================================================
 dist/
 .gradle-docker/
+.docker-config/
 back/.pytest_cache/
 back/tests/__pycache__/
 

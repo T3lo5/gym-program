@@ -8,6 +8,7 @@ import com.treinos.app.data.local.WorkoutPlanEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WeeklyScheduleTest {
@@ -132,6 +133,35 @@ class WeeklyScheduleTest {
     fun aba_padrao_sem_sessoes() {
         val tab = defaultModalityTab(emptyList(), 1)
         assertNull(tab)
+    }
+
+    @Test
+    fun aba_inicial_e_a_de_hoje() {
+        // H3-28: com sessão hoje, a aba inicial é a de hoje, não a de amanhã.
+        val todayWeekday = 2 // terça
+        val days = listOf(
+            day(2, 0, "strength"),
+            day(3, 0, "run"),
+        )
+        assertEquals(ModalityTab.STRENGTH, defaultModalityTab(days, todayWeekday))
+    }
+
+    @Test
+    fun descanso_escolhe_proxima_sessao() {
+        // Sábado descansa e o domingo também: a aba inicial é a da próxima
+        // sessão futura (segunda), não a primeira aba do plano.
+        val todayWeekday = 6
+        val days = listOf(day(1, 0, "strength"))
+        assertEquals(ModalityTab.STRENGTH, defaultModalityTab(days, todayWeekday))
+    }
+
+    @Test
+    fun heroi_hoje_descanso_com_proximo() {
+        val todayWeekday = 3 // quarta
+        val days = listOf(day(5, 0, "run"))
+        val heroi = todaySessionSelector(days, todayWeekday)
+        assertTrue(heroi is TodaySession.Next)
+        assertEquals("Dia 0", (heroi as TodaySession.Next).day.day.name)
     }
 
     @Test

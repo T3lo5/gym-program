@@ -2,13 +2,14 @@ package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayEntity
@@ -21,6 +22,7 @@ import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.SessionKind
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -88,6 +90,9 @@ class HomeScreenTest {
             )
         }
 
+        // H3-28: com o herói e as ações compactas acima das abas, elas podem
+        // ficar abaixo da dobra no viewport do Robolectric — rolar até elas.
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Academia"))
         composeRule.onNodeWithText("Academia").assertIsDisplayed()
         composeRule.onNodeWithText("Corrida").assertIsDisplayed()
         composeRule.onNodeWithText("Mobilidade").assertIsDisplayed()
@@ -109,7 +114,9 @@ class HomeScreenTest {
             )
         }
 
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Corrida"))
         composeRule.onNodeWithText("Corrida").performClick()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Corrida A"))
         composeRule.onNodeWithText("Corrida A").assertIsDisplayed()
     }
 
@@ -129,6 +136,7 @@ class HomeScreenTest {
             )
         }
 
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Academia"))
         composeRule.onNodeWithText("Academia").assertIsDisplayed()
         composeRule.onNodeWithText("Corrida").assertIsDisplayed()
 
@@ -161,10 +169,11 @@ class HomeScreenTest {
             )
         }
 
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Academia"))
         composeRule.onAllNodes(hasText("Academia") and hasClickAction()).onFirst().performClick()
         composeRule.waitForIdle()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Supino reto"))
         composeRule.onNodeWithText("Supino reto", useUnmergedTree = true)
-            .performScrollTo()
             .assertIsDisplayed()
         assertTrue(
             composeRule.onAllNodesWithContentDescription(
@@ -205,11 +214,119 @@ class HomeScreenTest {
             )
         }
 
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Corrida"))
         composeRule.onAllNodes(hasText("Corrida") and hasClickAction()).onFirst().performClick()
         composeRule.waitForIdle()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Corrida leve 30 min"))
         composeRule.onNodeWithText("Corrida leve 30 min", useUnmergedTree = true)
-            .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun heroi_hoje_visivel_sem_rolagem() {
+        // H3-28: com sessão hoje, o herói é o primeiro item da Home — visível
+        // sem rolar, no viewport padrão do Robolectric.
+        composeRule.setContent {
+            HomeScreen(
+                plan = planComSessaoHoje(),
+                inProgressSession = null,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Hoje — Treino A").assertIsDisplayed()
+        composeRule.onNodeWithText("Iniciar").assertIsDisplayed()
+    }
+
+    @Test
+    fun badge_hoje_no_card() {
+        composeRule.setContent {
+            HomeScreen(
+                plan = planComSessaoHoje(),
+                inProgressSession = null,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Treino A"))
+        composeRule.onNodeWithText("Treino A").assertIsDisplayed()
+        composeRule.onNodeWithText("Hoje").assertIsDisplayed()
+    }
+
+    @Test
+    fun rodape_somente_sem_plano() {
+        composeRule.setContent {
+            HomeScreen(
+                plan = plan,
+                inProgressSession = null,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+        composeRule.onNodeWithText("Atividade avulsa", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun rodape_no_empty_state() {
+        composeRule.setContent {
+            HomeScreen(
+                plan = null,
+                inProgressSession = null,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Atividade avulsa", substring = true))
+        composeRule.onNodeWithText("Atividade avulsa", substring = true).assertIsDisplayed()
+    }
+
+    /** Plano com sessão de musculação hoje e corrida amanhã, independente da data. */
+    private fun planComSessaoHoje(): WorkoutPlanWithDetails {
+        val hoje = LocalDate.now().dayOfWeek.value
+        return WorkoutPlanWithDetails(
+            plan = WorkoutPlanEntity(id = 3, name = "Plano de hoje", daysPerWeek = 2),
+            days = listOf(
+                day(
+                    weekday = hoje,
+                    dayOrder = 0,
+                    modality = "strength",
+                    exercises = listOf(
+                        exercise(id = "Barbell_Bench_Press", name = "Supino reto", order = 0),
+                    ),
+                ),
+                day(
+                    weekday = hoje % 7 + 1,
+                    dayOrder = 0,
+                    modality = "run",
+                    exercises = listOf(
+                        exercise(id = "run_easy_30", name = "Corrida leve 30 min", order = 0),
+                    ),
+                ),
+            ),
+        )
     }
 
     private fun exercise(id: String, name: String, order: Int): WorkoutPlanExerciseEntity =

@@ -5,8 +5,10 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
@@ -16,7 +18,10 @@ import com.treinos.app.ui.history.STATUS_COMPLETED
 import com.treinos.app.ui.screens.HistoryScreen
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,6 +88,23 @@ class HistoryScreenTest {
     /** Card expansível: único nó com a combinação "Treino A" + ação de clique. */
     private fun cardSessao() = composeRule.onNode(hasClickAction() and hasText("Treino A"))
 
+    /** Atividade avulsa de outra modalidade, para o seletor de modalidades aparecer. */
+    private val atividadeAvulsa = SessionWithExercises(
+        session = WorkoutSessionEntity(
+            id = 2,
+            planName = "",
+            dayName = "Caminhada",
+            status = STATUS_COMPLETED,
+            startedAt = millisOf(today),
+            endedAt = millisOf(today) + 1_800_000L,
+            totalDurationSeconds = 1800,
+            modality = "run",
+            source = MANUAL_SESSION_SOURCE,
+            title = "Caminhada",
+        ),
+        exercises = emptyList(),
+    )
+
     @Test
     fun mostra_estado_vazio() {
         var gerou = false
@@ -146,5 +168,41 @@ class HistoryScreenTest {
         composeRule.onNodeWithText("Outros", useUnmergedTree = true).assertExists()
         composeRule.onAllNodesWithText("400 kg", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithText("1h 00min", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun chips_antes_das_metricas() {
+        // H3-28: os chips de modalidade vêm logo após o calendário, antes das métricas.
+        composeRule.setContent {
+            HistoryScreen(
+                sessions = listOf(sessaoConcluida, atividadeAvulsa),
+                onBack = { },
+            )
+        }
+
+        val chipY = composeRule.onNodeWithText("Todas", useUnmergedTree = true)
+            .fetchSemanticsNode().positionInRoot.y
+        val metricasY = composeRule.onNodeWithText("Treinos", useUnmergedTree = true)
+            .fetchSemanticsNode().positionInRoot.y
+        assertTrue("chips devem vir antes das métricas", chipY < metricasY)
+    }
+
+    @Test
+    fun dia_selecionado_lista_primeiro() {
+        // H3-28: com um dia selecionado, a lista daquele dia vem antes das métricas.
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })
+        }
+
+        val formato = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("pt-BR"))
+        composeRule.onNodeWithContentDescription(
+            "${today.format(formato)}, 1 treino",
+            useUnmergedTree = true,
+        ).performClick()
+
+        val listaY = cardSessao().fetchSemanticsNode().positionInRoot.y
+        val metricasY = composeRule.onNodeWithText("Treinos", useUnmergedTree = true)
+            .fetchSemanticsNode().positionInRoot.y
+        assertTrue("lista do dia deve vir antes das métricas", listaY < metricasY)
     }
 }
