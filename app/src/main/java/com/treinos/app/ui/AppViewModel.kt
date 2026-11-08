@@ -52,6 +52,7 @@ import com.treinos.app.ui.progression.deloadSuggested
 import com.treinos.app.ui.progression.progressionHistory
 import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.progressText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -296,6 +297,26 @@ class AppViewModel(
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
+
+    /** Job da geração em curso; `cancelGenerate` o interrompe (H3-30). */
+    private var generateJob: Job? = null
+
+    /**
+     * H3-30: motivo do último fallback local, persistido em
+     * `last_fallback_reason`. Vazio = o último plano veio da IA. O selo do
+     * plano na Home cita este motivo até a próxima geração da IA.
+     */
+    private val _lastFallbackReason = MutableStateFlow(preferences.lastFallbackReason)
+    val lastFallbackReason: StateFlow<String> = _lastFallbackReason.asStateFlow()
+
+    /**
+     * H3-30: última configuração da tela "Gerar", restaurada na abertura.
+     * null = nenhuma config salva (a tela usa os defaults).
+     */
+    private val _generateConfig = MutableStateFlow(
+        GenerateConfigCodec.decode(preferences.generateConfigJson)
+    )
+    val generateConfig: StateFlow<GenerateConfig?> = _generateConfig.asStateFlow()
 
     private val _isReviewing = MutableStateFlow(false)
     val isReviewing: StateFlow<Boolean> = _isReviewing.asStateFlow()
@@ -628,6 +649,9 @@ class AppViewModel(
         sexChoice: String?,
         environment: String? = null,
         kind: String = "main",
+        // H3-30: configuração completa do formulário, persistida quando a
+        // geração é bem-sucedida e restaurada na próxima abertura da tela.
+        config: GenerateConfig? = null,
     ) {
         if (_isGenerating.value) return
         val args = GeneratePlanArgs(
@@ -644,10 +668,11 @@ class AppViewModel(
             sexChoice = sexChoice,
             environment = environment,
             kind = kind,
+            config = config,
         )
         lastGenerateArgs = args
         _generateError.value = null
-        viewModelScope.launch {
+        generateJob = viewModelScope.launch {
             _isGenerating.value = true
             try {
                 val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText, sexChoice)
@@ -720,6 +745,20 @@ class AppViewModel(
                     ),
                     kind = kind,
                 )
+                // H3-30: geração bem-sucedida persiste a configuração do
+                // formulário e o motivo do fallback (vazio quando veio da IA).
+                args.config?.let { config ->
+                    preferences.generateConfigJson = GenerateConfigCodec.encode(config)
+                    _generateConfig.value = config
+                }
+                val fallbackReason = if (response.source == "ai") {
+                    ""
+                } else {
+                    response.fallbackReason?.takeIf { it.isNotBlank() } ?: "unknown"
+                }
+                preferences.lastFallbackReason = fallbackReason
+                _lastFallbackReason.value = fallbackReason
+
                 _screen.value = Screen.Home
                 val source = if (response.source == "ai") "com IA" else "local"
                 val review = formatReviewDate(response.nextReviewAt) ?: response.nextReviewAt
@@ -727,6 +766,10 @@ class AppViewModel(
                 // H3-21: quando o plano veio do fallback local, a mensagem diz o porquê.
                 _message.value = fallbackReasonLabel(response.fallbackReason)
                     ?.let { motivo -> "$base Motivo: $motivo." } ?: base
+            } catch (error: CancellationException) {
+                // H3-30: cancelar não é erro — o overlay fecha e nada é salvo
+                // (o salvamento é @Transaction, então não fica plano pela metade).
+                throw error
             } catch (error: Exception) {
                 Log.w(TAG, "Falha ao gerar o treino", error)
                 _generateError.value = uiErrorFrom(error, "gerar o treino")
@@ -734,6 +777,16 @@ class AppViewModel(
                 _isGenerating.value = false
             }
         }
+    }
+
+    /**
+     * H3-30: cancela a geração em curso a partir do overlay — interrompe a
+     * coroutine, fecha o overlay e não salva plano nem mensagem de erro.
+     */
+    fun cancelGenerate() {
+        generateJob?.cancel()
+        generateJob = null
+        _isGenerating.value = false
     }
 
     /**
@@ -756,6 +809,7 @@ class AppViewModel(
             sexChoice = args.sexChoice,
             environment = args.environment,
             kind = args.kind,
+            config = args.config,
         )
     }
 
@@ -1626,6 +1680,8 @@ private data class GeneratePlanArgs(
     val sexChoice: String?,
     val environment: String?,
     val kind: String,
+    /** H3-30: configuração do formulário, persistida quando a geração funciona. */
+    val config: GenerateConfig? = null,
 )
 
 sealed interface BackupImportState {

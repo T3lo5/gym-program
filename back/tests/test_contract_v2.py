@@ -300,3 +300,56 @@ def test_duracao_15_sem_foco_422():
     request = GenerateRequest(deviceId="d1", focusMuscles=["abs"], sessionDurationMinutes=15)
     assert request.sessionDurationMinutes == 15
 
+
+# ---------------- Novos testes de contrato v2 (H3-30) ----------------
+
+
+def test_goal_modalidade_forca_aceito():
+    """`modalities[].goal` aceita o objetivo do chip (H3-30) e o prompt o
+    carrega — o app envia o goal escolhido na modalidade de força em vez do
+    "hypertrophy" fixo; sem mudança de schema, o campo já existia."""
+    from app.main import ModalityRequest, build_hybrid_user_prompt
+
+    req = GenerateRequest(
+        deviceId="d1",
+        goal="strength",
+        modalities=[
+            ModalityRequest(type="strength", sessionsPerWeek=4, goal="strength"),
+            ModalityRequest(type="run", sessionsPerWeek=2, goal="endurance"),
+        ],
+    )
+    assert req.modalities[0].goal == "strength"
+    assert req.modalities[1].goal == "endurance"
+
+    # O prompt da IA recebe o objetivo coerente por modalidade.
+    prompt = build_hybrid_user_prompt(req)
+    assert "objetivo=strength" in prompt
+    assert "objetivo=endurance" in prompt
+
+
+def test_goal_modalidade_forca_valores_fechados():
+    """Os seis valores fechados do contrato são aceitos em modalities[].goal."""
+    from app.main import ModalityRequest
+
+    valores = ["hypertrophy", "strength", "endurance", "power", "fat_loss", "general"]
+    for valor in valores:
+        req = GenerateRequest(
+            deviceId="d1",
+            modalities=[ModalityRequest(type="strength", goal=valor)],
+        )
+        assert req.modalities[0].goal == valor
+
+
+def test_goal_modalidade_fora_da_lista_422():
+    """Valor fora da lista fechada é rejeitado (contrato v2)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.main import ModalityRequest
+
+    with pytest.raises(ValidationError):
+        GenerateRequest(
+            deviceId="d1",
+            modalities=[ModalityRequest(type="strength", goal="hipertrofia")],
+        )
+

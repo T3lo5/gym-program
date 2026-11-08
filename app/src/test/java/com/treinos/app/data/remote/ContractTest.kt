@@ -274,4 +274,42 @@ class ContractTest {
         val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
         assertNull(decoded.focusMuscles)
     }
+
+    @Test
+    fun goal_da_modalidade_forca_segue_chip() {
+        // H3-30: o goal da modalidade de força é o do chip global (ex.:
+        // "strength" quando o usuário escolhe Força) — não mais o "hypertrophy"
+        // fixo. O campo já existe no contrato (`modalities[].goal`), aceito nos
+        // dois lados (back/tests/test_contract_v2.py).
+        val request = GeneratePlanRequest(
+            deviceId = "d1",
+            goal = "strength",
+            modalities = listOf(
+                ModalityDto(
+                    type = "strength",
+                    sessionsPerWeek = 4,
+                    goal = "strength",
+                    level = "intermediate",
+                ),
+                ModalityDto(type = "run", sessionsPerWeek = 2, goal = "endurance"),
+            ),
+        )
+
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), request)
+        assertTrue(encoded.contains("\"goal\":\"strength\""))
+
+        val decoded = json.decodeFromString(GeneratePlanRequest.serializer(), encoded)
+        assertEquals("strength", decoded.modalities.first { it.type == "strength" }.goal)
+        assertEquals("endurance", decoded.modalities.first { it.type == "run" }.goal)
+
+        // Os seis valores fechados do contrato viajam e voltam intactos.
+        for (value in listOf("hypertrophy", "strength", "endurance", "power", "fat_loss", "general")) {
+            val text = json.encodeToString(
+                GeneratePlanRequest.serializer(),
+                request.copy(modalities = listOf(request.modalities.first().copy(goal = value))),
+            )
+            val roundTrip = json.decodeFromString(GeneratePlanRequest.serializer(), text)
+            assertEquals(value, roundTrip.modalities.first().goal)
+        }
+    }
 }

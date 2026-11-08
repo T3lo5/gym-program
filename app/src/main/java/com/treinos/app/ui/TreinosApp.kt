@@ -59,6 +59,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val restTotal by viewModel.restTotal.collectAsStateWithLifecycle()
     val restPaused by viewModel.restPaused.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
+    // H3-30: config restaurada na tela de gerar e motivo do fallback no selo.
+    val generateConfig by viewModel.generateConfig.collectAsStateWithLifecycle()
+    val lastFallbackReason by viewModel.lastFallbackReason.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
     val isTesting by viewModel.isTesting.collectAsStateWithLifecycle()
@@ -209,6 +212,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     plansState = plansState,
                     onSelectPlan = viewModel::selectPlan,
                     onDeletePlan = viewModel::deleteExtraPlan,
+                    // H3-30: o selo do plano local cita o motivo persistido do
+                    // fallback até a próxima geração da IA.
+                    fallbackReasonLabel = fallbackReasonLabel(lastFallbackReason),
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -217,8 +223,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     savedBodyWeightKg = bodyWeightKg,
                     savedHeightCm = heightCm,
                     savedSex = sex,
+                    savedConfig = generateConfig,
                     error = generateError,
                     onRetry = viewModel::retryGenerate,
+                    onCancel = viewModel::cancelGenerate,
                     onGenerate = viewModel::generatePlan,
                 )
 

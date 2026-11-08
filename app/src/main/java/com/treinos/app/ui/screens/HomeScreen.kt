@@ -104,6 +104,9 @@ fun HomeScreen(
     plansState: UiState<List<WorkoutPlanWithDetails>> = UiState.Content(emptyList()),
     onSelectPlan: (Long) -> Unit = {},
     onDeletePlan: (Long) -> Unit = {},
+    // H3-30: motivo do último fallback local, já traduzido; o selo do plano
+    // gerado localmente cita o motivo até a próxima geração da IA.
+    fallbackReasonLabel: String? = null,
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
@@ -276,7 +279,7 @@ fun HomeScreen(
                     }
                 }
 
-                item { ActivePlanCard(plan) }
+                item { ActivePlanCard(plan, fallbackReasonLabel) }
 
                 if (reviewIsDue(plan.plan.nextReviewAt)) {
                     item {
@@ -753,7 +756,10 @@ private fun InProgressCard(
 }
 
 @Composable
-private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
+private fun ActivePlanCard(
+    plan: WorkoutPlanWithDetails,
+    fallbackReasonLabel: String? = null,
+) {
     val entity = plan.plan
     val review = formatReviewDate(entity.nextReviewAt)
     val due = reviewIsDue(entity.nextReviewAt)
@@ -782,7 +788,13 @@ private fun ActivePlanCard(plan: WorkoutPlanWithDetails) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = if (entity.source == "ai") "Gerado com IA" else "Gerado localmente",
+                // H3-30: quando o plano veio do fallback local, o selo cita o
+                // motivo persistido — não some com o snackbar de ~4 s.
+                text = when {
+                    entity.source == "ai" -> "Gerado com IA"
+                    fallbackReasonLabel != null -> "Gerado localmente — $fallbackReasonLabel"
+                    else -> "Gerado localmente"
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

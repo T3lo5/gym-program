@@ -93,6 +93,30 @@ class AppPreferences private constructor(
             prefs.edit().putInt(KEY_REST_TOTAL, value).apply()
         }
 
+    /**
+     * Última configuração da tela "Gerar" (H3-30), como JSON
+     * (`GenerateConfigCodec`). null = nenhuma config salva ainda.
+     */
+    var generateConfigJson: String?
+        get() = prefs.getString(KEY_GENERATE_CONFIG_V1, null)
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_GENERATE_CONFIG_V1).apply()
+            } else {
+                prefs.edit().putString(KEY_GENERATE_CONFIG_V1, value).apply()
+            }
+        }
+
+    /**
+     * Motivo do último fallback local (H3-30), código fechado do contrato
+     * (`fallbackReason`). Vazio = o último plano veio da IA.
+     */
+    var lastFallbackReason: String
+        get() = prefs.getString(KEY_LAST_FALLBACK_REASON, "").orEmpty()
+        set(value) {
+            prefs.edit().putString(KEY_LAST_FALLBACK_REASON, value).apply()
+        }
+
     fun isRecentCommand(commandId: String): Boolean {
         val ids = prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()
         return CommandDedupe.isRecent(ids, commandId)
@@ -134,5 +158,7 @@ class AppPreferences private constructor(
         private const val KEY_HEIGHT_CM = "height_cm"
         private const val KEY_SEX = "sex"
         private const val KEY_WEAR_RECENT_COMMANDS = "wear_recent_commands"
+        private const val KEY_GENERATE_CONFIG_V1 = "generate_config_v1"
+        private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"
     }
 }

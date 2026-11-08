@@ -77,6 +77,31 @@ class HomeScreenTest {
     }
 
     @Test
+    fun selo_do_plano_local_cita_motivo_persistido() {
+        // H3-30: o motivo do fallback persiste e o selo o cita — não some com
+        // o snackbar de ~4 s; some só na próxima geração da IA.
+        composeRule.setContent {
+            HomeScreen(
+                plan = plan,
+                inProgressSession = null,
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+                fallbackReasonLabel = "resposta da IA sem IDs válidos",
+            )
+        }
+
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Gerado localmente", substring = true))
+        composeRule.onNodeWithText("Gerado localmente — resposta da IA sem IDs válidos")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun mostra_abas_apenas_das_modalidades_do_plano() {
         composeRule.setContent {
             HomeScreen(
