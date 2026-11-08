@@ -22,6 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +44,58 @@ import com.treinos.app.ui.validPoolLengths
 
 private val modalityOptions = ActivityModality.entries.map { it.storageValue to it.label }
 
+/**
+ * H3-31: rascunho do registro avulso como um único valor saveable — girar o
+ * aparelho (ou o teclado recriar a Activity) não perde o que foi digitado.
+ * O `Saver` é coberto por round-trip em `ActivityLogSaverTest`.
+ */
+val ActivityLogDraftSaver: Saver<ActivityLogDraft, Any> = listSaver(
+    save = { draft ->
+        listOf(
+            draft.modality.storageValue,
+            draft.title,
+            draft.dateText,
+            draft.durationText,
+            draft.distanceText,
+            draft.poolLengthMeters,
+            draft.stroke,
+            draft.rpeText,
+            draft.notes,
+        )
+    },
+    restore = { list ->
+        ActivityLogDraft(
+            modality = ActivityModality.fromStorageValue(list[0] as? String),
+            title = list[1] as String,
+            dateText = list[2] as String,
+            durationText = list[3] as String,
+            distanceText = list[4] as String,
+            poolLengthMeters = list[5] as Int?,
+            stroke = list[6] as String?,
+            rpeText = list[7] as String,
+            notes = list[8] as String,
+        )
+    },
+)
+
+/** Estado inicial do formulário: preenchido quando há prefill (edição/copiar). */
+internal fun activityLogDraftFrom(prefill: ActivityLogInput?): ActivityLogDraft {
+    val input = prefill ?: return ActivityLogDraft(
+        dateText = formatDateTime(System.currentTimeMillis()),
+    )
+    return ActivityLogDraft(
+        modality = input.modality,
+        title = input.title,
+        dateText = formatDateTime(input.startedAt),
+        durationText = input.durationMinutes.toString(),
+        distanceText = input.distanceMeters?.toLong()?.toString() ?: "",
+        poolLengthMeters = input.poolLengthMeters,
+        stroke = input.stroke,
+        rpeText = input.rpe?.toString() ?: "",
+        notes = input.notes,
+    )
+}
+
 @Composable
 fun LogActivityScreen(
     prefill: ActivityLogInput?,
@@ -54,20 +109,13 @@ fun LogActivityScreen(
     onSave: (ActivityLogDraft) -> Unit,
     onDelete: () -> Unit,
 ) {
-    var modality by remember(prefill) { mutableStateOf(prefill?.modality ?: ActivityModality.SWIM) }
-    var title by remember(prefill) { mutableStateOf(prefill?.title ?: "") }
-    var dateText by remember(prefill) {
-        mutableStateOf(formatDateTime(prefill?.startedAt ?: System.currentTimeMillis()))
-    }
-    var durationText by remember(prefill) { mutableStateOf((prefill?.durationMinutes ?: 45).toString()) }
-    var distanceText by remember(prefill) {
-        mutableStateOf(prefill?.distanceMeters?.toLong()?.toString() ?: "")
-    }
-    var poolLength by remember(prefill) { mutableStateOf(prefill?.poolLengthMeters) }
-    var stroke by remember(prefill) { mutableStateOf(prefill?.stroke) }
-    var rpeText by remember(prefill) { mutableStateOf(prefill?.rpe?.toString() ?: "") }
-    var notes by remember(prefill) { mutableStateOf(prefill?.notes ?: "") }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    // H3-31: um único rascunho saveable; mudar o prefill (edição/copiar último)
+    // reinicia o formulário, girar a tela preserva tudo que foi digitado.
+    var draft by rememberSaveable(
+        inputs = arrayOf(prefill),
+        stateSaver = ActivityLogDraftSaver,
+    ) { mutableStateOf(activityLogDraftFrom(prefill)) }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -88,10 +136,10 @@ fun LogActivityScreen(
             item {
                 ChipGroup(
                     options = modalityOptions,
-                    selected = setOf(modality.storageValue),
+                    selected = setOf(draft.modality.storageValue),
                     onToggle = { value ->
                         ActivityModality.entries.firstOrNull { it.storageValue == value }?.let {
-                            modality = it
+                            draft = draft.copy(modality = it)
                             onModalityChanged(it)
                         }
                     },
@@ -100,10 +148,10 @@ fun LogActivityScreen(
             if (canCopyLast) {
                 item {
                     OutlinedButton(
-                        onClick = { onCopyLast(modality) },
+                        onClick = { onCopyLast(draft.modality) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Copiar último treino de ${modality.label.lowercase()}")
+                        Text("Copiar último treino de ${draft.modality.label.lowercase()}")
                     }
                 }
             }
@@ -111,8 +159,8 @@ fun LogActivityScreen(
             item { SectionTitle("Como foi") }
             item {
                 OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
+                    value = draft.title,
+                    onValueChange = { draft = draft.copy(title = it) },
                     label = { Text("Título (opcional)") },
                     supportingText = errors[ActivityLogField.Title]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Title),
@@ -121,8 +169,8 @@ fun LogActivityScreen(
             }
             item {
                 OutlinedTextField(
-                    value = dateText,
-                    onValueChange = { dateText = it },
+                    value = draft.dateText,
+                    onValueChange = { draft = draft.copy(dateText = it) },
                     label = { Text("Quando (dd/mm/aaaa hh:mm)") },
                     supportingText = errors[ActivityLogField.Date]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Date),
@@ -135,8 +183,8 @@ fun LogActivityScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedTextField(
-                        value = durationText,
-                        onValueChange = { durationText = it },
+                        value = draft.durationText,
+                        onValueChange = { draft = draft.copy(durationText = it) },
                         label = { Text("Duração (min)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         supportingText = errors[ActivityLogField.Duration]?.let { { Text(it) } },
@@ -144,8 +192,8 @@ fun LogActivityScreen(
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
-                        value = rpeText,
-                        onValueChange = { rpeText = it },
+                        value = draft.rpeText,
+                        onValueChange = { draft = draft.copy(rpeText = it) },
                         label = { Text("RPE (1 a 10)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         supportingText = errors[ActivityLogField.Rpe]?.let { { Text(it) } },
@@ -156,8 +204,8 @@ fun LogActivityScreen(
             }
             item {
                 OutlinedTextField(
-                    value = distanceText,
-                    onValueChange = { distanceText = it },
+                    value = draft.distanceText,
+                    onValueChange = { draft = draft.copy(distanceText = it) },
                     label = { Text("Distância (m, opcional)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     supportingText = errors[ActivityLogField.Distance]?.let { { Text(it) } },
@@ -166,21 +214,23 @@ fun LogActivityScreen(
                 )
             }
 
-            if (modality == ActivityModality.SWIM) {
+            if (draft.modality == ActivityModality.SWIM) {
                 item { SectionTitle("Piscina") }
                 item {
                     ChipGroup(
                         options = validPoolLengths.map { it.toString() to "${it} m" } + ("" to "Sem piscina"),
-                        selected = setOf(poolLength?.toString() ?: ""),
-                        onToggle = { value -> poolLength = value.toIntOrNull() },
+                        selected = setOf(draft.poolLengthMeters?.toString() ?: ""),
+                        onToggle = { value -> draft = draft.copy(poolLengthMeters = value.toIntOrNull()) },
                     )
                 }
                 item { SectionTitle("Nado (opcional)") }
                 item {
                     ChipGroup(
                         options = swimStrokeOptions,
-                        selected = setOf(stroke ?: ""),
-                        onToggle = { value -> stroke = if (value == stroke) null else value },
+                        selected = setOf(draft.stroke ?: ""),
+                        onToggle = { value ->
+                            draft = draft.copy(stroke = if (value == draft.stroke) null else value)
+                        },
                     )
                 }
             }
@@ -188,8 +238,8 @@ fun LogActivityScreen(
             item { SectionTitle("Notas") }
             item {
                 OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
+                    value = draft.notes,
+                    onValueChange = { draft = draft.copy(notes = it) },
                     label = { Text("Ex.: 8 x 100 m") },
                     supportingText = errors[ActivityLogField.Notes]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Notes),
@@ -202,16 +252,9 @@ fun LogActivityScreen(
                 Button(
                     onClick = {
                         onSave(
-                            ActivityLogDraft(
-                                modality = modality,
-                                title = title,
-                                dateText = dateText,
-                                durationText = durationText,
-                                distanceText = distanceText,
-                                poolLengthMeters = if (modality == ActivityModality.SWIM) poolLength else null,
-                                stroke = if (modality == ActivityModality.SWIM) stroke else null,
-                                rpeText = rpeText,
-                                notes = notes,
+                            draft.copy(
+                                poolLengthMeters = if (draft.modality == ActivityModality.SWIM) draft.poolLengthMeters else null,
+                                stroke = if (draft.modality == ActivityModality.SWIM) draft.stroke else null,
                             )
                         )
                     },

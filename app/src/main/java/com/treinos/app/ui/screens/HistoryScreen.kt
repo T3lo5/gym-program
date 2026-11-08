@@ -66,12 +66,13 @@ import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
+import com.treinos.app.ui.formatDateShort
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
-import com.treinos.app.ui.formatDateShort
 import com.treinos.app.ui.formatMonthYear
 import com.treinos.app.ui.formatPacePer100m
 import com.treinos.app.ui.formatPacePerKm
+import com.treinos.app.ui.formatRunDistanceKm
 import com.treinos.app.ui.formatVolumeKg
 import com.treinos.app.ui.history.HistoryMetrics
 import com.treinos.app.ui.history.STATUS_COMPLETED
@@ -510,7 +511,12 @@ private fun ActivityCard(
     var showDeleteDialog by remember(session.id) { mutableStateOf(false) }
     val modality = ActivityModality.fromStorageValue(session.modality)
     val title = session.title.ifBlank { session.dayName }.ifBlank { modality.label }
-    val distance = formatDistanceMeters(session.totalDistanceMeters)
+    // H3-31: corrida em km como o corredor pensa; demais modalidades em metros.
+    val distance = if (modality == ActivityModality.RUN) {
+        formatRunDistanceKm(session.totalDistanceMeters)
+    } else {
+        formatDistanceMeters(session.totalDistanceMeters)
+    }
     val pace = when (modality) {
         ActivityModality.SWIM ->
             formatPacePer100m(session.totalDurationSeconds, session.totalDistanceMeters)
@@ -648,9 +654,15 @@ private fun SessionCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "${formatDateTime(session.session.startedAt)} • " +
-                    "duração ${formatDuration(session.session.totalDurationSeconds)} • " +
-                    "$totalSets série(s)",
+                text = buildString {
+                    append("${formatDateTime(session.session.startedAt)} • ")
+                    append("duração ${formatDuration(session.session.totalDurationSeconds)}")
+                    // H3-31: corrida planejada mostra a distância em km.
+                    session.session.totalDistanceMeters
+                        ?.takeIf { it > 0.0 }
+                        ?.let { append(" • ${formatRunDistanceKm(it)}") }
+                    append(" • $totalSets série(s)")
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
 

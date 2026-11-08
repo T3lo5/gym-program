@@ -110,6 +110,18 @@ fun formatDistanceMeters(meters: Double?): String? {
     return groupThousands(value.roundToLong()) + " m"
 }
 
+/**
+ * Distância de corrida como o corredor pensa (H3-31): km com uma casa decimal
+ * a partir de 1 km e metros abaixo disso. O arredondamento acontece aqui,
+ * nunca no cálculo agregado.
+ */
+fun formatRunDistanceKm(meters: Double?): String? {
+    val value = meters?.takeIf { it > 0.0 && it.isFinite() } ?: return null
+    if (value < 1000.0) return groupThousands(value.roundToLong()) + " m"
+    val kmTenths = (value / 100.0).roundToLong()
+    return "${groupThousands(kmTenths / 10)},${kmTenths % 10} km"
+}
+
 /** Pace de natação em `mm:ss/100m`; null quando não há distância registrada. */
 fun formatPacePer100m(durationSeconds: Long, distanceMeters: Double?): String? =
     paceSecondsPer100m(durationSeconds, distanceMeters)?.let { "${formatMinuteSecond(it)}/100m" }

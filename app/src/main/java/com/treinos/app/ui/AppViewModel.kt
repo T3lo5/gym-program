@@ -210,6 +210,18 @@ class AppViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
+    /**
+     * H3-31: alvo do dia planejado para a corrida em andamento (nome do bloco,
+     * duração e distância quando existirem no plano). `null` sem plano casado —
+     * a tela mostra o cartão genérico.
+     */
+    val runPlanTarget: StateFlow<RunPlanTarget?> = combine(
+        activeSession,
+        activePlan,
+    ) { session, plan ->
+        session?.let { runPlanTargetFor(it, plan) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val _exerciseIndex = MutableStateFlow(0)
     val exerciseIndex: StateFlow<Int> = _exerciseIndex.asStateFlow()
 
@@ -1208,6 +1220,82 @@ class AppViewModel(
     }
 
     // ---------------- Mobilidade ----------------
+
+    /**
+     * H3-31: estado da rotina de mobilidade vive aqui (rotina, movimento,
+     * tempo restante e decorrido) — sobrevive à rotação. O tick roda em job
+     * próprio, como o descanso; morte de processo reinicia a rotina (aceito).
+     */
+    private val _mobilityState = MutableStateFlow(MobilityScreenState())
+    val mobilityState: StateFlow<MobilityScreenState> = _mobilityState.asStateFlow()
+
+    private var mobilityJob: Job? = null
+
+    fun startMobilityRoutine(routine: MobilityRoutine) {
+        val session = MobilitySessionEngine.start(routine) ?: return
+        _mobilityState.value = MobilityScreenState(routine = routine, session = session)
+        startMobilityTicker()
+    }
+
+    /** Rotina planejada (preset): não sobrescreve uma rotina em andamento. */
+    fun startMobilityFromPreset(routineId: String) {
+        if (_mobilityState.value.session != null) return
+        val routine = MobilityRoutineTemplates.getRoutine(routineId) ?: return
+        startMobilityRoutine(routine)
+    }
+
+    fun toggleMobilityPause() {
+        val current = _mobilityState.value
+        val session = current.session ?: return
+        _mobilityState.value = current.copy(session = MobilitySessionEngine.togglePause(session))
+    }
+
+    fun mobilityPreviousMovement() {
+        val current = _mobilityState.value
+        val routine = current.routine ?: return
+        val session = current.session ?: return
+        if (session.movementIndex == 0) return
+        _mobilityState.value = current.copy(
+            session = MobilitySessionEngine.goTo(session, routine, session.movementIndex - 1) ?: session,
+        )
+    }
+
+    /** "Avançar" manual ou toque na transição (H3-31): pula direto ao próximo. */
+    fun mobilityNextMovement() {
+        val current = _mobilityState.value
+        val routine = current.routine ?: return
+        val session = current.session ?: return
+        val next = if (session.inTransition) {
+            MobilitySessionEngine.skipTransition(session, routine)
+        } else {
+            MobilitySessionEngine.goTo(session, routine, session.movementIndex + 1) ?: return
+        }
+        _mobilityState.value = current.copy(session = next)
+    }
+
+    /** Limpa a rotina em andamento (finalização ou descarte confirmado). */
+    fun clearMobilitySession() {
+        mobilityJob?.cancel()
+        mobilityJob = null
+        _mobilityState.value = MobilityScreenState()
+    }
+
+    private fun startMobilityTicker() {
+        mobilityJob?.cancel()
+        mobilityJob = viewModelScope.launch {
+            while (true) {
+                delay(1_000)
+                val current = _mobilityState.value
+                val session = current.session ?: break
+                if (!session.running) break
+                if (session.paused) continue
+                val routine = current.routine ?: break
+                val ticked = MobilitySessionEngine.tick(session, routine)
+                _mobilityState.value = current.copy(session = ticked)
+                if (!ticked.running) break
+            }
+        }
+    }
 
     fun finishMobility(routineId: String, elapsedSeconds: Long) {
         viewModelScope.launch {

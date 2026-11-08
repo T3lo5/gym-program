@@ -1,11 +1,13 @@
 package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
@@ -187,6 +189,29 @@ class WorkoutScreenTest {
         campoDeTexto("6.0.5").performTextReplacement("61,5")
         composeRule.onNodeWithText("Salvar alterações").performClick()
         assertEquals(Triple(10, 61.5, null), atualizada)
+    }
+
+    @Test
+    fun dialogo_preserva_campos_apos_recreate() {
+        // H3-31: os campos do diálogo de série vivem em rememberSaveable(key=...).
+        // Na janela padrão do Robolectric (320×470) o botão "Registrar série 2"
+        // fica sob o bottomBar — rolar o mínimo para trazê-lo à vista, como o
+        // usuário faria, antes de abrir o diálogo. Os campos vêm pré-preenchidos
+        // com a última série (10 reps / 60 kg) e são localizados pelo valor,
+        // como nos demais testes deste arquivo.
+        setContent(session = sessao())
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Registrar série 2").performClick()
+        composeRule.onNodeWithText("Série 2 — Supino reto").assertIsDisplayed()
+
+        campoDeTexto("10").performTextReplacement("12")
+        campoDeTexto("60").performTextReplacement("62,5")
+
+        composeRule.onNodeWithText("12").assertIsDisplayed()
+        composeRule.onNodeWithText("62,5").assertIsDisplayed()
     }
 
 }

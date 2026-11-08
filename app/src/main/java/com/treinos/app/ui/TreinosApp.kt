@@ -94,6 +94,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
     val isSavingActivity by viewModel.isSavingActivity.collectAsStateWithLifecycle()
     val canCopyLastActivity by viewModel.canCopyLastActivity.collectAsStateWithLifecycle()
+    // H3-31: alvo do plano na corrida e estado da mobilidade fora da composição.
+    val runPlanTarget by viewModel.runPlanTarget.collectAsStateWithLifecycle()
+    val mobilityState by viewModel.mobilityState.collectAsStateWithLifecycle()
     val discoveredBackends by viewModel.discoveredBackends.collectAsStateWithLifecycle()
     val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
     val isConnectingBackend by viewModel.isConnectingBackend.collectAsStateWithLifecycle()
@@ -256,6 +259,8 @@ fun TreinosApp(viewModel: AppViewModel) {
 
                 Screen.RunWorkout -> RunWorkoutScreen(
                     state = activeSessionState,
+                    // H3-31: o alvo do dia planejado aparece no topo da corrida.
+                    planTarget = runPlanTarget,
                     onLeave = viewModel::leaveWorkout,
                     // H3-29: o sessionId vem da sessão renderizada — "Finalizar"
                     // sem sessão não existe mais como no-op silencioso.
@@ -263,7 +268,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                         viewModel.finishRunWorkout(
                             sessionId = sessionId,
                             durationSeconds = input.durationSeconds,
-                            distanceMeters = input.distanceMeters,
+                            // H3-31: o usuário digita km; a sessão grava metros.
+                            distanceMeters = input.distanceKm?.let(::runDistanceKmToMeters),
                             rpe = input.rpe,
                         )
                     },
@@ -301,8 +307,17 @@ fun TreinosApp(viewModel: AppViewModel) {
                     val mobilitySession = inProgressSession
                         ?.takeIf { it.session.modality == "mobility" }
                     MobilityScreen(
+                        // H3-31: estado da rotina no ViewModel — rotação não
+                        // devolve a tela para a lista nem perde o movimento.
+                        state = mobilityState,
                         onBack = viewModel::goHome,
                         onFinishMobility = viewModel::finishPlannedMobility,
+                        onStartRoutine = viewModel::startMobilityRoutine,
+                        onStartPreset = viewModel::startMobilityFromPreset,
+                        onTogglePause = viewModel::toggleMobilityPause,
+                        onPreviousMovement = viewModel::mobilityPreviousMovement,
+                        onNextMovement = viewModel::mobilityNextMovement,
+                        onClearSession = viewModel::clearMobilitySession,
                         planId = mobilitySession?.session?.planId ?: 0L,
                         dayId = mobilitySession?.session?.dayId ?: 0L,
                     )

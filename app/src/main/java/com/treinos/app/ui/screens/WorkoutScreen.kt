@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,8 +105,16 @@ fun WorkoutScreen(
     onAbandon: () -> Unit = {},
     onNextExercise: () -> Unit = {},
 ) {
-    var exerciseToLog by remember { mutableStateOf<SessionExerciseWithSets?>(null) }
-    var editTarget by remember { mutableStateOf<Pair<SessionExerciseWithSets, SetLogEntity>?>(null) }
+    // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
+    // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
+    var exerciseToLogId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editSetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val exerciseToLog = session?.exercises?.firstOrNull { it.exercise.id == exerciseToLogId }
+    val editTarget = editSetId?.let { setId ->
+        session?.exercises
+            ?.firstOrNull { candidate -> candidate.sets.any { it.id == setId } }
+            ?.let { exercise -> exercise to exercise.sets.first { it.id == setId } }
+    }
     var setToDelete by remember { mutableStateOf<SetLogEntity?>(null) }
     var showFinishConfirm by remember { mutableStateOf(false) }
     var showAbandonConfirm by remember { mutableStateOf(false) }
@@ -252,12 +261,12 @@ fun WorkoutScreen(
                     ExerciseCard(
                         exercise = exercise,
                         media = exerciseMedia[exercise.exercise.exerciseId],
-                        onLogSet = { exerciseToLog = exercise },
+                        onLogSet = { exerciseToLogId = exercise.exercise.id },
                         onRepeatLastSet = { reps, weight, rpe ->
                             onLogSet(exercise, reps, weight, rpe)
                         },
                         onOpenDetail = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
-                        onEditSet = { set -> editTarget = exercise to set },
+                        onEditSet = { set -> editSetId = set.id },
                         onNextExercise = {
                             // Rola até o primeiro exercício com séries pendentes;
                             // o ViewModel alinha o índice usado pelo relógio.
@@ -289,6 +298,9 @@ fun WorkoutScreen(
     exerciseToLog?.let { exercise ->
         val last = exercise.sets.maxByOrNull { it.setNumber }
         SetDialog(
+            // H3-31: chave por diálogo — reabrir para outra série não herda o
+            // rascunho da anterior, e girar não perde o que foi digitado.
+            key = "log-${exercise.exercise.id}-${exercise.sets.size + 1}",
             title = "Série ${exercise.sets.size + 1} — ${exercise.exercise.exerciseName}",
             helper = "Planejado: ${exercise.exercise.plannedSets} séries. Preencha o que você fez.",
             suggestion = progressionSuggestions[exercise.exercise.exerciseId]
@@ -303,16 +315,17 @@ fun WorkoutScreen(
             initialRpe = last?.rpe?.let { formatWeight(it) }.orEmpty(),
             confirmLabel = "Salvar série",
             onDelete = null,
-            onDismiss = { exerciseToLog = null },
+            onDismiss = { exerciseToLogId = null },
             onConfirm = { reps, weight, rpe ->
                 onLogSet(exercise, reps, weight, rpe)
-                exerciseToLog = null
+                exerciseToLogId = null
             },
         )
     }
 
     editTarget?.let { (exercise, set) ->
         SetDialog(
+            key = "edit-${set.id}",
             title = "Editar série ${set.setNumber} — ${exercise.exercise.exerciseName}",
             helper = "Corrija o que você fez: a série já registrada é atualizada no lugar.",
             suggestion = null,
@@ -321,10 +334,10 @@ fun WorkoutScreen(
             initialRpe = set.rpe?.let { formatWeight(it) }.orEmpty(),
             confirmLabel = "Salvar alterações",
             onDelete = { setToDelete = set },
-            onDismiss = { editTarget = null },
+            onDismiss = { editSetId = null },
             onConfirm = { reps, weight, rpe ->
                 onUpdateSet(set, reps, weight, rpe)
-                editTarget = null
+                editSetId = null
             },
         )
     }
@@ -344,7 +357,7 @@ fun WorkoutScreen(
                     onClick = {
                         onDeleteSet(set)
                         setToDelete = null
-                        editTarget = null
+                        editSetId = null
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
@@ -674,6 +687,7 @@ private fun lastSetLabel(set: SetLogEntity): String? = when {
 
 @Composable
 private fun SetDialog(
+    key: String,
     title: String,
     helper: String?,
     suggestion: ProgressionSuggestion?,
@@ -685,9 +699,11 @@ private fun SetDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int?, Double?, Double?) -> Unit,
 ) {
-    var reps by remember { mutableStateOf(initialReps) }
-    var weight by remember { mutableStateOf(initialWeight) }
-    var rpe by remember { mutableStateOf(initialRpe) }
+    // H3-31: o que foi digitado sobrevive à rotação (e ao teclado que recria
+    // a Activity). `key` evita herdar rascunho de outro diálogo na mesma posição.
+    var reps by rememberSaveable(key = key) { mutableStateOf(initialReps) }
+    var weight by rememberSaveable(key = key) { mutableStateOf(initialWeight) }
+    var rpe by rememberSaveable(key = key) { mutableStateOf(initialRpe) }
     var errors by remember { mutableStateOf(SetInputErrors()) }
     val haptics = LocalHapticFeedback.current
     val suggestionText = suggestionLabel(suggestion)

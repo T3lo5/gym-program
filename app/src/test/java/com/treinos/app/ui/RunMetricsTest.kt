@@ -33,7 +33,7 @@ class RunMetricsTest {
     @Test
     fun pace_calculado_na_finalizacao() {
         val result = validateRunLog(
-            RunLogInput(durationSeconds = 1_500L, distanceMeters = 5_000.0, rpe = null),
+            RunLogInput(durationSeconds = 1_500L, distanceKm = 5.0, rpe = null),
         )
         assertTrue(result.valid)
         assertEquals(300, result.paceSecondsPerKm)
@@ -42,7 +42,7 @@ class RunMetricsTest {
     @Test
     fun distancia_zero_nao_gera_pace() {
         val result = validateRunLog(
-            RunLogInput(durationSeconds = 1_500L, distanceMeters = 0.0, rpe = null),
+            RunLogInput(durationSeconds = 1_500L, distanceKm = 0.0, rpe = null),
         )
         assertTrue(result.valid)
         assertNull(result.paceSecondsPerKm)
@@ -51,7 +51,7 @@ class RunMetricsTest {
     @Test
     fun duracao_invalida_bloqueia_registro() {
         val result = validateRunLog(
-            RunLogInput(durationSeconds = 0L, distanceMeters = null, rpe = null),
+            RunLogInput(durationSeconds = 0L, distanceKm = null, rpe = null),
         )
         assertFalse(result.valid)
         assertNotNull(result.error)
@@ -60,7 +60,7 @@ class RunMetricsTest {
     @Test
     fun rpe_fora_de_faixa_bloqueia_registro() {
         val result = validateRunLog(
-            RunLogInput(durationSeconds = 600L, distanceMeters = null, rpe = 11.0),
+            RunLogInput(durationSeconds = 600L, distanceKm = null, rpe = 11.0),
         )
         assertFalse(result.valid)
         assertNotNull(result.error)

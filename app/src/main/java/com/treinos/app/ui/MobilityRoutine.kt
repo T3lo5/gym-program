@@ -19,7 +19,11 @@ data class MobilityMovement(
 )
 
 object MobilityRoutineTemplates {
-    private const val TRANSITION_SECONDS = 5
+    /**
+     * H3-31: pausa guiada entre movimentos; passa a valer de verdade no
+     * [MobilitySessionEngine] (antes era definido e nunca usado).
+     */
+    const val TRANSITION_SECONDS = 5
 
     val routines: List<MobilityRoutine> = listOf(
         MobilityRoutine(

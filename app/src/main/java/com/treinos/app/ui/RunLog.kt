@@ -1,11 +1,17 @@
 package com.treinos.app.ui
 
+import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.WorkoutPlanWithDetails
 import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 
+/**
+ * H3-31: a distância informada pelo corredor é em **km** (uma casa decimal);
+ * a conversão para metros acontece uma única vez, em [runDistanceKmToMeters],
+ * antes de gravar na sessão.
+ */
 data class RunLogInput(
     val durationSeconds: Long,
-    val distanceMeters: Double?,
+    val distanceKm: Double?,
     val rpe: Double?,
 )
 
@@ -17,7 +23,7 @@ data class RunLogValidation(
 
 private const val MIN_DURATION_MINUTES = 1
 private const val MAX_DURATION_MINUTES = 600
-private const val MAX_DISTANCE_METERS = 100_000.0
+private const val MAX_DISTANCE_KM = 100.0
 private const val MIN_RPE = 1.0
 private const val MAX_RPE = 10.0
 
@@ -29,8 +35,8 @@ fun validateRunLog(input: RunLogInput): RunLogValidation {
     if (durationMinutes < MIN_DURATION_MINUTES || durationMinutes > MAX_DURATION_MINUTES) {
         return RunLogValidation(valid = false, error = "Duração entre $MIN_DURATION_MINUTES e $MAX_DURATION_MINUTES minutos.", paceSecondsPerKm = null)
     }
-    input.distanceMeters?.let { distance ->
-        if (!distance.isFinite() || distance < 0.0 || distance > MAX_DISTANCE_METERS) {
+    input.distanceKm?.let { distance ->
+        if (!distance.isFinite() || distance < 0.0 || distance > MAX_DISTANCE_KM) {
             return RunLogValidation(valid = false, error = "Distância inválida.", paceSecondsPerKm = null)
         }
     }
@@ -39,9 +45,8 @@ fun validateRunLog(input: RunLogInput): RunLogValidation {
             return RunLogValidation(valid = false, error = "O RPE deve ficar entre 1 e 10.", paceSecondsPerKm = null)
         }
     }
-    val pace = input.distanceMeters?.takeIf { it > 0.0 }?.let { distance ->
-        val secondsPerKm = (input.durationSeconds / (distance / 1000.0)).roundToInt()
-        secondsPerKm
+    val pace = input.distanceKm?.takeIf { it > 0.0 }?.let { distance ->
+        (input.durationSeconds / distance).roundToInt()
     }
     return RunLogValidation(valid = true, error = null, paceSecondsPerKm = pace)
 }
@@ -50,6 +55,59 @@ fun formatRunPace(paceSecondsPerKm: Int?): String? = paceSecondsPerKm?.let {
     "${it / 60}:${(it % 60).toString().padStart(2, '0')}/km"
 }
 
-fun formatRunDistance(meters: Double?): String? = meters?.takeIf { it > 0.0 }?.let {
-    "${it.roundToLong().toString().replace(Regex("\\B(?=(\\d{3})+(?!\\d))"), ".")} m"
+/**
+ * H3-31: o campo "Distância (km)" aceita vírgula ou ponto e no máximo uma
+ * casa decimal. Vazio = sem distância (campo opcional); texto inválido,
+ * negativo ou com duas casas devolve `null` para a tela mostrar o erro.
+ */
+fun parseDistanceKm(text: String): Double? {
+    val normalized = text.trim().replace(',', '.')
+    if (normalized.isEmpty()) return null
+    val dot = normalized.indexOf('.')
+    if (dot >= 0 && normalized.length - dot - 1 > 1) return null
+    return normalized.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+}
+
+/** km → m (×1000), com o resultado em metros arredondado a uma casa decimal. */
+fun runDistanceKmToMeters(km: Double): Double =
+    Math.round(km * 1000.0 * 10.0) / 10.0
+
+/** Alvo do dia planejado exibido no topo da corrida (H3-31). */
+data class RunPlanTarget(
+    val name: String,
+    val durationSeconds: Int? = null,
+    val distanceMeters: Double? = null,
+)
+
+/** "5,2 km • 30 min"; `null` quando o plano não traz nem duração nem distância. */
+fun formatRunPlanTarget(target: RunPlanTarget): String? {
+    val parts = buildList {
+        target.distanceMeters
+            ?.takeIf { it > 0.0 }
+            ?.let { formatRunDistanceKm(it) }
+            ?.let(::add)
+        target.durationSeconds?.takeIf { it > 0 }?.let { "${it / 60} min" }?.let(::add)
+    }
+    return parts.joinToString(" • ").ifEmpty { null }
+}
+
+/**
+ * Resolve o alvo do plano para a sessão de corrida aberta: o primeiro
+ * exercício da sessão corresponde ao bloco planejado do dia. Sem sessão
+ * planejada correspondente, devolve `null` (a tela mostra o cartão genérico).
+ */
+fun runPlanTargetFor(
+    session: SessionWithExercises,
+    plan: WorkoutPlanWithDetails?,
+): RunPlanTarget? {
+    val exerciseId = session.exercises.firstOrNull()?.exercise?.exerciseId ?: return null
+    val planExercise = plan?.days
+        ?.flatMap { it.exercises }
+        ?.firstOrNull { it.exerciseId == exerciseId }
+        ?: return null
+    return RunPlanTarget(
+        name = planExercise.exerciseName.ifBlank { session.session.dayName },
+        durationSeconds = planExercise.targetDurationSeconds,
+        distanceMeters = planExercise.targetDistanceMeters,
+    )
 }

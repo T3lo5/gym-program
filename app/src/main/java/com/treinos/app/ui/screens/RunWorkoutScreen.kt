@@ -2,13 +2,14 @@ package com.treinos.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,7 +22,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -33,10 +34,12 @@ import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
-import com.treinos.app.ui.RunLogValidation
+import com.treinos.app.ui.RunPlanTarget
 import com.treinos.app.ui.UiState
 import com.treinos.app.ui.formatRunPace
+import com.treinos.app.ui.formatRunPlanTarget
 import com.treinos.app.ui.parseDraftNumber
+import com.treinos.app.ui.parseDistanceKm
 import com.treinos.app.ui.validateRunLog
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.LoadingState
@@ -47,12 +50,16 @@ import com.treinos.app.ui.components.SectionTitle
  * Corrida planejada (H3-29): a tela distingue carregando (antes do Room
  * emitir), sessão inexistente (empty state com volta — nunca um formulário
  * morto) e o formulário de registro.
+ *
+ * H3-31: os campos sobrevivem à rotação (`rememberSaveable`), o alvo do dia
+ * planejado aparece no topo e a distância é digitada em km.
  */
 @Composable
 fun RunWorkoutScreen(
     state: UiState<SessionWithExercises?>,
     onLeave: () -> Unit,
     onFinish: (sessionId: Long, input: RunLogInput) -> Unit,
+    planTarget: RunPlanTarget? = null,
 ) {
     when (val current = state) {
         is UiState.Loading -> RunWorkoutLoading(onLeave)
@@ -62,7 +69,12 @@ fun RunWorkoutScreen(
             if (session == null) {
                 RunWorkoutMissing(onLeave)
             } else {
-                RunWorkoutForm(session = session, onFinish = onFinish, onLeave = onLeave)
+                RunWorkoutForm(
+                    session = session,
+                    planTarget = planTarget,
+                    onFinish = onFinish,
+                    onLeave = onLeave,
+                )
             }
         }
     }
@@ -99,29 +111,36 @@ private fun RunWorkoutMissing(onLeave: () -> Unit) {
 @Composable
 private fun RunWorkoutForm(
     session: SessionWithExercises,
+    planTarget: RunPlanTarget?,
     onFinish: (sessionId: Long, input: RunLogInput) -> Unit,
     onLeave: () -> Unit,
 ) {
-    var durationMinutes by remember { mutableStateOf("") }
-    var distanceMeters by remember { mutableStateOf("") }
-    var rpe by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var pace by remember { mutableStateOf<String?>(null) }
+    var durationMinutes by rememberSaveable { mutableStateOf("") }
+    var distanceKm by rememberSaveable { mutableStateOf("") }
+    var rpe by rememberSaveable { mutableStateOf("") }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var pace by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDiscardConfirm by rememberSaveable { mutableStateOf(false) }
 
     // Sessão de corrida em andamento mantém a tela acesa (H3-26).
     KeepScreenOnEffect(enabled = true)
 
     fun compute() {
         val dur = durationMinutes.toIntOrNull() ?: 0
-        val dist = parseDraftNumber(distanceMeters)
-        val rpeVal = parseDraftNumber(rpe)
+        val km = parseDistanceKm(distanceKm)
         val input = RunLogInput(
             durationSeconds = dur.toLong() * 60,
-            distanceMeters = dist,
-            rpe = rpeVal,
+            distanceKm = km,
+            rpe = parseDraftNumber(rpe),
         )
         val result = validateRunLog(input)
-        error = result.error
+        // H3-31: texto presente que não parseia (ex.: "5,25") não pode passar
+        // silenciosamente por "sem distância" — mostra o erro e bloqueia.
+        error = if (km == null && distanceKm.isNotBlank()) {
+            "Distância inválida. Use até uma casa decimal, com vírgula ou ponto (ex.: 5,2)."
+        } else {
+            result.error
+        }
         pace = result.paceSecondsPerKm?.let { formatRunPace(it) }
     }
 
@@ -142,26 +161,65 @@ private fun RunWorkoutForm(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            if (planTarget != null) {
+                // H3-31: o alvo do dia planejado no topo — a corrida se comporta
+                // como parte do plano, não como protótipo.
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    ),
                 ) {
-                    Text(
-                        text = "Registre a corrida planejada",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Duração, distância e RPE. Nada de reps ou carga nesta sessão.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Alvo do plano",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Text(
+                            text = planTarget.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        formatRunPlanTarget(planTarget)?.let { alvo ->
+                            Text(
+                                text = alvo,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                        Text(
+                            text = "Registre o que você conseguiu — o alvo não precisa ser batido.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Registre a corrida planejada",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "Duração, distância e RPE. Nada de reps ou carga nesta sessão.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -176,16 +234,16 @@ private fun RunWorkoutForm(
                     onValueChange = { durationMinutes = it; compute() },
                     label = { Text("Duração (min)") },
                     supportingText = { Text("Opcional; se não preencher, usa a duração do plano") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
                 )
                 OutlinedTextField(
-                    value = distanceMeters,
-                    onValueChange = { distanceMeters = it; compute() },
-                    label = { Text("Distância (m)") },
-                    supportingText = { Text("Opcional. Ex.: 5000 para 5 km") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    value = distanceKm,
+                    onValueChange = { distanceKm = it; compute() },
+                    label = { Text("Distância (km)") },
+                    supportingText = { Text("Opcional. Ex.: 5,2 para 5 km") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
                 )
@@ -194,7 +252,7 @@ private fun RunWorkoutForm(
                     onValueChange = { rpe = it; compute() },
                     label = { Text("RPE (opcional)") },
                     supportingText = { Text("De 1 a 10. Use vírgula ou ponto para decimais.") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
                 )
@@ -231,14 +289,12 @@ private fun RunWorkoutForm(
                     compute()
                     if (error == null) {
                         val dur = durationMinutes.toIntOrNull() ?: 0
-                        val dist = parseDraftNumber(distanceMeters)
-                        val rpeVal = parseDraftNumber(rpe)
                         onFinish(
                             session.session.id,
                             RunLogInput(
                                 durationSeconds = dur.toLong() * 60,
-                                distanceMeters = dist,
-                                rpe = rpeVal,
+                                distanceKm = parseDistanceKm(distanceKm),
+                                rpe = parseDraftNumber(rpe),
                             ),
                         )
                     }
@@ -253,11 +309,43 @@ private fun RunWorkoutForm(
             }
 
             TextButton(
-                onClick = onLeave,
+                onClick = { showDiscardConfirm = true },
                 modifier = Modifier.minimumInteractiveComponentSize(),
             ) {
                 Text("Cancelar")
             }
         }
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text("Descartar treino?") },
+            text = {
+                Text(
+                    "Você sai sem registrar a corrida. A sessão continua em andamento " +
+                        "e pode ser retomada na tela inicial."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardConfirm = false
+                        onLeave()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Descartar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDiscardConfirm = false },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Continuar")
+                }
+            },
+        )
     }
 }

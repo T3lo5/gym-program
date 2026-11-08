@@ -69,6 +69,7 @@ import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
 import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
+import com.treinos.app.ui.formatRunDistanceKm
 import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
 import com.treinos.app.ui.planVolumeLabel
@@ -999,7 +1000,12 @@ private fun DayCard(
 private fun ActivitySummaryCard(session: SessionWithExercises) {
     val modality = ActivityModality.fromStorageValue(session.session.modality)
     val title = session.session.title.ifBlank { session.session.dayName }.ifBlank { modality.label }
-    val distance = formatDistanceMeters(session.session.totalDistanceMeters)
+    // H3-31: corrida em km como o corredor pensa; demais modalidades em metros.
+    val distance = if (modality == ActivityModality.RUN) {
+        formatRunDistanceKm(session.session.totalDistanceMeters)
+    } else {
+        formatDistanceMeters(session.session.totalDistanceMeters)
+    }
     val pace = when (modality) {
         ActivityModality.RUN ->
             formatPacePerKm(session.session.totalDurationSeconds, session.session.totalDistanceMeters)
