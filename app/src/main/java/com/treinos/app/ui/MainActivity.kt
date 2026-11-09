@@ -1,5 +1,6 @@
 package com.treinos.app.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ class MainActivity : ComponentActivity() {
             TreinosTheme {
                 val viewModel: AppViewModel = viewModel(
                     factory = AppViewModel.factory(
+                        context = this@MainActivity,
                         repository = container.repository,
                         preferences = container.preferences,
                         exerciseMediaRepository = container.exerciseMediaRepository,
@@ -24,6 +26,10 @@ class MainActivity : ComponentActivity() {
                         restFeedback = container.restFeedback,
                     )
                 )
+                // H3-35: atalho "Retomar treino" abre direto a tela de treino.
+                if (intent.getBooleanExtra("extra_resume_session", false)) {
+                    viewModel.resumeWorkout()
+                }
                 TreinosApp(viewModel)
             }
         }

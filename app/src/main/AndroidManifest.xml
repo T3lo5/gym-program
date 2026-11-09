@@ -30,6 +30,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- H3-35: atalho dinâmico "Retomar treino" (publicado via ShortcutManagerCompat). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Wear OS Data Layer: recebe comandos do relógio -->

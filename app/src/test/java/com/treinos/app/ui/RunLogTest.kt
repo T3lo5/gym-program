@@ -36,4 +36,29 @@ class RunLogTest {
         // Vazio = sem distância (campo opcional).
         assertNull(parseDistanceKm(""))
     }
+
+    @Test
+    fun parse5k_mm_ss() {
+        assertEquals(1530, parse5k("25:30"))
+        assertEquals(60, parse5k("1:00"))
+        assertEquals(5, parse5k("0:05"))
+    }
+
+    @Test
+    fun parse5k_segundos_crus() {
+        assertEquals(1530, parse5k("1530"))
+        assertEquals(0, parse5k("0"))
+    }
+
+    @Test
+    fun parse5k_invalido_null() {
+        assertNull(parse5k(""))
+        assertNull(parse5k("   "))
+        assertNull(parse5k("-5"))
+        assertNull(parse5k("abc"))
+        assertNull(parse5k("25:70")) // segundos > 59
+        assertNull(parse5k("25:0:0")) // três partes
+        assertNull(parse5k("25:")) // segundos faltando
+        assertNull(parse5k(":30")) // minutos faltando
+    }
 }

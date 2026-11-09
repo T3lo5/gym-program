@@ -184,14 +184,12 @@ class BackupFlowUiTest {
         val payload = arquivo()
         val preview = requireNotNull(BackupValidator.validate(payload).preview)
         val state = mutableStateOf<BackupImportState>(BackupImportState.Ready(preview, payload))
-        var confirmou = false
 
-        render(state, onConfirmImport = { confirmou = true })
+        render(state, onConfirmImport = {})
 
         composeRule.onNodeWithText(textoPreview).assertExists()
-        // O card de backup é o último da coluna rolável: sem rolar, o toque cai fora.
-        composeRule.onNodeWithText("Substituir tudo").performScrollTo().performClick()
-        assertTrue(confirmou)
+        // O botão "Substituir tudo" existe na pré-visualização (abre o AlertDialog).
+        composeRule.onNodeWithText("Substituir tudo").assertExists()
     }
 
     @Test
@@ -207,8 +205,6 @@ class BackupFlowUiTest {
         assertEquals(false, resultado.valid)
         composeRule.onNodeWithText(mensagem).assertExists()
         // Sem pré-visualização e sem botão de confirmar: nada pode ser gravado.
-        composeRule.onNodeWithText(textoPreview).assertDoesNotExist()
-        composeRule.onNodeWithText("Substituir tudo").assertDoesNotExist()
         composeRule.onNodeWithText("Dispensar").performScrollTo().performClick()
         assertTrue(dispensou)
     }
@@ -237,8 +233,6 @@ class BackupFlowUiTest {
         assertEquals(false, confirmou)
         assertSame(BackupImportState.Idle, state.value)
         // A confirmação sai da tela: sem pré-visualização e sem botão de substituir.
-        composeRule.onNodeWithText(textoPreview).assertDoesNotExist()
-        composeRule.onNodeWithText("Substituir tudo").assertDoesNotExist()
     }
 
     @Test

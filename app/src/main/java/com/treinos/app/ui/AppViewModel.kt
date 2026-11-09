@@ -1,6 +1,10 @@
 package com.treinos.app.ui
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -73,6 +77,7 @@ import java.time.temporal.ChronoUnit
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
+import com.treinos.app.R
 
 enum class Screen {
     Home,
@@ -106,6 +111,7 @@ fun fallbackReasonLabel(reason: String?): String? = when (reason) {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(
+    private val context: Context,
     private val repository: WorkoutRepository,
     private val preferences: AppPreferences,
     private val exerciseMediaRepository: ExerciseMediaRepository? = null,
@@ -114,6 +120,26 @@ class AppViewModel(
     private val wearSyncRepository: WearSyncRepository? = null,
     private val restFeedback: RestFeedbackPlayer? = null,
 ) : ViewModel() {
+
+    // H3-35: atalho dinâmico "Retomar treino".
+    private fun publishResumeShortcut(session: com.treinos.app.data.local.SessionWithExercises?) {
+        if (session != null) {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                putExtra(EXTRA_RESUME_SESSION, true)
+            }
+            val shortcut = ShortcutInfoCompat.Builder(context, SHORTCUT_ID_RESUME)
+                .setShortLabel("Retomar treino")
+                .setLongLabel("Retomar o treino em andamento")
+                .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(
+                    context, com.treinos.app.R.mipmap.ic_launcher))
+                .setIntent(intent)
+                .build()
+            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        } else {
+            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(SHORTCUT_ID_RESUME))
+        }
+    }
 
     private val backendConnector = BackendConnector(healthChecker, preferences)
 
@@ -504,6 +530,12 @@ class AppViewModel(
                         _wearState.value = null
                     }
                 }
+            }
+        }
+        // H3-35: atalho dinâmico "Retomar treino" quando há sessão em andamento.
+        viewModelScope.launch {
+            inProgressSession.collect { session ->
+                publishResumeShortcut(session)
             }
         }
     }
@@ -1719,10 +1751,15 @@ class AppViewModel(
     companion object {
         private const val TAG = "AppViewModel"
 
+        // H3-35: atalho dinâmico "Retomar treino".
+        private const val SHORTCUT_ID_RESUME = "resume_workout"
+        private const val EXTRA_RESUME_SESSION = "extra_resume_session"
+
         /** "+15 s" padrão da faixa de descanso (H3-26). */
         const val REST_EXTEND_SECONDS = 15
 
         fun factory(
+            context: Context,
             repository: WorkoutRepository,
             preferences: AppPreferences,
             exerciseMediaRepository: ExerciseMediaRepository? = null,
@@ -1734,6 +1771,7 @@ class AppViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return AppViewModel(
+                    context,
                     repository,
                     preferences,
                     exerciseMediaRepository,

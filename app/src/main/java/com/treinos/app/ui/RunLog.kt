@@ -68,6 +68,25 @@ fun parseDistanceKm(text: String): Double? {
 fun runDistanceKmToMeters(km: Double): Double =
     Math.round(km * 1000.0 * 10.0) / 10.0
 
+/**
+ * H3-35: benchmark 5 km aceita "mm:ss" (ex.: "25:30" → 1530 s) ou segundos crus
+ * ("1530" → 1530 s). Rejeita segundos > 59 na parte de minutos (ex.: "25:70"),
+ * vazio e negativo. Sem mudança de rede/banco.
+ */
+fun parse5k(value: String): Int? {
+    val normalized = value.trim()
+    if (normalized.isEmpty()) return null
+    if (normalized.contains(':')) {
+        val partes = normalized.split(':')
+        if (partes.size != 2) return null
+        val minutos = partes[0].toIntOrNull() ?: return null
+        val segundos = partes[1].toIntOrNull() ?: return null
+        if (minutos < 0 || segundos < 0 || segundos > 59) return null
+        return (minutos * 60 + segundos).takeIf { it >= 0 }
+    }
+    return normalized.toIntOrNull()?.takeIf { it >= 0 }
+}
+
 /** Alvo do dia planejado exibido no topo da corrida (H3-31). */
 data class RunPlanTarget(
     val name: String,

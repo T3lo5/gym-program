@@ -200,6 +200,14 @@ fun LogActivityScreen(
                 }
             }
             item {
+                Text(
+                    text = "Esforço de 1 (leve) a 10 (máximo). Deixe vazio se não souber informar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
                 OutlinedTextField(
                     value = draft.distanceText,
                     onValueChange = { draft = draft.copy(distanceText = it) },

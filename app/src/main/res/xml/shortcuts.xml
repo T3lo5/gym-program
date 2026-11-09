@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- H3-35: atalho dinâmico "Retomar treino", publicado via ShortcutManagerCompat
+         quando há sessão em andamento. O id e o intent são preenchidos dinamicamente. -->
+    <shortcut
+        android:shortcutId="resume_workout"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_resume_short_label"
+        android:shortcutLongLabel="@string/shortcut_resume_long_label" />
+</shortcuts>

@@ -56,6 +56,7 @@ import com.treinos.app.ui.ModalityDraft
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.UiError
 import com.treinos.app.ui.formatDecimal
+import com.treinos.app.ui.parse5k
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ErrorState
@@ -444,6 +445,7 @@ fun GenerateScreen(
                                     val draft = modalityDrafts[type] ?: ModalityDraft(type = type)
                                     var included by remember(type) { mutableStateOf(draft.included) }
                                     var sessions by remember(type) { mutableStateOf(draft.sessionsPerWeek) }
+                                    var sessionsText by remember(type) { mutableStateOf(draft.sessionsPerWeek.toString()) }
                                     var recent5kText by remember(type) {
                                         mutableStateOf(draft.recent5kSeconds?.toString() ?: "")
                                     }
@@ -502,8 +504,9 @@ fun GenerateScreen(
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                 ) {
                                                     OutlinedTextField(
-                                                        value = sessions.toString(),
+                                                        value = sessionsText,
                                                         onValueChange = {
+                                                            sessionsText = it
                                                             val v = if (it.isBlank()) sessions else (it.toIntOrNull() ?: sessions)
                                                             sessions = v.coerceIn(1, 7)
                                                             val updated = draft.copy(included = true, sessionsPerWeek = sessions)
@@ -516,7 +519,8 @@ fun GenerateScreen(
                                                             imeAction = ImeAction.Done,
                                                         ),
                                                         isError = sessions < 1 || sessions > 7,
-                                                        modifier = Modifier.weight(1f),
+                                                        modifier = Modifier
+                                                            .weight(1f),
                                                     )
                                                 }
                                                 when (type) {
@@ -527,12 +531,12 @@ fun GenerateScreen(
                                                                 recent5kText = it
                                                                 val updated = draft.copy(
                                                                     included = true,
-                                                                    recent5kSeconds = it.toIntOrNull(),
+                                                                    recent5kSeconds = parse5k(it),
                                                                 )
                                                                 modalityDrafts = modalityDrafts + (type to updated)
                                                             },
-                                                            label = { Text("Benchmark 5 km (s, opcional)") },
-                                                            supportingText = { Text("Opcional. Tempo em segundos.") },
+                                                            label = { Text("Benchmark 5 km (mm:ss ou segundos, opcional)") },
+                                                            supportingText = { Text("Ex.: 25:30 ou 1530") },
                                                             keyboardOptions = KeyboardOptions(
                                                                 keyboardType = KeyboardType.Number,
                                                                 imeAction = ImeAction.Done,
