@@ -35,6 +35,7 @@ from .plan_builder import (
     id_name_mismatches,
     normalize,
     resolve_plan_ids,
+    request_language,
     review_date,
     profile_adjustments,
     suggest_initial_load,
@@ -188,8 +189,23 @@ def system_prompt_for_request(request: "GenerateRequest") -> str:
         base = SYSTEM_PROMPT_HYBRID_RULES.format(catalog_summary=summary)
         if is_complementary_request(request):
             base += COMPLEMENTARY_SYSTEM_RULES
-        return base
-    return SYSTEM_PROMPT_STRENGTH_RULES.format(catalog_summary=summary)
+    else:
+        base = SYSTEM_PROMPT_STRENGTH_RULES.format(catalog_summary=summary)
+    # H3-36: o catálogo do summary já está no idioma do request; a diretiva
+    # explícita evita a IA traduzir por conta própria (ou voltar ao EN).
+    if request_language(request) == "pt":
+        base += (
+            "\n\nIDIOMA: o catálogo acima está em português. Escreva "
+            "`exerciseName` e as notas em português, usando exatamente os nomes "
+            "do catálogo. O `exerciseId` permanece o ID exato do catálogo."
+        )
+    else:
+        base += (
+            "\n\nIDIOMA: escreva `exerciseName` e as notas em inglês, usando "
+            "exatamente os nomes do catálogo. O `exerciseId` permanece o ID "
+            "exato do catálogo."
+        )
+    return base
 
 
 def system_prompt_hybrid(complementary: bool = False) -> str:
@@ -348,6 +364,10 @@ class GenerateRequest(BaseModel):
         description="Foco EXCLUSIVO do plano complementar (H3-16), 1–4 grupos de "
         "MUSCLE_ALIASES (ex.: ['abs']). Presente ⇒ plano só de força.",
     )
+    # H3-36: idioma do conteúdo do plano (nomes/instruções dos exercícios).
+    # Ausente ⇒ "en" — comportamento atual preservado para app antigo; "pt" ⇒
+    # exerciseName e instructions em português, com o mesmo exerciseId.
+    language: Optional[Literal["pt", "en"]] = None
 
     @model_validator(mode="after")
     def validate_complementary(self) -> "GenerateRequest":
@@ -609,6 +629,11 @@ def build_user_prompt(request: GenerateRequest) -> str:
 - Duração por sessão: ~{request.sessionDurationMinutes} min
 - Split preferido: {request.preferredSplit or 'livre'}
 - Lesões/limitações: {request.injuriesOrLimitations or 'nenhuma'}
+- Idioma dos nomes/instruções dos exercícios: {
+        'português (use exatamente os nomes em português do catálogo)'
+        if request_language(request) == 'pt'
+        else 'inglês (use exatamente os nomes em inglês do catálogo)'
+    }
 
 O treino deve ser progressivo, balanceado e usar apenas exercícios do catálogo fornecido.
 Retorne APENAS o JSON válido."""
@@ -645,6 +670,13 @@ def build_hybrid_user_prompt(request: GenerateRequest) -> str:
         f"- Nível: {request.currentLevel}",
         f"- Objetivo global: {request.goal}",
         f"- Revisar após: {request.reviewAfterWeeks} semanas",
+        # H3-36: idioma do conteúdo segue o request (ausente ⇒ inglês).
+        "- Idioma dos nomes/instruções dos exercícios: "
+        + (
+            "português (use exatamente os nomes em português do catálogo)"
+            if request_language(request) == "pt"
+            else "inglês (use exatamente os nomes em inglês do catálogo)"
+        ),
         "",
         "Modalidades (cada uma gera sessões próprias, nunca misturadas num único dia):",
     ]
@@ -1040,7 +1072,11 @@ async def generate_workout(request: GenerateRequest):
                 raw_plan = parse_ai_plan(content, EXERCISE_CATALOG, request)
 
                 workout = WorkoutPlanDTO(**raw_plan)
-                workout_data = enrich_plan(workout.model_dump(), EXERCISE_CATALOG)
+                # H3-36: conteúdo do plano no idioma do request (PT quando
+                # pedido; EN canônico quando ausente).
+                workout_data = enrich_plan(
+                    workout.model_dump(), EXERCISE_CATALOG, language=request_language(request)
+                )
                 if is_hybrid:
                     workout_data = normalize_hybrid_plan(workout_data)
                 if is_complementary:

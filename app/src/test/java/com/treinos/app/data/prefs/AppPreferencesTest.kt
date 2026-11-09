@@ -55,4 +55,18 @@ class AppPreferencesTest {
 
         assertNotNull("${preferences.backendUrl}/health".toHttpUrlOrNull())
     }
+
+    @Test
+    fun language_default_pt_e_normalizado() {
+        // H3-36: conteúdo de exercício nasce em português; valor desconhecido
+        // cai para o default e só "en"/"pt" são aceitos.
+        assertEquals(AppPreferences.DEFAULT_LANGUAGE, preferences.language)
+        assertEquals("pt", preferences.language)
+
+        preferences.language = "en"
+        assertEquals("en", preferences.language)
+
+        preferences.language = "es"
+        assertEquals("pt", preferences.language)
+    }
 }

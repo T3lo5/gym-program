@@ -1,6 +1,7 @@
 package com.treinos.app.data.media
 
 import android.content.Context
+import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 import com.treinos.app.data.remote.CatalogResponseDto
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,30 @@ data class ExerciseMedia(
     val equipment: String,
     val instructions: List<String>,
     val imageUrl: String?,
+    // H3-36: tradução PT aditiva do catálogo. Null = sem tradução — o app
+    // usa o EN canônico (nunca inventar).
+    val namePt: String? = null,
+    val instructionsPt: List<String>? = null,
 )
+
+/** Idiomas de conteúdo (H3-36); a preferência do app defaulta "pt". */
+const val LANGUAGE_CONTENT_PT = "pt"
+
+/**
+ * H3-36: conteúdo no idioma pedido. "pt" usa `namePt`/`instructionsPt`
+ * quando existem; tradução ausente/vazia cai para o EN canônico — campo a
+ * campo, porque o fork pode trazer nome sem passos. Pura: testável em JVM.
+ */
+fun ExerciseMedia.resolvedFor(language: String?): ExerciseMedia {
+    if (language != LANGUAGE_CONTENT_PT) return this
+    val ptName = namePt?.takeIf { it.isNotBlank() }
+    val ptInstructions = instructionsPt?.takeIf { it.isNotEmpty() }
+    if (ptName == null && ptInstructions == null) return this
+    return copy(
+        name = ptName ?: name,
+        instructions = ptInstructions ?: instructions,
+    )
+}
 
 @Serializable
 private data class CachedCatalog(
@@ -37,6 +61,9 @@ private data class CachedExercise(
     val equipment: String = "",
     val instructions: List<String> = emptyList(),
     val images: List<String> = emptyList(),
+    // H3-36: cache guarda EN + PT; cache antigo sem os campos decodifica null.
+    val namePt: String? = null,
+    val instructionsPt: List<String>? = null,
 )
 
 class ExerciseMediaRepository(
@@ -85,9 +112,15 @@ class ExerciseMediaRepository(
 
     suspend fun load(forceRefresh: Boolean = false): Map<String, ExerciseMedia> =
         withContext(Dispatchers.IO) {
+            // H3-36: o cache/merge guarda EN + PT; a resolução por idioma
+            // acontece na saída, lendo a preferência do app (default "pt").
+            val language = AppPreferences(context).language
+            fun localize(map: Map<String, ExerciseMedia>) =
+                map.mapValues { (_, media) -> media.resolvedFor(language) }
+
             val cached = if (!forceRefresh) readCache() else null
             if (cached != null && !isExpired()) {
-                return@withContext cached
+                return@withContext localize(cached)
             }
 
             val fetched = runCatching { fetchFromBackend() }.getOrNull()
@@ -98,7 +131,7 @@ class ExerciseMediaRepository(
             if (merged.isNotEmpty() && merged !== cached) {
                 writeCache(merged)
             }
-            return@withContext merged
+            return@withContext localize(merged)
         }
 
     private suspend fun fetchFromBackend(): Map<String, ExerciseMedia>? {
@@ -116,6 +149,8 @@ class ExerciseMediaRepository(
                 equipment = exercise.equipment,
                 instructions = exercise.instructions,
                 imageUrl = imageUrl,
+                namePt = exercise.namePt,
+                instructionsPt = exercise.instructionsPt,
             )
         }
     }
@@ -136,6 +171,8 @@ class ExerciseMediaRepository(
                     equipment = ex.equipment,
                     instructions = ex.instructions,
                     imageUrl = imageUrlFor(ex.images),
+                    namePt = ex.namePt,
+                    instructionsPt = ex.instructionsPt,
                 )
             }
         }.getOrNull()
@@ -162,6 +199,10 @@ class ExerciseMediaRepository(
                     equipment = media.equipment,
                     instructions = media.instructions,
                     images = imagesFromUrl(media.imageUrl),
+                    // EN + PT vão juntos para o cache: trocar a preferência
+                    // (H3-37) não exige refetch do backend.
+                    namePt = media.namePt,
+                    instructionsPt = media.instructionsPt,
                 )
             }
             val cached = CachedCatalog(fetchedAt = System.currentTimeMillis(), exercises = exercises)

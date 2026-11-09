@@ -786,6 +786,9 @@ class AppViewModel(
                         modalities = effectiveModalities,
                         environment = environment,
                         focusMuscles = focusMuscles,
+                        // H3-36: conteúdo do plano no idioma da preferência
+                        // (default "pt"); null nunca viaja (explicitNulls=false).
+                        language = preferences.language,
                     ),
                     kind = kind,
                 )

@@ -9,6 +9,7 @@
   "currentLevel": "intermediate",
   "sessionDurationMinutes": 15,
   "reviewAfterWeeks": 4,
+  "language": "pt",
   "focusMuscles": ["abs"],
   "modalities": [
     {

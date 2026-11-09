@@ -486,17 +486,51 @@ def resolve_plan_ids(
     return plan, dropped
 
 
-def enrich_plan(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Adiciona nome, músculos e equipamento para o app não precisar do catálogo."""
+def request_language(request: Any) -> str:
+    """Idioma do conteúdo do plano (H3-36): 'pt' só quando o request pede;
+    ausente/inválido ⇒ 'en' (comportamento atual preservado)."""
+    return "pt" if str(getattr(request, "language", None) or "").strip().lower() == "pt" else "en"
+
+
+def _localized(
+    source: Dict[str, Any],
+    pt_key: str,
+    en_value: Any,
+    language: str,
+) -> Any:
+    """Valor no idioma do request (H3-36). Tradução ausente/vazia nunca é
+    inventada: `namePt`/`instructionsPt` null caem para o EN canônico."""
+    if language == "pt":
+        pt_value = source.get(pt_key)
+        if pt_value:
+            return pt_value
+    return en_value
+
+
+def enrich_plan(
+    plan: Dict[str, Any],
+    catalog: List[Dict[str, Any]],
+    language: str = "en",
+) -> Dict[str, Any]:
+    """Adiciona nome, músculos e equipamento para o app não precisar do catálogo.
+
+    `language="pt"` (H3-36): `exerciseName`/`instructions` vêm de
+    `namePt`/`instructionsPt` quando existem; sem tradução, EN. O
+    `exerciseId` nunca muda — é a chave em todo o sistema.
+    """
     by_id, _ = catalog_index(catalog)
     for day in plan.get("days", []):
         for exercise in day.get("exercises", []):
             source = by_id.get(exercise.get("exerciseId", ""))
             if source:
-                exercise["exerciseName"] = source.get("name", exercise.get("exerciseId", ""))
+                exercise["exerciseName"] = _localized(
+                    source, "namePt", source.get("name", exercise.get("exerciseId", "")), language
+                )
                 exercise["primaryMuscles"] = source.get("primaryMuscles", [])
                 exercise["equipment"] = source.get("equipment") or "body only"
-                exercise["instructions"] = source.get("instructions", [])
+                exercise["instructions"] = _localized(
+                    source, "instructionsPt", source.get("instructions", []), language
+                )
                 exercise["images"] = source.get("images", [])
             else:
                 exercise.setdefault("exerciseName", exercise.get("exerciseId", ""))
@@ -554,6 +588,8 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
     lines = [
         "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (IDs exatos; prefira sempre estes IDs):"
     ]
+    # H3-36: nomes listados no idioma do request — a IA ecoa o nome que vê.
+    language = request_language(request)
     for muscle in ordered_muscles:
         exercises = by_muscle.get(muscle) or []
         if not exercises:
@@ -561,7 +597,8 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
         lines.append(f"\n{muscle.upper()}:")
         for ex in exercises:
             eq = (ex.get("equipment") or "body only").strip()
-            lines.append(f"  - {ex['id']} ({ex.get('name', ex['id'])}, {eq})")
+            name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
+            lines.append(f"  - {ex['id']} ({name}, {eq})")
     return "\n".join(lines)
 
 
@@ -593,18 +630,32 @@ def id_name_mismatches(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> L
             source = by_id.get(ex_id)
             if not source:
                 continue
-            official = str(source.get("name", "")).strip()
-            if not official:
+            # H3-36: mapa duplo — o nome declarado pode ser o EN canônico OU o
+            # PT do mesmo ID; sem isso, todo plano em PT viraria falso positivo.
+            official_names = [str(source.get("name", "")).strip()]
+            name_pt = str(source.get("namePt") or "").strip()
+            if name_pt and name_pt not in official_names:
+                official_names.append(name_pt)
+            if not any(official_names):
                 continue
 
             n_declared = normalize(declared)
-            n_official = normalize(official)
-            if not n_declared or not n_official:
+            if not n_declared:
                 continue
-            # Match tolerante: igual normalizado, contido, ou fuzzy próximo.
-            if n_declared == n_official or n_declared in n_official or n_official in n_declared:
-                continue
-            if get_close_matches(n_declared, [n_official], n=1, cutoff=0.72):
+            # Match tolerante por candidato: igual normalizado, contido, ou
+            # fuzzy próximo.
+            matched = False
+            for official in official_names:
+                n_official = normalize(official)
+                if not n_official:
+                    continue
+                if n_declared == n_official or n_declared in n_official or n_official in n_declared:
+                    matched = True
+                    break
+                if get_close_matches(n_declared, [n_official], n=1, cutoff=0.72):
+                    matched = True
+                    break
+            if matched:
                 continue
             # Também aceita se o nome declarado resolve para o MESMO ID no índice
             # global (ex.: variação/tradução que o fuzzy do catálogo já conhece).
@@ -620,7 +671,7 @@ def id_name_mismatches(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> L
                 {
                     "exerciseId": ex_id,
                     "declared": declared,
-                    "official": official,
+                    "official": official_names[0],
                     "reason": "id_name_mismatch",
                 }
             )
@@ -850,7 +901,7 @@ def build_local_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, A
         "daysPerWeek": days_per_week,
         "days": days,
     }
-    plan = enrich_plan(plan, catalog)
+    plan = enrich_plan(plan, catalog, language=request_language(request))
 
     body_weight_kg = getattr(request, "bodyWeightKg", None)
     height_cm = getattr(request, "heightCm", None)
@@ -1492,7 +1543,7 @@ def build_hybrid_plan(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, 
         "daysPerWeek": len(days),
         "days": days,
     }
-    plan = enrich_plan(plan, catalog)
+    plan = enrich_plan(plan, catalog, language=request_language(request))
     plan = normalize_hybrid_plan(plan)
 
     body_weight_kg = getattr(request, "bodyWeightKg", None)

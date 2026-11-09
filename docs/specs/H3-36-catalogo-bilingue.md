@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-36` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-09` (proposta de 2026-11-07) |
+| Implementação | `concluída (2026-11-09)` |
 
 **Origem:** avaliação de 2026-11-07 do dataset
 [gugeldev/exercicios-bd-ptbr](https://github.com/gugeldev/exercicios-bd-ptbr)

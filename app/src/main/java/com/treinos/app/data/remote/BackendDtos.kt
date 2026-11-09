@@ -23,6 +23,9 @@ data class GeneratePlanRequest(
     // (ex.: ["abs"]). Presente ⇒ o backend gera plano só de força. Null quando
     // não há foco (o campo nem viaja: explicitNulls = false).
     val focusMuscles: List<String>? = null,
+    // H3-36: idioma do conteúdo do plano (nomes/instruções). Null ⇒ o campo
+    // nem viaja e o backend usa "en" (retrocompatível com backend antigo).
+    val language: String? = null,
 )
 
 @Serializable
@@ -347,11 +350,16 @@ data class SyncDownloadSetLogDto(
 data class CatalogExerciseDto(
     val id: String,
     val name: String = "",
+    // H3-36: tradução PT aditiva. Null nos exercícios sem tradução — o app
+    // cai para o EN canônico (nunca inventar). Backend antigo não envia os
+    // campos e o decode usa o default null.
+    val namePt: String? = null,
     val primaryMuscles: List<String> = emptyList(),
     val secondaryMuscles: List<String> = emptyList(),
     val equipment: String = "",
     val level: String = "",
     val instructions: List<String> = emptyList(),
+    val instructionsPt: List<String>? = null,
     val images: List<String> = emptyList(),
 )
 

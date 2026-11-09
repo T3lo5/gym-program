@@ -117,6 +117,21 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_LAST_FALLBACK_REASON, value).apply()
         }
 
+    /**
+     * Idioma do conteúdo de exercício (H3-36): "pt" ou "en". Default "pt" —
+     * planos novos já nascem em português antes do seletor da H3-37. Valor
+     * desconhecido cai para o default.
+     */
+    var language: String
+        get() = prefs.getString(KEY_LANGUAGE, null)?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_LANGUAGE
+        set(value) {
+            prefs.edit().putString(
+                KEY_LANGUAGE,
+                if (value == LANGUAGE_EN) LANGUAGE_EN else LANGUAGE_PT,
+            ).apply()
+        }
+
     fun isRecentCommand(commandId: String): Boolean {
         val ids = prefs.getStringSet(KEY_WEAR_RECENT_COMMANDS, emptySet()) ?: emptySet()
         return CommandDedupe.isRecent(ids, commandId)
@@ -135,6 +150,11 @@ class AppPreferences private constructor(
         /** Emulador Android acessa o host em 10.0.2.2. */
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:3000"
 
+        /** Idiomas do conteúdo de exercício (H3-36); default português. */
+        const val LANGUAGE_PT = "pt"
+        const val LANGUAGE_EN = "en"
+        const val DEFAULT_LANGUAGE = LANGUAGE_PT
+
         /**
          * Aceita o endereço com ou sem esquema ("192.168.1.16:3000" é o formato
          * sugerido na tela de Ajustes). Sem esquema o OkHttp recusa a URL antes
@@ -152,6 +172,7 @@ class AppPreferences private constructor(
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_LANGUAGE = "language"
         private const val KEY_REST_DEADLINE_AT = "rest_deadline_at"
         private const val KEY_REST_TOTAL = "rest_total"
         private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"

@@ -173,4 +173,56 @@ class ExerciseMediaTest {
             ),
         )
     }
+
+    @Test
+    fun instrucoes_por_idioma() {
+        // H3-36: "pt" resolve nome e instruções do catálogo; "en"/null mantém
+        // o EN canônico. Resolução campo a campo e pura (sem Android).
+        val media = ExerciseMedia(
+            id = "3_4_Sit-Up",
+            name = "3/4 Sit-Up",
+            primaryMuscles = listOf("abdominals"),
+            equipment = "body only",
+            instructions = listOf("Lie down on the floor.", "Sit back up."),
+            imageUrl = null,
+            namePt = "Abdominal 3/4",
+            instructionsPt = listOf("Deite-se no chão.", "Sente-se de novo."),
+        )
+        val pt = media.resolvedFor("pt")
+        assertEquals("Abdominal 3/4", pt.name)
+        assertEquals(listOf("Deite-se no chão.", "Sente-se de novo."), pt.instructions)
+        // EN e idioma ausente não traduzem.
+        assertEquals("3/4 Sit-Up", media.resolvedFor("en").name)
+        assertEquals(media.instructions, media.resolvedFor("en").instructions)
+        assertEquals("3/4 Sit-Up", media.resolvedFor(null).name)
+        // Original intacto (resolvedFor não muta).
+        assertEquals("3/4 Sit-Up", media.name)
+    }
+
+    @Test
+    fun namept_ausente_cai_para_en() {
+        // H3-36: os 3 exercícios sem tradução (ex.: Kettlebell_Halo) chegam
+        // com namePt/instructionsPt null — nunca inventar; o app usa o EN.
+        val media = ExerciseMedia(
+            id = "Kettlebell_Halo",
+            name = "Kettlebell Halo",
+            primaryMuscles = listOf("shoulders"),
+            equipment = "kettlebells",
+            instructions = listOf("Hold the bell at chest height."),
+            imageUrl = null,
+            namePt = null,
+            instructionsPt = null,
+        )
+        val pt = media.resolvedFor("pt")
+        assertEquals("Kettlebell Halo", pt.name)
+        assertEquals(listOf("Hold the bell at chest height."), pt.instructions)
+        // Tradução parcial: nome PT existe, passos não — cada campo cai só
+        // quando falta a sua tradução.
+        val parcial = media.copy(namePt = "Halo com Kettlebell")
+        assertEquals("Halo com Kettlebell", parcial.resolvedFor("pt").name)
+        assertEquals(
+            listOf("Hold the bell at chest height."),
+            parcial.resolvedFor("pt").instructions,
+        )
+    }
 }

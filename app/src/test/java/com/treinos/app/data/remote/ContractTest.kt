@@ -276,6 +276,23 @@ class ContractTest {
     }
 
     @Test
+    fun language_no_request_fixture() {
+        // H3-36: o fixture compartilhado com o backend declara `language` e o
+        // app decodifica. Ausente ⇒ null no DTO — o campo nem viaja
+        // (explicitNulls = false) e o backend interpreta como "en"
+        // (retrocompatível com app antigo e backend antigo).
+        val file = File("../contracts/generate_request_complementary.json")
+        assertTrue("Fixture de contrato não encontrado em ${file.absolutePath}", file.exists())
+        val request = json.decodeFromString(GeneratePlanRequest.serializer(), file.readText())
+        assertEquals("pt", request.language)
+
+        val semIdioma = GeneratePlanRequest(deviceId = "d1")
+        val encoded = json.encodeToString(GeneratePlanRequest.serializer(), semIdioma)
+        assertFalse(encoded.contains("language"))
+        assertNull(json.decodeFromString(GeneratePlanRequest.serializer(), encoded).language)
+    }
+
+    @Test
     fun goal_da_modalidade_forca_segue_chip() {
         // H3-30: o goal da modalidade de força é o do chip global (ex.:
         // "strength" quando o usuário escolhe Força) — não mais o "hypertrophy"
