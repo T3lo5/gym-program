@@ -5,6 +5,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -202,7 +203,12 @@ fun TreinosApp(viewModel: AppViewModel) {
                 targetState = screen,
                 label = "screen",
                 transitionSpec = {
-                    val duration = motionDurationMillis(ValueAnimator.getDurationScale())
+                    val animatorScale = if (Build.VERSION.SDK_INT >= 33) {
+                        ValueAnimator.getDurationScale()
+                    } else {
+                        1f
+                    }
+                    val duration = motionDurationMillis(animatorScale)
                     val motion = if (initialState == null) {
                         ScreenMotion.NONE
                     } else {
