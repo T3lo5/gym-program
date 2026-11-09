@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -122,6 +124,7 @@ fun WorkoutScreen(
     var showFinishConfirm by remember { mutableStateOf(false) }
     var showAbandonConfirm by remember { mutableStateOf(false) }
     var scrollTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var setSavedAnnouncement by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
     // Sessão ativa mantém a tela acesa (H3-26); ao sair da tela a flag é liberada.
@@ -183,6 +186,16 @@ fun WorkoutScreen(
             }
         },
     ) { padding ->
+        // Anúncio TalkBack: série salva (dispara quando o texto muda).
+        setSavedAnnouncement?.let { announcement ->
+            Text(
+                text = announcement,
+                modifier = Modifier
+                    .size(0.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+
         val current = session
         if (current == null) {
             if (hasInProgressSession) {
@@ -320,6 +333,13 @@ fun WorkoutScreen(
             onDelete = null,
             onDismiss = { exerciseToLogId = null },
             onConfirm = { reps, weight, rpe ->
+                val nextSetNumber = exercise.sets.size + 1
+                val partes = mutableListOf<String>()
+                reps?.let { partes.add("$it reps") }
+                weight?.let { partes.add(formatKg(it)) }
+                val detalhe = partes.joinToString(" • ")
+                setSavedAnnouncement =
+                    "Série $nextSetNumber salva${if (detalhe.isNotBlank()) " — $detalhe" else ""}"
                 onLogSet(exercise, reps, weight, rpe)
                 exerciseToLogId = null
             },
@@ -452,6 +472,15 @@ private fun RestBar(
 ) {
     val announce = timerShouldAnnounce(remaining)
     val finished = remaining <= 0
+    val restStarted = remaining == total && remaining > 0 && !paused && !finished
+    var restStartedAnnouncement by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(remaining, total, paused, finished) {
+        if (restStarted) {
+            restStartedAnnouncement = "Descanso de ${formatSeconds(remaining)} s iniciado"
+        } else {
+            restStartedAnnouncement = null
+        }
+    }
     val message = when {
         finished -> "Descanso concluído. Bora para a próxima série."
         paused -> "Descanso pausado: ${formatSeconds(remaining)}"
@@ -478,6 +507,14 @@ private fun RestBar(
             },
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            restStartedAnnouncement?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier
+                        .size(0.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             Text(
                 text = message,
                 style = MaterialTheme.typography.titleMedium,
@@ -738,7 +775,10 @@ private fun SetDialog(
             Text(title)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 helper?.let {
                     Text(
                         text = it,

@@ -220,7 +220,7 @@ fun SettingsScreen(
                         )
                     }
                     connectionMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                     Text(
                         text = "ID deste aparelho: $deviceId",
@@ -327,7 +327,7 @@ fun SettingsScreen(
                     }
 
                     discoveryMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                 }
             }
@@ -365,7 +365,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     syncMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                     // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
                     syncError?.let { uiError ->
@@ -383,7 +383,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     downloadMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                     // H3-29: erro persiste com "Tentar de novo" — não é snackbar.
                     downloadError?.let { uiError ->
@@ -439,7 +439,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     restoreMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                 }
             }
@@ -461,7 +461,7 @@ fun SettingsScreen(
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
                         catalogMessage?.let {
-                            StatusText(text = it, isSuccess = statusIsSuccess(it))
+                            StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
@@ -569,7 +569,7 @@ fun SettingsScreen(
                     }
 
                     backupMessage?.let {
-                        StatusText(text = it, isSuccess = statusIsSuccess(it))
+                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                     }
                 }
             }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -453,7 +455,22 @@ fun GenerateScreen(
                                             verticalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .minimumInteractiveComponentSize()
+                                                    .toggleable(
+                                                        value = included,
+                                                        role = Role.Checkbox,
+                                                        onValueChange = { novo ->
+                                                            included = novo
+                                                            modalityDrafts = modalityDrafts +
+                                                                (type to draft.copy(included = novo))
+                                                        },
+                                                    )
+                                                    .semantics {
+                                                        stateDescription = if (included) "Ligado" else "Desligado"
+                                                        contentDescription = "Incluir $label"
+                                                    },
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Checkbox(
@@ -465,10 +482,7 @@ fun GenerateScreen(
                                                     },
                                                     modifier = Modifier
                                                         .minimumInteractiveComponentSize()
-                                                        .semantics {
-                                                            stateDescription = if (included) "Ligado" else "Desligado"
-                                                            contentDescription = "Incluir $label"
-                                                        },
+                                                        .clearAndSetSemantics { }
                                                 )
                                                 Text(
                                                     text = label,
@@ -490,18 +504,18 @@ fun GenerateScreen(
                                                     OutlinedTextField(
                                                         value = sessions.toString(),
                                                         onValueChange = {
-                                                            val v = it.toIntOrNull() ?: 1
-                                                            sessions = v
-                                                            val updated = draft.copy(included = true, sessionsPerWeek = v)
+                                                            val v = if (it.isBlank()) sessions else (it.toIntOrNull() ?: sessions)
+                                                            sessions = v.coerceIn(1, 7)
+                                                            val updated = draft.copy(included = true, sessionsPerWeek = sessions)
                                                             modalityDrafts = modalityDrafts + (type to updated)
                                                         },
                                                         label = { Text("Sessões por semana") },
-                                                        supportingText = { Text("Número inteiro") },
+                                                        supportingText = { Text("Inteiro de 1 a 7") },
                                                         keyboardOptions = KeyboardOptions(
                                                             keyboardType = KeyboardType.Number,
                                                             imeAction = ImeAction.Done,
                                                         ),
-                                                        isError = sessions < 1,
+                                                        isError = sessions < 1 || sessions > 7,
                                                         modifier = Modifier.weight(1f),
                                                     )
                                                 }

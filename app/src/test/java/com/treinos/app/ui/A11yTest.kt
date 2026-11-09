@@ -1,9 +1,45 @@
 package com.treinos.app.ui
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.statusIsSuccess
+import com.treinos.app.ui.screens.GenerateScreen
+import com.treinos.app.ui.screens.MobilityScreen
+import com.treinos.app.ui.screens.WorkoutScreen
+import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SessionExerciseEntity
+import com.treinos.app.data.local.SessionExerciseWithSets
+import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.ui.MobilityScreenState
+import com.treinos.app.ui.MobilitySessionState
+import com.treinos.app.ui.MobilityRoutine
+import com.treinos.app.ui.MobilityMovement
+import com.treinos.app.data.media.ExerciseMedia
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,7 +49,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class A11yTest {
+    @get:Rule
+    val composeRule = createComposeRule()
     @Test
     fun descricao_do_exercicio_inclui_nome() {
         assertEquals("Exercício Supino reto", exerciseContentDescription("Supino reto"))
@@ -90,6 +129,126 @@ class A11yTest {
         assertFalse(statusIsSuccess("Sem conexão com o servidor. Verifique o Wi-Fi e tente de novo."))
         assertFalse(statusIsSuccess("Informe um ID de aparelho válido."))
         assertFalse(statusIsSuccess("Nenhum dado encontrado; seus dados locais foram mantidos."))
+    }
+
+    @Test
+    fun checkbox_row_tem_role_e_rotulo() {
+        composeRule.setContent {
+            CheckboxRowDemo(included = true, onToggle = {})
+        }
+        composeRule.onNodeWithContentDescription("Incluir Musculação").assertExists()
+    }
+
+    @Test
+    fun liveRegion_anuncia_inicio_do_descanso() {
+        composeRule.setContent {
+            WorkoutScreen(
+                session = sessaoComRest(),
+                restRemaining = 90,
+                restTotal = 90,
+                onLeave = {},
+                onLogSet = { _, _, _, _ -> },
+                onSkipRest = {},
+                onFinish = {},
+                hasInProgressSession = true,
+            )
+        }
+        composeRule.onNodeWithText("Descanso de 01:30 s iniciado").assertExists()
+    }
+
+    @Test
+    fun liveRegion_anuncia_marco_do_timer_mobilidade() {
+        val rotina = MobilityRoutine(
+            id = "r1",
+            name = "Rotina",
+            focus = "Costas",
+            description = "d",
+            movements = listOf(MobilityMovement("Gato-Camelo", 60, cue = "Faça")),
+        )
+        val sessaoMob = MobilitySessionState(
+            routineId = "r1",
+            movementIndex = 0,
+            secondsRemaining = 60,
+            running = true,
+        )
+        composeRule.setContent {
+            MobilityScreen(
+                state = MobilityScreenState(routine = rotina, session = sessaoMob),
+                onBack = {},
+            )
+        }
+        composeRule.onNodeWithText("Temporizador 1 min").assertExists()
+    }
+
+    @Test
+    fun campo_sessoes_tem_supporting_text() {
+        composeRule.setContent {
+            GenerateScreen(
+                isGenerating = false,
+                onBack = {},
+                onGenerate = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+            )
+        }
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Sessões por semana"))
+        composeRule.onNodeWithText("Inteiro de 1 a 7").assertIsDisplayed()
+    }
+
+    private fun sessaoComRest(): SessionWithExercises {
+        return SessionWithExercises(
+            session = WorkoutSessionEntity(
+                id = 1,
+                planId = 1,
+                dayId = 10,
+                planName = "Plano",
+                dayName = "Treino",
+                status = "in_progress",
+            ),
+            exercises = listOf(
+                SessionExerciseWithSets(
+                    exercise = SessionExerciseEntity(
+                        id = 100,
+                        sessionId = 1,
+                        exerciseId = "x",
+                        exerciseName = "Ex",
+                        exerciseOrder = 0,
+                        plannedSets = 3,
+                        completedSets = 0,
+                        restSeconds = 90,
+                    ),
+                    sets = emptyList(),
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun CheckboxRowDemo(
+        included: Boolean,
+        onToggle: () -> Unit,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .minimumInteractiveComponentSize()
+                .toggleable(
+                    value = included,
+                    role = Role.Checkbox,
+                    onValueChange = { onToggle() },
+                )
+                .semantics {
+                    stateDescription = if (included) "Ligado" else "Desligado"
+                    contentDescription = "Incluir Musculação"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = included,
+                onCheckedChange = { onToggle() },
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+            Text(text = "Musculação")
+        }
     }
 }
 

@@ -34,9 +34,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -283,10 +286,13 @@ fun StatusText(
     text: String,
     isSuccess: Boolean,
     modifier: Modifier = Modifier,
+    announce: Boolean = false,
 ) {
     val color = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     Row(
-        modifier = modifier.semantics(mergeDescendants = true) { },
+        modifier = modifier.semantics(mergeDescendants = true) {
+            if (announce) liveRegion = LiveRegionMode.Polite
+        },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

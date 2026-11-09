@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -26,12 +29,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import com.treinos.app.ui.timerShouldAnnounce
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.MobilityRoutine
 import com.treinos.app.ui.MobilityRoutineTemplates
@@ -248,6 +256,16 @@ private fun MobilityPlayer(
     val nextMovement = routine.movements.getOrNull(session.movementIndex + 1)
     val isLast = session.movementIndex >= routine.movements.size - 1
 
+    val timerAnnouncement = when {
+        timerShouldAnnounce(session.secondsRemaining) ->
+            "Temporizador ${formatDuration(session.secondsRemaining.toLong())}"
+        else -> null
+    }
+    var lastTimerAnnounced by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(session.secondsRemaining) {
+        lastTimerAnnounced = timerAnnouncement
+    }
+
     fun finalize() {
         onFinishMobility(planId, dayId, routine.id, session.elapsedSeconds)
         onClearSession()
@@ -266,9 +284,18 @@ private fun MobilityPlayer(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            timerAnnouncement?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier
+                        .size(0.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),

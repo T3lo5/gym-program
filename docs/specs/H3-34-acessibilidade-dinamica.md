@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-34` |
 | MoSCoW | `S` |
 | Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Implementação | `concluída` (gate verde: `VERIFICAÇÃO COMPLETA OK — build, testes, lint e assinatura`) |
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P3.4–3.7).
 

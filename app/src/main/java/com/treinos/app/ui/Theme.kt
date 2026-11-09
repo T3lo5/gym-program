@@ -24,12 +24,30 @@ private val Teal = Color(0xFF00695C)
 internal object ThemeColors {
     const val LightSurface = 0xFFFFFFFF
     const val LightOnSurface = 0xFF1C1B1F
+    const val LightOnSurfaceVariant = 0xFF49494F
     const val LightPrimaryContainer = 0xFFE8F5E9
     const val LightOnPrimaryContainer = 0xFF1B5E20
+    const val LightSecondaryContainer = 0xFFE0F2F1
+    const val LightOnSecondaryContainer = 0xFF004D40
+    const val LightTertiaryContainer = 0xFFE8DEF8
+    const val LightOnTertiaryContainer = 0xFF21005E
+    const val LightError = 0xFFB3261E
+    const val LightOnError = 0xFFFFFFFF
+    const val LightErrorContainer = 0xFFEF9A9A
+    const val LightOnErrorContainer = 0xFF4D0000
     const val DarkSurface = 0xFF1E1E1E
     const val DarkOnSurface = 0xFFE6E1E5
+    const val DarkOnSurfaceVariant = 0xFFCAC4D0
     const val DarkPrimaryContainer = 0xFF387C3C
     const val DarkOnPrimaryContainer = 0xFFE8F5E9
+    const val DarkSecondaryContainer = 0xFF00695C
+    const val DarkOnSecondaryContainer = 0xFFE0F2F1
+    const val DarkTertiaryContainer = 0xFF2D2240
+    const val DarkOnTertiaryContainer = 0xFFE8DEF8
+    const val DarkError = 0xFFEF5350
+    const val DarkOnError = 0xFF000000
+    const val DarkErrorContainer = 0xFF9A3A3A
+    const val DarkOnErrorContainer = 0xFFFFFFFF
 }
 
 private val LightColors = lightColorScheme(
