@@ -50,6 +50,8 @@ import com.treinos.app.ui.components.AppIcons
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatDuration
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 /**
  * Mobilidade e alongamento (H2-7) com o estado da rotina no `AppViewModel`
@@ -113,11 +115,10 @@ fun MobilityScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("Descartar rotina?") },
+            title = { Text(stringResource(R.string.mobility_discard_title)) },
             text = {
                 Text(
-                    "A rotina em andamento será interrompida e o tempo decorrido não " +
-                        "será registrado no histórico."
+                    stringResource(R.string.mobility_discard_body)
                 )
             },
             confirmButton = {
@@ -129,11 +130,13 @@ fun MobilityScreen(
                         onClearSession()
                     },
                 ) {
-                    Text("Descartar", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.mobility_discard_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) { Text("Continuar") }
+                TextButton(onClick = { showDiscardDialog = false }            ) {
+                Text(stringResource(R.string.common_continue))
+            }
             },
         )
     }
@@ -150,7 +153,7 @@ private fun MobilityRoutineList(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = "Mobilidade e alongamento",
+                title = stringResource(R.string.screen_mobility),
                 onBack = onBack,
             )
         },
@@ -174,33 +177,30 @@ private fun MobilityRoutineList(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            text = "Aviso de segurança",
+                            text = stringResource(R.string.mobility_safety_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Esta rotina é para bem-estar e recuperação, não substitui avaliação profissional. " +
-                                "Não é diagnóstico, tratamento ou reabilitação.",
+                            text = stringResource(R.string.mobility_safety_body),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        TextButton(onClick = onToggleSafety) {
-                            Text(if (showSafety) "Ocultar sinais de alerta" else "Ver sinais de alerta")
-                        }
+                        Text(if (showSafety) stringResource(R.string.mobility_safety_hide) else stringResource(R.string.mobility_safety_show))
                         if (showSafety) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Procure um profissional se houver:", style = MaterialTheme.typography.labelLarge)
-                                Text("• Dor irradiada para braço/perna", style = MaterialTheme.typography.bodySmall)
-                                Text("• Formigamento ou dormência", style = MaterialTheme.typography.bodySmall)
-                                Text("• Perda de força súbita", style = MaterialTheme.typography.bodySmall)
-                                Text("• Trauma recente ou febre", style = MaterialTheme.typography.bodySmall)
-                                Text("• Dor que piora com o movimento", style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.mobility_safety_seek), style = MaterialTheme.typography.labelLarge)
+                                Text(stringResource(R.string.mobility_safety_arm_leg), style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.mobility_safety_numbness), style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.mobility_safety_strength), style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.mobility_safety_trauma), style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.mobility_safety_pain), style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
                 }
             }
 
-            item { Text("Rotinas curadas", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.mobility_curated), style = MaterialTheme.typography.titleMedium) }
 
             items(MobilityRoutineTemplates.routines.filter { it.movements.isNotEmpty() }) { routine ->
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -229,7 +229,7 @@ private fun MobilityRoutineList(
                             onClick = { onStartRoutine(routine) },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("Iniciar")
+                            Text(stringResource(R.string.mobility_start))
                         }
                     }
                 }
@@ -256,6 +256,7 @@ private fun MobilityPlayer(
     val nextMovement = routine.movements.getOrNull(session.movementIndex + 1)
     val isLast = session.movementIndex >= routine.movements.size - 1
 
+    val sideLabel = movement?.side?.let { if (it == "left") stringResource(R.string.mobility_side_left) else stringResource(R.string.mobility_side_right) }
     val timerAnnouncement = when {
         timerShouldAnnounce(session.secondsRemaining) ->
             "Temporizador ${formatDuration(session.secondsRemaining.toLong())}"
@@ -326,7 +327,7 @@ private fun MobilityPlayer(
                         // H3-31: transição de 5 s entre movimentos, com toque
                         // para pular.
                         Text(
-                            "Transição",
+                            stringResource(R.string.mobility_transition),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -339,7 +340,7 @@ private fun MobilityPlayer(
                         )
                         nextMovement?.let { next ->
                             Text(
-                                "Próximo: ${next.name}",
+                                stringResource(R.string.mobility_next, next.name),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -348,7 +349,7 @@ private fun MobilityPlayer(
                             onClick = onNextMovement,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
-                            Text("Pular transição")
+                            Text(stringResource(R.string.mobility_skip_transition))
                         }
                     } else {
                         Text(
@@ -358,7 +359,7 @@ private fun MobilityPlayer(
                         )
                         if (nextMovement != null && movement != null) {
                             Text(
-                                "Próximo: ${nextMovement.name}",
+                                stringResource(R.string.mobility_next, nextMovement.name),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -376,7 +377,7 @@ private fun MobilityPlayer(
                     modifier = Modifier.weight(1f),
                     enabled = session.movementIndex > 0,
                 ) {
-                    Text("Voltar")
+                    Text(stringResource(R.string.common_back))
                 }
                 Button(
                     onClick = onTogglePause,
@@ -390,9 +391,9 @@ private fun MobilityPlayer(
                     )
                     Text(
                         when {
-                            session.running && !session.paused -> "Pausar"
-                            session.paused -> "Retomar"
-                            else -> "Iniciar"
+                            session.running && !session.paused -> stringResource(R.string.mobility_pause)
+                            session.paused -> stringResource(R.string.mobility_resume)
+                            else -> stringResource(R.string.mobility_start)
                         }
                     )
                 }
@@ -415,9 +416,9 @@ private fun MobilityPlayer(
                     }
                     Text(
                         when {
-                            session.inTransition -> "Pular"
-                            !isLast -> "Avançar"
-                            else -> "Finalizar"
+                            session.inTransition -> stringResource(R.string.mobility_skip)
+                            !isLast -> stringResource(R.string.mobility_advance)
+                            else -> stringResource(R.string.mobility_finish)
                         }
                     )
                 }
@@ -427,7 +428,7 @@ private fun MobilityPlayer(
                 onClick = ::finalize,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Finalizar antes do fim")
+                Text(stringResource(R.string.mobility_finish_early))
             }
         }
     }

@@ -14,10 +14,15 @@ import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +33,14 @@ class WorkoutScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     /** Sessão de força com um exercício e uma série 60 kg × 10 registrada. */
     private fun sessao(comSets: Boolean = true, weightKg: Double = 60.0): SessionWithExercises {

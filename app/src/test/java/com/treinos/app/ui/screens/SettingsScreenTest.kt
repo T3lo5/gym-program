@@ -14,8 +14,13 @@ import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.UiError
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
+import java.util.Locale
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +35,14 @@ class SettingsScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     private fun screen(
         backupImportState: BackupImportState = BackupImportState.Idle,

@@ -24,7 +24,15 @@ import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.SessionKind
 import com.treinos.app.ui.UiState
+import android.content.Context
+import android.content.res.Configuration
+import android.content.res.Resources
+import android.content.ContextWrapper
+import androidx.test.core.app.ApplicationProvider
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
 import java.time.LocalDate
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -74,6 +82,10 @@ class HomeScreenTest {
                 ),
             ),
         )
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
     }
 
     @Test
@@ -371,6 +383,35 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("Nenhum treino ainda").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Carregando").assertDoesNotExist()
+    }
+
+    @Test
+    fun home_em_ingles_com_locale_en() {
+        // H3-37: com o locale do app em inglês, a Home exibe strings em inglês.
+        // Usa um LocalContext com locale EN apenas dentro deste teste, sem
+        // vazar o Configuration.global para os testes subsequentes.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val res = context.resources
+        val confEn = Configuration(res.configuration).apply { setLocale(Locale("en", "US")) }
+        val wrapperEn = object : ContextWrapper(context) {
+            override fun getResources(): Resources = Resources(res.assets, res.displayMetrics, confEn)
+        }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalContext provides wrapperEn) {
+                HomeScreen(
+                    plan = null,
+                    inProgressSession = null,
+                    onGenerate = {},
+                    onHistory = {},
+                    onSettings = {},
+                    onStartDay = {},
+                    onResume = {},
+                    onLogActivity = {},
+                    onOpenMobility = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("No workouts yet").assertIsDisplayed()
     }
 
     /** Plano com sessão de musculação hoje e corrida amanhã, independente da data. */

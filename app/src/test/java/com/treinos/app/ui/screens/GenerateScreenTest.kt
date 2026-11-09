@@ -19,8 +19,13 @@ import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.remote.ModalityDto
 import com.treinos.app.ui.GenerateConfig
 import com.treinos.app.ui.ModalityDraft
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +40,14 @@ class GenerateScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     @Test
     fun cta_fixo_e_hint_juntos() {

@@ -45,6 +45,8 @@ import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 /**
  * Corrida planejada (H3-29): a tela distingue carregando (antes do Room
@@ -83,7 +85,7 @@ fun RunWorkoutScreen(
 @Composable
 private fun RunWorkoutLoading(onLeave: () -> Unit) {
     Scaffold(
-        topBar = { ScreenTopBar(title = "Corrida", onBack = onLeave) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_run), onBack = onLeave) },
     ) { padding ->
         LoadingState(modifier = Modifier.fillMaxSize().padding(padding))
     }
@@ -92,16 +94,15 @@ private fun RunWorkoutLoading(onLeave: () -> Unit) {
 @Composable
 private fun RunWorkoutMissing(onLeave: () -> Unit) {
     Scaffold(
-        topBar = { ScreenTopBar(title = "Corrida", onBack = onLeave) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_run), onBack = onLeave) },
     ) { padding ->
         EmptyState(
-            title = "Sessão não encontrada",
-            description = "A corrida em andamento não foi encontrada no aparelho. " +
-                "Ela pode ter sido abandonada ou finalizada em outra tela.",
+            title = stringResource(R.string.run_session_not_found),
+            description = stringResource(R.string.run_session_not_found_body),
             modifier = Modifier.fillMaxSize().padding(padding),
             action = {
                 Button(onClick = onLeave, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Voltar")
+                    Text(stringResource(R.string.common_back))
                 }
             },
         )
@@ -144,10 +145,11 @@ private fun RunWorkoutForm(
         pace = formatPacePerKm(dur.toLong() * 60, km?.let { it * 1000.0 })
     }
 
+    val runTitle = session.session.dayName.takeIf { it.isNotBlank() } ?: stringResource(R.string.screen_run)
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = session.session.dayName.ifBlank { "Corrida" },
+                title = runTitle,
                 onBack = onLeave,
             )
         },
@@ -175,7 +177,7 @@ private fun RunWorkoutForm(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "Alvo do plano",
+                            text = stringResource(R.string.run_plan_target),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
@@ -192,7 +194,7 @@ private fun RunWorkoutForm(
                             )
                         }
                         Text(
-                            text = "Registre o que você conseguiu — o alvo não precisa ser batido.",
+                            text = stringResource(R.string.run_plan_target_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -210,12 +212,12 @@ private fun RunWorkoutForm(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "Registre a corrida planejada",
+                            text = stringResource(R.string.run_record_planned),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Duração, distância e RPE. Nada de reps ou carga nesta sessão.",
+                            text = stringResource(R.string.run_record_planned_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -223,7 +225,7 @@ private fun RunWorkoutForm(
                 }
             }
 
-            SectionTitle("Sua corrida")
+            SectionTitle(stringResource(R.string.run_your_run))
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -232,8 +234,8 @@ private fun RunWorkoutForm(
                 OutlinedTextField(
                     value = durationMinutes,
                     onValueChange = { durationMinutes = it; compute() },
-                    label = { Text("Duração (min)") },
-                    supportingText = { Text("Opcional; se não preencher, usa a duração do plano") },
+                    label = { Text(stringResource(R.string.run_duration)) },
+                    supportingText = { Text(stringResource(R.string.run_duration_support)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
@@ -241,8 +243,8 @@ private fun RunWorkoutForm(
                 OutlinedTextField(
                     value = distanceKm,
                     onValueChange = { distanceKm = it; compute() },
-                    label = { Text("Distância (km)") },
-                    supportingText = { Text("Opcional. Ex.: 5,2 para 5 km") },
+                    label = { Text(stringResource(R.string.run_distance)) },
+                    supportingText = { Text(stringResource(R.string.run_distance_support)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
@@ -250,8 +252,8 @@ private fun RunWorkoutForm(
                 OutlinedTextField(
                     value = rpe,
                     onValueChange = { rpe = it; compute() },
-                    label = { Text("RPE (opcional)") },
-                    supportingText = { Text("De 1 a 10. Use vírgula ou ponto para decimais.") },
+                    label = { Text(stringResource(R.string.run_rpe)) },
+                    supportingText = { Text(stringResource(R.string.run_rpe_support)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     modifier = Modifier.fillMaxWidth(),
                     isError = error != null,
@@ -267,7 +269,7 @@ private fun RunWorkoutForm(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Pace estimado: $p",
+                            text = stringResource(R.string.run_estimated_pace, p),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -305,14 +307,14 @@ private fun RunWorkoutForm(
                     .padding(top = 16.dp)
                     .minimumInteractiveComponentSize(),
             ) {
-                Text("Finalizar corrida")
+                Text(stringResource(R.string.run_finish))
             }
 
             TextButton(
                 onClick = { showDiscardConfirm = true },
                 modifier = Modifier.minimumInteractiveComponentSize(),
             ) {
-                Text("Cancelar")
+                Text(stringResource(R.string.common_cancel))
             }
         }
     }
@@ -320,11 +322,10 @@ private fun RunWorkoutForm(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text("Descartar treino?") },
+            title = { Text(stringResource(R.string.run_discard_title)) },
             text = {
                 Text(
-                    "Você sai sem registrar a corrida. A sessão continua em andamento " +
-                        "e pode ser retomada na tela inicial."
+                    stringResource(R.string.run_discard_body)
                 )
             },
             confirmButton = {
@@ -335,16 +336,16 @@ private fun RunWorkoutForm(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Descartar")
+                    Text(stringResource(R.string.run_discard_confirm))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showDiscardConfirm = false },
                     modifier = Modifier.minimumInteractiveComponentSize(),
-                ) {
-                    Text("Continuar")
-                }
+            ) {
+                Text(stringResource(R.string.common_continue))
+            }
             },
         )
     }

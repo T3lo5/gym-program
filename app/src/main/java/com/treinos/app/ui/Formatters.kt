@@ -13,6 +13,9 @@ import kotlin.math.roundToLong
 private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 private val shortDateFormatter = DateTimeFormatter.ofPattern("dd/MM")
+
+/** Locale da interface do app (per-app locale). Default = locale do aparelho. */
+var appLocale: Locale = Locale.getDefault()
 private val ptBr = Locale.forLanguageTag("pt-BR")
 
 fun formatDateTime(millis: Long): String =

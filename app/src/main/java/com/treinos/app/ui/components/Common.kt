@@ -46,6 +46,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.treinos.app.ui.exerciseContentDescription
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +66,7 @@ fun ScreenTopBar(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Voltar",
+                        contentDescription = stringResource(R.string.common_back),
                     )
                 }
             }
@@ -98,6 +100,8 @@ fun ChipGroup(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val chipSelectedDesc = stringResource(R.string.chip_selected)
+        val chipNotSelectedDesc = stringResource(R.string.chip_not_selected)
         options.forEach { (value, label) ->
             FilterChip(
                 selected = value in selected,
@@ -106,7 +110,7 @@ fun ChipGroup(
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .semantics {
-                        stateDescription = if (value in selected) "Selecionado" else "Não selecionado"
+                        stateDescription = if (value in selected) chipSelectedDesc else chipNotSelectedDesc
                     },
             )
         }
@@ -174,9 +178,10 @@ fun MetricCard(
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
+    val loadingDesc = stringResource(R.string.common_loading)
     Box(
         modifier = modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) {
-            contentDescription = "Carregando"
+            contentDescription = loadingDesc
         },
         contentAlignment = Alignment.Center,
     ) {
@@ -212,7 +217,7 @@ fun ErrorState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         onRetry?.let {
-            Button(onClick = it, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Tentar de novo") }
+            Button(onClick = it, modifier = Modifier.minimumInteractiveComponentSize()) { Text(stringResource(R.string.common_retry)) }
         }
     }
 }

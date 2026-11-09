@@ -17,12 +17,16 @@ import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.ui.history.STATUS_COMPLETED
 import com.treinos.app.ui.screens.HistoryScreen
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,6 +46,14 @@ class HistoryScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     private val today = LocalDate.now()
 

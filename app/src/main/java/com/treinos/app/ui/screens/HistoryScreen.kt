@@ -91,6 +91,8 @@ import com.treinos.app.ui.history.sessionDay
 import com.treinos.app.ui.history.weekDayLabels
 import com.treinos.app.ui.swimStrokeOptions
 import com.treinos.app.ui.UiState
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -148,7 +150,7 @@ fun HistoryScreen(
                     .padding(padding),
                 action = {
                     Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
-                        Text("Gerar treino")
+                        Text(stringResource(R.string.history_empty_cta))
                     }
                 },
             )
@@ -195,7 +197,7 @@ fun HistoryScreen(
                             FilterChip(
                                 selected = modalityFilter == null,
                                 onClick = { modalityFilter = null },
-                                label = { Text("Todas") },
+                                label = { Text(stringResource(R.string.history_filter_all)) },
                             )
                             modalities.forEach { modality ->
                                 FilterChip(
@@ -215,7 +217,7 @@ fun HistoryScreen(
                         FilterChip(
                             selected = true,
                             onClick = { selectedDate = null },
-                            label = { Text("Dia ${formatDateShort(date)} • limpar") },
+                            label = { Text(stringResource(R.string.history_day_label, formatDateShort(date))) },
                         )
                     }
                 }
@@ -568,9 +570,9 @@ private fun ActivityCard(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEdit, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Editar") }
+                TextButton(onClick = onEdit, modifier = Modifier.minimumInteractiveComponentSize()) { Text(stringResource(R.string.history_activity_edit)) }
                 TextButton(onClick = { showDeleteDialog = true }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -579,8 +581,8 @@ private fun ActivityCard(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Excluir o registro?") },
-            text = { Text("$title sai do histórico e do próximo backup. Não dá para desfazer.") },
+            title = { Text(stringResource(R.string.history_activity_delete_title)) },
+            text = { Text(stringResource(R.string.history_activity_delete_body, title)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -589,11 +591,11 @@ private fun ActivityCard(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.minimumInteractiveComponentSize()) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }

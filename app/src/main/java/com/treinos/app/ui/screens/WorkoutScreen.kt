@@ -87,6 +87,8 @@ import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
 import com.treinos.app.ui.timerShouldAnnounce
 import com.treinos.app.ui.validateSetInput
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 @Composable
 fun WorkoutScreen(
@@ -179,7 +181,7 @@ fun WorkoutScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp),
                         ) {
-                            Text("Finalizar treino")
+                            Text(stringResource(R.string.action_finish))
                         }
                     }
                 }
@@ -482,9 +484,9 @@ private fun RestBar(
         }
     }
     val message = when {
-        finished -> "Descanso concluído. Bora para a próxima série."
-        paused -> "Descanso pausado: ${formatSeconds(remaining)}"
-        else -> "Descanso: ${formatSeconds(remaining)}"
+        finished -> stringResource(R.string.workout_rest_finished)
+        paused -> stringResource(R.string.workout_rest_paused, formatSeconds(remaining))
+        else -> stringResource(R.string.workout_rest_running, formatSeconds(remaining))
     }
     Card(
         colors = CardDefaults.cardColors(
@@ -526,7 +528,7 @@ private fun RestBar(
                     modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
                 )
                 Text(
-                    text = "Total de ${formatSeconds(total)}. A próxima série pode começar quando quiser.",
+                    text = stringResource(R.string.workout_rest_total, formatSeconds(total)),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -544,13 +546,13 @@ private fun RestBar(
                         onClick = onExtend,
                         modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
-                        Text("+15 s")
+                        Text(stringResource(R.string.workout_rest_extend))
                     }
                     OutlinedButton(
                         onClick = onTogglePause,
                         modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
-                        Text(if (paused) "Continuar" else "Pausar")
+                        Text(if (paused) stringResource(R.string.workout_rest_resume) else stringResource(R.string.workout_rest_pause))
                     }
                 }
             }
@@ -606,8 +608,7 @@ private fun ExerciseCard(
                             modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
                         )
                         Text(
-                            text = "${exercise.exercise.plannedSets} séries planejadas • descanso de " +
-                                "${exercise.exercise.restSeconds}s",
+                            text = stringResource(R.string.workout_planned_sets, exercise.exercise.plannedSets, exercise.exercise.restSeconds),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -617,7 +618,7 @@ private fun ExerciseCard(
                 val sets = exercise.sets.sortedBy { it.setNumber }
                 if (sets.isEmpty()) {
                     Text(
-                        text = "Nenhuma série registrada ainda.",
+                        text = stringResource(R.string.workout_no_sets),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -637,7 +638,7 @@ private fun ExerciseCard(
                                     ) + ", série concluída"
                                 }
                                 .clickable(
-                                    onClickLabel = "Editar série ${set.setNumber}",
+                                    onClickLabel = stringResource(R.string.workout_set_edit_label, set.setNumber),
                                     role = Role.Button,
                                     onClick = { onEditSet(set) },
                                 ),
@@ -645,23 +646,12 @@ private fun ExerciseCard(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Série ${set.setNumber}",
+                                text = stringResource(R.string.workout_set, set.setNumber),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
-                                text = buildString {
-                                    set.reps?.let { append("$it reps") }
-                                    set.weightKg?.let {
-                                        if (isNotEmpty()) append(" • ")
-                                        append(formatKg(it))
-                                    }
-                                    set.rpe?.let {
-                                        if (isNotEmpty()) append(" • ")
-                                        append("RPE ${formatDecimal(it, 1)}")
-                                    }
-                                    if (isEmpty()) append("registrada")
-                                },
+                                text = setDetailText(set),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             Icon(
@@ -686,7 +676,7 @@ private fun ExerciseCard(
                         modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
                         val label = lastSetLabel(lastSet)
-                        Text(if (label == null) "Repetir última série" else "Repetir última série ($label)")
+                        Text(if (label == null) stringResource(R.string.workout_repeat_last) else stringResource(R.string.workout_repeat_last_with_label, label))
                     }
                 }
             }
@@ -707,12 +697,27 @@ private fun ExerciseCard(
                 // séries extras sem sinalizar.
                 Text(
                     if (completed) {
-                        "Exercício concluído — próximo"
+                        stringResource(R.string.workout_exercise_done)
                     } else {
-                        "Registrar série ${exercise.sets.size + 1}"
+                        stringResource(R.string.workout_log_set, exercise.sets.size + 1)
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun setDetailText(set: SetLogEntity): String {
+    val repsPart = set.reps?.let { stringResource(R.string.workout_reps, it) }
+    val weightPart = set.weightKg?.let { formatKg(it) }
+    val rpePart = set.rpe?.let { "RPE ${formatDecimal(it, 1)}" }
+    return buildString {
+        repsPart?.let { append(it) }
+        weightPart?.let { if (isNotEmpty()) append(" • "); append(it) }
+        rpePart?.let { if (isNotEmpty()) append(" • "); append(it) }
+        if (repsPart == null && weightPart == null && rpePart == null) {
+            append(stringResource(R.string.workout_set_recorded))
         }
     }
 }
@@ -861,12 +866,13 @@ private fun SetDialog(
 }
 
 /** Texto de apoio do motor de progressão; `null` quando não há o que sugerir. */
+@Composable
 private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
     if (suggestion == null || suggestion.action == ProgressionAction.NONE) return null
     val weight = suggestion.suggestedWeightKg?.let { formatKg(it) }
-    val reps = if (weight == null) suggestion.suggestedReps?.let { "$it repetições" } else null
+    val reps = if (weight == null) suggestion.suggestedReps?.let { stringResource(R.string.workout_reps, it) } else null
     val target = weight ?: reps ?: return null
-    return "Sugestão: $target — ${suggestion.reason}"
+    return stringResource(R.string.workout_suggestion, target, suggestion.reason)
 }
 
 private fun formatSeconds(seconds: Int): String {

@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-37` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-09` |
+| Implementação | `concluída` |
 
 **Origem:** pedido do usuário (2026-11-07) — "um app que funcione tanto em
 português quanto em inglês, deixando o usuário selecionar a língua, já que

@@ -84,6 +84,8 @@ import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 @Composable
 fun HomeScreen(
@@ -142,10 +144,10 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = "Treinos",
+                title = stringResource(R.string.screen_home),
                 actions = {
-                    TextButton(onClick = onHistory) { Text("Histórico") }
-                    TextButton(onClick = onSettings) { Text("Ajustes") }
+                    TextButton(onClick = onHistory) { Text(stringResource(R.string.action_history)) }
+                    TextButton(onClick = onSettings) { Text(stringResource(R.string.action_settings)) }
                 },
             )
         },
@@ -176,18 +178,16 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Text(
-                                text = "Nenhum treino ainda",
+                                text = stringResource(R.string.home_empty_title),
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(
-                                text = "Gere um plano sob demanda. O backend devolve os treinos e a " +
-                                    "data em que eles devem ser revistos. Depois disso, tudo fica " +
-                                    "salvo no aparelho.",
+                                text = stringResource(R.string.home_empty_body),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
-                                Text("Gerar meu primeiro treino")
+                                Text(stringResource(R.string.home_empty_cta))
                             }
                         }
                     }
@@ -198,7 +198,7 @@ fun HomeScreen(
                 // H3-28: os parágrafos de rodapé só fazem sentido no empty state.
                 item {
                     Text(
-                        text = "Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.",
+                                text = stringResource(R.string.home_footnote_activity),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -206,7 +206,7 @@ fun HomeScreen(
 
                 item {
                     Text(
-                        text = "Rotinas curtas de mobilidade/alongamento para bem-estar e recuperação.",
+                                text = stringResource(R.string.home_footnote_mobility),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -214,8 +214,7 @@ fun HomeScreen(
 
                 item {
                     Text(
-                        text = "Os treinos e as séries ficam salvos apenas neste aparelho. " +
-                            "O backend só recebe dados quando você toca em Sincronizar, em Ajustes.",
+                                text = stringResource(R.string.home_footnote_privacy),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -314,9 +313,9 @@ fun HomeScreen(
                                     onClick = { selectedTab = tab },
                                     text = {
                                         Text(when (tab) {
-                                            ModalityTab.STRENGTH -> "Academia"
-                                            ModalityTab.RUN -> "Corrida"
-                                            ModalityTab.MOBILITY -> "Mobilidade"
+                                            ModalityTab.STRENGTH -> stringResource(R.string.home_tab_gym)
+                                            ModalityTab.RUN -> stringResource(R.string.home_tab_run)
+                                            ModalityTab.MOBILITY -> stringResource(R.string.home_tab_mobility)
                                         })
                                     },
                                 )
@@ -325,7 +324,11 @@ fun HomeScreen(
                     }
 
                     val currentSessions = tabsByModality[selectedTab ?: presentTabs.first()].orEmpty()
-                    item { SectionTitle("Sessões de ${tabLabel(selectedTab ?: presentTabs.first())}") }
+                    val currentTab = selectedTab ?: presentTabs.first()
+                    item {
+                        val currentTabLabel = stringResource(tabLabel(currentTab))
+                        SectionTitle("Sessões de $currentTabLabel")
+                    }
                     items(currentSessions, key = { it.day.id }) { day ->
                         ModalityDayCard(
                             day = day,
@@ -391,10 +394,10 @@ fun HomeScreen(
     }
 }
 
-private fun tabLabel(tab: ModalityTab): String = when (tab) {
-    ModalityTab.STRENGTH -> "musculação"
-    ModalityTab.RUN -> "corrida"
-    ModalityTab.MOBILITY -> "mobilidade"
+private fun tabLabel(tab: ModalityTab): Int = when (tab) {
+    ModalityTab.STRENGTH -> R.string.home_tab_label_gym
+    ModalityTab.RUN -> R.string.home_tab_label_run
+    ModalityTab.MOBILITY -> R.string.home_tab_label_mobility
 }
 
 private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
@@ -403,14 +406,7 @@ private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
     SessionKind.MOBILITY -> ModalityTab.MOBILITY
 }
 
-/** Resumo curto do herói "Hoje", por modalidade. */
-private fun todayHeroSubtitle(day: WorkoutDayWithExercises): String =
-    when (SessionKind.fromModality(day.day.modality)) {
-        SessionKind.RUN -> "Corrida • ${day.exercises.size} bloco(s)"
-        SessionKind.MOBILITY -> "Mobilidade • ${day.exercises.size} rotina(s)"
-        SessionKind.STRENGTH ->
-            "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}"
-    }
+
 
 /**
  * H3-28: card-herói do dia. Com sessão hoje, mostra o nome e "Iniciar" direto;
@@ -431,13 +427,21 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
             when (today) {
                 is TodaySession.Today -> {
                     Text(
-                        text = "Hoje — ${today.day.day.name}",
+                        text = stringResource(R.string.home_hero_today, today.day.day.name),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = todayHeroSubtitle(today.day),
+                        text = when (SessionKind.fromModality(today.day.day.modality)) {
+                            SessionKind.RUN -> stringResource(R.string.home_hero_run_subtitle, today.day.exercises.size)
+                            SessionKind.MOBILITY -> stringResource(R.string.home_hero_mobility_subtitle, today.day.exercises.size)
+                            SessionKind.STRENGTH -> stringResource(
+                                R.string.home_hero_strength_subtitle,
+                                today.day.exercises.size,
+                                if (today.day.exercises.size != 1) "s" else "",
+                            )
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -445,18 +449,18 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
                         onClick = { onStartDay(today.day.day.id) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Iniciar")
+                        Text(stringResource(R.string.action_start))
                     }
                 }
                 is TodaySession.Next -> {
                     Text(
-                        text = "Hoje é descanso",
+                        text = stringResource(R.string.home_hero_rest),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = "Próximo: ${today.day.day.name}",
+                        text = stringResource(R.string.home_hero_next, today.day.day.name),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -479,19 +483,19 @@ private fun HomeQuickActions(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         HomeQuickAction(
-            label = "Novo treino",
+            label = stringResource(R.string.home_quick_new_workout),
             icon = Icons.Default.Add,
             onClick = onGenerate,
             modifier = Modifier.weight(1f),
         )
         HomeQuickAction(
-            label = "Atividade",
+            label = stringResource(R.string.home_quick_activity),
             icon = Icons.Default.Edit,
             onClick = onLogActivity,
             modifier = Modifier.weight(1f),
         )
         HomeQuickAction(
-            label = "Alongamento",
+            label = stringResource(R.string.home_quick_stretching),
             icon = Icons.Default.Favorite,
             onClick = onOpenMobility,
             modifier = Modifier.weight(1f),
@@ -542,7 +546,7 @@ private fun TodayBadge() {
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(
-            text = "Hoje",
+                        text = stringResource(R.string.home_today),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
@@ -617,7 +621,7 @@ private fun ModalityDayCard(
 
             if (day.day.isRestDay) {
                 Text(
-                    text = "Dia de descanso",
+                                text = stringResource(R.string.home_rest_day),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -672,7 +676,7 @@ private fun ModalityDayCard(
                     onClick = onStart,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
                 ) {
-                    Text("Iniciar ${tabLabel(modalityTabOf(kind))}")
+                    Text(stringResource(R.string.home_start_modality, stringResource(tabLabel(modalityTabOf(kind)))))
                 }
             }
         }
@@ -697,21 +701,25 @@ private fun InProgressCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = "Treino em andamento",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "${session.session.dayName} • iniciado em " +
-                    formatDateTime(session.session.startedAt) + " • $done série(s)",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+                            Text(
+                                text = stringResource(R.string.home_in_progress),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.home_in_progress_detail,
+                                    session.session.dayName,
+                                    formatDateTime(session.session.startedAt),
+                                    done,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
             Button(
                 onClick = onResume,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Retomar treino")
+                Text(stringResource(R.string.action_resume))
             }
             // H3-27: "Abandonar treino" também na Home, sempre com confirmação —
             // a sessão some do aparelho junto com as séries registradas.
@@ -720,7 +728,7 @@ private fun InProgressCard(
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             ) {
                 Text(
-                    text = "Abandonar treino",
+                    text = stringResource(R.string.action_abandon),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -729,11 +737,10 @@ private fun InProgressCard(
     if (showAbandonConfirm) {
         AlertDialog(
             onDismissRequest = { showAbandonConfirm = false },
-            title = { Text("Abandonar treino?") },
+            title = { Text(stringResource(R.string.home_abandon_title)) },
             text = {
                 Text(
-                    "O treino em andamento e as séries já registradas serão excluídos do " +
-                        "aparelho. Essa ação não pode ser desfeita."
+                    stringResource(R.string.home_abandon_body)
                 )
             },
             confirmButton = {
@@ -744,12 +751,15 @@ private fun InProgressCard(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Abandonar", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(R.string.home_abandon_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAbandonConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -793,20 +803,20 @@ private fun ActivePlanCard(
                 // H3-30: quando o plano veio do fallback local, o selo cita o
                 // motivo persistido — não some com o snackbar de ~4 s.
                 text = when {
-                    entity.source == "ai" -> "Gerado com IA"
-                    fallbackReasonLabel != null -> "Gerado localmente — $fallbackReasonLabel"
-                    else -> "Gerado localmente"
+                    entity.source == "ai" -> stringResource(R.string.home_plan_ai)
+                    fallbackReasonLabel != null -> stringResource(R.string.home_plan_local_reason, fallbackReasonLabel)
+                    else -> stringResource(R.string.home_plan_local)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (review != null) {
                 Text(
-                    text = if (due) {
-                        "Revisão atrasada desde $review — gere um treino novo."
-                    } else {
-                        "Próxima revisão: $review"
-                    },
+                                text = if (due) {
+                                    stringResource(R.string.home_review_overdue, review)
+                                } else {
+                                    stringResource(R.string.home_review_next, review)
+                                },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = if (due) MaterialTheme.colorScheme.error
@@ -834,13 +844,13 @@ private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpon
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Revisar plano",
+                text = stringResource(R.string.home_review_card_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "A revisão de $reviewDate está atrasada. Gere um treino novo ou adie a revisão.",
+                text = stringResource(R.string.home_review_card_body, reviewDate),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -848,13 +858,13 @@ private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpon
                     onClick = onGenerate,
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Gerar novo treino")
+                    Text(stringResource(R.string.home_review_cta))
                 }
                 OutlinedButton(
                     onClick = onPostpone,
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Adiar $REVIEW_POSTPONE_WEEKS semanas")
+                    Text(stringResource(R.string.home_review_postpone, REVIEW_POSTPONE_WEEKS))
                 }
             }
         }
@@ -869,17 +879,17 @@ private fun DeloadNoticeCard(week: Int, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Ciclo do plano",
+                text = stringResource(R.string.home_cycle_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "Semana $week do ciclo — considere reduzir 1 série por exercício.",
+                text = stringResource(R.string.home_cycle_body, week),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "O app não muda o plano sozinho. Ajuste as séries ao registrar.",
+                text = stringResource(R.string.home_cycle_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -887,7 +897,7 @@ private fun DeloadNoticeCard(week: Int, onDismiss: () -> Unit) {
                 onClick = onDismiss,
                 modifier = Modifier.minimumInteractiveComponentSize(),
             ) {
-                Text("Entendi")
+                Text(stringResource(R.string.common_got_it))
             }
         }
     }
@@ -933,7 +943,7 @@ private fun DayCard(
 
             if (day.day.isRestDay) {
                 Text(
-                    text = "Dia de descanso",
+                                text = stringResource(R.string.home_rest_day),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -988,7 +998,7 @@ private fun DayCard(
                     onClick = onStart,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
                 ) {
-                    Text("Iniciar treino")
+                    Text(stringResource(R.string.action_start_workout))
                 }
             }
         }

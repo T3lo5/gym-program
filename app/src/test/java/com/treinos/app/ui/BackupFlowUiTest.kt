@@ -16,9 +16,14 @@ import com.treinos.app.data.backup.BackupSessionExercise
 import com.treinos.app.data.backup.BackupSetLog
 import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.ui.screens.SettingsScreen
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +39,14 @@ class BackupFlowUiTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     /** Texto exato que a tela mostra quando o arquivo passou na validação. */
     private val textoPreview =

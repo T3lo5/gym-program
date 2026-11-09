@@ -27,6 +27,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.statusIsSuccess
+import android.content.Context
+import android.content.res.Configuration
+import androidx.test.core.app.ApplicationProvider
+import java.util.Locale
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.WorkoutScreen
@@ -44,6 +48,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,6 +58,15 @@ import org.robolectric.RobolectricTestRunner
 class A11yTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
+
     @Test
     fun descricao_do_exercicio_inclui_nome() {
         assertEquals("Exercício Supino reto", exerciseContentDescription("Supino reto"))
@@ -104,6 +118,23 @@ class A11yTest {
             "Próxima revisão em 01/12/2026",
             reviewStateDescription("01/12/2026", false),
         )
+    }
+
+    @Test
+    fun content_descriptions_localizados() {
+        // H3-37: content descriptions seguem o locale do app.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val res = context.resources
+        val originalLocale = res.configuration.locale
+        try {
+            res.configuration.locale = Locale("en", "US")
+            composeRule.setContent {
+                ScreenTopBar(title = "Tela", onBack = {})
+            }
+            composeRule.onNodeWithContentDescription("Voltar").assertExists()
+        } finally {
+            res.configuration.locale = originalLocale
+        }
     }
 
     @Test
@@ -257,6 +288,14 @@ class A11yTest {
 class A11yComposeTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setPtLocale() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val conf = context.resources.configuration
+        conf.setLocale(Locale("pt", "BR"))
+        context.resources.updateConfiguration(conf, context.resources.displayMetrics)
+    }
 
     @Test
     fun iconbuttons_tem_content_description() {

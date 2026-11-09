@@ -62,6 +62,8 @@ import com.treinos.app.ui.components.ChipGroup
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 import kotlinx.coroutines.delay
 
 private val goalOptions = listOf(
@@ -285,7 +287,7 @@ fun GenerateScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            topBar = { ScreenTopBar(title = "Novo treino", onBack = onBack) },
+            topBar = { ScreenTopBar(title = stringResource(R.string.screen_generate), onBack = onBack) },
             // H3-30: CTA fixo no fim da tela, sempre visível, com o hint de
             // validação junto — o usuário não precisa rolar para saber por que
             // não pode gerar.
@@ -384,9 +386,7 @@ fun GenerateScreen(
                         ),
                     ) {
                         Text(
-                            text = "O backend monta o plano na hora e devolve também a data em que ele " +
-                                "deve ser revisto. O plano é salvo no aparelho; nada é enviado ao backend " +
-                                "até você tocar em Sincronizar.",
+                            text = stringResource(R.string.generate_info),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(16.dp),
                         )
@@ -409,8 +409,8 @@ fun GenerateScreen(
                 item {
                     ChipGroup(
                         options = listOf(
-                            "main" to "Substituir meu plano principal",
-                            "extra" to "Adicionar plano complementar",
+                            "main" to stringResource(R.string.generate_plan_main),
+                            "extra" to stringResource(R.string.generate_plan_extra),
                         ),
                         selected = setOf(planKind),
                         onToggle = { value ->
@@ -437,7 +437,7 @@ fun GenerateScreen(
                 }
 
                 if (!isComplementary) {
-                    item { SectionTitle("Modalidades da semana") }
+                    item { SectionTitle(stringResource(R.string.generate_modalities_section)) }
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             modalityTypes.forEach { (type, label) ->
@@ -450,6 +450,7 @@ fun GenerateScreen(
                                         mutableStateOf(draft.recent5kSeconds?.toString() ?: "")
                                     }
                                     var focusText by remember(type) { mutableStateOf(draft.focus ?: "") }
+                                    val includeContentDesc = stringResource(R.string.generate_include_label, label)
 
                                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                                         Column(
@@ -469,10 +470,10 @@ fun GenerateScreen(
                                                                 (type to draft.copy(included = novo))
                                                         },
                                                     )
-                                                    .semantics {
-                                                        stateDescription = if (included) "Ligado" else "Desligado"
-                                                        contentDescription = "Incluir $label"
-                                                    },
+                                                        .semantics {
+                                                            stateDescription = if (included) "Ligado" else "Desligado"
+                                                            contentDescription = includeContentDesc
+                                                        },
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Checkbox(
@@ -512,8 +513,8 @@ fun GenerateScreen(
                                                             val updated = draft.copy(included = true, sessionsPerWeek = sessions)
                                                             modalityDrafts = modalityDrafts + (type to updated)
                                                         },
-                                                        label = { Text("Sessões por semana") },
-                                                        supportingText = { Text("Inteiro de 1 a 7") },
+                                                        label = { Text(stringResource(R.string.generate_sessions_week_label)) },
+                                                        supportingText = { Text(stringResource(R.string.generate_sessions_week_support)) },
                                                         keyboardOptions = KeyboardOptions(
                                                             keyboardType = KeyboardType.Number,
                                                             imeAction = ImeAction.Done,
@@ -535,8 +536,8 @@ fun GenerateScreen(
                                                                 )
                                                                 modalityDrafts = modalityDrafts + (type to updated)
                                                             },
-                                                            label = { Text("Benchmark 5 km (mm:ss ou segundos, opcional)") },
-                                                            supportingText = { Text("Ex.: 25:30 ou 1530") },
+                                                            label = { Text(stringResource(R.string.generate_benchmark5k_label)) },
+                                                            supportingText = { Text(stringResource(R.string.generate_benchmark5k_support)) },
                                                             keyboardOptions = KeyboardOptions(
                                                                 keyboardType = KeyboardType.Number,
                                                                 imeAction = ImeAction.Done,
@@ -555,8 +556,8 @@ fun GenerateScreen(
                                                                 )
                                                                 modalityDrafts = modalityDrafts + (type to updated)
                                                             },
-                                                            label = { Text("Foco (ex.: costas, quadril, opcional)") },
-                                                            supportingText = { Text("Opcional") },
+                                                            label = { Text(stringResource(R.string.generate_focus_label)) },
+                                                            supportingText = { Text(stringResource(R.string.common_optional)) },
                                                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                                         )
@@ -581,7 +582,7 @@ fun GenerateScreen(
                 }
 
                 if (strengthIncluded) {
-                    item { SectionTitle("Objetivo (musculação)") }
+                    item { SectionTitle(stringResource(R.string.generate_goal_section)) }
                     item {
                         ChipGroup(
                             options = goalOptions,
@@ -590,7 +591,7 @@ fun GenerateScreen(
                         )
                     }
 
-                    item { SectionTitle("Seu nível (musculação)") }
+                    item { SectionTitle(stringResource(R.string.generate_level_section)) }
                     item {
                         ChipGroup(
                             options = levelOptions,
@@ -599,7 +600,7 @@ fun GenerateScreen(
                         )
                     }
 
-                    item { SectionTitle("Equipamentos disponíveis") }
+                    item { SectionTitle(stringResource(R.string.generate_equipment_section)) }
                     item {
                         ChipGroup(
                             options = equipmentOptions,
@@ -612,7 +613,8 @@ fun GenerateScreen(
 
                     item {
                         SectionTitle(
-                            if (isComplementary) "Foco exclusivo (complementar)" else "Foco muscular (opcional, musculação)"
+                            if (isComplementary) stringResource(R.string.generate_focus_exclusive_section)
+                            else stringResource(R.string.generate_muscle_section)
                         )
                     }
                     if (isComplementary) {
@@ -636,34 +638,33 @@ fun GenerateScreen(
                     if (!isComplementary && muscles.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Os grupos escolhidos entram em todas as sessões de força. " +
-                                    "Para um plano APENAS de um grupo (ex.: só abdômen), use " +
-                                    "\"Adicionar plano complementar\".",
+                                text = stringResource(R.string.generate_muscle_groups_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
 
-                    item { SectionTitle("Duração da sessão") }
+                    item { SectionTitle(stringResource(R.string.generate_duration_section)) }
                     item {
                         ChipGroup(
                             options = (if (isComplementary) complementaryDurationOptions else durationOptions)
-                                .map { it.toString() to "$it min" },
+                                .map { it.toString() to stringResource(R.string.generate_duration_min, it) },
                             selected = setOf(duration.toString()),
                             onToggle = { duration = it.toInt() },
                         )
                     }
                 }
 
-                item { SectionTitle("Dias por semana") }
-                item {
-                    ChipGroup(
-                        options = (if (isComplementary) 1..6 else 2..6).map { it.toString() to "${it}x" },
-                        selected = setOf(daysPerWeek.toString()),
-                        onToggle = { daysPerWeek = it.toInt() },
-                    )
-                }
+                    item { SectionTitle(stringResource(R.string.generate_days_section)) }
+                    item {
+                        ChipGroup(
+                            options = (if (isComplementary) 1..6 else 2..6)
+                                .map { it.toString() to stringResource(R.string.generate_days_x, it) },
+                            selected = setOf(daysPerWeek.toString()),
+                            onToggle = { daysPerWeek = it.toInt() },
+                        )
+                    }
 
                 // H3-30: perfil/sexo/revisão/ambiente em "Mais opções", colapsado.
                 item {
@@ -680,7 +681,7 @@ fun GenerateScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            text = if (showMoreOptions) "Menos opções" else "Mais opções",
+                            text = if (showMoreOptions) stringResource(R.string.generate_less_options) else stringResource(R.string.generate_more_options),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,
@@ -697,7 +698,7 @@ fun GenerateScreen(
                     }
                 }
                 if (showMoreOptions) {
-                    item { SectionTitle("Seu perfil (opcional)") }
+                    item { SectionTitle(stringResource(R.string.generate_profile_section)) }
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -706,8 +707,8 @@ fun GenerateScreen(
                             OutlinedTextField(
                                 value = bodyWeightKgText,
                                 onValueChange = { bodyWeightKgText = it; profileError = null },
-                                label = { Text("Peso (kg)") },
-                                supportingText = { Text("Opcional") },
+                                label = { Text(stringResource(R.string.generate_weight_label)) },
+                                                            supportingText = { Text(stringResource(R.string.common_optional)) },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Next,
@@ -718,8 +719,8 @@ fun GenerateScreen(
                             OutlinedTextField(
                                 value = heightCmText,
                                 onValueChange = { heightCmText = it; profileError = null },
-                                label = { Text("Altura (cm)") },
-                                supportingText = { Text("Opcional") },
+                                label = { Text(stringResource(R.string.generate_height_label)) },
+                                                            supportingText = { Text(stringResource(R.string.common_optional)) },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Done,
@@ -736,7 +737,7 @@ fun GenerateScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                text = "Sexo (opcional)",
+                                text = stringResource(R.string.generate_sex_section),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -746,21 +747,21 @@ fun GenerateScreen(
                                 onToggle = { value -> sexChoice = if (value == sexChoice) null else value },
                             )
                             Text(
-                                text = "Omitir é o padrão. Você pode limpar a seleção quando quiser.",
+                                text = stringResource(R.string.generate_sex_omit),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                    item { SectionTitle("Revisar o plano em") }
+                    item { SectionTitle(stringResource(R.string.generate_review_section)) }
                     item {
                         ChipGroup(
-                            options = reviewOptions.map { it.toString() to "$it semanas" },
+                            options = reviewOptions.map { it.toString() to stringResource(R.string.generate_review_weeks, it) },
                             selected = setOf(reviewWeeks.toString()),
                             onToggle = { reviewWeeks = it.toInt() },
                         )
                     }
-                    item { SectionTitle("Ambiente de treino") }
+                    item { SectionTitle(stringResource(R.string.generate_environment_section)) }
                     item {
                         ChipGroup(
                             options = environmentOptions,
@@ -874,7 +875,7 @@ private fun GenerateOverlay(onCancel: () -> Unit) {
                     onClick = onCancel,
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         }

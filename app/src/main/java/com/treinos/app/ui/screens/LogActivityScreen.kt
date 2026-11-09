@@ -38,6 +38,8 @@ import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.swimStrokeOptions
 import com.treinos.app.ui.validPoolLengths
+import androidx.compose.ui.res.stringResource
+import com.treinos.app.R
 
 private val modalityOptions = ActivityModality.entries.map { it.storageValue to it.label }
 
@@ -148,7 +150,7 @@ fun LogActivityScreen(
                         onClick = { onCopyLast(draft.modality) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Copiar último treino de ${draft.modality.label.lowercase()}")
+                        Text(stringResource(R.string.log_copy_last, draft.modality.label.lowercase()))
                     }
                 }
             }
@@ -158,7 +160,7 @@ fun LogActivityScreen(
                 OutlinedTextField(
                     value = draft.title,
                     onValueChange = { draft = draft.copy(title = it) },
-                    label = { Text("Título (opcional)") },
+                    label = { Text(stringResource(R.string.log_title_label)) },
                     supportingText = errors[ActivityLogField.Title]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Title),
                     modifier = Modifier.fillMaxWidth(),
@@ -168,7 +170,7 @@ fun LogActivityScreen(
                 OutlinedTextField(
                     value = draft.dateText,
                     onValueChange = { draft = draft.copy(dateText = it) },
-                    label = { Text("Quando (dd/mm/aaaa hh:mm)") },
+                    label = { Text(stringResource(R.string.log_date_label)) },
                     supportingText = errors[ActivityLogField.Date]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Date),
                     modifier = Modifier.fillMaxWidth(),
@@ -182,7 +184,7 @@ fun LogActivityScreen(
                     OutlinedTextField(
                         value = draft.durationText,
                         onValueChange = { draft = draft.copy(durationText = it) },
-                        label = { Text("Duração (min)") },
+                        label = { Text(stringResource(R.string.log_duration_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         supportingText = errors[ActivityLogField.Duration]?.let { { Text(it) } },
                         isError = errors.containsKey(ActivityLogField.Duration),
@@ -191,7 +193,7 @@ fun LogActivityScreen(
                     OutlinedTextField(
                         value = draft.rpeText,
                         onValueChange = { draft = draft.copy(rpeText = it) },
-                        label = { Text("RPE (1 a 10)") },
+                        label = { Text(stringResource(R.string.log_rpe_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         supportingText = errors[ActivityLogField.Rpe]?.let { { Text(it) } },
                         isError = errors.containsKey(ActivityLogField.Rpe),
@@ -211,7 +213,7 @@ fun LogActivityScreen(
                 OutlinedTextField(
                     value = draft.distanceText,
                     onValueChange = { draft = draft.copy(distanceText = it) },
-                    label = { Text("Distância (m, opcional)") },
+                    label = { Text(stringResource(R.string.log_distance_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     supportingText = errors[ActivityLogField.Distance]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Distance),
@@ -245,7 +247,7 @@ fun LogActivityScreen(
                 OutlinedTextField(
                     value = draft.notes,
                     onValueChange = { draft = draft.copy(notes = it) },
-                    label = { Text("Ex.: 8 x 100 m") },
+                    label = { Text(stringResource(R.string.log_notes_placeholder)) },
                     supportingText = errors[ActivityLogField.Notes]?.let { { Text(it) } },
                     isError = errors.containsKey(ActivityLogField.Notes),
                     minLines = 3,
@@ -302,8 +304,8 @@ fun LogActivityScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Excluir o registro?") },
-            text = { Text("O registro avulso sai do histórico e do próximo backup. Não dá para desfazer.") },
+            title = { Text(stringResource(R.string.history_activity_delete_title)) },
+            text = { Text(stringResource(R.string.log_activity_delete_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -311,11 +313,11 @@ fun LogActivityScreen(
                         onDelete()
                     },
                 ) {
-                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }

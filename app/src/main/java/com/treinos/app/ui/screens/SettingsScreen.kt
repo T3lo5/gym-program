@@ -1,8 +1,5 @@
 package com.treinos.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,8 +45,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import com.treinos.app.R
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
@@ -122,12 +123,10 @@ fun SettingsScreen(
     if (showDownloadConfirm) {
         AlertDialog(
             onDismissRequest = { showDownloadConfirm = false },
-            title = { Text("Substituir os dados locais?") },
+            title = { Text(stringResource(R.string.settings_dialog_replace_title)) },
             text = {
                 Text(
-                    "Restaurar do servidor apaga os planos, treinos e séries deste " +
-                        "aparelho e grava no lugar o snapshot deste deviceId. " +
-                        "Exporte um backup JSON antes, se quiser voltar atrás.",
+                    stringResource(R.string.settings_dialog_replace_body)
                 )
             },
             confirmButton = {
@@ -137,12 +136,12 @@ fun SettingsScreen(
                         onDownload()
                     },
                 ) {
-                    Text("Restaurar")
+                    Text(stringResource(R.string.settings_btn_restore_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDownloadConfirm = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -151,7 +150,7 @@ fun SettingsScreen(
     if (showRestoreConfirm) {
         AlertDialog(
             onDismissRequest = { showRestoreConfirm = false },
-            title = { Text("Assumir este aparelho?") },
+            title = { Text(stringResource(R.string.settings_dialog_restore_title)) },
             text = {
                 Text(
                     "Os dados locais serão substituídos pelo snapshot de " +
@@ -166,12 +165,12 @@ fun SettingsScreen(
                         onRestoreByDeviceId(restoreDeviceId)
                     },
                 ) {
-                    Text("Restaurar")
+                    Text(stringResource(R.string.settings_btn_restore_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirm = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -181,7 +180,7 @@ fun SettingsScreen(
     if (showReplaceConfirm) {
         AlertDialog(
             onDismissRequest = { showReplaceConfirm = false },
-            title = { Text("Substituir tudo?") },
+            title = { Text(stringResource(R.string.settings_dialog_replace_all_title)) },
             text = {
                 Text(
                     "Isso apaga os planos, treinos, séries e o perfil (peso, altura e " +
@@ -197,12 +196,12 @@ fun SettingsScreen(
                         onConfirmImport()
                     },
                 ) {
-                    Text("Substituir tudo")
+                    Text(stringResource(R.string.settings_btn_replace_all))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showReplaceConfirm = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -253,7 +252,7 @@ fun SettingsScreen(
                                 Text(if (isUpdatingCatalog) "Atualizando..." else "Atualizar catálogo")
                             }
                             TextButton(onClick = onClearCatalogMessage, modifier = Modifier.minimumInteractiveComponentSize()) {
-                                Text("Limpar")
+                                Text(stringResource(R.string.settings_btn_clear))
                             }
                         }
                     }
@@ -285,8 +284,8 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = url,
                             onValueChange = { url = it },
-                            label = { Text("URL do servidor") },
-                            supportingText = { Text("Ex.: http://192.168.0.10:3000") },
+                            label = { Text(stringResource(R.string.settings_label_server_url)) },
+                            supportingText = { Text(stringResource(R.string.settings_server_url_ex)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = { onSaveUrl(url) }),
@@ -299,7 +298,7 @@ fun SettingsScreen(
                                 onClick = { onSaveUrl(url) },
                                 modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                             ) {
-                                Text("Salvar")
+                                Text(stringResource(R.string.settings_btn_save))
                             }
                             BusyButton(
                                 busy = isTesting,
@@ -361,9 +360,9 @@ fun SettingsScreen(
                                         modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
                                     )
-                                    Text("Procurando… (toque para parar)")
+                                    Text(stringResource(R.string.settings_btn_searching))
                                 } else {
-                                    Text("Buscar servidores")
+                                    Text(stringResource(R.string.settings_btn_search))
                                 }
                             }
                         }
@@ -512,7 +511,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = restoreDeviceId,
                             onValueChange = onRestoreDeviceIdChanged,
-                            label = { Text("Código do outro aparelho") },
+                            label = { Text(stringResource(R.string.settings_label_other_code)) },
                             supportingText = { Text(if (restoreDeviceId.isBlank()) "Obrigatório para restaurar" else "Pronto para restaurar") },
                             isError = restoreDeviceId.isBlank() && restoreMessage != null,
                             singleLine = true,
@@ -607,13 +606,13 @@ fun SettingsScreen(
                                         onClick = { showReplaceConfirm = true },
                                         modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                                     ) {
-                                        Text("Substituir tudo")
+                                        Text(stringResource(R.string.settings_btn_replace_all))
                                     }
                                     OutlinedButton(
                                         onClick = onCancelImport,
                                         modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
                                     ) {
-                                        Text("Cancelar")
+                                        Text(stringResource(R.string.common_cancel))
                                     }
                                 }
                             }
@@ -627,7 +626,7 @@ fun SettingsScreen(
                                     onClick = onClearBackupMessage,
                                     modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                                 ) {
-                                    Text("Dispensar")
+                                    Text(stringResource(R.string.settings_btn_dismiss))
                                 }
                             }
                             else -> { }
@@ -639,9 +638,34 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // H3-37: seletor de idioma do app (per-app locale).
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_language_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Escolha o idioma da interface do app. A mudança é aplicada imediatamente.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
+
+
+
+
+
+
 
 /**
  * H3-35: seção colapsável com título e ícone de expansão.
@@ -686,15 +710,82 @@ private fun CollapsibleSection(
                 )
             }
         }
-        AnimatedVisibility(
-            visible = localExpanded,
-            enter = expandVertically(),
-            exit = shrinkVertically(),
-        ) {
+        if (localExpanded) {
             Column(
                 modifier = Modifier.padding(top = 8.dp),
             ) {
                 content()
+            }
+        }
+    }
+}
+
+/** Idioma da interface do app, conforme a escolha do seletor ou o sistema. */
+private enum class AppLanguage {
+    System,
+    Portuguese,
+    English,
+}
+
+/** Idioma efetivo do app, lido do per-app locale (vazio = padrão do sistema). */
+private fun currentAppLanguage(): AppLanguage {
+    val locales = AppCompatDelegate.getApplicationLocales()
+    val tag = if (locales.size() > 0) locales.get(0)?.toLanguageTag() else null
+    return when (tag) {
+        "pt-BR" -> AppLanguage.Portuguese
+        "en" -> AppLanguage.English
+        else -> AppLanguage.System
+    }
+}
+
+/** Aplica o idioma escolhido, recriando a activity via per-app locale. */
+private fun applyAppLanguage(language: AppLanguage) {
+    val locales = when (language) {
+        AppLanguage.System -> LocaleListCompat.getEmptyLocaleList()
+        AppLanguage.Portuguese -> LocaleListCompat.forLanguageTags("pt-BR")
+        AppLanguage.English -> LocaleListCompat.forLanguageTags("en")
+    }
+    AppCompatDelegate.setApplicationLocales(locales)
+}
+
+@Composable
+private fun LanguageSelector(
+    current: AppLanguage,
+    onChange: (AppLanguage) -> Unit,
+) {
+    val options = listOf(
+        AppLanguage.System to R.string.settings_language_system,
+        AppLanguage.Portuguese to R.string.settings_language_pt,
+        AppLanguage.English to R.string.settings_language_en,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { (lang, resId) ->
+            val selected = current == lang
+            if (selected) {
+                Button(
+                    onClick = {
+                        onChange(lang)
+                        applyAppLanguage(lang)
+                    },
+                    enabled = true,
+                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                ) {
+                    Text(stringResource(resId))
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        onChange(lang)
+                        applyAppLanguage(lang)
+                    },
+                    enabled = true,
+                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                ) {
+                    Text(stringResource(resId))
+                }
             }
         }
     }
