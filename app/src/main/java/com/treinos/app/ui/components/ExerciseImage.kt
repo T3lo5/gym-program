@@ -1,5 +1,6 @@
 package com.treinos.app.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -24,21 +26,40 @@ import coil.request.ImageRequest
  * Imagem de exercício resiliente (H3-32): cantos do tema, crossfade e fallback
  * de letra tanto sem URL quanto enquanto carrega e quando a rede falha — nunca
  * um quadrado vazio. A letra escala com o tamanho do container.
+ *
+ * H3-39: `imageRes` é o drawable local de fallback (APK, offline) usado quando
+ * não há `imageUrl`. A URL do catálogo remoto vence sobre o drawable local
+ * (fonte preferencial).
  */
 @Composable
 fun ExerciseImage(
     imageUrl: String?,
     exerciseName: String,
+    imageRes: Int? = null,
     modifier: Modifier = Modifier,
     size: Dp = 72.dp,
     contentDescription: String? = null,
 ) {
     val shape = MaterialTheme.shapes.small
-    if (imageUrl.isNullOrBlank()) {
+    if (imageUrl.isNullOrBlank() && imageRes == null) {
         ExerciseImageFallback(
             exerciseName = exerciseName,
             size = size,
             modifier = modifier.size(size).clip(shape),
+        )
+        return
+    }
+
+    if (imageUrl.isNullOrBlank()) {
+        // H3-39: drawable local offline — sem rede, sem Coil.
+        val description = contentDescription ?: "Imagem do exercício $exerciseName"
+        Image(
+            painter = painterResource(id = imageRes!!),
+            contentDescription = description,
+            modifier = modifier
+                .size(size)
+                .clip(shape)
+                .semantics { this.contentDescription = description },
         )
         return
     }
@@ -50,9 +71,6 @@ fun ExerciseImage(
             .crossfade(true)
             .build()
     }
-    // A descrição fica no container: os slots loading/error do SubcomposeAsyncImage
-    // não recebem o contentDescription do parâmetro, e a imagem precisa anunciá-la
-    // também enquanto carrega ou quando cai no fallback.
     val description = contentDescription ?: "Imagem do exercício $exerciseName"
     SubcomposeAsyncImage(
         model = request,

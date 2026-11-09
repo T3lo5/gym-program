@@ -1,5 +1,6 @@
 package com.treinos.app.ui
 
+import com.treinos.app.R
 import kotlin.math.max
 
 data class MobilityRoutine(
@@ -16,6 +17,36 @@ data class MobilityMovement(
     val side: String? = null,
     val cue: String,
     val catalogId: String? = catalogIdForMovement(name),
+    val imageRes: Int? = imageResForMovement(name),
+)
+
+/**
+ * H3-39: ligar movimentos curados a drawables locais do APK, para que o
+ * jogador de mobilidade mostre a imagem mesmo offline (sem catálogo remoto).
+ * Pura: testável em JVM.
+ */
+fun imageResForMovement(name: String): Int? = MOVEMENT_IMAGE_RES[name]
+
+private val MOVEMENT_IMAGE_RES: Map<String, Int> = mapOf(
+    "Gato-Camelo" to R.drawable.img_cat_stretch,
+    "Rotação torácica em decúbito lateral" to R.drawable.img_torso_rotation,
+    "Rotação torácica em 4 apoios" to R.drawable.img_torso_rotation,
+    "Flexão do quadril em meia ponte" to R.drawable.img_pelvic_tilt_bridge,
+    "Mobilização pélvica em ponte" to R.drawable.img_pelvic_tilt_bridge,
+    "Mobilização pélvica relaxada" to R.drawable.img_pelvic_tilt_bridge,
+    "Alongamento do piriforme sentado" to R.drawable.img_seated_glute,
+    "Alongamento do piriforme" to R.drawable.img_lying_glute,
+    "Alongamento dos isquiotibiais" to R.drawable.img_hamstring_stretch,
+    "Alongamento dos isquiotibiais sentado" to R.drawable.img_seated_hamstring,
+    "Relaxamento em posição fetal" to R.drawable.img_hug_knees_chest,
+    "Borboleta" to R.drawable.img_adductor_groin,
+    "Alongamento do quadríceps" to R.drawable.img_quad_stretch,
+    "Alongamento do flexor do quadril" to R.drawable.img_kneeling_hip_flexor,
+    "Mobilização cervical" to R.drawable.img_side_neck_stretch,
+    "Alongamento dos ombros" to R.drawable.img_shoulder_stretch,
+    "Relaxamento" to R.drawable.img_childs_pose,
+    "Alongamento dos panturrilhas" to R.drawable.img_calf_stretch,
+    "Mobilização de tornozelo" to R.drawable.img_ankle_circles,
 )
 
 /**

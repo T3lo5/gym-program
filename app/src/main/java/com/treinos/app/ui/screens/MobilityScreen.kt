@@ -215,6 +215,7 @@ private fun MobilityRoutineList(
                             ExerciseImage(
                                 imageUrl = cover.catalogId?.let { exerciseMedia[it]?.imageUrl },
                                 exerciseName = cover.name,
+                                imageRes = cover.imageRes,
                                 size = 56.dp,
                             )
                         }
@@ -319,6 +320,7 @@ private fun MobilityPlayer(
                         ExerciseImage(
                             imageUrl = movement.catalogId?.let { exerciseMedia[it]?.imageUrl },
                             exerciseName = movement.name,
+                            imageRes = movement.imageRes,
                             size = 160.dp,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
