@@ -2,6 +2,7 @@ package com.treinos.app
 
 import android.app.Application
 import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.AppDatabase
 import com.treinos.app.data.media.ExerciseMediaRepository
@@ -61,6 +62,12 @@ class TreinosApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Aplica o idioma por app persistido (per-app locale) antes de criar
+        // qualquer activity, para que ela já nasça no idioma escolhido pelo
+        // usuário. Chamar aqui (Application) evita o NPE em
+        // AppCompatDelegate.isAutoStorageOptedIn que ocorre quando a chamada
+        // é feita antes de super.onCreate() na Activity.
+        AppCompatDelegate.setApplicationLocales(AppCompatDelegate.getApplicationLocales())
         container = AppContainer(this)
     }
 }
