@@ -145,10 +145,6 @@ fun HomeScreen(
         topBar = {
             ScreenTopBar(
                 title = stringResource(R.string.screen_home),
-                actions = {
-                    TextButton(onClick = onHistory) { Text(stringResource(R.string.action_history)) }
-                    TextButton(onClick = onSettings) { Text(stringResource(R.string.action_settings)) }
-                },
             )
         },
     ) { padding ->

@@ -146,6 +146,9 @@ class AppViewModel(
     private val _screen = MutableStateFlow(Screen.Home)
     val screen: StateFlow<Screen> = _screen.asStateFlow()
 
+    private val _backTarget = MutableStateFlow<Screen?>(null)
+    val backTarget: StateFlow<Screen?> = _backTarget.asStateFlow()
+
     private val _discoveredBackends = MutableStateFlow<List<DiscoveredBackend>>(emptyList())
     val discoveredBackends: StateFlow<List<DiscoveredBackend>> = _discoveredBackends.asStateFlow()
 
@@ -654,23 +657,34 @@ class AppViewModel(
     fun openGenerate() {
         // H3-29: entrar na tela é uma nova tentativa — erro antigo não volta.
         _generateError.value = null
+        _backTarget.value = _screen.value
         _screen.value = Screen.Generate
     }
 
     fun openHistory() {
+        _backTarget.value = _screen.value
         _screen.value = Screen.History
     }
 
     fun openSettings() {
+        _backTarget.value = _screen.value
         _screen.value = Screen.Settings
     }
 
     fun openMobility() {
+        _backTarget.value = _screen.value
         _screen.value = Screen.Mobility
     }
 
     fun goHome() {
         _screen.value = Screen.Home
+    }
+
+    /** H3-38: volta para a origem da navegação (ou Home como raiz padrão). */
+    fun voltar() {
+        val destino = _backTarget.value ?: Screen.Home
+        _backTarget.value = null
+        _screen.value = destino
     }
 
     fun clearMessage() {
@@ -1227,9 +1241,10 @@ class AppViewModel(
                     repository.logActivity(input.toManualSession())
                     _message.value = "Atividade registrada e salva no aparelho."
                 }
-                _activityEditingId.value = null
-                _activityPrefill.value = null
-                _screen.value = Screen.Home
+                    _activityEditingId.value = null
+                    _activityPrefill.value = null
+                    // H3-38: salvar edição retorna à origem (Histórico quando veio dele).
+                    _screen.value = _backTarget.value ?: Screen.Home
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, "Não foi possível salvar a atividade.")
             } finally {

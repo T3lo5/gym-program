@@ -44,6 +44,7 @@ import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.RunWorkoutScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
+import com.treinos.app.ui.components.BottomNavigationBar
 import com.treinos.app.ui.components.ExerciseDetailSheet
 import java.io.File
 import java.text.SimpleDateFormat
@@ -187,12 +188,21 @@ fun TreinosApp(viewModel: AppViewModel) {
     BackHandler(enabled = screen != Screen.Home) {
         when (screen) {
             Screen.Workout -> viewModel.leaveWorkout()
-            else -> viewModel.goHome()
+            else -> viewModel.voltar()
         }
+    }
+
+    val isHub = screen == Screen.Home || screen == Screen.History || screen == Screen.Settings
+    val bottomBarSelected = when (screen) {
+        Screen.Home -> 0
+        Screen.History -> 1
+        Screen.Settings -> 2
+        else -> -1
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = { if (isHub) BottomNavigationBar(bottomBarSelected, viewModel) else null },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -268,7 +278,7 @@ fun TreinosApp(viewModel: AppViewModel) {
 
                 Screen.Generate -> GenerateScreen(
                     isGenerating = isGenerating,
-                    onBack = viewModel::goHome,
+                    onBack = viewModel::voltar,
                     savedBodyWeightKg = bodyWeightKg,
                     savedHeightCm = heightCm,
                     savedSex = sex,
@@ -324,7 +334,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                 Screen.History -> HistoryScreen(
                     sessions = sessions,
                     sessionsState = sessionsState,
-                    onBack = viewModel::goHome,
+                    onBack = viewModel::voltar,
                     exerciseMedia = exerciseMedia,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                     onEditActivity = viewModel::editLogActivity,
@@ -339,7 +349,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     isSaving = isSavingActivity,
                     errors = activityErrors,
                     canCopyLast = canCopyLastActivity,
-                    onBack = viewModel::goHome,
+                    onBack = viewModel::voltar,
                     onModalityChanged = viewModel::onActivityModalityChanged,
                     onCopyLast = viewModel::copyLastActivity,
                     onSave = viewModel::saveActivity,
@@ -385,7 +395,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     isRestoring = isRestoring,
                     restoreDeviceId = restoreDeviceId,
                     restoreMessage = restoreMessage,
-                    onBack = viewModel::goHome,
+                    onBack = viewModel::voltar,
                     onSaveUrl = viewModel::saveBackendUrl,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,

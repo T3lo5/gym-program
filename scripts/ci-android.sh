@@ -50,6 +50,8 @@ echo "    versionCode=$VERSION_CODE versionName=$VERSION_NAME"
   --no-daemon \
   --stacktrace \
   --console=plain \
+  "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Dorg.gradle.daemon=false" \
+  ${ANDROID_HOME:+"-Dsdk.dir=$ANDROID_HOME"} \
   "-PversionCode=$VERSION_CODE" \
   "-PversionName=$VERSION_NAME"
 

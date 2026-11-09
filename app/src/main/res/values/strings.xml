@@ -35,6 +35,11 @@
     <string name="action_start_workout">Iniciar treino</string>
     <string name="action_edit">Editar</string>
 
+    <!-- Bottom bar (H3-38) -->
+    <string name="bottom_bar_treinar">Treinar</string>
+    <string name="bottom_bar_historico">Histórico</string>
+    <string name="bottom_bar_ajustes">Ajustes</string>
+
     <!-- Idioma do app (seletor em Ajustes) -->
     <string name="settings_language_title">Idioma do app</string>
     <string name="settings_language_system">Padrão do sistema</string>
