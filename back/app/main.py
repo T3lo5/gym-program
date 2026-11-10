@@ -1197,9 +1197,9 @@ async def generate_workout(request: GenerateRequest):
         attempts = 2
         for attempt in range(attempts):
             attempt_timeout = (
-                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 45.0)
+                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 90.0)
                 if attempt == 0
-                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 25.0)
+                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 45.0)
             )
             try:
                 timeout = httpx.Timeout(
