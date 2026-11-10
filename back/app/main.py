@@ -48,14 +48,22 @@ from .plan_builder import (
     _build_pool,
     _expand_muscles,
     _is_strength_exercise,
+    build_shortlist,
+    shortlist_summary_for_request,
+    shortlist_summary_metrics,
 )
 from .run_templates import template_for
 
 # Config
 SENSENOVA_API_KEY = os.getenv("SENSENOVA_API_KEY")
 SENSENOVA_BASE_URL = os.getenv("SENSENOVA_BASE_URL", "https://token.sensenova.ai/v1")
-MODEL_ID = os.getenv("MODEL_ID", "sensenova-6.8-flash-lite")
+MODEL_ID = os.getenv("MODEL_ID", "sensenova-6.8-flash")
 MDNS_ENABLED = os.getenv("MDNS_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+
+# T7 experiment flag: usar shortlist com IDs + schema rígido
+# Valores: "0"/"false"/"no" = desligado (padrão), "1"/"true"/"yes" = ligado
+EXPERIMENT_SHORTLIST = os.getenv("EXPERIMENT_SHORTLIST", "0").strip().lower() in {"1", "true", "yes"}
+SHORTLIST_PER_MUSCLE = int(os.getenv("SHORTLIST_PER_MUSCLE", "12"))
 
 if not SENSENOVA_API_KEY:
     print("WARNING: SENSENOVA_API_KEY not set!")
@@ -182,16 +190,83 @@ RESTRIÇÕES DE PLANO COMPLEMENTAR (obrigatórias):
 """
 
 
+# T7 — Shortlist + IDs + schema rígido
+# Shortlist determinística (~12 por grupo) com IDs exatos; IA deve usar APENAS
+# estes IDs. Prompt compacto, schema estrito, sem nomes livres.
+SYSTEM_PROMPT_SHORTLIST = """Você é um gerador de treinos de musculação baseado em evidências.
+
+{shortlist_summary}
+
+REGRAS OBRIGATÓRIAS (ESTRITAS):
+1. Use APENAS os IDs listados na SHORTLIST acima. Não invente IDs, não use IDs
+   fora da lista, não use nomes livres. O `exerciseId` DEVE ser um dos IDs da
+   shortlist. O `exerciseName` deve copiar exatamente o nome listado ao lado
+   do ID.
+2. Retorne JSON válido conforme schema WorkoutPlanDTO.
+3. Respeite equipamentos, nível, objetivo e duração informados.
+4. Musculação: 4 a 8 exercícios por `day`, todos `metricType = "reps_weight"`,
+   categoria de força, sem alongamento/cardio.
+5. Um `day` = uma sessão = uma única modalidade (apenas strength neste modo).
+6. `weekday` 1..7. Várias sessões no mesmo `weekday` são `day`s separados.
+7. Não inclua corrida nem mobilidade.
+
+FORMATO DE SAÍDA (JSON):
+{{
+  "name": "string",
+  "description": "string",
+  "goal": "hypertrophy|strength|endurance|power|fat_loss|general",
+  "daysPerWeek": 2-6,
+  "days": [
+    {{
+      "name": "string",
+      "dayOrder": 0,
+      "weekday": 1-7,
+      "modality": "strength",
+      "isRestDay": false,
+      "exercises": [
+        {{
+          "exerciseId": "string (ID EXATO da shortlist acima; OBRIGATÓRIO)",
+          "exerciseName": "string (nome canônico listado ao lado do ID na shortlist)",
+          "exerciseOrder": 0,
+          "sets": 1-20,
+          "targetReps": "string (ex: '8-12', '10', 'AMRAP')",
+          "targetRpe": 5.0-10.0,
+          "restSeconds": 0-300,
+          "notes": "string",
+          "isSupersetWithPrevious": false,
+          "metricType": "reps_weight"
+        }}
+      ]
+    }}
+  ]
+}}"""
+
+
 def system_prompt_for_request(request: "GenerateRequest") -> str:
-    """Prompt de sistema por request (H3-22): catálogo filtrado ao pool."""
-    summary = catalog_summary_for_request(request, EXERCISE_CATALOG)
+    """Prompt de sistema por request (H3-22): catálogo filtrado ao pool.
+
+    T7 experiment: quando EXPERIMENT_SHORTLIST=true, usa shortlist com IDs
+    exatos e schema rígido (apenas plano principal de força, sem modalidades
+    híbridas nem complementar).
+    """
     modalities = getattr(request, "modalities", None) or []
-    if modalities or is_complementary_request(request):
-        base = SYSTEM_PROMPT_HYBRID_RULES.format(catalog_summary=summary)
-        if is_complementary_request(request):
-            base += COMPLEMENTARY_SYSTEM_RULES
+    is_complementary = is_complementary_request(request)
+
+    # T7: shortlist mode apenas para plano principal (sem modalidades, sem foco)
+    if EXPERIMENT_SHORTLIST and not modalities and not is_complementary:
+        shortlist_summary = shortlist_summary_for_request(
+            request, EXERCISE_CATALOG, SHORTLIST_PER_MUSCLE
+        )
+        base = SYSTEM_PROMPT_SHORTLIST.format(shortlist_summary=shortlist_summary)
     else:
-        base = SYSTEM_PROMPT_STRENGTH_RULES.format(catalog_summary=summary)
+        summary = catalog_summary_for_request(request, EXERCISE_CATALOG)
+        if modalities or is_complementary:
+            base = SYSTEM_PROMPT_HYBRID_RULES.format(catalog_summary=summary)
+            if is_complementary:
+                base += COMPLEMENTARY_SYSTEM_RULES
+        else:
+            base = SYSTEM_PROMPT_STRENGTH_RULES.format(catalog_summary=summary)
+
     # H3-36: o catálogo do summary já está no idioma do request; a diretiva
     # explícita evita a IA traduzir por conta própria (ou voltar ao EN).
     if request_language(request) == "pt":
@@ -657,6 +732,46 @@ Retorne APENAS o JSON válido."""
     return prompt
 
 
+def build_shortlist_user_prompt(request: GenerateRequest) -> str:
+    """Prompt do usuário para modo T7 shortlist: reforça uso exclusivo da shortlist."""
+    equipment_str = ", ".join(request.availableEquipment) if request.availableEquipment else "nenhum (apenas peso corporal)"
+    muscles_str = ", ".join(request.targetMuscles) if request.targetMuscles else "corpo todo"
+
+    prompt = f"""Gere um treino de {request.goal} usando APENAS os exercícios da SHORTLIST
+fornecida no prompt de sistema. Regras estritas:
+- Dias por semana: {request.daysPerWeek}
+- Equipamentos disponíveis: {equipment_str}
+- Foco muscular: {muscles_str}
+- Nível: {request.currentLevel}
+- Duração por sessão: ~{request.sessionDurationMinutes} min
+- Split preferido: {request.preferredSplit or 'livre'}
+- Lesões/limitações: {request.injuriesOrLimitations or 'nenhuma'}
+- Idioma: {
+        'português (copie o exerciseName exatamente da shortlist)'
+        if request_language(request) == 'pt'
+        else 'inglês (copie o exerciseName exatamente da shortlist)'
+    }
+
+O treino deve ser progressivo, balanceado e usar SOMENTE IDs da shortlist.
+Retorne APENAS o JSON válido."""
+
+    if request.sex is not None:
+        prompt += f"""
+
+- Sexo biológico: {SEX_LABELS_PT[request.sex]}"""
+
+    if request.bodyWeightKg is not None and request.heightCm is not None:
+        bmi = request.bodyWeightKg / ((request.heightCm / 100.0) ** 2)
+        prompt += f"""
+
+- Peso corporal: {request.bodyWeightKg} kg
+- Altura: {request.heightCm} cm
+- IMC: {bmi:.1f}
+- Use o perfil para calibrar descanso, RPE, volume e cargas iniciais."""
+
+    return prompt
+
+
 def build_hybrid_user_prompt(request: GenerateRequest) -> str:
     """Prompt para geração de semana híbrida (musculação/corrida/mobilidade)."""
     environment = request.environment or "inferir pelos equipamentos"
@@ -1024,6 +1139,9 @@ async def generate_workout(request: GenerateRequest):
     IDs inválidos, monta um plano local válido com o catálogo. A resposta
     sempre informa a origem (`ai` ou `local`), o motivo do fallback quando
     local (`fallbackReason`, H3-21) e a data de revisão.
+
+    T7 experiment: quando EXPERIMENT_SHORTLIST=true (apenas plano principal),
+    usa shortlist determinística com IDs exatos e schema rígido.
     """
     if not EXERCISE_CATALOG:
         raise HTTPException(500, "Exercise catalog not loaded")
@@ -1037,8 +1155,14 @@ async def generate_workout(request: GenerateRequest):
     is_hybrid = bool(modalities)
     is_complementary = is_complementary_request(request)
 
+    # T7: shortlist mode apenas para plano principal (sem modalidades, sem foco)
+    use_shortlist = EXPERIMENT_SHORTLIST and not is_hybrid and not is_complementary
+
     if is_hybrid:
         user_prompt = build_hybrid_user_prompt(request)
+        system_prompt = system_prompt_for_request(request)
+    elif use_shortlist:
+        user_prompt = build_shortlist_user_prompt(request)
         system_prompt = system_prompt_for_request(request)
     else:
         user_prompt = build_user_prompt(request)
@@ -1059,9 +1183,16 @@ async def generate_workout(request: GenerateRequest):
             except (TypeError, ValueError):
                 return default
 
-        # Log métricas do catálogo no prompt (baseline ~32k chars / ~8k tok caso principal).
-        catalog_metrics = catalog_summary_metrics(request, EXERCISE_CATALOG)
-        print(f"[catalog] chars={catalog_metrics['chars']} linhas={catalog_metrics['linhas']} tokens_aprox={catalog_metrics['tokens_aprox']}")
+        # Log métricas do catálogo/shortlist no prompt.
+        if use_shortlist:
+            shortlist_metrics = shortlist_summary_metrics(request, EXERCISE_CATALOG, SHORTLIST_PER_MUSCLE)
+            print(
+                f"[shortlist] chars={shortlist_metrics['chars']} linhas={shortlist_metrics['linhas']} "
+                f"tokens_aprox={shortlist_metrics['tokens_aprox']} exercises={shortlist_metrics['exercises']}"
+            )
+        else:
+            catalog_metrics = catalog_summary_metrics(request, EXERCISE_CATALOG)
+            print(f"[catalog] chars={catalog_metrics['chars']} linhas={catalog_metrics['linhas']} tokens_aprox={catalog_metrics['tokens_aprox']}")
 
         attempts = 2
         for attempt in range(attempts):

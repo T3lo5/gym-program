@@ -735,6 +735,163 @@ def catalog_summary_metrics(request: Any, catalog: List[Dict[str, Any]]) -> Dict
     }
 
 
+def build_shortlist(
+    request: Any,
+    catalog: List[Dict[str, Any]],
+    per_muscle: int = 12,
+) -> List[Dict[str, Any]]:
+    """Constrói shortlist determinística de ~per_muscle exercícios por grupo muscular.
+
+    Usa o pool elegível do request (equipamento, nível, foco/complementar) e seleciona
+    até `per_muscle` exercícios por primaryMuscle, priorizando:
+    1. Exercícios do foco/target do request
+    2. Equipamentos de carga (barbell, dumbbell, machine, cable) > body only
+    3. Nível beginner/intermediate > advanced
+    4. Ordem estável do catálogo (tie-break)
+
+    Retorna lista plana de exercícios (cada exercício aparece uma vez, no primeiro
+    músculo primário que o qualifica).
+    """
+    equipment = list(getattr(request, "availableEquipment", []) or [])
+    level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
+    strict_equipment = complementary_equipment_filter(request)
+    pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+    strength_pool = [e for e in pool if _is_strength_exercise(e)]
+
+    focus = list(getattr(request, "focusMuscles", []) or [])
+    target = list(getattr(request, "targetMuscles", []) or [])
+
+    # Agrupa por músculo primário (primeiro primaryMuscle relevante).
+    by_muscle: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for exercise in strength_pool:
+        primaries = [str(m).lower() for m in exercise.get("primaryMuscles", [])]
+        if not primaries:
+            by_muscle["other"].append(exercise)
+            continue
+        for muscle in primaries:
+            by_muscle[muscle].append(exercise)
+
+    # Ordem dos grupos: foco/target primeiro, depois alfabético.
+    if focus:
+        ordered_muscles = [m for m in _expand_muscles(focus) if m in by_muscle]
+    else:
+        ordered_muscles = []
+        for m in _expand_muscles(target):
+            if m in by_muscle and m not in ordered_muscles:
+                ordered_muscles.append(m)
+        for m in sorted(by_muscle.keys()):
+            if m not in ordered_muscles:
+                ordered_muscles.append(m)
+
+    # Prioridade de equipamento: carga > body only
+    def equip_priority(ex: Dict[str, Any]) -> int:
+        eq = str(ex.get("equipment", "")).strip().lower()
+        if eq in LOAD_EQUIPMENT:
+            return 0
+        return 1
+
+    # Prioridade de nível: beginner/intermediate > advanced
+    def level_priority(ex: Dict[str, Any]) -> int:
+        lvl = str(ex.get("level", "intermediate")).lower()
+        if lvl in ("beginner", "intermediate"):
+            return 0
+        return 1
+
+    shortlist: List[Dict[str, Any]] = []
+    used_ids: Set[str] = set()
+
+    for muscle in ordered_muscles:
+        exercises = by_muscle.get(muscle) or []
+        if not exercises:
+            continue
+        # Ordena por prioridade (equip, nível, ordem catálogo)
+        exercises_sorted = sorted(
+            exercises,
+            key=lambda ex: (
+                equip_priority(ex),
+                level_priority(ex),
+                catalog.index(ex) if ex in catalog else 999999,
+            ),
+        )
+        count = 0
+        for ex in exercises_sorted:
+            if ex["id"] in used_ids:
+                continue
+            shortlist.append(ex)
+            used_ids.add(ex["id"])
+            count += 1
+            if count >= per_muscle:
+                break
+
+    return shortlist
+
+
+def shortlist_summary_for_request(
+    request: Any,
+    catalog: List[Dict[str, Any]],
+    per_muscle: int = 12,
+) -> str:
+    """Resumo da shortlist para o prompt da IA (T7).
+
+    Formato compacto com ID + nome canônico + equipamento:
+      - <ID> — <nome canônico> (<eq>)
+    Cabeçalho instruindo a IA a usar APENAS estes IDs.
+    """
+    shortlist = build_shortlist(request, catalog, per_muscle)
+    language = request_language(request)
+
+    # Agrupa por músculo primário para exibição
+    by_muscle: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for exercise in shortlist:
+        primaries = [str(m).lower() for m in exercise.get("primaryMuscles", [])]
+        if not primaries:
+            by_muscle["other"].append(exercise)
+            continue
+        by_muscle[primaries[0]].append(exercise)
+
+    focus = list(getattr(request, "focusMuscles", []) or [])
+    target = list(getattr(request, "targetMuscles", []) or [])
+
+    if focus:
+        ordered_muscles = [m for m in _expand_muscles(focus) if m in by_muscle]
+    else:
+        ordered_muscles = []
+        for m in _expand_muscles(target):
+            if m in by_muscle and m not in ordered_muscles:
+                ordered_muscles.append(m)
+        for m in sorted(by_muscle.keys()):
+            if m not in ordered_muscles:
+                ordered_muscles.append(m)
+
+    lines = [
+        "SHORTLIST DE EXERCÍCIOS VÁLIDOS (use APENAS estes IDs exatos; "
+        "não invente IDs nem nomes fora desta lista):"
+    ]
+    for muscle in ordered_muscles:
+        exercises = by_muscle.get(muscle) or []
+        if not exercises:
+            continue
+        lines.append(f"\n{muscle.upper()}:")
+        for ex in exercises:
+            eq = (ex.get("equipment") or "body only").strip()
+            name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
+            lines.append(f"  - {ex['id']} — {name} ({eq})")
+    return "\n".join(lines)
+
+
+def shortlist_summary_metrics(
+    request: Any, catalog: List[Dict[str, Any]], per_muscle: int = 12
+) -> Dict[str, int]:
+    """Métricas do resumo da shortlist para log/observabilidade."""
+    summary = shortlist_summary_for_request(request, catalog, per_muscle)
+    return {
+        "chars": len(summary),
+        "linhas": len(summary.splitlines()),
+        "tokens_aprox": len(summary) // 4,
+        "exercises": len(build_shortlist(request, catalog, per_muscle)),
+    }
+
+
 def id_name_mismatches(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """Detecta pares exerciseId↔exerciseName divergentes (H3-22).
 
