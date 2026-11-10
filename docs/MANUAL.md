@@ -26,8 +26,10 @@ já funciona nesta versão:
 | Atualização do APK | ✅ Funciona (com a mesma assinatura) |
 | Backend: saúde, catálogo e documentação | ✅ Funciona |
 | Backend: geração de treino sob demanda | ✅ Funciona com IA ou com plano local de reserva |
+| Backend: geração assíncrona (job 202 + status/cancel) | ✅ Funciona com orçamento de 600 s |
 | Telas de plano, execução, histórico e ajustes no app | ✅ Funciona |
 | Registro de séries no SQLite do aparelho | ✅ Funciona |
+| Card de geração pendente na Home (Atualizar/Cancelar/Tentar de novo/Descartar) | ✅ Funciona |
 | Sincronização manual app → backend | ✅ Funciona pelo botão **Sincronizar agora** |
 | Restauração do backend por `deviceId` | ✅ Funciona pelo botão **Restaurar do backend** |
 | Backup JSON manual | 🟡 Lógica pronta; botões de exportar/importar em correção (H1-7) |
@@ -318,6 +320,30 @@ O plano complementar aparece na Home junto do principal e nada é desativado;
 o nome vem do foco ou do ambiente (ex.: "Complementar — Abdômen",
 "Complementar — Casa"). Se o foco escolhido não tiver exercícios suficientes no
 ambiente, o app avisa em vez de gerar um plano fora do foco.
+
+#### 3.3.1.5 Geração assíncrona (pedir agora, receber pronto)
+
+Como o plano de IA pode demorar vários minutos, a geração **não trava a tela**.
+O fluxo é:
+
+1. Toque em **Gerar treino** (ou **Gerar plano complementar**).
+2. O app responde imediatamente com "Treino sendo preparado" e vai para a Home.
+3. Na Home aparece o **card de geração pendente**, com o botão **Atualizar**.
+4. Volte ao app quando quiser e toque em **Atualizar**. Se o backend já
+   concluiu o job, o plano é salvo e aparece na Home. Se ainda não terminou,
+   nada muda — toque em **Atualizar** novamente mais tarde.
+5. Se a geração falhar, o card mostra **Tentar de novo** (reenvia o mesmo
+   request) ou **Descartar** (limpa o envelope sem salvar nada).
+
+O envelope da geração sobrevive a fechar o app ou matar o processo: ao
+reabrir, o status do job é consultado automaticamente. Não há WorkManager, nem
+permissão nova, nem notificação — o poll é só sob demanda (voltar ao foreground
+ou tocar em Atualizar).
+
+> **Dica:** o backend precisa estar acessível na rede durante o job. Se você
+> desligar o computador no meio da geração, o job marca como interrompido ao
+> reiniciar o backend e o app oferece **Tentar de novo**.
+
 
 #### 3.3.2 Fazer o treino e registrar as séries
 

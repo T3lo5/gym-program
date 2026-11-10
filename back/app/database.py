@@ -157,12 +157,25 @@ CREATE TABLE IF NOT EXISTS synced_set_logs (
     UNIQUE(session_exercise_id, local_id)
 );
 
+CREATE TABLE IF NOT EXISTS generation_jobs (
+    id TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    request_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_synced_plans_device
     ON synced_plans(device_id);
 CREATE INDEX IF NOT EXISTS idx_synced_sessions_device
     ON synced_sessions(device_id);
 CREATE INDEX IF NOT EXISTS idx_generations_device
     ON plan_generations(device_id);
+CREATE INDEX IF NOT EXISTS idx_generation_jobs_device
+    ON generation_jobs(device_id);
 """
 
 
@@ -237,6 +250,100 @@ def init_db() -> None:
                 "session_rpe": "REAL",
             },
         )
+
+
+def create_generation_job(job_id: str, device_id: str, request_payload: Dict[str, Any]) -> None:
+    """Registra um job de geração aceito (H3-40), ainda sem task em voo."""
+    now = _now_iso()
+    with _lock, get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO generation_jobs (
+                id, device_id, request_json, status, created_at, updated_at
+            ) VALUES (?, ?, ?, 'pending', ?, ?)
+            """,
+            (job_id, device_id, json.dumps(request_payload, ensure_ascii=False), now, now),
+        )
+
+
+def get_generation_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM generation_jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_active_generation_job(device_id: str) -> Optional[Dict[str, Any]]:
+    """Job pending/running mais recente do device (last-write-wins do submit)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM generation_jobs
+            WHERE device_id = ? AND status IN ('pending', 'running')
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (device_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def mark_generation_job_running(job_id: str) -> bool:
+    """pending → running; False quando o job já terminou (cancelado antes de começar)."""
+    with _lock, get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = 'running', updated_at = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (_now_iso(), job_id),
+        )
+        return cursor.rowcount > 0
+
+
+def finish_generation_job(
+    job_id: str,
+    status: str,
+    result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+) -> bool:
+    """Transição terminal guardada: só pending/running muda de estado.
+
+    Quem commitar primeiro vence (cancel concorrente × conclusão do runner):
+    se o job já está terminal, retorna False e o chamador descarta o resultado.
+    """
+    with _lock, get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = ?, result_json = ?, error = ?, updated_at = ?
+            WHERE id = ? AND status IN ('pending', 'running')
+            """,
+            (
+                status,
+                json.dumps(result, ensure_ascii=False) if result is not None else None,
+                error,
+                _now_iso(),
+                job_id,
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def mark_interrupted_jobs() -> int:
+    """Startup sweep: pending/running de uma execução anterior não têm task
+    viva neste processo — viram failed com error='interrupted' (H3-40)."""
+    with _lock, get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = 'failed', error = 'interrupted', updated_at = ?
+            WHERE status IN ('pending', 'running')
+            """,
+            (_now_iso(),),
+        )
+        return cursor.rowcount
 
 
 def save_generation(

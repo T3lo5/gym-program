@@ -61,6 +61,7 @@ import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
+import com.treinos.app.ui.PendingGeneration
 import com.treinos.app.ui.SessionKind
 import com.treinos.app.ui.TodaySession
 import com.treinos.app.ui.defaultModalityTab
@@ -80,10 +81,12 @@ import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
 import com.treinos.app.ui.todaySessionSelector
 import com.treinos.app.ui.UiState
+import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import com.treinos.app.ui.components.StatusText
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 
@@ -112,6 +115,13 @@ fun HomeScreen(
     // H3-30: motivo do último fallback local, já traduzido; o selo do plano
     // gerado localmente cita o motivo até a próxima geração da IA.
     fallbackReasonLabel: String? = null,
+    // H3-40: envelope da geração em andamento e ações do card pendente.
+    pendingGeneration: PendingGeneration? = null,
+    pendingGenerationStatus: String? = null,
+    onRefreshPending: () -> Unit = {},
+    onCancelPending: () -> Unit = {},
+    onRetryPending: () -> Unit = {},
+    onDismissPending: () -> Unit = {},
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
@@ -155,6 +165,20 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // H3-40: card de geração pendente no topo — em andamento ou falhou.
+            pendingGeneration?.let {
+                item {
+                    PendingGenerationCard(
+                        envelope = it,
+                        status = pendingGenerationStatus,
+                        onRefresh = onRefreshPending,
+                        onCancel = onCancelPending,
+                        onRetry = onRetryPending,
+                        onDismiss = onDismissPending,
+                    )
+                }
+            }
+
             if (inProgressSession != null) {
                 item {
                     InProgressCard(
@@ -390,6 +414,85 @@ fun HomeScreen(
     }
 }
 
+/**
+ * H3-40: card de geração pendente no topo da Home.
+ * - `pending`/`running`: mostra "Atualizar" (consulta o status) e "Cancelar".
+ * - `failed`: mostra "Tentar de novo" (reenvia o request do envelope) e "Descartar".
+ */
+@Composable
+private fun PendingGenerationCard(
+    envelope: PendingGeneration,
+    status: String?,
+    onRefresh: () -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isFailed = status == "failed"
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = if (isFailed) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer) else CardDefaults.cardColors(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = if (isFailed) stringResource(R.string.home_pending_titulo_falhou) else stringResource(R.string.home_pending_titulo_andamento),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            if (!isFailed) {
+                Text(
+                    text = stringResource(R.string.home_pending_subtitulo_andamento),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (status == "pending" || status == "running") {
+                    BusyButton(
+                        busy = false,
+                        idleText = stringResource(R.string.home_pending_btn_atualizar),
+                        busyText = stringResource(R.string.common_loading),
+                        onClick = onRefresh,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.home_pending_btn_cancelar))
+                    }
+                } else if (isFailed) {
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.home_pending_btn_tentar_de_novo))
+                    }
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.home_pending_btn_descartar))
+                    }
+                } else {
+                    StatusText(
+                        text = stringResource(R.string.home_pending_msg_sem_plano),
+                        isSuccess = false,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun tabLabel(tab: ModalityTab): Int = when (tab) {
     ModalityTab.STRENGTH -> R.string.home_tab_label_gym
     ModalityTab.RUN -> R.string.home_tab_label_run
@@ -401,7 +504,6 @@ private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
     SessionKind.RUN -> ModalityTab.RUN
     SessionKind.MOBILITY -> ModalityTab.MOBILITY
 }
-
 
 
 /**

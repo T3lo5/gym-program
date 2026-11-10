@@ -2,6 +2,8 @@
 contra os modelos Pydantic do backend, garantindo compatibilidade com v1."""
 
 from app.main import (
+    GenerateJobAck,
+    GenerateJobStatus,
     GenerateResponse,
     GenerateReviewRequest,
     GenerateReviewResponse,
@@ -352,4 +354,79 @@ def test_goal_modalidade_fora_da_lista_422():
             deviceId="d1",
             modalities=[ModalityRequest(type="strength", goal="hipertrofia")],
         )
+
+
+# ---------------- Novos testes de contrato v2 (H3-40) ----------------
+
+
+def test_job_ack_round_trip():
+    """GenerateJobAck aceita o payload do contrato generate_job_ack."""
+    ack = GenerateJobAck.model_validate(
+        {"jobId": "b8f1c2d4-0000-4000-8000-000000000001", "status": "pending"}
+    )
+    assert ack.jobId == "b8f1c2d4-0000-4000-8000-000000000001"
+    assert ack.status == "pending"
+
+
+def test_job_status_done_round_trip():
+    """GenerateJobStatus aceita o payload do contrato generate_job_status."""
+    status = GenerateJobStatus.model_validate(
+        {
+            "jobId": "b8f1c2d4-0000-4000-8000-000000000001",
+            "status": "done",
+            "createdAt": "2026-11-10T12:00:00+00:00",
+            "result": {
+                "workout": {
+                    "name": "Full Body A",
+                    "description": "Plano de contrato",
+                    "goal": "hypertrophy",
+                    "daysPerWeek": 2,
+                    "days": [
+                        {
+                            "name": "Treino A",
+                            "dayOrder": 0,
+                            "weekday": 1,
+                            "modality": "strength",
+                            "isRestDay": False,
+                            "exercises": [
+                                {
+                                    "exerciseId": "Barbell_Bench_Press",
+                                    "exerciseOrder": 0,
+                                    "sets": 3,
+                                    "targetReps": "8-12",
+                                    "targetRpe": 8.0,
+                                    "restSeconds": 90,
+                                    "notes": "",
+                                    "isSupersetWithPrevious": False,
+                                    "exerciseName": "Supino reto",
+                                    "primaryMuscles": ["chest"],
+                                    "equipment": "barbell",
+                                    "metricType": "reps_weight",
+                                    "targetDurationSeconds": None,
+                                    "targetDistanceMeters": None,
+                                    "targetPaceSecondsPerKm": None,
+                                    "targetHrZone": None,
+                                }
+                            ],
+                        }
+                    ],
+                },
+                "generationTimeMs": 1200,
+                "modelUsed": "contrato",
+                "planId": 42,
+                "nextReviewAt": "2026-12-01",
+                "reviewAfterWeeks": 4,
+                "source": "local",
+                "fallbackReason": "no_api_key",
+            },
+            "error": None,
+        }
+    )
+    assert status.jobId == "b8f1c2d4-0000-4000-8000-000000000001"
+    assert status.status == "done"
+    assert status.createdAt == "2026-11-10T12:00:00+00:00"
+    assert status.result is not None
+    assert status.result.source == "local"
+    assert status.result.fallbackReason == "no_api_key"
+    assert status.error is None
 

@@ -118,6 +118,21 @@ class AppPreferences private constructor(
         }
 
     /**
+     * Envelope de geração em andamento (H3-40): jobId, kind, request e config
+     * serializados como JSON. Sobrevive a processo morto; null quando não há
+     * job em andamento.
+     */
+    var pendingGenerationV1: String?
+        get() = prefs.getString(KEY_PENDING_GENERATION_V1, null)
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_PENDING_GENERATION_V1).apply()
+            } else {
+                prefs.edit().putString(KEY_PENDING_GENERATION_V1, value).apply()
+            }
+        }
+
+    /**
      * Idioma do conteúdo de exercício (H3-36): "pt" ou "en". Default "pt" —
      * planos novos já nascem em português antes do seletor da H3-37. Valor
      * desconhecido cai para o default.
@@ -181,5 +196,6 @@ class AppPreferences private constructor(
         private const val KEY_WEAR_RECENT_COMMANDS = "wear_recent_commands"
         private const val KEY_GENERATE_CONFIG_V1 = "generate_config_v1"
         private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"
+        private const val KEY_PENDING_GENERATION_V1 = "pending_generation_v1"
     }
 }

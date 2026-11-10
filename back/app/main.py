@@ -1,9 +1,11 @@
+import asyncio
 import json
 import os
 import random
 import re
 import socket
 import threading
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -361,10 +363,18 @@ class MDNSService:
 
 mdns_service = MDNSService()
 
+# Tasks dos jobs de geração em voo (H3-40), para cancel/shutdown.
+_job_tasks: Dict[str, asyncio.Task] = {}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     db.init_db()
+    # H3-40: jobs pending/running de uma execução anterior não têm task viva
+    # neste processo — o app oferece "Tentar de novo" a partir do failed.
+    interrupted = db.mark_interrupted_jobs()
+    if interrupted:
+        print(f"[jobs] {interrupted} job(s) interrompido(s) marcados como failed")
     print("Treinos Backend started")
     print(f"Model: {MODEL_ID}")
     print(f"Catalog loaded: {len(EXERCISE_CATALOG)} exercises")
@@ -375,7 +385,13 @@ async def lifespan(app: FastAPI):
     else:
         print("mDNS disabled (MDNS_ENABLED=false)")
     yield
-    # Shutdown
+    # Shutdown: cancela os jobs em voo (best-effort); o sweep do próximo
+    # startup cobre o que sobrar pending/running (ex.: SIGKILL).
+    for task in list(_job_tasks.values()):
+        task.cancel()
+    if _job_tasks:
+        await asyncio.gather(*list(_job_tasks.values()), return_exceptions=True)
+    _job_tasks.clear()
     if MDNS_ENABLED:
         mdns_service.stop()
     print("Treinos Backend shutting down")
@@ -546,6 +562,21 @@ class GenerateResponse(BaseModel):
     # Diagnóstico do fallback (H3-21): vazio quando source == "ai"; quando
     # source == "local" carrega um dos códigos fechados em FALLBACK_REASONS.
     fallbackReason: str = ""
+
+
+class GenerateJobAck(BaseModel):
+    """Resposta imediata do submit (H3-40): a IA roda em background."""
+
+    jobId: str
+    status: Literal["pending"] = "pending"
+
+
+class GenerateJobStatus(BaseModel):
+    jobId: str
+    status: Literal["pending", "running", "done", "failed", "cancelled"]
+    createdAt: str
+    result: Optional[GenerateResponse] = None
+    error: Optional[str] = None
 
 
 class GenerateReviewRequest(BaseModel):
@@ -1132,21 +1163,127 @@ def fallback_log_line(reason: str, detail: str) -> str:
     return f"[fallback] reason={reason} detail={safe}"
 
 
-@app.post("/v1/generate-workout", response_model=GenerateResponse)
+def _ai_timeout(name: str, default: float) -> float:
+    try:
+        return max(3.0, float(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+# Orçamento TOTAL da IA dentro do job (deadline, não por attempt). Default
+# 600s (H3-40): nenhum caminho de rede espera a IA — o app consulta o job sob
+# demanda. Retry único (json_parse, 5xx, 429, content vazio) só com orçamento
+# restante; timeout na 1ª esgota o orçamento e cai direto no fallback local.
+AI_TIMEOUT_DEFAULT_SECONDS = 600.0
+
+
+async def run_generation_job(job_id: str, request: GenerateRequest) -> None:
+    """Executa a geração em background e grava o estado terminal no SQLite.
+
+    As transições são guardadas no banco: quem commitar primeiro vence
+    (cancel concorrente × conclusão); se o job já está terminal, o resultado
+    é descartado. IA falha/esgota o orçamento ⇒ fallback local ⇒ done;
+    failed só quando nem o fallback é possível (pool vazio) ou erro inesperado.
+    """
+    try:
+        if not db.mark_generation_job_running(job_id):
+            return  # cancelado antes de a task começar
+        try:
+            response = await _generate_plan_response(request)
+        except ValueError as exc:
+            # Pool vazio do complementar (H3-16): nem o fallback é possível.
+            db.finish_generation_job(job_id, "failed", error=str(exc))
+            return
+        except Exception as exc:
+            db.finish_generation_job(job_id, "failed", error=f"{type(exc).__name__}: {exc}")
+            return
+        db.finish_generation_job(job_id, "done", result=response.model_dump())
+    except asyncio.CancelledError:
+        db.finish_generation_job(job_id, "cancelled")
+        raise
+    finally:
+        _job_tasks.pop(job_id, None)
+
+
+def _spawn_generation_job(job_id: str, request: GenerateRequest) -> None:
+    """Costura dos testes: o TestClient não mantém o event loop entre
+    requests, então os testes desligam o spawn e dirigem o runner na mão."""
+    _job_tasks[job_id] = asyncio.create_task(run_generation_job(job_id, request))
+
+
+def _cancel_job(job_id: str) -> None:
+    # O banco é a fonte de verdade: marca cancelled primeiro; a task em voo
+    # recebe cancel best-effort (o runner descarta o resultado se já cancelado).
+    db.finish_generation_job(job_id, "cancelled")
+    task = _job_tasks.pop(job_id, None)
+    if task is not None:
+        task.cancel()
+
+
+def _job_status_response(row: Dict[str, Any]) -> GenerateJobStatus:
+    result = None
+    if row.get("result_json"):
+        result = GenerateResponse.model_validate_json(row["result_json"])
+    return GenerateJobStatus(
+        jobId=row["id"],
+        status=row["status"],
+        createdAt=row["created_at"],
+        result=result,
+        error=row.get("error"),
+    )
+
+
+@app.post("/v1/generate-workout", response_model=GenerateJobAck, status_code=202)
 async def generate_workout(request: GenerateRequest):
-    """Gera um plano sob demanda.
+    """Submete a geração como job assíncrono (H3-40): 202 imediato com jobId.
 
-    Tenta a IA primeiro. Se a IA falhar, demorar, não tiver chave ou devolver
-    IDs inválidos, monta um plano local válido com o catálogo. A resposta
-    sempre informa a origem (`ai` ou `local`), o motivo do fallback quando
-    local (`fallbackReason`, H3-21) e a data de revisão.
-
-    T7 experiment: quando EXPERIMENT_SHORTLIST=true (apenas plano principal),
-    usa shortlist determinística com IDs exatos e schema rígido.
+    A IA roda em background (`run_generation_job`); o app consulta
+    `GET /v1/generate-workout/{jobId}` sob demanda. Validação de entrada
+    continua 422; catálogo não carregado continua 500. Last-write-wins:
+    novo submit do mesmo device cancela o job em andamento anterior.
     """
     if not EXERCISE_CATALOG:
         raise HTTPException(500, "Exercise catalog not loaded")
 
+    active = db.get_active_generation_job(request.deviceId)
+    if active:
+        _cancel_job(active["id"])
+
+    job_id = str(uuid.uuid4())
+    db.create_generation_job(job_id, request.deviceId, request.model_dump())
+    _spawn_generation_job(job_id, request)
+    return GenerateJobAck(jobId=job_id)
+
+
+@app.get("/v1/generate-workout/{job_id}", response_model=GenerateJobStatus)
+async def generation_job_status(job_id: str):
+    row = db.get_generation_job(job_id)
+    if row is None:
+        raise HTTPException(404, "Job não encontrado")
+    return _job_status_response(row)
+
+
+@app.post("/v1/generate-workout/{job_id}/cancel", response_model=GenerateJobStatus)
+async def cancel_generation_job(job_id: str):
+    """Idempotente: job done/failed/cancelled não muda; devolve o estado atual."""
+    row = db.get_generation_job(job_id)
+    if row is None:
+        raise HTTPException(404, "Job não encontrado")
+    _cancel_job(job_id)
+    return _job_status_response(db.get_generation_job(job_id))
+
+
+async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
+    """Gera o plano: IA primeiro, fallback local quando a IA falha.
+
+    Lógica extraída do endpoint síncrono na H3-40 — o resultado sempre informa
+    a origem (`ai` ou `local`), o motivo do fallback quando local
+    (`fallbackReason`, H3-21) e a data de revisão. O caller (runner) decide
+    como reportar: ValueError (pool vazio) sobe e vira job failed.
+
+    T7 experiment: quando EXPERIMENT_SHORTLIST=true (apenas plano principal),
+    usa shortlist determinística com IDs exatos e schema rígido.
+    """
     start_time = datetime.utcnow()
     workout_data = None
     source = "local"
@@ -1175,18 +1312,6 @@ async def generate_workout(request: GenerateRequest):
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
     else:
-        # Orçamento TOTAL da IA (deadline, não por attempt): precisa ficar
-        # abaixo do read timeout do app (90s, BackendClient.kt) com folga para
-        # connect, fallback local e rede. Medição 2026-11-10: request amplo com
-        # Tier B leva ~72s — por isso 80s, e não os 70s antigos. Retry único
-        # (json_parse, 5xx, 429, content vazio) só com orçamento restante;
-        # timeout na 1ª esgota o orçamento e cai direto no fallback local.
-        def _ai_timeout(name: str, default: float) -> float:
-            try:
-                return max(3.0, float(os.getenv(name, str(default))))
-            except (TypeError, ValueError):
-                return default
-
         # Log métricas do catálogo/shortlist no prompt.
         if use_shortlist:
             shortlist_metrics = shortlist_summary_metrics(request, EXERCISE_CATALOG, SHORTLIST_PER_MUSCLE)
@@ -1198,7 +1323,7 @@ async def generate_workout(request: GenerateRequest):
             catalog_metrics = catalog_summary_metrics(request, EXERCISE_CATALOG)
             print(f"[catalog] chars={catalog_metrics['chars']} linhas={catalog_metrics['linhas']} tokens_aprox={catalog_metrics['tokens_aprox']}")
 
-        ai_budget = _ai_timeout("AI_TIMEOUT_TOTAL_SECONDS", 80.0)
+        ai_budget = _ai_timeout("AI_TIMEOUT_TOTAL_SECONDS", AI_TIMEOUT_DEFAULT_SECONDS)
         ai_started = monotonic()
         attempts = 2
         for attempt in range(attempts):
@@ -1290,20 +1415,17 @@ async def generate_workout(request: GenerateRequest):
         print(fallback_log_line(fallback_reason, fallback_detail))
 
     if workout_data is None:
-        try:
-            if is_hybrid:
-                workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
-                workout_data = normalize_hybrid_plan(workout_data)
-                if is_complementary:
-                    workout_data = enforce_complementary_plan(
-                        workout_data, request, EXERCISE_CATALOG
-                    )
-            else:
-                workout_data = build_local_plan(request, EXERCISE_CATALOG)
-        except ValueError as exc:
-            # Pool vazio no modo complementar (foco/ambiente sem candidatos
-            # suficientes): erro de entrada, não falha de servidor (H3-16).
-            raise HTTPException(422, str(exc))
+        # ValueError (pool vazio do complementar, H3-16) sobe para o runner
+        # marcar o job como failed com a mesma mensagem (H3-40).
+        if is_hybrid:
+            workout_data = build_hybrid_plan(request, EXERCISE_CATALOG)
+            workout_data = normalize_hybrid_plan(workout_data)
+            if is_complementary:
+                workout_data = enforce_complementary_plan(
+                    workout_data, request, EXERCISE_CATALOG
+                )
+        else:
+            workout_data = build_local_plan(request, EXERCISE_CATALOG)
 
     next_review = review_date(request.reviewAfterWeeks)
     plan_id = 0

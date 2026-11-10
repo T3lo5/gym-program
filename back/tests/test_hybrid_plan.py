@@ -2,6 +2,9 @@
 
 Rodam contra o FastAPI com TestClient e banco SQLite temporário. Sem
 SENSENOVA_API_KEY definido, a geração cai no fallback local híbrido.
+
+H3-40: o POST responde 202 com jobId; os testes dirigem `run_generation_job`
+via `job_helpers.run_job` (ou submit+drive) e verificam o `result` do job.
 """
 
 import os
@@ -18,6 +21,7 @@ from app.plan_builder import (
     normalize_hybrid_plan,
     STRENGTH_SPLITS,
 )
+from job_helpers import run_job
 
 
 def setup_test_db():
@@ -50,20 +54,16 @@ def _hybrid_payload():
 
 
 def test_cada_dia_tem_uma_unica_modalidade():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     for day in workout["days"]:
         metric_types = {ex.get("metricType") for ex in day["exercises"]}
         assert len(metric_types) == 1, f"dia mistura metricTypes: {day['name']}"
 
 
 def test_musculacao_tem_4_a_8_exercicios():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     for day in workout["days"]:
         if day["modality"] == "strength":
             assert 4 <= len(day["exercises"]) <= 8, day["name"]
@@ -75,10 +75,8 @@ def test_musculacao_academia_usa_equipamentos_de_academia():
     payload["modalities"][0]["availableEquipment"] = [
         "barbell", "dumbbell", "machine", "cable", "body only"
     ]
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     load_eq = {"barbell", "dumbbell", "machine", "cable"}
     strength_days = [d for d in workout["days"] if d["modality"] == "strength"]
     assert strength_days, "esperava pelo menos um dia de musculação"
@@ -91,10 +89,8 @@ def test_musculacao_academia_usa_equipamentos_de_academia():
 
 
 def test_musculacao_nao_usa_alongamento_ou_cardio():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     for day in workout["days"]:
         if day["modality"] == "strength":
             for ex in day["exercises"]:
@@ -102,10 +98,8 @@ def test_musculacao_nao_usa_alongamento_ou_cardio():
 
 
 def test_musculacao_3x_nao_usa_dias_consecutivos():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     strength_weekdays = sorted(
         d["weekday"] for d in workout["days"] if d["modality"] == "strength"
     )
@@ -116,10 +110,8 @@ def test_musculacao_3x_nao_usa_dias_consecutivos():
 
 
 def test_modalidades_diferentes_podem_compartilhar_weekday():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     by_weekday = {}
     for day in workout["days"]:
         by_weekday.setdefault(day["weekday"], set()).add(day["modality"])
@@ -131,10 +123,8 @@ def test_modalidades_diferentes_podem_compartilhar_weekday():
 
 def test_sessoes_no_mesmo_dia_nao_sao_mescladas():
     """Cada day tem exatamente uma modality, mesmo quando vários dias caem no mesmo weekday."""
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload())
+    workout = result["workout"]
     for day in workout["days"]:
         modalities = {ex.get("metricType") for ex in day["exercises"]}
         assert len(modalities) == 1, f"day mistura modalidades: {day['name']}"
@@ -149,10 +139,8 @@ def test_tres_modalidades_no_mesmo_dia_sao_tres_dias():
         {"type": "mobility", "sessionsPerWeek": 1, "focus": "back"},
     ]
     payload["sessionDurationMinutes"] = 60
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     assert len(workout["days"]) == 3
     modalities = {d["modality"] for d in workout["days"]}
     assert modalities == {"strength", "run", "mobility"}
@@ -165,10 +153,8 @@ def test_duracao_por_modalidade_limita_volume():
         {"type": "mobility", "sessionsPerWeek": 1, "focus": "back", "sessionDurationMinutes": 10},
     ]
     payload["sessionDurationMinutes"] = 60
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     mob = [d for d in workout["days"] if d["modality"] == "mobility"][0]
     ex = mob["exercises"][0]
     dur = ex.get("targetDurationSeconds") or 0
@@ -182,10 +168,8 @@ def test_corrida_varia_templates_por_sessao():
         {"type": "run", "sessionsPerWeek": 3, "level": "intermediate"},
     ]
     payload["sessionDurationMinutes"] = 40
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     run_days = [d for d in workout["days"] if d["modality"] == "run"]
     ids = [d["exercises"][0]["exerciseId"] for d in run_days]
     assert len(set(ids)) > 1, f"templates não rotacionaram: {ids}"
@@ -201,9 +185,8 @@ def test_corrida_escala_distancia_pela_duracao():
     payload_longo["modalities"] = [
         {"type": "run", "sessionsPerWeek": 1, "level": "intermediate", "sessionDurationMinutes": 90},
     ]
-    client = _client()
-    c = client.post("/v1/generate-workout", json=payload_curto).json()["workout"]
-    l = client.post("/v1/generate-workout", json=payload_longo).json()["workout"]
+    c = run_job(_client(), payload_curto)["workout"]
+    l = run_job(_client(), payload_longo)["workout"]
     dc = c["days"][0]["exercises"][0].get("targetDistanceMeters") or 0
     dl = l["days"][0]["exercises"][0].get("targetDistanceMeters") or 0
     assert dl >= dc, f"longa ({dl}) deveria ser >= curta ({dc})"
@@ -215,10 +198,8 @@ def test_mobilidade_respeita_foco_e_duracao():
         {"type": "mobility", "sessionsPerWeek": 1, "focus": "hips", "sessionDurationMinutes": 8},
     ]
     payload["sessionDurationMinutes"] = 60
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     mob = [d for d in workout["days"] if d["modality"] == "mobility"][0]
     ex = mob["exercises"][0]
     assert "hips" in (ex.get("notes") or ""), ex.get("notes")
@@ -312,22 +293,17 @@ def test_sets_de_corrida_aceitam_intervalos_ate_20():
         {"type": "run", "sessionsPerWeek": 1, "level": "advanced", "sessionDurationMinutes": 120},
     ]
     payload["sessionDurationMinutes"] = 120
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     run = [d for d in workout["days"] if d["modality"] == "run"][0]
     sets = run["exercises"][0]["sets"]
     assert 3 <= sets <= 20, f"sets de corrida fora da faixa: {sets}"
 
 
 def test_fallback_sem_ia():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload())
-    assert r.status_code == 200, r.text
-    data = r.json()
-    assert data["source"] == "local"
-    assert data["workout"]["daysPerWeek"] == 7  # 3+2+2 sessões
+    result = run_job(_client(), _hybrid_payload())
+    assert result["source"] == "local"
+    assert result["workout"]["daysPerWeek"] == 7  # 3+2+2 sessões
 
 
 # ---------------- Testes de revisão (mantidos) ----------------
@@ -455,10 +431,8 @@ def test_foco_principal_garante_grupo_em_cada_sessao():
     Antes: o fallback sobrescrevia o targetMuscles com o split do ciclo
     (Empurrar/Puxar/Pernas) e o grupo pedido era ignorado em silêncio.
     """
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_hybrid_payload_com_foco())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _hybrid_payload_com_foco())
+    workout = result["workout"]
     strength_days = [d for d in workout["days"] if d["modality"] == "strength"]
     assert len(strength_days) == 3
     for day in strength_days:
@@ -471,10 +445,8 @@ def test_foco_com_dois_grupos_garante_os_dois():
     payload["modalities"][0]["availableEquipment"] = [
         "barbell", "dumbbell", "machine", "cable"
     ]
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     strength_days = [d for d in workout["days"] if d["modality"] == "strength"]
     assert len(strength_days) == 3
     for day in strength_days:
@@ -490,10 +462,8 @@ def test_sem_foco_mantem_split_atual():
     payload["modalities"][0]["availableEquipment"] = [
         "barbell", "dumbbell", "machine", "cable"
     ]
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     strength_days = sorted(
         [d for d in workout["days"] if d["modality"] == "strength"],
         key=lambda d: d["dayOrder"],

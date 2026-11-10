@@ -4,6 +4,9 @@
 em português, com o mesmo `exerciseId`. Ausente ⇒ "en" (comportamento
 anterior preservado). `id_name_mismatches` aceita o nome EN **ou** PT do
 mesmo ID (mapa duplo), sem falso positivo para plano em PT.
+
+H3-40: o POST responde 202 com jobId; os testes que esperam um plano no
+corpo dirigem `run_generation_job` via `job_helpers.run_job`.
 """
 
 import os
@@ -14,6 +17,7 @@ from fastapi.testclient import TestClient
 from app import database as db
 from app import main
 from app.plan_builder import id_name_mismatches
+from job_helpers import run_job
 
 
 def setup_test_db():
@@ -50,10 +54,8 @@ def _catalog_names():
 
 
 def test_language_pt_fallback_nomes_pt():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_payload("pt"))
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _payload("pt"))
+    workout = result["workout"]
     names = _catalog_names()
     exercise_ids = [
         ex["exerciseId"]
@@ -82,10 +84,8 @@ def test_language_pt_fallback_nomes_pt():
 
 
 def test_language_ausente_en():
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _payload())
+    workout = result["workout"]
     names = _catalog_names()
     for day in workout["days"]:
         for ex in day["exercises"]:

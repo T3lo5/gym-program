@@ -82,6 +82,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
+    // H3-40: estado da geração pendente (envelope + status do job).
+    val pendingGeneration by viewModel.pendingGeneration.collectAsStateWithLifecycle()
+    val pendingGenerationStatus by viewModel.pendingGenerationStatus.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val generateError by viewModel.generateError.collectAsStateWithLifecycle()
     val syncError by viewModel.syncError.collectAsStateWithLifecycle()
@@ -274,6 +277,13 @@ fun TreinosApp(viewModel: AppViewModel) {
                     // H3-30: o selo do plano local cita o motivo persistido do
                     // fallback até a próxima geração da IA.
                     fallbackReasonLabel = fallbackReasonLabel(lastFallbackReason),
+                    // H3-40: card de geração pendente (em andamento / falhou).
+                    pendingGeneration = pendingGeneration,
+                    pendingGenerationStatus = pendingGenerationStatus,
+                    onRefreshPending = { scope.launch { viewModel.refreshPendingGeneration() } },
+                    onCancelPending = { scope.launch { viewModel.cancelGeneration() } },
+                    onRetryPending = { viewModel.retryFromEnvelope() },
+                    onDismissPending = { viewModel.dismissPendingGeneration() },
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -285,8 +295,24 @@ fun TreinosApp(viewModel: AppViewModel) {
                     savedConfig = generateConfig,
                     error = generateError,
                     onRetry = viewModel::retryGenerate,
-                    onCancel = viewModel::cancelGenerate,
-                    onGenerate = viewModel::generatePlan,
+                    onGenerate = { modalities, goal, daysPerWeek, level, equipment, muscles, sessionDuration, reviewWeeks, bodyWeightKgText, heightCmText, sexChoice, environment, kind, config ->
+                        viewModel.submitGeneration(
+                            modalities = modalities,
+                            goal = goal,
+                            daysPerWeek = daysPerWeek,
+                            level = level,
+                            equipment = equipment,
+                            muscles = muscles,
+                            sessionDuration = sessionDuration,
+                            reviewWeeks = reviewWeeks,
+                            bodyWeightKgText = bodyWeightKgText,
+                            heightCmText = heightCmText,
+                            sexChoice = sexChoice,
+                            environment = environment,
+                            kind = kind,
+                            config = config,
+                        )
+                    },
                 )
 
                 Screen.Workout -> WorkoutScreen(

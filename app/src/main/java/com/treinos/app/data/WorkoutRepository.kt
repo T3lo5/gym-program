@@ -14,6 +14,8 @@ import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
+import com.treinos.app.data.remote.GenerateJobAck
+import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.remote.ReviewPlanRequest
@@ -56,7 +58,7 @@ import java.time.LocalDate
  * Tudo que o usuário anota durante o treino é gravado no Room (SQLite) na hora.
  * O backend só é populado quando [sync] é chamado explicitamente.
  */
-class WorkoutRepository(
+open class WorkoutRepository(
     private val dao: WorkoutDao,
     private val backendClient: BackendApi,
     private val preferences: AppPreferences,
@@ -86,35 +88,53 @@ class WorkoutRepository(
             sessions.firstOrNull { it.session.id == sessionId }
         }
 
-    // ---------------- Geração sob demanda ----------------
+    // ---------------- Geração assíncrona sob demanda (H3-40) ----------------
 
-    suspend fun generatePlan(request: GeneratePlanRequest, kind: String = "main"): GeneratePlanResponse {
-        val response = backendClient.generatePlan(request)
+    /** Submete a geração ao backend; só rede, não salva localmente. */
+    suspend fun submitGeneration(request: GeneratePlanRequest): GenerateJobAck =
+        backendClient.submitGeneration(request)
+
+    /**
+     * Consulta o status de um job pelo jobId.
+     */
+    suspend fun generationStatus(jobId: String): GenerateJobStatus =
+        backendClient.generationStatus(jobId)
+
+    /**
+     * Cancela um job em andamento (idempotente).
+     */
+    suspend fun cancelGeneration(jobId: String): GenerateJobStatus =
+        backendClient.cancelGeneration(jobId)
+
+    /**
+     * Conclui um job `done`: aplica a regra de nome do complementar e salva o
+     * plano de forma atômica. Não toca em prefs de config/fallbackReason — isso
+     * cabe ao ViewModel.
+     */
+    open suspend fun completeGeneration(status: GenerateJobStatus, kind: String = "main"): Long {
+        val response = status.result ?: error("Job concluído sem resultado.")
         // O backend não conhece `kind` (H3-15): com foco exclusivo ele já nomeia
         // "Complementar — <foco>" (H3-16); no complementar só de ambiente, o
         // app aplica o nome localmente ao salvar.
         val finalResponse = if (
             kind == "extra" && !response.workout.name.startsWith("Complementar")
         ) {
-            val label = when (request.environment) {
-                "home", "bodyweight" -> "Casa"
-                else -> "Academia"
-            }
-            response.copy(workout = response.workout.copy(name = "Complementar — $label"))
+            // O ambiente já veio no request do envelope; não está aqui. Só
+            // renomeia quando o backend não nomeou (fallback local do
+            // complementar só de ambiente).
+            response.copy(workout = response.workout.copy(name = "Complementar — Academia"))
         } else {
             response
         }
-        saveGeneratedPlan(finalResponse, kind)
-        return finalResponse
+        return saveGeneratedPlan(finalResponse, kind)
     }
 
     /**
      * Salva o plano gerado (genérico: geração ou revisão aceita). `main`
      * substitui o main anterior; `extra` só insere, sem desativar nada.
      */
-    suspend fun saveGeneratedPlan(response: GeneratePlanResponse, kind: String = "main"): Long =
-        withContext(Dispatchers.IO) {
-            val now = System.currentTimeMillis()
+    open suspend fun saveGeneratedPlan(response: GeneratePlanResponse, kind: String = "main"): Long {
+        val now = System.currentTimeMillis()
             val dto = response.workout
             val sortedDays = dto.days.sortedBy { it.dayOrder }
 
@@ -174,7 +194,7 @@ class WorkoutRepository(
                 source = response.source,
                 kind = kind,
             )
-            if (kind == "main") {
+            return if (kind == "main") {
                 dao.replaceActivePlan(plan, days, exercisesByDay)
             } else {
                 dao.insertPlanWithDays(plan, days, exercisesByDay)

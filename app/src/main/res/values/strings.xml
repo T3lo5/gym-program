@@ -101,6 +101,16 @@
     <string name="home_loading">Carregando</string>
     <string name="home_activity_avulsa">Atividade avulsa</string>
 
+    <!-- H3-40: card de geração pendente na Home -->
+    <string name="home_pending_titulo_andamento">Geração em andamento</string>
+    <string name="home_pending_subtitulo_andamento">O backend está preparando seu treino. Toque em Atualizar para ver se já ficou pronto.</string>
+    <string name="home_pending_titulo_falhou">A geração falhou</string>
+    <string name="home_pending_btn_atualizar">Atualizar</string>
+    <string name="home_pending_btn_cancelar">Cancelar</string>
+    <string name="home_pending_btn_tentar_de_novo">Tentar de novo</string>
+    <string name="home_pending_btn_descartar">Descartar</string>
+    <string name="home_pending_msg_sem_plano">O job terminou, mas não trouxe plano.</string>
+
     <!-- Workout -->
     <string name="workout_loading">Carregando treino…</string>
     <string name="workout_none_title">Nenhum treino em andamento</string>

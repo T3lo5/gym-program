@@ -47,8 +47,14 @@ class BackendClient(
 
     override suspend fun health(): HealthResponse = get("/health")
 
-    override suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse =
+    override suspend fun submitGeneration(request: GeneratePlanRequest): GenerateJobAck =
         post("/v1/generate-workout", json.encodeToString(GeneratePlanRequest.serializer(), request))
+
+    override suspend fun generationStatus(jobId: String): GenerateJobStatus =
+        get("/v1/generate-workout/$jobId")
+
+    override suspend fun cancelGeneration(jobId: String): GenerateJobStatus =
+        post("/v1/generate-workout/$jobId/cancel", "")
 
     override suspend fun sync(request: SyncRequestDto): SyncResponseDto =
         post("/v1/sync", json.encodeToString(SyncRequestDto.serializer(), request))

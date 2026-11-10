@@ -113,41 +113,6 @@ class GenerateScreenTest {
     }
 
     @Test
-    fun overlay_mostra_tempo_e_cancela() {
-        var generating by mutableStateOf(true)
-        var cancelled = false
-        composeRule.setContent {
-            GenerateScreen(
-                isGenerating = generating,
-                onBack = {},
-                onCancel = {
-                    cancelled = true
-                    generating = false
-                },
-                onGenerate = ::onGenerateNoop,
-            )
-        }
-        composeRule.waitForIdle()
-
-        // Overlay cobre a tela com expectativa honesta e tempo decorrido.
-        composeRule.onNodeWithText("A IA pode levar até 90 s.").assertIsDisplayed()
-        composeRule.onNodeWithText("Tempo decorrido: 0s").assertIsDisplayed()
-
-        composeRule.mainClock.autoAdvance = false
-        composeRule.mainClock.advanceTimeBy(2_100)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("Tempo decorrido: 2s").assertIsDisplayed()
-
-        // Cancelar interrompe: o overlay fecha e o callback dispara. Com o
-        // clock manual, reativa o auto-advance para a recomposição rodar.
-        composeRule.onNodeWithText("Cancelar").performClick()
-        composeRule.mainClock.autoAdvance = true
-        composeRule.waitForIdle()
-        assertTrue(cancelled)
-        composeRule.onNodeWithText("Cancelar").assertDoesNotExist()
-    }
-
-    @Test
     fun goal_do_chip_vai_na_modalidade_de_forca() {
         var capturedGoal: String? = null
         var capturedStrengthGoal: String? = null

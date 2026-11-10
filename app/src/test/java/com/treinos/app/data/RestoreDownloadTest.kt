@@ -14,8 +14,9 @@ import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.CatalogResponseDto
+import com.treinos.app.data.remote.GenerateJobAck
+import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
-import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.remote.HealthResponse
 import com.treinos.app.data.remote.ReviewPlanRequest
 import com.treinos.app.data.remote.ReviewPlanResponse
@@ -334,7 +335,13 @@ class RestoreDownloadTest {
     ) : BackendApi {
         override suspend fun health(): HealthResponse = error("não usado")
 
-        override suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse =
+        override suspend fun submitGeneration(request: GeneratePlanRequest): GenerateJobAck =
+            error("não usado")
+
+        override suspend fun generationStatus(jobId: String): GenerateJobStatus =
+            error("não usado")
+
+        override suspend fun cancelGeneration(jobId: String): GenerateJobStatus =
             error("não usado")
 
         override suspend fun sync(request: SyncRequestDto): SyncResponseDto = error("não usado")

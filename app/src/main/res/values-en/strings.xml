@@ -101,6 +101,16 @@
     <string name="home_loading">Loading</string>
     <string name="home_activity_avulsa">Unplanned activity</string>
 
+    <!-- H3-40: pending generation card on Home -->
+    <string name="home_pending_titulo_andamento">Generation in progress</string>
+    <string name="home_pending_subtitulo_andamento">The backend is preparing your workout. Tap Update to check if it\'s ready.</string>
+    <string name="home_pending_titulo_falhou">Generation failed</string>
+    <string name="home_pending_btn_atualizar">Update</string>
+    <string name="home_pending_btn_cancelar">Cancel</string>
+    <string name="home_pending_btn_tentar_de_novo">Try again</string>
+    <string name="home_pending_btn_descartar">Discard</string>
+    <string name="home_pending_msg_sem_plano">The job finished but returned no plan.</string>
+
     <!-- Workout -->
     <string name="workout_loading">Loading workout…</string>
     <string name="workout_none_title">No workout in progress</string>

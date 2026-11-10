@@ -329,4 +329,62 @@ class ContractTest {
             assertEquals(value, roundTrip.modalities.first().goal)
         }
     }
+
+    // ---------------- Contratos de job assíncrono (H3-40) ----------------
+
+    @Test
+    fun generate_job_ack_decodifica_fixture() {
+        val file = java.io.File("../contracts/generate_job_ack.json")
+        assertTrue("Fixture não encontrado: ${file.absolutePath}", file.exists())
+        val ack = json.decodeFromString(GenerateJobAck.serializer(), file.readText())
+
+        assertEquals("b8f1c2d4-0000-4000-8000-000000000001", ack.jobId)
+        assertEquals("pending", ack.status)
+
+        // Round-trip.
+        val encoded = json.encodeToString(GenerateJobAck.serializer(), ack)
+        assertTrue(encoded.contains("\"jobId\":\"b8f1c2d4-0000-4000-8000-000000000001\""))
+        val roundTrip = json.decodeFromString(GenerateJobAck.serializer(), encoded)
+        assertEquals(ack.jobId, roundTrip.jobId)
+    }
+
+    @Test
+    fun generate_job_status_decodifica_fixture() {
+        val file = java.io.File("../contracts/generate_job_status.json")
+        assertTrue("Fixture não encontrado: ${file.absolutePath}", file.exists())
+        val status = json.decodeFromString(GenerateJobStatus.serializer(), file.readText())
+
+        assertEquals("b8f1c2d4-0000-4000-8000-000000000001", status.jobId)
+        assertEquals("done", status.status)
+        assertEquals("2026-11-10T12:00:00+00:00", status.createdAt)
+        assertNotNull(status.result)
+        assertEquals("local", status.result!!.source)
+        assertEquals("no_api_key", status.result!!.fallbackReason)
+        assertNull(status.error)
+
+        // Round-trip do status com resultado.
+        val encoded = json.encodeToString(GenerateJobStatus.serializer(), status)
+        val roundTrip = json.decodeFromString(GenerateJobStatus.serializer(), encoded)
+        assertEquals(status.jobId, roundTrip.jobId)
+        assertEquals(status.status, roundTrip.status)
+        assertEquals("local", roundTrip.result!!.source)
+    }
+
+    @Test
+    fun generate_job_status_failed_decodifica() {
+        val falhou = """
+            {
+              "jobId": "job-fail",
+              "status": "failed",
+              "createdAt": "2026-11-10T12:00:00+00:00",
+              "result": null,
+              "error": "pool vazio para o foco calves"
+            }
+        """.trimIndent()
+        val status = json.decodeFromString(GenerateJobStatus.serializer(), falhou)
+
+        assertEquals("failed", status.status)
+        assertNull(status.result)
+        assertEquals("pool vazio para o foco calves", status.error)
+    }
 }

@@ -1,7 +1,10 @@
 """Testes de robustez da geração por IA (H3-22/H3-25).
 
 Funções puras: parse tolerante, salvamento parcial, resumo por request,
-check ID↔nome. Testes de endpoint usam cliente HTTP falso (sem SenseNova).
+check ID↔nome. Testes de endpoint usam cliente HTTP falso (sem SenseNova)
+e dirigem `run_generation_job` (H3-40): o POST responde 202 imediato e a
+IA roda no runner, então não há mais a invariante "pior caso < 90 s" do
+app síncrono.
 """
 
 import json
@@ -24,6 +27,7 @@ from app.plan_builder import (
     resolve_plan_ids,
     resolve_exercise_names,
 )
+from job_helpers import run_job
 
 
 def setup_test_db():
@@ -322,6 +326,8 @@ def test_resumo_inclui_todos_elegiveis_sem_cap_por():
             chest_b += 1
     assert chest_a >= 8, f"Esperava >= 8 detalhados em chest no Tier A, got {chest_a}"
     assert chest_b > 0, "Esperava exercicios restantes no Tier B"
+
+
 def test_resumo_nao_lista_equipamento_fora_request():
     """Equipamento não informado não aparece no resumo."""
     req = main.GenerateRequest(
@@ -360,6 +366,7 @@ def test_resumo_metrics_baseline_compativel():
 
 
 def test_retry_unico_em_429(monkeypatch):
+    """429 na 1ª tentativa → retry dentro do orçamento → plano da IA."""
     monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
     _SequenceClient.calls = 0
     _SequenceClient.steps = [
@@ -368,11 +375,9 @@ def test_retry_unico_em_429(monkeypatch):
     ]
     monkeypatch.setattr(main.httpx, "AsyncClient", _SequenceClient)
 
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "ai"
-    assert body["fallbackReason"] == ""
+    result = run_job(_client(), _payload())
+    assert result["source"] == "ai"
+    assert result["fallbackReason"] == ""
     assert _SequenceClient.calls == 2
 
 
@@ -391,126 +396,10 @@ def test_retry_em_content_vazio_http200(monkeypatch):
     ]
     monkeypatch.setattr(main.httpx, "AsyncClient", _SequenceClient)
 
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "json_parse"
+    result = run_job(_client(), _payload())
+    assert result["source"] == "local"
+    assert result["fallbackReason"] == "json_parse"
     assert _SequenceClient.calls == 2
-
-
-# ---------------- orçamento total de IA (deadline) ----------------
-
-
-class _FakeClock:
-    """Relógio controlado pelo teste: monotonic() sem dormir de verdade."""
-
-    def __init__(self):
-        self.now = 0.0
-
-    def __call__(self):
-        return self.now
-
-
-class _HangingAIClient:
-    """IA que nunca responde: cada post queima todo o read timeout no relógio.
-
-    Registra o timeout real que o endpoint passou ao httpx.AsyncClient, para
-    medir o pior caso de latência sem dormir de verdade.
-    """
-
-    read_timeouts = []
-    clock = None
-
-    def __init__(self, *args, **kwargs):
-        self._read = kwargs["timeout"].read
-        type(self).read_timeouts.append(self._read)
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return False
-
-    async def post(self, *args, **kwargs):
-        type(self).clock.now += self._read
-        raise httpx.ReadTimeout("IA não respondeu dentro do read timeout")
-
-
-def test_pior_caso_ia_lenta_responde_antes_do_timeout_do_app(monkeypatch):
-    """IA pendurada: o backend ainda responde (fallback) dentro dos 90s do app.
-
-    O app desiste após 90s de read timeout (BackendClient.kt) e mostra
-    "O servidor demorou demais para responder". Com a IA pendurada, o pior
-    caso é o orçamento total da IA; ele precisa ficar abaixo dos 90s, senão
-    o usuário nunca recebe o plano substituto. Timeout na 1ª esgota o
-    orçamento: não há retry, o fallback local responde direto.
-    """
-    monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
-    monkeypatch.delenv("AI_TIMEOUT_TOTAL_SECONDS", raising=False)
-    clock = _FakeClock()
-    monkeypatch.setattr(main, "monotonic", clock)
-    _HangingAIClient.read_timeouts = []
-    _HangingAIClient.clock = clock
-    monkeypatch.setattr(main.httpx, "AsyncClient", _HangingAIClient)
-
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "timeout"
-    assert len(_HangingAIClient.read_timeouts) == 1
-    pior_caso = sum(_HangingAIClient.read_timeouts)
-    assert pior_caso < 90.0, (
-        f"pior caso {pior_caso}s ≥ read timeout do app (90s): "
-        "o app desiste antes de o backend responder"
-    )
-    assert clock.now < 90.0
-
-
-class _SlowInvalidJsonClient:
-    """IA responde JSON inválido 1s antes de estourar o read timeout."""
-
-    calls = 0
-    clock = None
-
-    def __init__(self, *args, **kwargs):
-        self._read = kwargs["timeout"].read
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return False
-
-    async def post(self, *args, **kwargs):
-        type(self).calls += 1
-        type(self).clock.now += self._read - 1.0
-        return _FakeResponse("isso não é json")
-
-
-def test_resposta_lenta_invalida_nao_ganha_retry_que_estoura_orcamento(monkeypatch):
-    """Resposta inválida após ~79s: retry de timeout fixo estouraria os 90s do app.
-
-    Com orçamento total, o retry só existe com tempo restante; aqui sobra ~1s
-    (< mínimo de 3s), então o endpoint cai no fallback local ainda dentro dos
-    90s do app.
-    """
-    monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
-    monkeypatch.delenv("AI_TIMEOUT_TOTAL_SECONDS", raising=False)
-    clock = _FakeClock()
-    monkeypatch.setattr(main, "monotonic", clock)
-    _SlowInvalidJsonClient.calls = 0
-    _SlowInvalidJsonClient.clock = clock
-    monkeypatch.setattr(main.httpx, "AsyncClient", _SlowInvalidJsonClient)
-
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "json_parse"
-    assert _SlowInvalidJsonClient.calls == 1
-    assert clock.now < 90.0
 
 
 # ---------------- check ID↔nome ----------------
@@ -597,6 +486,8 @@ def test_plano_b_entra_quando_cap_por_musulo_e_excedido():
     )
     summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
     assert "ÍNDICE DE EXERCÍCIOS COMPLEMENTARES" in summary
+
+
 def test_plano_b_nenhum_id_elegivel_sai_do_prompt():
     """Cada ID do pool elegível do request aparece no prompt (Tier A ou Tier B)."""
     from app.plan_builder import _build_pool, _is_strength_exercise, normalize
@@ -655,6 +546,8 @@ def test_plano_b_exercício_atende_a_varios_grupos():
     in_tier_b = sample["id"] in tier_b_part
     in_tier_a = (sample.get("name") or "") in tier_a_part or (sample.get("namePt") or "") in tier_a_part
     assert in_tier_b or in_tier_a, f"{sample['id']} ({sample.get('name')}) saiu do prompt"
+
+
 def test_plano_b_tamaho_prompt_abaixo_do_baseline():
     """Prompt com Tier B é menor que o baseline de 23.019 chars (H3-22 medição)."""
     req = main.GenerateRequest(

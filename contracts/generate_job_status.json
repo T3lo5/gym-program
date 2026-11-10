@@ -1,0 +1,50 @@
+{
+  "jobId": "b8f1c2d4-0000-4000-8000-000000000001",
+  "status": "done",
+  "createdAt": "2026-11-10T12:00:00+00:00",
+  "result": {
+    "workout": {
+      "name": "Full Body A",
+      "description": "Plano de contrato",
+      "goal": "hypertrophy",
+      "daysPerWeek": 2,
+      "days": [
+        {
+          "name": "Treino A",
+          "dayOrder": 0,
+          "weekday": 1,
+          "modality": "strength",
+          "isRestDay": false,
+          "exercises": [
+            {
+              "exerciseId": "Barbell_Bench_Press",
+              "exerciseOrder": 0,
+              "sets": 3,
+              "targetReps": "8-12",
+              "targetRpe": 8.0,
+              "restSeconds": 90,
+              "notes": "",
+              "isSupersetWithPrevious": false,
+              "exerciseName": "Supino reto",
+              "primaryMuscles": ["chest"],
+              "equipment": "barbell",
+              "metricType": "reps_weight",
+              "targetDurationSeconds": null,
+              "targetDistanceMeters": null,
+              "targetPaceSecondsPerKm": null,
+              "targetHrZone": null
+            }
+          ]
+        }
+      ]
+    },
+    "generationTimeMs": 1200,
+    "modelUsed": "contrato",
+    "planId": 42,
+    "nextReviewAt": "2026-12-01",
+    "reviewAfterWeeks": 4,
+    "source": "local",
+    "fallbackReason": "no_api_key"
+  },
+  "error": null
+}

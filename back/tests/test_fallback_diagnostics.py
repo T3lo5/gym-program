@@ -1,11 +1,11 @@
 """Diagnóstico do fallback da IA (H3-21).
 
 Cada tipo de falha da geração por IA vira um código fechado de
-`fallbackReason`, visível na resposta do endpoint e no log `[fallback]`.
-Os testes de `parse_ai_plan` são puros (sem rede); os testes de endpoint
-usam um cliente HTTP falso para forçar cada tipo de falha sem chamar a
-SenseNova. Sem chave (conftest zera `SENSENOVA_API_KEY`), o endpoint
-responde `no_api_key`.
+`fallbackReason`, visível no result do job e no log `[fallback]`.
+Os testes de `parse_ai_plan` são puros (sem rede); os testes de geração
+dirigem `run_generation_job` (H3-40) com um cliente HTTP falso para forçar
+cada tipo de falha sem chamar a SenseNova. Sem chave (conftest zera
+`SENSENOVA_API_KEY`), o job conclui com `no_api_key`.
 """
 
 import json
@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from app import database as db
 from app import main
+from job_helpers import run_job
 
 
 def setup_test_db():
@@ -103,14 +104,11 @@ def _plano_valido():
 
 def test_sem_chave_responde_no_api_key(monkeypatch):
     monkeypatch.setattr(main, "SENSENOVA_API_KEY", "")
-    response = _client().post("/v1/generate-workout", json=_payload())
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "no_api_key"
+    result = run_job(_client(), _payload())
+    assert result["source"] == "local"
+    assert result["fallbackReason"] == "no_api_key"
     # Plano local válido de sempre (não vazio).
-    assert body["workout"]["days"]
+    assert result["workout"]["days"]
 
 
 def test_json_invalido_vira_json_parse(monkeypatch):
@@ -123,13 +121,11 @@ def test_json_invalido_vira_json_parse(monkeypatch):
         main.parse_ai_plan("isto não é JSON", main.EXERCISE_CATALOG)
     assert excinfo.value.reason == "json_parse"
 
-    # ...e o endpoint responde `json_parse` com plano local no lugar.
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "json_parse"
-    assert body["workout"]["days"]
+    # ...e o job conclui `done` com `json_parse` no result e plano local.
+    result = run_job(_client(), _payload())
+    assert result["source"] == "local"
+    assert result["fallbackReason"] == "json_parse"
+    assert result["workout"]["days"]
 
 
 def test_ids_inexistentes_vira_unresolved_ids(monkeypatch):
@@ -149,15 +145,13 @@ def test_ids_inexistentes_vira_unresolved_ids(monkeypatch):
         assert fake_id in excinfo.value.detail
     assert fake_ids[5] not in excinfo.value.detail
 
-    # Endpoint: mesmo código, plano local no lugar.
+    # Job: mesmo código, plano local no result.
     monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
     monkeypatch.setattr(_FakeClient, "payload", content)
     monkeypatch.setattr(main.httpx, "AsyncClient", _FakeClient)
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "unresolved_ids"
+    result = run_job(_client(), _payload())
+    assert result["source"] == "local"
+    assert result["fallbackReason"] == "unresolved_ids"
 
 
 def test_resposta_valida_nao_tem_fallback_reason(monkeypatch):
@@ -170,11 +164,9 @@ def test_resposta_valida_nao_tem_fallback_reason(monkeypatch):
     monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
     monkeypatch.setattr(_FakeClient, "payload", content)
     monkeypatch.setattr(main.httpx, "AsyncClient", _FakeClient)
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "ai"
-    assert body["fallbackReason"] == ""
+    result = run_job(_client(), _payload())
+    assert result["source"] == "ai"
+    assert result["fallbackReason"] == ""
 
 
 def test_erro_inesperado_vira_unknown(monkeypatch):
@@ -184,11 +176,9 @@ def test_erro_inesperado_vira_unknown(monkeypatch):
     monkeypatch.setattr(_FakeClient, "error", RuntimeError)
     monkeypatch.setattr(main.httpx, "AsyncClient", _FakeClient)
 
-    response = _client().post("/v1/generate-workout", json=_payload())
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source"] == "local"
-    assert body["fallbackReason"] == "unknown"
+    result = run_job(_client(), _payload())
+    assert result["source"] == "local"
+    assert result["fallbackReason"] == "unknown"
 
 
 def test_detail_truncado_em_300():

@@ -3,6 +3,11 @@
 Rodam contra o FastAPI com TestClient e banco SQLite temporário. Sem
 SENSENOVA_API_KEY definido (conftest), a geração cai no fallback local —
 que é exatamente o caminho que precisa respeitar foco e equipamento.
+
+H3-40: o POST responde 202 com jobId; os testes que esperam um plano
+no corpo dirigem `run_generation_job` via `job_helpers.run_job`.
+Validações 422 (Pydantic) acontecem no submit e continuam testadas com
+`client.post` direto.
 """
 
 import os
@@ -13,6 +18,7 @@ from fastapi.testclient import TestClient
 from app import database as db
 from app import main
 from app.plan_builder import enforce_complementary_plan, build_hybrid_plan
+from job_helpers import run_job, submit, drive
 
 
 def setup_test_db():
@@ -60,10 +66,8 @@ def _strength_days(workout):
 
 def test_foco_abs_exclusivo_no_fallback():
     """Todo exercício do plano tem abdômen como músculo primário."""
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_complementary_payload())
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), _complementary_payload())
+    workout = result["workout"]
     assert workout["name"].startswith("Complementar"), workout["name"]
     days = _strength_days(workout)
     assert len(days) == 2
@@ -76,10 +80,8 @@ def test_foco_abs_exclusivo_no_fallback():
 
 def test_bodyweight_so_peso_corporal():
     """Com environment=bodyweight, nenhum exercício usa equipamento de carga."""
-    client = _client()
-    r = client.post("/v1/generate-workout", json=_complementary_payload())
-    assert r.status_code == 200, r.text
-    for day in _strength_days(r.json()["workout"]):
+    result = run_job(_client(), _complementary_payload())
+    for day in _strength_days(result["workout"]):
         for ex in day["exercises"]:
             assert ex["equipment"].strip().lower() in {"body only", "none"}, ex
 
@@ -92,32 +94,29 @@ def test_home_respeita_available_equipment():
         focusMuscles=["chest"],
     )
     payload["modalities"][0]["availableEquipment"] = ["dumbbell", "bands"]
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
+    result = run_job(_client(), payload)
     allowed = {"dumbbell", "bands", "body only", "none"}
-    for day in _strength_days(r.json()["workout"]):
+    for day in _strength_days(result["workout"]):
         for ex in day["exercises"]:
             assert ex["equipment"].strip().lower() in allowed, ex
             assert "chest" in [m.lower() for m in ex["primaryMuscles"]], ex
 
 
-def test_pool_vazio_422():
-    """Foco sem candidato suficiente no ambiente ⇒ 422, nunca plano fora do foco.
+def test_pool_vazio_marca_job_failed():
+    """Foco sem candidato suficiente no ambiente ⇒ job `failed` com a
+    mensagem do ValueError (H3-40: não é mais 422 síncrono).
 
     `calves` tem apenas 1 exercício sem equipamento no catálogo (mínimo é 3):
-    com environment=bodyweight o pool efetivo é insuficiente e o erro é
-    explícito, em vez de um plano cheio de exercício de academia.
+    com environment=bodyweight o pool efetivo é insuficiente e o runner
+    encerra o job como failed.
     """
     client = _client()
-    r = client.post(
-        "/v1/generate-workout",
-        json=_complementary_payload(focusMuscles=["calves"]),
-    )
-    assert r.status_code == 422, r.text
-    detail = r.json()["detail"]
-    detail_text = detail if isinstance(detail, str) else str(detail)
-    assert "foco" in detail_text.lower()
+    payload = _complementary_payload(focusMuscles=["calves"])
+    job_id = submit(client, payload)
+    body = drive(client, payload, job_id)
+    assert body["status"] == "failed", body
+    assert body["result"] is None
+    assert "foco" in body["error"].lower()
 
 
 # ---------------- Duração e dias ----------------
@@ -136,10 +135,8 @@ def test_duracao_15_tres_exercicios():
             }
         ],
     )
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    days = _strength_days(r.json()["workout"])
+    result = run_job(_client(), payload)
+    days = _strength_days(result["workout"])
     assert len(days) == 2
     for day in days:
         assert len(day["exercises"]) == 3, day["name"]
@@ -158,10 +155,8 @@ def test_um_dia_por_semana():
             }
         ],
     )
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     assert workout["daysPerWeek"] == 1
     assert len(_strength_days(workout)) == 1
 
@@ -341,10 +336,8 @@ def test_sem_foco_comportamento_inalterado():
         "sessionDurationMinutes": 60,
         "reviewAfterWeeks": 4,
     }
-    client = _client()
-    r = client.post("/v1/generate-workout", json=payload)
-    assert r.status_code == 200, r.text
-    workout = r.json()["workout"]
+    result = run_job(_client(), payload)
+    workout = result["workout"]
     assert workout["name"] == "Semana híbrida"
     modalities = {day["modality"] for day in workout["days"]}
     assert {"strength", "run", "mobility"} <= modalities

@@ -26,6 +26,8 @@ import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.media.resolveExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.SyncDownloadResult
+import com.treinos.app.data.remote.GenerateJobAck
+import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.data.remote.ModalityDto
@@ -43,6 +45,8 @@ import com.treinos.app.data.backup.backupImportDecoder
 import com.treinos.app.data.wear.WearSessionMapper
 import com.treinos.app.data.wear.WearSyncRepository
 import com.treinos.app.ui.ExerciseSessionData
+import com.treinos.app.ui.PendingGeneration
+import com.treinos.app.ui.PendingGenerationCodec
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
@@ -339,7 +343,7 @@ class AppViewModel(
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
-    /** Job da geração em curso; `cancelGenerate` o interrompe (H3-30). */
+    /** Job da geração em curso (H3-30, mantido para compatibilidade). */
     private var generateJob: Job? = null
 
     /**
@@ -349,6 +353,21 @@ class AppViewModel(
      */
     private val _lastFallbackReason = MutableStateFlow(preferences.lastFallbackReason)
     val lastFallbackReason: StateFlow<String> = _lastFallbackReason.asStateFlow()
+
+    /**
+     * H3-40: envelope da geração em andamento (jobId, kind, request, config).
+     * Sobrevive a processo morto; restaurado no init. Nulo quando não há job.
+     */
+    private val _pendingGeneration = MutableStateFlow<PendingGeneration?>(null)
+    val pendingGeneration: StateFlow<PendingGeneration?> = _pendingGeneration.asStateFlow()
+
+    /** Dedupe de polls sobrepostos (H3-40): só um refresh de cada vez. */
+    private val _isPolling = MutableStateFlow(false)
+    val isPolling: StateFlow<Boolean> = _isPolling.asStateFlow()
+
+    /** Último status conhecido do job do envelope (H3-40): pending/running/done/failed/cancelled. */
+    private val _pendingGenerationStatus = MutableStateFlow<String?>(null)
+    val pendingGenerationStatus: StateFlow<String?> = _pendingGenerationStatus.asStateFlow()
 
     /**
      * H3-30: última configuração da tela "Gerar", restaurada na abertura.
@@ -517,6 +536,12 @@ class AppViewModel(
             loadExerciseMedia(false)
         }
         restorePersistedRest()
+        // H3-40: restaura o envelope persistido (sobrevive a processo morto).
+        preferences.pendingGenerationV1?.let { raw ->
+            PendingGenerationCodec.decode(raw)?.let { envelope ->
+                _pendingGeneration.value = envelope
+            }
+        }
         if (wearSyncRepository != null) {
             viewModelScope.launch {
                 wearSyncRepository!!.commands.collect { command ->
@@ -691,9 +716,15 @@ class AppViewModel(
         _message.value = null
     }
 
-    // ---------------- Geração ----------------
+    // ---------------- Geração assíncrona (H3-40) ----------------
 
-    fun generatePlan(
+    /**
+     * Submete a geração ao backend (202 imediato), persiste o envelope e vai
+     * para a Home. Não salva o plano — ele só é salvo quando o job conclui
+     * (`refreshPendingGeneration`). O submit é rápido; nenhum caminho de rede
+     * espera a IA.
+     */
+    fun submitGeneration(
         modalities: List<ModalityDto>,
         goal: String,
         daysPerWeek: Int,
@@ -707,30 +738,30 @@ class AppViewModel(
         sexChoice: String?,
         environment: String? = null,
         kind: String = "main",
-        // H3-30: configuração completa do formulário, persistida quando a
-        // geração é bem-sucedida e restaurada na próxima abertura da tela.
         config: GenerateConfig? = null,
     ) {
         if (_isGenerating.value) return
-        val args = GeneratePlanArgs(
-            modalities = modalities,
-            goal = goal,
-            daysPerWeek = daysPerWeek,
-            level = level,
-            equipment = equipment,
-            muscles = muscles,
-            sessionDuration = sessionDuration,
-            reviewWeeks = reviewWeeks,
-            bodyWeightKgText = bodyWeightKgText,
-            heightCmText = heightCmText,
-            sexChoice = sexChoice,
-            environment = environment,
-            kind = kind,
-            config = config,
-        )
-        lastGenerateArgs = args
         _generateError.value = null
-        generateJob = viewModelScope.launch {
+
+        val isComplementary = kind == "extra"
+        val focusMuscles = if (isComplementary && muscles.isNotEmpty()) muscles else null
+        val effectiveModalities = if (isComplementary) {
+            listOf(
+                ModalityDto(
+                    type = "strength",
+                    sessionsPerWeek = daysPerWeek.coerceIn(1, 6),
+                    goal = goal,
+                    level = level,
+                    availableEquipment = equipment,
+                    targetMuscles = emptyList(),
+                    sessionDurationMinutes = sessionDuration,
+                )
+            )
+        } else {
+            modalities
+        }
+
+        viewModelScope.launch {
             _isGenerating.value = true
             try {
                 val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText, sexChoice)
@@ -747,30 +778,9 @@ class AppViewModel(
                     preferences.heightCm = validation.heightCm
                     _heightCm.value = preferences.heightCm
                 }
-                // O campo nasce com a seleção salva, então null aqui é escolha explícita.
                 preferences.sex = validation.sex
                 _sex.value = preferences.sex
 
-                // Modo complementar (H3-16): foco exclusivo via focusMuscles e
-                // apenas força; o backend aplica o filtro estrito de equipamento.
-                // Sem foco, o campo é omitido (o ambiente restrito segue valendo).
-                val isComplementary = kind == "extra"
-                val focusMuscles = if (isComplementary && muscles.isNotEmpty()) muscles else null
-                val effectiveModalities = if (isComplementary) {
-                    listOf(
-                        ModalityDto(
-                            type = "strength",
-                            sessionsPerWeek = daysPerWeek.coerceIn(1, 6),
-                            goal = goal,
-                            level = level,
-                            availableEquipment = equipment,
-                            targetMuscles = emptyList(),
-                            sessionDurationMinutes = sessionDuration,
-                        )
-                    )
-                } else {
-                    modalities
-                }
                 if (isComplementary) {
                     val complementary = ComplementaryValidator.validate(
                         focusMuscles = focusMuscles,
@@ -784,55 +794,49 @@ class AppViewModel(
                     }
                 }
 
-                val response = repository.generatePlan(
-                    GeneratePlanRequest(
-                        deviceId = preferences.deviceId,
-                        goal = goal,
-                        daysPerWeek = daysPerWeek,
-                        availableEquipment = equipment,
-                        targetMuscles = if (isComplementary) emptyList() else muscles,
-                        currentLevel = level,
-                        sessionDurationMinutes = sessionDuration,
-                        reviewAfterWeeks = reviewWeeks,
-                        bodyWeightKg = validation.bodyWeightKg,
-                        heightCm = validation.heightCm,
-                        sex = validation.sex,
-                        modalities = effectiveModalities,
-                        environment = environment,
-                        focusMuscles = focusMuscles,
-                        // H3-36: conteúdo do plano no idioma da preferência
-                        // (default "pt"); null nunca viaja (explicitNulls=false).
-                        language = preferences.language,
-                    ),
-                    kind = kind,
+                val request = GeneratePlanRequest(
+                    deviceId = preferences.deviceId,
+                    goal = goal,
+                    daysPerWeek = daysPerWeek,
+                    availableEquipment = equipment,
+                    targetMuscles = if (isComplementary) emptyList() else muscles,
+                    currentLevel = level,
+                    sessionDurationMinutes = sessionDuration,
+                    reviewAfterWeeks = reviewWeeks,
+                    bodyWeightKg = validation.bodyWeightKg,
+                    heightCm = validation.heightCm,
+                    sex = validation.sex,
+                    modalities = effectiveModalities,
+                    environment = environment,
+                    focusMuscles = focusMuscles,
+                    language = preferences.language,
                 )
-                // H3-30: geração bem-sucedida persiste a configuração do
-                // formulário e o motivo do fallback (vazio quando veio da IA).
-                args.config?.let { config ->
-                    preferences.generateConfigJson = GenerateConfigCodec.encode(config)
-                    _generateConfig.value = config
+
+                // Persistir config ANTES do submit: se o processo morrer, o
+                // retry reenvia o request do envelope (com a config do form).
+                config?.let { cfg ->
+                    preferences.generateConfigJson = GenerateConfigCodec.encode(cfg)
+                    _generateConfig.value = cfg
                 }
-                val fallbackReason = if (response.source == "ai") {
-                    ""
-                } else {
-                    response.fallbackReason?.takeIf { it.isNotBlank() } ?: "unknown"
-                }
-                preferences.lastFallbackReason = fallbackReason
-                _lastFallbackReason.value = fallbackReason
+
+                val ack = repository.submitGeneration(request)
+
+                // Envelope: sobrevive a processo morto.
+                val envelope = PendingGeneration(
+                    jobId = ack.jobId,
+                    kind = kind,
+                    request = request,
+                    config = config,
+                )
+                preferences.pendingGenerationV1 = PendingGenerationCodec.encode(envelope)
+                _pendingGeneration.value = envelope
 
                 _screen.value = Screen.Home
-                val source = if (response.source == "ai") "com IA" else "local"
-                val review = formatReviewDate(response.nextReviewAt) ?: response.nextReviewAt
-                val base = "Treino gerado $source e salvo no aparelho. Revisar em $review."
-                // H3-21: quando o plano veio do fallback local, a mensagem diz o porquê.
-                _message.value = fallbackReasonLabel(response.fallbackReason)
-                    ?.let { motivo -> "$base Motivo: $motivo." } ?: base
+                _message.value = "Treino sendo preparado. Toque em Atualizar quando voltar."
             } catch (error: CancellationException) {
-                // H3-30: cancelar não é erro — o overlay fecha e nada é salvo
-                // (o salvamento é @Transaction, então não fica plano pela metade).
                 throw error
             } catch (error: Exception) {
-                Log.w(TAG, "Falha ao gerar o treino", error)
+                Log.w(TAG, "Falha ao submeter geração", error)
                 _generateError.value = uiErrorFrom(error, "gerar o treino")
             } finally {
                 _isGenerating.value = false
@@ -841,22 +845,124 @@ class AppViewModel(
     }
 
     /**
-     * H3-30: cancela a geração em curso a partir do overlay — interrompe a
-     * coroutine, fecha o overlay e não salva plano nem mensagem de erro.
+     * Consulta o status do job em andamento e, quando concluído, salva o plano,
+     * limpa o envelope e mostra a mensagem. Quando falhou, mantém o envelope
+     * para o retry. Só um poll de cada vez (dedupe).
      */
-    fun cancelGenerate() {
-        generateJob?.cancel()
-        generateJob = null
-        _isGenerating.value = false
+    suspend fun refreshPendingGeneration() {
+        if (_isPolling.value) return
+        val envelope = _pendingGeneration.value ?: return
+        _isPolling.value = true
+        try {
+            val status = repository.generationStatus(envelope.jobId)
+            _pendingGenerationStatus.value = status.status
+            when (status.status) {
+                "done" -> {
+                    status.result?.let { result ->
+                        try {
+                            val planId = repository.completeGeneration(status, envelope.kind)
+                            // Persistir config + motivo do fallback (regras H3-30).
+                            envelope.config?.let { cfg ->
+                                preferences.generateConfigJson = GenerateConfigCodec.encode(cfg)
+                                _generateConfig.value = cfg
+                            }
+                            val fallbackReason = if (result.source == "ai") {
+                                ""
+                            } else {
+                                result.fallbackReason?.takeIf { it.isNotBlank() } ?: "unknown"
+                            }
+                            preferences.lastFallbackReason = fallbackReason
+                            _lastFallbackReason.value = fallbackReason
+                            // Não navega se o usuário estiver em outra tela — só mensagem.
+                            val source = if (result.source == "ai") "com IA" else "local"
+                            val review = formatReviewDate(result.nextReviewAt) ?: result.nextReviewAt
+                            val base = "Treino gerado $source e salvo no aparelho. Revisar em $review."
+                            _message.value = fallbackReasonLabel(result.fallbackReason)
+                                ?.let { motivo -> "$base Motivo: $motivo." } ?: base
+                        } catch (error: Exception) {
+                            // O job está done no backend; falha local ao salvar não
+                            // deve manter o envelope travado.
+                            Log.w(TAG, "Falha ao salvar plano do job concluído", error)
+                            _generateError.value = uiErrorFrom(error, "salvar o treino")
+                        }
+                        clearPendingEnvelope()
+                    } ?: run {
+                        _message.value = "Job concluído sem plano."
+                        clearPendingEnvelope()
+                    }
+                }
+                "failed" -> {
+                    // Mantém o envelope para o retry ("Tentar de novo").
+                    _generateError.value = uiErrorFrom(
+                        Exception(status.error ?: "Falha na geração"), "gerar o treino"
+                    )
+                }
+                "cancelled" -> {
+                    clearPendingEnvelope()
+                    _message.value = "Geração cancelada."
+                }
+                else -> {
+                    // pending/running: ainda em andamento, nada a fazer.
+                }
+            }
+        } catch (error: Exception) {
+            // 404 (job sumido) ou erro de rede: falha com retry, envelope mantido.
+            Log.w(TAG, "Falha ao consultar status do job", error)
+            _generateError.value = uiErrorFrom(error, "consultar a geração")
+        } finally {
+            _isPolling.value = false
+        }
+    }
+
+    /** Cancela o job no backend e limpa o envelope local (sem salvar nada). */
+    suspend fun cancelGeneration() {
+        val envelope = _pendingGeneration.value ?: return
+        try {
+            repository.cancelGeneration(envelope.jobId)
+        } catch (error: Exception) {
+            Log.w(TAG, "Falha ao cancelar job", error)
+        } finally {
+            clearPendingEnvelope()
+        }
+    }
+
+    /** Chamado pelo onResume da MainActivity: consulta o status se houver envelope. */
+    fun onAppResumed() {
+        if (_pendingGeneration.value != null) {
+            viewModelScope.launch {
+                refreshPendingGeneration()
+            }
+        }
+    }
+
+    /** Retry de job failed: reenvia o request persistido no envelope. */
+    fun retryFromEnvelope() {
+        val envelope = _pendingGeneration.value ?: return
+        submitGeneration(
+            modalities = envelope.request.modalities,
+            goal = envelope.request.goal,
+            daysPerWeek = envelope.request.daysPerWeek,
+            level = envelope.request.currentLevel,
+            equipment = envelope.request.availableEquipment,
+            muscles = envelope.request.targetMuscles,
+            sessionDuration = envelope.request.sessionDurationMinutes,
+            reviewWeeks = envelope.request.reviewAfterWeeks,
+            bodyWeightKgText = envelope.request.bodyWeightKg?.toString() ?: "",
+            heightCmText = envelope.request.heightCm?.toString() ?: "",
+            sexChoice = envelope.request.sex,
+            environment = envelope.request.environment,
+            kind = envelope.kind,
+            config = envelope.config,
+        )
     }
 
     /**
      * H3-29: "Tentar de novo" da GenerateScreen — reexecuta a última geração
-     * com exatamente os mesmos parâmetros.
+     * com exatamente os mesmos parâmetros (mantido para compatibilidade).
      */
     fun retryGenerate() {
         val args = lastGenerateArgs ?: return
-        generatePlan(
+        submitGeneration(
             modalities = args.modalities,
             goal = args.goal,
             daysPerWeek = args.daysPerWeek,
@@ -872,6 +978,16 @@ class AppViewModel(
             kind = args.kind,
             config = args.config,
         )
+    }
+
+    private fun clearPendingEnvelope() {
+        preferences.pendingGenerationV1 = null
+        _pendingGeneration.value = null
+    }
+
+    /** Descarta o envelope local (usuário descartou o job falho). */
+    fun dismissPendingGeneration() {
+        clearPendingEnvelope()
     }
 
     private fun nextReviewAt(reviewAfterWeeks: Int): String =

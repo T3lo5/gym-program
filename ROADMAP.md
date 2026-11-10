@@ -31,7 +31,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 |------|--------|-----------|
 | Banco local (Room) | ✅ | Planos, dias, exercícios, sessões, séries |
 | Execução de treino | ✅ | Timer de descanso, séries, RPE, carga, histórico (H1-2) |
-| Geração via IA | ✅ | Backend + SenseNova + fallback local existe; robustez entregue (H3-22): prompt com o pool completo do request (sem cap de 136 IDs), parse tolerante, salvamento parcial de IDs inválidos, timeout 60 s + retry; diagnóstico no ar (H3-21: `fallbackReason` no contrato, log `[fallback]` e motivo no app); foco do usuário priorizado nas sessões (H3-23); **plano B (dois níveis) ativo em 2026-11-10**: gatilho de 22.000 chars disparou com request amplo (29.067 chars, IA levava 74,5s, fallback `reason=timeout`) e cortou o prompt para ~14.000 chars sem perder nenhum ID elegível (Tier A: 8 detalhados por músculo; Tier B: IDs agrupados por músculo); evolução planejada: seleção por nome (H3-25) |
+| Geração via IA | ✅ | Backend + SenseNova + fallback local existe; robustez entregue (H3-22): prompt com o pool completo do request (sem cap de 136 IDs), parse tolerante, salvamento parcial de IDs inválidos, timeout 60 s + retry; diagnóstico no ar (H3-21: `fallbackReason` no contrato, log `[fallback]` e motivo no app); foco do usuário priorizado nas sessões (H3-23); **plano B (dois níveis) ativo em 2026-11-10**: gatilho de 22.000 chars disparou com request amplo (29.067 chars, IA levava 74,5s, fallback `reason=timeout`) e cortou o prompt para ~14.000 chars sem perder nenhum ID elegível (Tier A: 8 detalhados por músculo; Tier B: IDs agrupados por músculo); evolução planejada: seleção por nome (H3-25); geração assíncrona proposta (H3-40) |
 | Foco muscular no plano principal | ✅ | No principal, foco é **prioridade**: cada sessão de força garante ≥ 1 exercício de cada grupo pedido antes do split do ciclo (`user_target_muscles` em `build_strength_session`/`build_hybrid_plan`), regra explícita no prompt e dica na GenerateScreen; exclusivo só no complementar (H3-16) (H3-23) |
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
 | Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
@@ -165,6 +165,8 @@ implementada separadamente.
 | H3-36 | Catálogo bilíngue PT/EN (mesmos IDs) | **M** | Nomes e instruções de exercícios só em inglês; o dataset PT-BR (fork CC0 do free-exercise-db) tem 873/876 IDs idênticos e não é aproveitado. | Catálogo com `namePt`/`instructionsPt` aditivos (merge por ID via script validado), `GenerateRequest.language` (ausente ⇒ `en`), mismatch tolerante a nome PT e app resolvendo mídia por idioma. | 1 dia | — | [H3-36](docs/specs/H3-36-catalogo-bilingue.md) (concluída) |
 | H3-38 | Navegação em pilha e retomada | **M** | "Voltar" sempre vai para Home (salvar edição vinda do Histórico abandona o usuário lá), Histórico/Ajustes são TextButtons no topo (pior zona de alcance) e não há como retomar o treino em 1 toque. | Pilha mínima origem→destino no ViewModel, bottom bar Treinar/Histórico/Ajustes nos hubs e shortcut dinâmico de retomada. | 1 dia | — | [H3-38](docs/specs/H3-38-navegacao-pilha.md) (concluída) |
 | H3-39 | Imagens dos alongamentos (mobilidade) | **C** | Movimentos de mobilidade não têm imagem quando o catálogo remoto não carrega (offline), deixando quadrado vazio/fallback de letra. | Drawables locais (`imageRes`) como fallback offline; catálogo remoto vence quando disponível; 16 drawables vetoriais em `res/drawable`; nenhum cambio de Room/backend. | 0,5 dia | H2-7, H3-32 | [H3-39](docs/specs/H3-39-imagens-mobilidade.md) (concluída) |
+| H3-40 | Geração assíncrona: pedir agora, receber pronto | Job no backend (202 + `jobId`, status/cancel, sweep de interrompidos), orçamento de IA de 600 s; app sem overlay: card na Home com Atualizar/Cancelar, poll no refresh e na volta ao foreground, envelope sobrevive a processo morto. Offline-first intacto: sem WorkManager, sem permissão nova, chave só no backend. | [H3-40](docs/specs/H3-40-geracao-assincrona.md) (implementado)
+| H3-40 | Geração assíncrona: pedir agora, receber pronto | **M** | A IA quase sempre estoura o orçamento síncrono de 80 s e o dono recebe o fallback local; a geração prende o usuário na tela por até 90 s. | Job no backend (202 + `jobId`, status/cancel, sweep de interrompidos), orçamento de IA de 600 s; app sem overlay: card na Home com Atualizar/Cancelar, poll no refresh e na volta ao foreground, envelope sobrevive a processo morto. Offline-first intacto: sem WorkManager, sem permissão nova, chave só no backend. | 1,5–2 dias | H3-22, H3-30 | [H3-40](docs/specs/H3-40-geracao-assincrona.md) (implementado)
 
 > H3-26..H3-39 nasceram da auditoria UX/UI de 2026-11-07
 > ([docs/auditoria-ux-ui-2026-11-07.md](docs/auditoria-ux-ui-2026-11-07.md)) e do
@@ -235,6 +237,7 @@ precisa para ser útil amanhã.
 | Título varia conforme split (H3-13) ✅ | | | |
 | Múltiplos planos (H3-15) ✅ | Geração complementar (H3-16) ✅ | | |
 | Fechar o MVP do relógio (H3-17–H3-20) | | | |
+| Geração assíncrona (H3-40) — implementado (2026-11-10) | | | |
 
 ---
 
@@ -324,6 +327,11 @@ e fila offline real). As quatro specs foram escritas em 2026-11-07
 [H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md) e
 [H3-20](docs/specs/H3-20-robustez-conexao-relogio.md)) e aguardam aprovação
 antes de implementar.
+**Implementado pelo dono (2026-11-10):** **H3-40** (geração assíncrona — pedir o
+treino, sair do app e receber pronto ao voltar; [spec](docs/specs/H3-40-geracao-assincrona.md))
+nasceu do uso real: a IA quase sempre estoura os 80 s e entrega fallback.
+Aguarda aprovação; a ordem de execução frente ao MVP do relógio é decisão do
+dono na aprovação.
 **Correções prioritárias concluídas:** H3-21 (diagnóstico do fallback da IA),
 H3-22 (robustez da geração por IA), H3-23 (foco muscular no plano principal) e
 H3-24 (imagens e descrição do exercício vindas do plano + catálogo resiliente;
@@ -396,6 +404,7 @@ confirme antes de implementar.
 - [H3-35 — Ajustes organizados e copy do usuário](docs/specs/H3-35-ajustes-copy.md) — proposta, aguardando aprovação (seções colapsáveis, AlertDialog no import, 5 km em mm:ss, shortcut)
 - [H3-36 — Catálogo bilíngue PT/EN](docs/specs/H3-36-catalogo-bilingue.md) — concluída (`namePt`/`instructionsPt` aditivos via script validado, `GenerateRequest.language` ausente ⇒ `en`, mismatch duplo EN/PT, mídia do app por idioma)
 - [H3-38 — Navegação em pilha e retomada](docs/specs/H3-38-navegacao-pilha.md) — proposta, aguardando aprovação (pilha origem→destino, bottom bar, shortcut de retomada)
+- [H3-40 — Geração assíncrona: pedir agora, receber pronto](docs/specs/H3-40-geracao-assincrona.md) — implementado (2026-11-10) (job no backend com orçamento de 600 s; app com poll sob demanda; substitui parcialmente o overlay da H3-30 e a invariante de 90 s da H3-22)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

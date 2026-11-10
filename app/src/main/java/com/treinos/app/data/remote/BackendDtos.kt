@@ -403,3 +403,22 @@ data class ReviewPlanResponse(
     val changes: List<String> = emptyList(),
     val source: String = "local",
 )
+
+// ---------------- Geração assíncrona (H3-40) ----------------
+
+/** Resposta imediata do submit: a IA roda em background. */
+@Serializable
+data class GenerateJobAck(
+    val jobId: String,
+    val status: String = "pending",
+)
+
+/** Status do job consultado sob demanda pelo app. */
+@Serializable
+data class GenerateJobStatus(
+    val jobId: String,
+    val status: String,
+    val createdAt: String,
+    val result: GeneratePlanResponse? = null,
+    val error: String? = null,
+)

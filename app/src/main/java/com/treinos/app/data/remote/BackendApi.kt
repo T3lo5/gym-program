@@ -8,7 +8,14 @@ package com.treinos.app.data.remote
 interface BackendApi {
     suspend fun health(): HealthResponse
 
-    suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse
+    /** H3-40: submete a geração como job assíncrono; 202 imediato com jobId. */
+    suspend fun submitGeneration(request: GeneratePlanRequest): GenerateJobAck
+
+    /** H3-40: consulta o status do job sob demanda (Atualizar / volta ao foreground). */
+    suspend fun generationStatus(jobId: String): GenerateJobStatus
+
+    /** H3-40: cancela um job em andamento (idempotente). */
+    suspend fun cancelGeneration(jobId: String): GenerateJobStatus
 
     suspend fun sync(request: SyncRequestDto): SyncResponseDto
 

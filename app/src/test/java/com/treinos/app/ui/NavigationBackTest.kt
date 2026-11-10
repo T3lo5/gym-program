@@ -9,8 +9,9 @@ import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
+import com.treinos.app.data.remote.GenerateJobAck
+import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
-import com.treinos.app.data.remote.GeneratePlanResponse
 import com.treinos.app.ui.ActivityLogDraft
 import com.treinos.app.ui.ActivityModality
 import kotlinx.coroutines.launch
@@ -26,7 +27,11 @@ import org.robolectric.RobolectricTestRunner
 
 class FakeBackendApiNav : BackendApi {
     override suspend fun health() = throw UnsupportedOperationException()
-    override suspend fun generatePlan(request: GeneratePlanRequest): GeneratePlanResponse =
+    override suspend fun submitGeneration(request: GeneratePlanRequest): GenerateJobAck =
+        throw UnsupportedOperationException()
+    override suspend fun generationStatus(jobId: String): GenerateJobStatus =
+        throw UnsupportedOperationException()
+    override suspend fun cancelGeneration(jobId: String): GenerateJobStatus =
         throw UnsupportedOperationException()
     override suspend fun sync(request: com.treinos.app.data.remote.SyncRequestDto) =
         throw UnsupportedOperationException()

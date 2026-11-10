@@ -9,13 +9,15 @@ import com.treinos.app.TreinosApplication
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var viewModel: AppViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as TreinosApplication).container
 
         setContent {
             TreinosTheme {
-                val viewModel: AppViewModel = viewModel(
+                viewModel = viewModel(
                     factory = AppViewModel.factory(
                         context = this@MainActivity,
                         repository = container.repository,
@@ -33,5 +35,11 @@ class MainActivity : AppCompatActivity() {
                 TreinosApp(viewModel)
             }
         }
+    }
+
+    /** H3-40: poll sob demanda ao voltar ao foreground — consulta o job se houver envelope. */
+    override fun onResume() {
+        super.onResume()
+        viewModel.onAppResumed()
     }
 }

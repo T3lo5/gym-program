@@ -145,8 +145,6 @@ fun GenerateScreen(
     // H3-29: erro persistente na tela de origem, com "Tentar de novo".
     error: UiError? = null,
     onRetry: () -> Unit = {},
-    // H3-30: cancelar a geração em curso a partir do overlay.
-    onCancel: () -> Unit = {},
     onGenerate: (
         modalities: List<ModalityDto>,
         goal: String,
@@ -816,66 +814,6 @@ fun GenerateScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
-                }
-            }
-        }
-
-        // H3-30: overlay de geração — progresso honesto com tempo decorrido e
-        // cancelar, no lugar do spinner de 18 dp escondido no botão.
-        if (isGenerating) {
-            GenerateOverlay(onCancel = onCancel)
-        }
-    }
-}
-
-/** Overlay modal da geração: tempo decorrido, expectativa honesta e Cancelar. */
-@Composable
-private fun GenerateOverlay(onCancel: () -> Unit) {
-    var elapsedSeconds by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1_000)
-            elapsedSeconds++
-        }
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
-                // O scrim consome toques fora do cartão.
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Card(modifier = Modifier.padding(32.dp)) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                CircularProgressIndicator()
-                Text(
-                    text = "Gerando semana…",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Tempo decorrido: ${elapsedSeconds}s",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "A IA pode levar até 90 s.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(
-                    onClick = onCancel,
-                    modifier = Modifier.minimumInteractiveComponentSize(),
-                ) {
-                    Text(stringResource(R.string.common_cancel))
                 }
             }
         }
