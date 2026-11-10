@@ -6,6 +6,7 @@ check ID↔nome. Testes de endpoint usam cliente HTTP falso (sem SenseNova).
 
 import json
 import os
+import re
 import tempfile
 
 import pytest
@@ -13,7 +14,15 @@ from fastapi.testclient import TestClient
 
 from app import database as db
 from app import main
-from app.plan_builder import catalog_summary_for_request, catalog_summary_metrics, id_name_mismatches, resolve_plan_ids, resolve_exercise_names
+from app.plan_builder import (
+    _build_pool,
+    _is_strength_exercise,
+    catalog_summary_for_request,
+    catalog_summary_metrics,
+    id_name_mismatches,
+    resolve_plan_ids,
+    resolve_exercise_names,
+)
 
 
 def setup_test_db():
@@ -271,39 +280,47 @@ def test_resumo_formato_compacto_sem_id_inline():
     assert "copie o nome exatamente como listado" in lines[0]
     assert "o backend resolve o ID" in lines[0]
     assert "não invente nomes" in lines[0]
-    # Linhas de exercício sem ID
-    exercise_lines = [l for l in lines if l.strip().startswith("- ")]
+    # Linhas de exercício do Tier A: formato '  - <nome> (<eq>)'.
+    tier_a_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[0]
+    exercise_lines = [l for l in tier_a_part.splitlines() if l.strip().startswith("- ")]
+    assert exercise_lines, "Esperava linhas de exercício no Tier A"
     for line in exercise_lines:
-        # Não deve ter padrão de ID (ex: Barbell_Bench_Press_-_Medium_Grip)
-        assert "_" not in line.split("(")[0].strip().split()[-1], f"Parece conter ID: {line}"
+        # Não deve ter o padrão antigo de ID inline: "<ID> — <nome> (<eq>)"
+        assert " — " not in line.split("(")[0], f"Parece conter ID inline: {line}"
         assert "(" in line and ")" in line, f"Formato inesperado: {line}"
 
 
-def test_resumo_inclui_todos_elegiveis_sem_cap_por_grupo():
-    """Pool completo do request, sem cap por grupo muscular."""
+def test_resumo_inclui_todos_elegiveis_sem_cap_por():
+    """Pool completo do request: o Tier A cobre todos os exercicios do foco
+    (sem cap por grupo) e o Tier B cobre o restante como IDs."""
     req = main.GenerateRequest(
-        targetMuscles=["abs"],
-        availableEquipment=["body only", "dumbbell"],
-        daysPerWeek=2,
-        sessionDurationMinutes=45,
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
         currentLevel="intermediate",
     )
     summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
-    lines = [l for l in summary.splitlines() if l.strip()]
-    # Conta itens em ABDOMINALS
-    in_abd = False
-    abd_items = 0
-    for l in lines:
-        if l.strip() == "ABDOMINALS:":
-            in_abd = True
+    # Conta itens em CHEST no Tier A (ate 8 detalhados) + Tier B (restante).
+    tier_a_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[0]
+    tier_b_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[1]
+    in_a = False
+    chest_a = 0
+    for l in tier_a_part.splitlines():
+        if l.strip() == "CHEST:":
+            in_a = True
             continue
-        if in_abd and l.endswith(":"):
+        if in_a and l.endswith(":"):
             break
-        if in_abd and l.strip().startswith("- "):
-            abd_items += 1
-    assert abd_items > 8, f"Esperava > 8 itens em abdominals, got {abd_items}"
-
-
+        if in_a and l.strip().startswith("- "):
+            chest_a += 1
+    chest_b = 0
+    for l in tier_b_part.splitlines():
+        if l.strip().startswith("- "):
+            chest_b += 1
+    assert chest_a >= 8, f"Esperava >= 8 detalhados em chest no Tier A, got {chest_a}"
+    assert chest_b > 0, "Esperava exercicios restantes no Tier B"
 def test_resumo_nao_lista_equipamento_fora_request():
     """Equipamento não informado não aparece no resumo."""
     req = main.GenerateRequest(
@@ -445,3 +462,118 @@ def test_nome_aproximado_nao_e_divergencia():
     parsed = main.parse_ai_plan(json.dumps(plano), main.EXERCISE_CATALOG, _request_for_parse())
     got_ids = [ex["exerciseId"] for ex in parsed["days"][0]["exercises"]]
     assert target in got_ids
+
+
+# ---------------- plano B (dois níveis, H3-22) ----------------
+
+
+def test_plano_b_tier_b_entra_quando_tier_a_estoura_limite():
+    """Request amplo (muitos músculos/equipamentos) ativa o Tier B."""
+    req = main.GenerateRequest(
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+    summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
+    assert "ÍNDICE DE EXERCÍCIOS COMPLEMENTARES" in summary
+    assert "prefira sempre os nomes do bloco acima" in summary
+
+
+def test_plano_b_nao_entra_em_request_estreito():
+    """Request com poucos exercícios por músculo e todos do foco: Tier A só."""
+    req = main.GenerateRequest(
+        targetMuscles=["chest"],
+        availableEquipment=["barbell"],
+        daysPerWeek=2,
+        sessionDurationMinutes=45,
+        currentLevel="intermediate",
+    )
+    summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
+    assert "ÍNDICE DE EXERCÍCIOS COMPLEMENTARES" not in summary
+
+
+def test_plano_b_entra_quando_cap_por_musulo_e_excedido():
+    """Request amplo (muitos músculos/equipamentos) ativa o Tier B."""
+    req = main.GenerateRequest(
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+    summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
+    assert "ÍNDICE DE EXERCÍCIOS COMPLEMENTARES" in summary
+def test_plano_b_nenhum_id_elegivel_sai_do_prompt():
+    """Cada ID do pool elegível do request aparece no prompt (Tier A ou Tier B)."""
+    from app.plan_builder import _build_pool, _is_strength_exercise, normalize
+    req = main.GenerateRequest(
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+    pool = [
+        e for e in _build_pool(main.EXERCISE_CATALOG, req.availableEquipment, req.currentLevel)
+        if _is_strength_exercise(e)
+    ]
+    summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
+    tier_b_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[1]
+    tier_a_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[0]
+    tier_b_ids = set(re.findall(r"^\s+- (\S+)$", tier_b_part, re.M))
+    by_name = {}
+    for e in pool:
+        for key in (e.get("name", ""), e.get("namePt", "")):
+            if key:
+                by_name.setdefault(normalize(key), e["id"])
+    # Formato do Tier A: '  - <nome> (<eq>)' — o nome pode conter parênteses
+    # (ex.: "Butt Lift (Bridge) (body only)"), então captura o (<eq>) do final.
+    tier_a_names = re.findall(r"^\s+- (.+) \(([^)]+)\)\s*$", tier_a_part, re.M)
+    tier_a_ids = {by_name.get(normalize(n)) for n, _ in tier_a_names if by_name.get(normalize(n))}
+    prompt_ids = tier_a_ids | tier_b_ids
+    missing = [e["id"] for e in pool if e["id"] not in prompt_ids]
+    assert not missing, f"IDs do pool que saíram do prompt: {missing[:10]}"
+
+
+def test_plano_b_exercício_atende_a_varios_grupos():
+    """Exercício com múltiplos primaryMuscles aparece em todos os grupos que atende."""
+    req = main.GenerateRequest(
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+    summary = catalog_summary_for_request(req, main.EXERCISE_CATALOG)
+    # Exercícios com múltiplos músculos primários devem aparecer em cada grupo
+    # que atendem (ex.: um exercício de peito+ombros em CHEST e SHOULDERS).
+    multi = [e for e in main.EXERCISE_CATALOG
+             if len(e.get("primaryMuscles", [])) > 1
+             and _is_strength_exercise(e)
+             and e.get("equipment") in {"barbell", "dumbbell", "body only", "cable", "machine", "kettlebells"}]
+    assert multi, "Esperava pelo menos um exercício com múltiplos músculos primários"
+    sample = multi[0]
+    # O exemplo deve aparecer no prompt: ou por ID (Tier B) ou por nome canônico (Tier A).
+    tier_b_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[1]
+    tier_a_part = summary.split("ÍNDICE DE EXERCÍCIOS COMPLEMENTARES")[0]
+    in_tier_b = sample["id"] in tier_b_part
+    in_tier_a = (sample.get("name") or "") in tier_a_part or (sample.get("namePt") or "") in tier_a_part
+    assert in_tier_b or in_tier_a, f"{sample['id']} ({sample.get('name')}) saiu do prompt"
+def test_plano_b_tamaho_prompt_abaixo_do_baseline():
+    """Prompt com Tier B é menor que o baseline de 23.019 chars (H3-22 medição)."""
+    req = main.GenerateRequest(
+        targetMuscles=["chest", "back", "legs", "shoulders", "arms", "abs", "glutes", "calves"],
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine",
+                            "kettlebells", "bands", "medicine ball"],
+        daysPerWeek=4,
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+    metrics = catalog_summary_metrics(req, main.EXERCISE_CATALOG)
+    assert metrics["chars"] < 23019, f"Prompt ainda grande: {metrics['chars']} chars"

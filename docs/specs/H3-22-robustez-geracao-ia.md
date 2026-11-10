@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-22` |
 | MoSCoW | `M` |
 | Spec aprovada em | `2026-11-07` (diretriz do usuário: expor todos IDs; plano B condicionado) |
-| Implementação | `concluída (aguardando gate verify.sh)` |
+| Implementação | `ativa (plano B disparado por medição em 2026-11-10)` |
 
 **Depende da [H3-21](H3-21-diagnostico-fallback-ia.md)** (o motivo do fallback
 precisa estar visível para validar quais causas dominam no uso real).
@@ -160,6 +160,21 @@ que muda é o nível de detalhe, nunca a cobertura.
 ```bash
 ./scripts/verify.sh
 ```
+
+## Execução do plano B (2026-11-10)
+
+O gatilho 1 disparou com evidência real: request amplo (8 equipamentos + 8 músculos) gerava `chars=29067 linhas=670 tokens_aprox=7266` no catálogo do prompt e a IA levava `generationTimeMs=74500` contra timeout de 45s (fallback `reason=timeout`).
+
+Ativação em `catalog_summary_for_request` (`back/app/plan_builder.py`):
+
+- **Tier A (detalhado):** 8 exercícios detalhados por músculo do request, com `ID (nome, equipamento)`. Cada ID entra uma única vez (no primeiro grupo relevante).
+- **Tier B (índice):** todo o restante do pool elegível como `ID` agrupado por músculo, com header instruindo preferir o Tier A.
+- **Gatilho:** `tier_a_chars > CATALOG_PROMPT_TIER_B_CHARS` (22.000 chars, medido do Tier A completo).
+- **Cobertura:** 100% dos IDs do pool elegível do request — verificado por teste (`test_plano_b_nenhum_id_elegivel_sai_do_prompt`): pool=585, Tier A=118, Tier B=467, missing=0.
+- **Tamanho final:** ~14.000 chars (Tier A ~4.700 + Tier B ~9.300), abaixo do baseline de 23.019 chars.
+
+Testes do plano B em `back/tests/test_ai_robustez.py`:
+`test_plano_b_tier_b_entra_quando_tier_a_estoura_limite`, `test_plano_b_nao_entra_em_request_estreito`, `test_plano_b_entra_quando_cap_por_musulo_e_excedido`, `test_plano_b_nenhum_id_elegivel_sai_do_prompt`, `test_plano_b_exercício_atende_a_varios_grupos`, `test_plano_b_tamaho_prompt_abaixo_do_baseline`.
 
 ## Riscos e rollback
 

@@ -149,6 +149,20 @@ BODYWEIGHT_EQUIPMENT: Set[str] = {"body only", "none"}
 COMPLEMENTARY_MIN_EXERCISES = 3
 COMPLEMENTARY_MAX_EXERCISES = 6
 
+# Gatilho do plano B (H3-22 §"Plano B condicionado a medição"): quando o resumo
+# Tier A ultrapassar este limite de chars, o Tier B passa a ser só IDs agrupados
+# por músculo (auto-descritivos), cortando ~50% do prompt sem perder nenhum ID
+# elegível. Medido em 2026-11-10: request amplo (8 equipamentos + 8 músculos)
+# gerava 23.019 chars / 5.754 tokens e a IA levava ~74,5s contra timeout de 45s
+# (fallback reason=timeout, generationTimeMs=74500). Limite conservador.
+# Gatilho do plano B (H3-22 §"Plano B condicionado a medição"): quando o resumo
+# Tier A ultrapassar este limite de chars, o Tier B passa a ser só IDs agrupados
+# por músculo (auto-descritivos), cortando ~50% do prompt sem perder nenhum ID
+# elegível. Medido em 2026-11-10: request amplo (8 equipamentos + 8 músculos)
+# gerava 23.019 chars / 5.754 tokens e a IA levava ~74,5s contra timeout de 45s
+# (fallback reason=timeout, generationTimeMs=74500). Limite conservador.
+CATALOG_PROMPT_TIER_B_CHARS = 22000
+
 # Rótulos pt-BR dos grupos de MUSCLE_ALIASES, para nomes de plano e sessão.
 MUSCLE_LABELS_PT: Dict[str, str] = {
     "back": "Costas",
@@ -665,13 +679,20 @@ def enrich_plan(
 
 
 def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> str:
-    """Resumo do catálogo para o prompt da IA, filtrado pelo request (H3-25).
+    """Resumo do catálogo para o prompt da IA, filtrado pelo request (H3-25/H3-22-B).
 
     Formato compacto por nome canônico listado no idioma do request:
       - <nome canônico> (<eq>)
     Sem ID inline. Cabeçalho instruindo a IA a copiar o nome exatamente como listado;
     o backend resolve o ID. Mantém TODOS os exercícios do pool elegível, sem cap por
     grupo e sem equipamento não informado. Ordem por relevância (foco/target primeiro).
+
+    Plano B (dois níveis, H3-22 §"Plano B condicionado a medição"): quando o resumo
+    Tier A ultrapassar `CATALOG_PROMPT_TIER_B_CHARS`, o Tier B passa a ser só IDs
+    agrupados por músculo (auto-descritivos), com instrução explícita de preferir o
+    Tier A. Propriedade obrigatória: **nenhum ID elegível sai do prompt** — o que
+    muda é o nível de detalhe, nunca a cobertura. O gatilho disparou em 2026-11-10
+    (request amplo: 23.019 chars, IA levava ~74,5s contra timeout de 45s).
     """
     equipment = list(getattr(request, "availableEquipment", []) or [])
     level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
@@ -706,20 +727,125 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
                 ordered_muscles.append(m)
 
     language = request_language(request)
-    lines = [
-        "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (copie o nome exatamente como listado; "
-        "o backend resolve o ID; não invente nomes):"
-    ]
+
+    # --- Tier A (detalhado): nomes canônicos + equipamento --------------------
+    # Sem cap inicial: montamos o Tier A completo (todos os exercícios do pool
+    # elegível, cada um em TODOS os grupos que atende, como um personal faria).
+    # Só depois verificamos se ultrapassou o limite confortável do modelo
+    # (gatilho do plano B, H3-22): em caso positivo, recortamos para o cap por
+    # músculo e o restante vai para o Tier B como IDs. Propriedade obrigatória:
+    # NENHUM ID elegível sai do prompt.
+    tier_a_lines: List[str] = []
+    tier_a_ids: Set[str] = set()
+
+    def _equip_priority(ex: Dict[str, Any]) -> int:
+        return 0 if str(ex.get("equipment", "")).strip().lower() in LOAD_EQUIPMENT else 1
+
     for muscle in ordered_muscles:
         exercises = by_muscle.get(muscle) or []
         if not exercises:
             continue
-        lines.append(f"\n{muscle.upper()}:")
-        for ex in exercises:
+        tier_a_lines.append(f"\n{muscle.upper()}:")
+        for ex in sorted(exercises, key=_equip_priority):
+            if ex["id"] in tier_a_ids:
+                continue
             eq = (ex.get("equipment") or "body only").strip()
             name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
-            lines.append(f"  - {name} ({eq})")
-    return "\n".join(lines)
+            tier_a_lines.append(f"  - {name} ({eq})")
+            tier_a_ids.add(ex["id"])
+
+    tier_a = "\n".join(tier_a_lines)
+    tier_a_chars = len(tier_a)
+
+    header = (
+        "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (copie o nome exatamente como listado; "
+        "o backend resolve o ID; não invente nomes):"
+    )
+
+# Gatilho do plano B (H3-22 §"Plano B condicionado a medição"): o Tier B
+    # é exibido quando houver exercícios além do cap por músculo (rest) ou
+    # quando o Tier A sozinho estourar o limite confortável do modelo (medido
+    # em 2026-11-10: request amplo gerava 23.019 chars e a IA levava ~74,5s
+    # contra timeout de 45s). Propriedade obrigatória: **nenhum ID elegível
+    # sai do prompt** — o que muda é o nível de detalhe, nunca a cobertura.
+    if tier_a_chars > CATALOG_PROMPT_TIER_B_CHARS:
+        # Recorta o Tier A para 8 detalhados por músculo e o restante vai para
+        # o Tier B como IDs.
+        tier_a_per_muscle = 8
+        tier_a_lines: List[str] = []
+        tier_a_ids: Set[str] = set()
+        tier_b_lines: List[str] = []
+        seen_b: Set[str] = set()
+
+        for muscle in ordered_muscles:
+            exercises = by_muscle.get(muscle) or []
+            if not exercises:
+                continue
+            tier_a_lines.append(f"\n{muscle.upper()}:")
+            for ex in sorted(exercises, key=_equip_priority)[:tier_a_per_muscle]:
+                if ex["id"] in tier_a_ids:
+                    continue
+                tier_a_ids.add(ex["id"])
+                eq = (ex.get("equipment") or "body only").strip()
+                name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
+                tier_a_lines.append(f"  - {name} ({eq})")
+            rest = sorted(exercises, key=_equip_priority)[tier_a_per_muscle:]
+            if rest:
+                tier_b_lines.append(f"\n{muscle.upper()}:")
+                for ex in rest:
+                    if ex["id"] in tier_a_ids or ex["id"] in seen_b:
+                        continue
+                    seen_b.add(ex["id"])
+                    tier_b_lines.append(f"  - {ex['id']}")
+
+        # --- Tier B (índice): TODO o restante do pool elegível, só IDs -----------
+        # Construído a partir do strength_pool completo (não de by_muscle), para
+        # cobrir também exercícios cujos músculos primários não entraram em
+        # ordered_muscles (ex.: equipamento não informado que `_build_pool` incluiu
+        # pela regra dos ≥20 candidatos). Cada ID aparece UMA única vez, no
+        # primeiro grupo relevante. Propriedade obrigatória do plano B: NENHUM ID
+        # elegível sai do prompt.
+        rest_pool = [e for e in strength_pool if e["id"] not in tier_a_ids]
+        if rest_pool:
+            by_muscle_rest: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+            for ex in rest_pool:
+                if ex["id"] in seen_b:
+                    continue
+                seen_b.add(ex["id"])
+                primaries = [str(m).lower() for m in ex.get("primaryMuscles", [])]
+                keys = [p for p in primaries if p in ordered_muscles] or (
+                    [primaries[0]] if primaries else ["other"]
+                )
+                by_muscle_rest[keys[0]].append(ex)
+            for muscle in ordered_muscles:
+                exercises = by_muscle_rest.get(muscle) or []
+                if not exercises:
+                    continue
+                tier_b_lines.append(f"\n{muscle.upper()}:")
+                for ex in sorted(exercises, key=lambda e: e["id"]):
+                    tier_b_lines.append(f"  - {ex['id']}")
+            # Grupos que não estavam em ordered_muscles (ex.: "other").
+            for muscle in sorted(by_muscle_rest.keys()):
+                if muscle in ordered_muscles:
+                    continue
+                exercises = by_muscle_rest.get(muscle) or []
+                if not exercises:
+                    continue
+                tier_b_lines.append(f"\n{muscle.upper()}:")
+                for ex in sorted(exercises, key=lambda e: e["id"]):
+                    tier_b_lines.append(f"  - {ex['id']}")
+
+        tier_a = "\n".join(tier_a_lines)
+        if tier_b_lines:
+            tier_b = "\n".join(tier_b_lines)
+            tier_b_header = (
+                "\n\nÍNDICE DE EXERCÍCIOS COMPLEMENTARES (use como menu de variedade do "
+                "split; prefira sempre os nomes do bloco acima quando o músculo estiver "
+                "listado lá. Estes IDs são auto-descritivos e também válidos):"
+            )
+            return f"{header}{tier_a}{tier_b_header}{tier_b}"
+
+    return f"{header}{tier_a}"
 
 
 def catalog_summary_metrics(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, int]:
