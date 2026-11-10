@@ -7,6 +7,7 @@ import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from time import monotonic
 from typing import Any, Dict, List, Literal, Optional
 
 import httpx
@@ -1174,9 +1175,12 @@ async def generate_workout(request: GenerateRequest):
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
     else:
-        # H3-25: timeouts calibrados — 1ª leitura 45s, retry 25s (connect 5s, env ≥3s).
-        # Pior caso 1ª+retry = 70s < 90s (read timeout do app). Retry único em:
-        # json_parse, HTTP 5xx, 429, timeout/erro de rede, e content vazio/inútil (T5).
+        # Orçamento TOTAL da IA (deadline, não por attempt): precisa ficar
+        # abaixo do read timeout do app (90s, BackendClient.kt) com folga para
+        # connect, fallback local e rede. Medição 2026-11-10: request amplo com
+        # Tier B leva ~72s — por isso 80s, e não os 70s antigos. Retry único
+        # (json_parse, 5xx, 429, content vazio) só com orçamento restante;
+        # timeout na 1ª esgota o orçamento e cai direto no fallback local.
         def _ai_timeout(name: str, default: float) -> float:
             try:
                 return max(3.0, float(os.getenv(name, str(default))))
@@ -1194,13 +1198,14 @@ async def generate_workout(request: GenerateRequest):
             catalog_metrics = catalog_summary_metrics(request, EXERCISE_CATALOG)
             print(f"[catalog] chars={catalog_metrics['chars']} linhas={catalog_metrics['linhas']} tokens_aprox={catalog_metrics['tokens_aprox']}")
 
+        ai_budget = _ai_timeout("AI_TIMEOUT_TOTAL_SECONDS", 80.0)
+        ai_started = monotonic()
         attempts = 2
         for attempt in range(attempts):
-            attempt_timeout = (
-                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 90.0)
-                if attempt == 0
-                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 45.0)
-            )
+            remaining = ai_budget - (monotonic() - ai_started)
+            if remaining < 3.0:
+                break
+            attempt_timeout = remaining
             try:
                 timeout = httpx.Timeout(
                     connect=5.0, read=attempt_timeout, write=10.0, pool=5.0

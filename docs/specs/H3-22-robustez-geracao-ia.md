@@ -188,5 +188,7 @@ Testes do plano B em `back/tests/test_ai_robustez.py`:
   desequilíbrio de volume: a reconstrução usa o mesmo pool e o mesmo nº alvo
   por duração; teste cobre o caso limite.
 - Pior caso de latência com retry pode passar do read timeout do app (90 s):
-  regra de retry documentada no código e limitada; se o log mostrar estouro,
-  reduzir o timeout da primeira tentativa para 45 s.
+  mitigado estruturalmente pelo **orçamento total (deadline)** da IA —
+  `AI_TIMEOUT_TOTAL_SECONDS` default 80s, retry só com orçamento restante
+  (H3-25, revisão 2026-11-10). Timeouts fixos por attempt não garantem a
+  invariante: 90s+45s chegou a 135s e o app desistia antes do fallback.

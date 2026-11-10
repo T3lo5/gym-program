@@ -9,6 +9,7 @@ import os
 import re
 import tempfile
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -398,29 +399,118 @@ def test_retry_em_content_vazio_http200(monkeypatch):
     assert _SequenceClient.calls == 2
 
 
-# ---------------- timeouts calibrados ----------------
+# ---------------- orçamento total de IA (deadline) ----------------
 
 
-def test_timeouts_default_somam_abaixo_de_90s():
-    """Defaults: AI_TIMEOUT_FIRST_SECONDS=45 + AI_TIMEOUT_RETRY_SECONDS=25 = 70s < 90s."""
-    # Verifica os defaults no código (não via env)
-    import os
-    os.environ.pop("AI_TIMEOUT_FIRST_SECONDS", None)
-    os.environ.pop("AI_TIMEOUT_RETRY_SECONDS", None)
+class _FakeClock:
+    """Relógio controlado pelo teste: monotonic() sem dormir de verdade."""
 
-    # Simula a lógica de _ai_timeout
-    def _ai_timeout(name: str, default: float) -> float:
-        try:
-            return max(3.0, float(os.getenv(name, str(default))))
-        except (TypeError, ValueError):
-            return default
+    def __init__(self):
+        self.now = 0.0
 
-    first = _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 45.0)
-    retry = _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 25.0)
-    assert first == 45.0
-    assert retry == 25.0
-    assert first + retry == 70.0
-    assert first + retry < 90.0  # read timeout do app
+    def __call__(self):
+        return self.now
+
+
+class _HangingAIClient:
+    """IA que nunca responde: cada post queima todo o read timeout no relógio.
+
+    Registra o timeout real que o endpoint passou ao httpx.AsyncClient, para
+    medir o pior caso de latência sem dormir de verdade.
+    """
+
+    read_timeouts = []
+    clock = None
+
+    def __init__(self, *args, **kwargs):
+        self._read = kwargs["timeout"].read
+        type(self).read_timeouts.append(self._read)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def post(self, *args, **kwargs):
+        type(self).clock.now += self._read
+        raise httpx.ReadTimeout("IA não respondeu dentro do read timeout")
+
+
+def test_pior_caso_ia_lenta_responde_antes_do_timeout_do_app(monkeypatch):
+    """IA pendurada: o backend ainda responde (fallback) dentro dos 90s do app.
+
+    O app desiste após 90s de read timeout (BackendClient.kt) e mostra
+    "O servidor demorou demais para responder". Com a IA pendurada, o pior
+    caso é o orçamento total da IA; ele precisa ficar abaixo dos 90s, senão
+    o usuário nunca recebe o plano substituto. Timeout na 1ª esgota o
+    orçamento: não há retry, o fallback local responde direto.
+    """
+    monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
+    monkeypatch.delenv("AI_TIMEOUT_TOTAL_SECONDS", raising=False)
+    clock = _FakeClock()
+    monkeypatch.setattr(main, "monotonic", clock)
+    _HangingAIClient.read_timeouts = []
+    _HangingAIClient.clock = clock
+    monkeypatch.setattr(main.httpx, "AsyncClient", _HangingAIClient)
+
+    response = _client().post("/v1/generate-workout", json=_payload())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "local"
+    assert body["fallbackReason"] == "timeout"
+    assert len(_HangingAIClient.read_timeouts) == 1
+    pior_caso = sum(_HangingAIClient.read_timeouts)
+    assert pior_caso < 90.0, (
+        f"pior caso {pior_caso}s ≥ read timeout do app (90s): "
+        "o app desiste antes de o backend responder"
+    )
+    assert clock.now < 90.0
+
+
+class _SlowInvalidJsonClient:
+    """IA responde JSON inválido 1s antes de estourar o read timeout."""
+
+    calls = 0
+    clock = None
+
+    def __init__(self, *args, **kwargs):
+        self._read = kwargs["timeout"].read
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def post(self, *args, **kwargs):
+        type(self).calls += 1
+        type(self).clock.now += self._read - 1.0
+        return _FakeResponse("isso não é json")
+
+
+def test_resposta_lenta_invalida_nao_ganha_retry_que_estoura_orcamento(monkeypatch):
+    """Resposta inválida após ~79s: retry de timeout fixo estouraria os 90s do app.
+
+    Com orçamento total, o retry só existe com tempo restante; aqui sobra ~1s
+    (< mínimo de 3s), então o endpoint cai no fallback local ainda dentro dos
+    90s do app.
+    """
+    monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
+    monkeypatch.delenv("AI_TIMEOUT_TOTAL_SECONDS", raising=False)
+    clock = _FakeClock()
+    monkeypatch.setattr(main, "monotonic", clock)
+    _SlowInvalidJsonClient.calls = 0
+    _SlowInvalidJsonClient.clock = clock
+    monkeypatch.setattr(main.httpx, "AsyncClient", _SlowInvalidJsonClient)
+
+    response = _client().post("/v1/generate-workout", json=_payload())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "local"
+    assert body["fallbackReason"] == "json_parse"
+    assert _SlowInvalidJsonClient.calls == 1
+    assert clock.now < 90.0
 
 
 # ---------------- check ID↔nome ----------------

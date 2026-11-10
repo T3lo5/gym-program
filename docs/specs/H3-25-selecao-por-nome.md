@@ -92,7 +92,7 @@ resolvível/resgate” indica o que um resolvedor nome→ID aceitaria.
 | `back/app/plan_builder.py` | Índice/lookup de resolução passa a casar `exerciseName` declarado contra **nome canônico listado no idioma do request**, `name`, `namePt` e forma normalizada de todos; empate/tie-break determinístico (ordem estável do catálogo). |
 | `back/app/main.py` | `build_*_prompt`/regras: seleção primária por **nome canônico da lista**; `exerciseId` torna-se opcional na resposta da IA (pode omitir/vazio). Exigir `exerciseName` exato da lista para exercícios de força. Manter IDs sintéticos `run_*`/`mobility_*` inalterados. |
 | `back/app/main.py` | `parse_ai_plan`: (1) `resolve_exercise_names` **antes** de `resolve_plan_ids`/validação do DTO; (2) preencher `exerciseId` resolvido; (3) aplicar salvamento parcial/reconstrução H3-22 para nome/ID não resolvível e para `id_name_mismatch`; (4) nunca derrubar plano inteiro por itens parciais. |
-| `back/app/main.py` | Chamada à IA: timeouts padrão calibrados (`AI_TIMEOUT_FIRST_SECONDS` default **45.0**, `AI_TIMEOUT_RETRY_SECONDS` **25.0**, `connect` 5s, `write`/`pool` 10/5s) — **pior caso 1ª+retry = 70s < 90s** (read timeout do app). Configurável por env (mín. 3s). |
+| `back/app/main.py` | Chamada à IA: **orçamento total (deadline)** de `AI_TIMEOUT_TOTAL_SECONDS` default **80.0** (env, mín. 3s; `connect` 5s, `write`/`pool` 10/5s). Cada attempt usa o orçamento restante; retry só com ≥3s restantes — **pior caso ≈ 80s < 90s** (read timeout do app) em qualquer modo de falha. |
 | `back/app/main.py` | Retry (máx. 1) em: `json_parse`, HTTP 5xx, HTTP 429, `httpx.TimeoutException`/erro de rede, e **resposta inútil** (HTTP 200 mas `content` vazio/ausente ou não parseável após extração). Retry de resposta inútil usa parâmetros seguros (ex.: sem `reasoning`, temperatura/payload inalterados salvo necessidade explícita) e timeout de retry. **Sem retry** em 4xx de autenticação/parâmetro. |
 | `back/app/main.py` | Log/observabilidade: manter `[fallback] reason=…`; registrar `generationTimeMs`, `dropped_ids`/nomes com motivo (`unresolved_name`, `id_name_mismatch`, `unresolved_id`), contagem de resoluções por nome e tentativas. (Sem vazar segredos/conteúdo sensível.) |
 | `back/tests/test_selecao_por_nome.py` (novo) | Testes puros e de parse para resolução por nome, formato compacto, resgate por nome e fallback total. |
@@ -169,9 +169,13 @@ Comportamental (mudança interna, compatível com o app):
   híbridas existentes.
 
 ### 3) Resposta da IA e retries
-- Defaults: 1ª tentativa timeout read **45s**, retry **25s** (env
-  `AI_TIMEOUT_FIRST_SECONDS`, `AI_TIMEOUT_RETRY_SECONDS`, mín. 3s), connect 5s.
-  Pior caso (duas leituras completas) = 70s, abaixo do read timeout do app (90s).
+- Orçamento **total** da IA: **80s** (env `AI_TIMEOUT_TOTAL_SECONDS`, mín. 3s),
+  connect 5s. Cada attempt usa o que resta do orçamento; com <3s restantes não
+  há novo attempt. Pior caso ≈ 80s, abaixo do read timeout do app (90s) com
+  folga para connect, fallback local e rede. (2026-11-10: os timeouts fixos
+  por attempt — 45s+25s, depois 90s+45s — foram substituídos pelo deadline;
+  90s+45s=135s estourava os 90s do app e o usuário via "O servidor demorou
+  demais para responder" sem receber o plano.)
 - 1 retry em: `json_parse`, HTTP 5xx, HTTP 429, timeout/erro de rede, e
   **content vazio ou não utilizável** após HTTP 200 (inclui caso de tokens
   consumidos em reasoning sem conteúdo). Na falha final, mapear `fallbackReason`
@@ -217,9 +221,10 @@ Comportamental (mudança interna, compatível com o app):
    parâmetros ajustados e, se persistir, cai em fallback com `fallbackReason`
    coerente (`json_parse`/`timeout`/`http_error`) — nunca `source="ai"` inválido.
 7. **Latência/timeout calibrados:** **Dado** configuração default,
-   **quando** há 1 retry de leitura, **então** pior caso = 45s + 25s = 70s < 90s
-   (app). Valores são sobrescritos por `AI_TIMEOUT_FIRST_SECONDS`/
-   `AI_TIMEOUT_RETRY_SECONDS` (≥3s) sem mudar contrato.
+   **quando** a IA falha ou demora, **então** o pior caso ≈ 80s < 90s
+   (app) em qualquer modo de falha — inclusive resposta lenta com JSON
+   inválido (retry só com orçamento restante). Valor sobrescrito por
+   `AI_TIMEOUT_TOTAL_SECONDS` (≥3s) sem mudar contrato.
 8. **Híbrido preservado:** **Dado** plano híbrido, **quando** resolve nomes/IDs,
    **então** `run_*`/`mobility_*` e invariantes de `normalize_hybrid_plan`
    permanecem válidos.
@@ -266,7 +271,7 @@ Critério: exit code `0` e linha `VERIFICAÇÃO COMPLETA OK — build, testes, l
   canônico (incluir eq/grupo na linha e no match) sem mudar contrato.
 - **Latência/variância do provider:** prompt compacto + timeouts calibrados
   reduzem, mas não eliminam; métricas (n>1) devem guiar ajuste fino dos envs.
-  Rollback rápido = aumentar `AI_TIMEOUT_*` ou restaurar defaults anteriores.
+  Rollback rápido = ajustar `AI_TIMEOUT_TOTAL_SECONDS` ou restaurar o default.
 - **Resposta vazia/reasoning-only:** tratada por retry de conteúdo inútil; se
   recorrente, desabilitar `reasoning` no retry (e documentar) antes de fallback.
 - **Queda de qualidade de escolha:** medir nos 5 planos manuais; rollback do
