@@ -389,8 +389,10 @@ def test_retry_em_content_vazio_http200(monkeypatch):
     monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
     _SequenceClient.calls = 0
     # Primeira resposta: HTTP 200 mas content vazio
-    # Segunda resposta: também vazia → fallback
+    # Segunda resposta: também vazia
+    # Terceira resposta: também vazia → fallback após 3 tentativas
     _SequenceClient.steps = [
+        ("", 200, ""),
         ("", 200, ""),
         ("", 200, ""),
     ]
@@ -399,7 +401,7 @@ def test_retry_em_content_vazio_http200(monkeypatch):
     result = run_job(_client(), _payload())
     assert result["source"] == "local"
     assert result["fallbackReason"] == "json_parse"
-    assert _SequenceClient.calls == 2
+    assert _SequenceClient.calls == 3
 
 
 # ---------------- check ID↔nome ----------------

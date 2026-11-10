@@ -1325,7 +1325,7 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
 
         ai_budget = _ai_timeout("AI_TIMEOUT_TOTAL_SECONDS", AI_TIMEOUT_DEFAULT_SECONDS)
         ai_started = monotonic()
-        attempts = 2
+        attempts = 3
         for attempt in range(attempts):
             remaining = ai_budget - (monotonic() - ai_started)
             if remaining < 3.0:
@@ -1379,7 +1379,6 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
                 raw_plan = parse_ai_plan(content, EXERCISE_CATALOG, request)
 
                 workout = WorkoutPlanDTO(**raw_plan)
-                # H3-36: conteúdo do plano no idioma do request (PT quando
                 # pedido; EN canônico quando ausente).
                 workout_data = enrich_plan(
                     workout.model_dump(), EXERCISE_CATALOG, language=request_language(request)
@@ -1402,10 +1401,16 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
                 fallback_reason, fallback_detail = "timeout", f"erro de rede na chamada da IA: {exc}"
             except AiFailure as exc:
                 fallback_reason, fallback_detail = exc.reason, exc.detail
+                # Log do conteúdo bruto da IA para debug de json_parse.
+                if exc.reason == "json_parse":
+                    try:
+                        print(fallback_log_line("json_parse_raw", content[:1000]))
+                    except Exception:
+                        pass
                 # Retry em json_parse (inclui content vazio), 429, 5xx, timeout/rede.
                 # Sem retry em 4xx de auth/parâmetro (http_error sem retry) ou schema_validation.
                 retryable = exc.reason in {"json_parse", "timeout", "http_error"}
-                if attempt == 0 and retryable and exc.reason != "http_error":
+                if attempt < attempts - 1 and retryable and exc.reason != "http_error":
                     # Para http_error, só retry se status 429/5xx (já tratado acima no status_code)
                     continue
             except Exception as exc:
