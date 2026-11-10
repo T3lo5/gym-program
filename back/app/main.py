@@ -1032,13 +1032,27 @@ async def generate_workout(request: GenerateRequest):
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
     else:
-        # H3-22: 1 retry só em json_parse / HTTP 5xx / 429. Timeout 60s na 1ª
-        # tentativa e 30s no retry (pior caso ~90s, alinhado ao read timeout do app).
+        # H3-22: 1 retry só em json_parse / HTTP 5xx / 429. Timeouts curtos por
+        # padrão: provider lento não deve segurar o app; o fallback local responde
+        # rápido. Ajustável por env sem mudar contrato.
+        def _ai_timeout(name: str, default: float) -> float:
+            try:
+                return max(3.0, float(os.getenv(name, str(default))))
+            except (TypeError, ValueError):
+                return default
+
         attempts = 2
         for attempt in range(attempts):
-            attempt_timeout = 60.0 if attempt == 0 else 30.0
+            attempt_timeout = (
+                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 12.0)
+                if attempt == 0
+                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 8.0)
+            )
             try:
-                async with httpx.AsyncClient(timeout=attempt_timeout) as client:
+                timeout = httpx.Timeout(
+                    connect=5.0, read=attempt_timeout, write=10.0, pool=5.0
+                )
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(
                         f"{SENSENOVA_BASE_URL}/chat/completions",
                         headers={
