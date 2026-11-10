@@ -423,6 +423,129 @@ def catalog_index(catalog: List[Dict[str, Any]]) -> Tuple[Dict[str, Dict[str, An
     return by_id, lookup
 
 
+def _build_name_resolution_index(
+    catalog: List[Dict[str, Any]],
+    language: str,
+    eligible_pool: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[Dict[str, str], Dict[str, int]]:
+    """Constrói índice para resolução nome→ID.
+
+    Chaves normalizadas: nome canônico listado no idioma do request, name, namePt.
+    Valor: exerciseId. Ordem estável do catálogo para tie-break (índice menor = prioridade).
+    Se `eligible_pool` fornecido, restringe ao pool elegível do request.
+    """
+    pool = eligible_pool if eligible_pool is not None else catalog
+    eligible_ids = {ex["id"] for ex in pool}
+    index: Dict[str, str] = {}
+    order: Dict[str, int] = {}
+
+    for idx, exercise in enumerate(catalog):
+        ex_id = exercise["id"]
+        if ex_id not in eligible_ids:
+            continue
+        # Ordem estável: primeiro a aparecer no catálogo ganha no empate
+        if ex_id not in order:
+            order[ex_id] = idx
+
+        # Nome canônico listado no idioma do request
+        canonical = _localized(exercise, "namePt", exercise.get("name", ex_id), language)
+        for key in (canonical, exercise.get("name", ""), exercise.get("namePt", "")):
+            if key:
+                nkey = normalize(key)
+                if nkey and nkey not in index:
+                    index[nkey] = ex_id
+
+    return index, order
+
+
+def resolve_exercise_names(
+    plan: Dict[str, Any],
+    catalog: List[Dict[str, Any]],
+    request: Any,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """Resolve exerciseName → exerciseId usando o nome canônico listado.
+
+    Ordem de resolução (determinística):
+    1. Match exato normalizado contra canônico listado / name / namePt do pool elegível.
+    2. Fuzzy (get_close_matches, cutoff 0.72) sobre chaves normalizadas.
+    3. Substring normalizada (containment).
+    Empate → primeira ocorrência na ordem estável do catálogo.
+
+    Retorna (plano_atualizado, drops) onde drops = lista de dicts com
+    exerciseName, exerciseId (se havia), reason (unresolved_name), declared.
+    IDs sintéticos run_*/mobility_* são ignorados (não passam por resolução de nome).
+    """
+    language = request_language(request)
+    equipment = list(getattr(request, "availableEquipment", []) or [])
+    level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
+    strict_equipment = complementary_equipment_filter(request)
+    pool = _build_pool(catalog, equipment, level, strict_equipment=strict_equipment)
+    strength_pool = [e for e in pool if _is_strength_exercise(e)]
+
+    index, order = _build_name_resolution_index(catalog, language, strength_pool)
+    index_keys = list(index.keys())
+
+    drops: List[Dict[str, Any]] = []
+
+    for day in plan.get("days", []):
+        kept: List[Dict[str, Any]] = []
+        for exercise in day.get("exercises", []):
+            ex_id = str(exercise.get("exerciseId", "")).strip()
+            ex_name = str(exercise.get("exerciseName", "")).strip()
+
+            low = ex_id.lower()
+            if low.startswith("run_") or low.startswith("mobility_"):
+                kept.append(exercise)
+                continue
+
+            # Se já tem ID válido no catálogo completo, preserva (id_name_mismatch
+            # e validação de pool são feitas depois em resolve_plan_ids/id_name_mismatches)
+            by_id_catalog = {ex["id"]: ex for ex in catalog if _is_strength_exercise(ex)}
+            if ex_id and ex_id in by_id_catalog:
+                kept.append(exercise)
+                continue
+
+            # Tenta resolver pelo exerciseName (apenas se ID ausente/inválido no catálogo)
+            # Restringe resolução ao pool elegível do request
+            resolved_id: Optional[str] = None
+            if ex_name:
+                nname = normalize(ex_name)
+                if nname:
+                    # 1) Match exato normalizado
+                    resolved_id = index.get(nname)
+
+                if not resolved_id and nname:
+                    # 2) Fuzzy cutoff 0.72
+                    matches = get_close_matches(nname, index_keys, n=1, cutoff=0.72)
+                    if matches:
+                        resolved_id = index[matches[0]]
+
+                if not resolved_id and nname:
+                    # 3) Substring normalizada
+                    for key in index_keys:
+                        if nname in key or key in nname:
+                            resolved_id = index[key]
+                            break
+
+            if resolved_id:
+                exercise["exerciseId"] = resolved_id
+                kept.append(exercise)
+            else:
+                # Não resolvível → drop com motivo
+                # Só dropa se não tinha ID válido no catálogo (já tratado acima)
+                drops.append({
+                    "exerciseName": ex_name,
+                    "exerciseId": ex_id or None,
+                    "reason": "unresolved_name",
+                    "declared": ex_name,
+                })
+                # Não adiciona ao kept (remove do plano)
+
+        day["exercises"] = kept
+
+    return plan, drops
+
+
 def resolve_plan_ids(
     plan: Dict[str, Any], catalog: List[Dict[str, Any]]
 ) -> Tuple[Dict[str, Any], List[str]]:
@@ -542,14 +665,13 @@ def enrich_plan(
 
 
 def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> str:
-    """Resumo do catálogo para o prompt da IA, filtrado pelo request (H3-22).
+    """Resumo do catálogo para o prompt da IA, filtrado pelo request (H3-25).
 
-    Diretriz (2026-11-07): expor TODOS os IDs do pool do request — sem cap por
-    grupo — porque treino "morre por padrão" quando o ID correto não foi exposto.
-    Só entram exercícios de força que passam no filtro de equipamento/nível do
-    request (nunca equipamento que o usuário não informou). Ordenação: no
-    complementar, só os grupos de `focusMuscles`; no principal, `targetMuscles`
-    primeiro e os demais grupos do split depois.
+    Formato compacto por nome canônico listado no idioma do request:
+      - <nome canônico> (<eq>)
+    Sem ID inline. Cabeçalho instruindo a IA a copiar o nome exatamente como listado;
+    o backend resolve o ID. Mantém TODOS os exercícios do pool elegível, sem cap por
+    grupo e sem equipamento não informado. Ordem por relevância (foco/target primeiro).
     """
     equipment = list(getattr(request, "availableEquipment", []) or [])
     level = str(getattr(request, "currentLevel", "intermediate") or "intermediate")
@@ -559,8 +681,6 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
 
     focus = list(getattr(request, "focusMuscles", []) or [])
     target = list(getattr(request, "targetMuscles", []) or [])
-    focus_groups = set(_expand_muscles(focus)) if focus else set()
-    target_groups = set(_expand_muscles(target))
 
     # Agrupa por músculo primário (primeiro primaryMuscle relevante).
     by_muscle: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -585,11 +705,11 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
             if m not in ordered_muscles:
                 ordered_muscles.append(m)
 
-    lines = [
-        "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (IDs exatos; prefira sempre estes IDs):"
-    ]
-    # H3-36: nomes listados no idioma do request — a IA ecoa o nome que vê.
     language = request_language(request)
+    lines = [
+        "CATÁLOGO DE EXERCÍCIOS VÁLIDOS (copie o nome exatamente como listado; "
+        "o backend resolve o ID; não invente nomes):"
+    ]
     for muscle in ordered_muscles:
         exercises = by_muscle.get(muscle) or []
         if not exercises:
@@ -598,8 +718,21 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
         for ex in exercises:
             eq = (ex.get("equipment") or "body only").strip()
             name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
-            lines.append(f"  - {ex['id']} ({name}, {eq})")
+            lines.append(f"  - {name} ({eq})")
     return "\n".join(lines)
+
+
+def catalog_summary_metrics(request: Any, catalog: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Métricas do resumo do catálogo para log/observabilidade.
+
+    Retorna dict com: chars, linhas, tokens_aprox (chars/4).
+    """
+    summary = catalog_summary_for_request(request, catalog)
+    return {
+        "chars": len(summary),
+        "linhas": len(summary.splitlines()),
+        "tokens_aprox": len(summary) // 4,
+    }
 
 
 def id_name_mismatches(plan: Dict[str, Any], catalog: List[Dict[str, Any]]) -> List[Dict[str, str]]:

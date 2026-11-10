@@ -27,6 +27,7 @@ from .plan_builder import (
     build_hybrid_plan,
     build_strength_session,
     catalog_summary_for_request,
+    catalog_summary_metrics,
     complementary_exercise_count,
     complementary_focus_label,
     complementary_plan_name,
@@ -34,6 +35,7 @@ from .plan_builder import (
     enrich_plan,
     id_name_mismatches,
     normalize,
+    resolve_exercise_names,
     resolve_plan_ids,
     request_language,
     review_date,
@@ -72,7 +74,7 @@ SYSTEM_PROMPT_HYBRID_RULES = """Você é um gerador de planos de treino híbrido
 {catalog_summary}
 
 REGRAS OBRIGATÓRIAS:
-1. Prefira SEMPRE os IDs listados no catálogo. IDs desconhecidos serão descartados e a sessão completada localmente.
+1. Para exercícios de musculação: use o **nome canônico listado no catálogo acima** como `exerciseName` (copie exatamente como aparece). O `exerciseId` é opcional para musculação — o backend resolve pelo nome. IDs sintéticos de corrida/mobilidade (abaixo) devem ser usados como `exerciseId`.
 2. Corrida use EXATAMENTE um destes IDs sintéticos (não existem no catálogo, são válidos):
    `run_easy`, `run_walk`, `run_interval`, `run_tempo`, `run_long`.
 3. Mobilidade use EXATAMENTE um destes IDs sintéticos: `mobility_full`,
@@ -85,8 +87,7 @@ REGRAS OBRIGATÓRIAS:
 8. Mobilidade: exatamente 1 bloco por `day`, `metricType = "duration"`, `targetDurationSeconds` entre 300 e 900.
 9. `weekday` 1..7. Várias sessões no mesmo `weekday` são `day`s separados com `dayOrder` diferente.
 10. Respeite equipamentos, nível, objetivo e duração informados por modalidade.
-11. Para cada exercício de musculação, informe `exerciseId` (ID exato do catálogo) e `exerciseName` (nome oficial do catálogo para esse ID).
-12. Retorne JSON válido conforme schema WorkoutPlanDTO.
+11. Retorne JSON válido conforme schema WorkoutPlanDTO.
 
 FORMATO DE SAÍDA (JSON):
 {{
@@ -103,8 +104,8 @@ FORMATO DE SAÍDA (JSON):
       "isRestDay": false,
       "exercises": [
         {{
-          "exerciseId": "string (ID EXATO do catálogo ou sintético run_*/mobility_*)",
-          "exerciseName": "string (nome oficial do catálogo para esse exerciseId)",
+          "exerciseId": "string (ID EXATO do catálogo OU sintético run_*/mobility_*; opcional para musculação se exerciseName for o nome canônico listado)",
+          "exerciseName": "string (nome canônico listado no catálogo para musculação; para run/mobility use o ID sintético como nome)",
           "exerciseOrder": 0,
           "sets": 1-20,
           "targetReps": "string ou vazio para corrida/mobilidade",
@@ -128,13 +129,13 @@ SYSTEM_PROMPT_STRENGTH_RULES = """Você é um gerador de treinos de musculação
 {catalog_summary}
 
 REGRAS OBRIGATÓRIAS:
-1. Prefira SEMPRE os IDs listados no catálogo. IDs desconhecidos serão descartados e a sessão completada localmente.
+1. Use o **nome canônico listado no catálogo acima** como `exerciseName` (copie exatamente como aparece). O `exerciseId` é opcional — o backend resolve pelo nome.
 2. Retorne JSON válido conforme schema WorkoutPlanDTO
 3. Não invente IDs para corrida/mobilidade fora dos casos híbridos.
 4. Respeite equipamentos disponíveis do usuário
 5. Balanceie volume entre grupos musculares
 6. Inclua aquecimento e alongamento sugeridos nas notas quando fizer sentido
-7. Para cada exercício, informe `exerciseId` (ID exato do catálogo) e `exerciseName` (nome oficial do catálogo para esse ID).
+7. Retorne JSON válido conforme schema WorkoutPlanDTO.
 
 FORMATO DE SAÍDA (JSON):
 {{
@@ -151,8 +152,8 @@ FORMATO DE SAÍDA (JSON):
       "isRestDay": false,
       "exercises": [
         {{
-          "exerciseId": "string (ID EXATO do catálogo)",
-          "exerciseName": "string (nome oficial do catálogo para esse exerciseId)",
+          "exerciseId": "string (ID EXATO do catálogo; opcional se exerciseName for o nome canônico listado)",
+          "exerciseName": "string (nome canônico listado no catálogo)",
           "exerciseOrder": 0,
           "sets": 1-20,
           "targetReps": "string (ex: '8-12', '10', 'AMRAP')",
@@ -806,10 +807,12 @@ def parse_ai_plan(
 ) -> Dict[str, Any]:
     """Converte a resposta bruta da IA em plano validado — função pura, sem rede.
 
-    H3-22: parse tolerante (cercas + objeto balanceado), resolve IDs com
-    salvamento parcial, remove pares ID↔nome divergentes e reconstrói dias de
-    força com < 3 exercícios. Falha total (`unresolved_ids`) só quando nada
-    aproveitável sobra. `schema_validation` continua rejeitando plano irrecuperável.
+    H3-25: resolve exerciseName → exerciseId (nome canônico listado) ANTES de
+    resolve_plan_ids/validação DTO. exerciseId opcional/ausente é preenchido;
+    ID válido+nome divergente mantém id_name_mismatch (H3-22); nome/ID não
+    resolvível ⇒ drop + salvamento parcial/reconstrução, nunca derruba plano
+    inteiro; todos inválidos ⇒ fallbackReason=unresolved_ids; run_*/mobility_*
+    preservados.
     """
     try:
         raw_plan = json.loads(_extract_first_json_object(content))
@@ -827,6 +830,21 @@ def parse_ai_plan(
         for ex in day.get("exercises", [])
         if str(ex.get("metricType", "reps_weight")) == "reps_weight" or not ex.get("metricType")
     )
+
+    # H3-25: Resolve exerciseName → exerciseId ANTES de resolve_plan_ids.
+    # Usa o pool elegível do request para restringir a resolução.
+    resolution_count = 0
+    name_drops: List[Dict[str, Any]] = []
+    if request is not None:
+        raw_plan, name_drops = resolve_exercise_names(raw_plan, catalog, request)
+        resolution_count = sum(
+            1
+            for day in raw_plan.get("days", [])
+            for ex in day.get("exercises", [])
+            if str(ex.get("metricType", "reps_weight")) == "reps_weight" or not ex.get("metricType")
+        )
+        for drop in name_drops:
+            print(fallback_log_line("dropped_ids", f"{drop.get('exerciseName', 'unknown')}:{drop.get('reason', 'unresolved_name')}"))
 
     # Resolve IDs (remove inválidos) e registra drops.
     raw_plan, dropped_ids = resolve_plan_ids(raw_plan, catalog)
@@ -864,7 +882,7 @@ def parse_ai_plan(
         )
         for day in raw_plan.get("days", [])
     )
-    # Critério H3-22 #4: todos os exercícios de força inválidos => fallback total.
+    # Critério H3-22/H3-25: todos os exercícios de força inválidos => fallback total.
     if original_strength_count > 0 and surviving_strength_count == 0 and not has_non_strength:
         raise AiFailure(
             "unresolved_ids",
@@ -1032,21 +1050,25 @@ async def generate_workout(request: GenerateRequest):
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
     else:
-        # H3-22: 1 retry só em json_parse / HTTP 5xx / 429. Timeouts curtos por
-        # padrão: provider lento não deve segurar o app; o fallback local responde
-        # rápido. Ajustável por env sem mudar contrato.
+        # H3-25: timeouts calibrados — 1ª leitura 45s, retry 25s (connect 5s, env ≥3s).
+        # Pior caso 1ª+retry = 70s < 90s (read timeout do app). Retry único em:
+        # json_parse, HTTP 5xx, 429, timeout/erro de rede, e content vazio/inútil (T5).
         def _ai_timeout(name: str, default: float) -> float:
             try:
                 return max(3.0, float(os.getenv(name, str(default))))
             except (TypeError, ValueError):
                 return default
 
+        # Log métricas do catálogo no prompt (baseline ~32k chars / ~8k tok caso principal).
+        catalog_metrics = catalog_summary_metrics(request, EXERCISE_CATALOG)
+        print(f"[catalog] chars={catalog_metrics['chars']} linhas={catalog_metrics['linhas']} tokens_aprox={catalog_metrics['tokens_aprox']}")
+
         attempts = 2
         for attempt in range(attempts):
             attempt_timeout = (
-                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 12.0)
+                _ai_timeout("AI_TIMEOUT_FIRST_SECONDS", 45.0)
                 if attempt == 0
-                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 8.0)
+                else _ai_timeout("AI_TIMEOUT_RETRY_SECONDS", 25.0)
             )
             try:
                 timeout = httpx.Timeout(
@@ -1083,6 +1105,16 @@ async def generate_workout(request: GenerateRequest):
                     )
 
                 content = response.json()["choices"][0]["message"]["content"]
+
+                # H3-25: detecta resposta inútil (HTTP 200 mas content vazio/ausente ou
+                # não parseável após extração) ⇒ 1 retry com parâmetros ajustados.
+                if not content or not content.strip():
+                    if attempt == 0:
+                        fallback_reason = "json_parse"
+                        fallback_detail = "resposta vazia (content ausente/vazio)"
+                        continue
+                    raise AiFailure("json_parse", "resposta vazia persistente após retry")
+
                 raw_plan = parse_ai_plan(content, EXERCISE_CATALOG, request)
 
                 workout = WorkoutPlanDTO(**raw_plan)
@@ -1109,7 +1141,11 @@ async def generate_workout(request: GenerateRequest):
                 fallback_reason, fallback_detail = "timeout", f"erro de rede na chamada da IA: {exc}"
             except AiFailure as exc:
                 fallback_reason, fallback_detail = exc.reason, exc.detail
-                if attempt == 0 and exc.reason == "json_parse":
+                # Retry em json_parse (inclui content vazio), 429, 5xx, timeout/rede.
+                # Sem retry em 4xx de auth/parâmetro (http_error sem retry) ou schema_validation.
+                retryable = exc.reason in {"json_parse", "timeout", "http_error"}
+                if attempt == 0 and retryable and exc.reason != "http_error":
+                    # Para http_error, só retry se status 429/5xx (já tratado acima no status_code)
                     continue
             except Exception as exc:
                 fallback_reason, fallback_detail = "unknown", f"{type(exc).__name__}: {exc}"
@@ -1149,6 +1185,7 @@ async def generate_workout(request: GenerateRequest):
         print(f"Failed to persist generated plan: {exc}")
 
     generation_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+    print(f"[generation] source={source} generationTimeMs={generation_time} model={model_used}")
 
     # Invariante do contrato (H3-21): source == "local" ⇒ fallbackReason
     # nunca vazio (no mínimo "unknown"); source == "ai" ⇒ sempre vazio.
