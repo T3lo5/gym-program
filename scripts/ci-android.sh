@@ -52,7 +52,7 @@ echo "    versionCode=$VERSION_CODE versionName=$VERSION_NAME"
   --console=plain \
   "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Dorg.gradle.daemon=false" \
   ${ANDROID_HOME:+"-Dsdk.dir=$ANDROID_HOME"} \
-  ${ROBOLECTRIC_REPO_URL:+"-Drobolectric.repo.url=$ROBOLECTRIC_REPO_URL"} \
+  ${ROBOLECTRIC_REPO_URL:+"-Drobolectric.dependency.repo.url=$ROBOLECTRIC_REPO_URL"} \
   "-PversionCode=$VERSION_CODE" \
   "-PversionName=$VERSION_NAME"
 

@@ -77,6 +77,9 @@ android {
             System.getenv("ROBOLECTRIC_REPO_URL")?.takeIf { url -> url.isNotBlank() }?.let { url ->
                 it.systemProperty("robolectric.dependency.repo.url", url)
             }
+            project.findProperty("robolectric.dependency.repo.url")?.let { url ->
+                it.systemProperty("robolectric.dependency.repo.url", url.toString())
+            }
         }
     }
 
