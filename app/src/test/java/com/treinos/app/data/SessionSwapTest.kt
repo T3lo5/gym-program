@@ -84,4 +84,20 @@ class SessionSwapTest {
         assertFalse("row não aparece (músculo diferente)", ids.contains("row"))
         assertFalse("bar_bench excluído", ids.contains("bar_bench"))
     }
+
+    @Test
+    fun exercicio_original_nao_est_no_catalogo_nao_filtra_por_musculo() {
+        // Exercício da sessão cujo ID não está no catálogo -> originalMuscle = null
+        val original = sessionExercise(exerciseId = "exercicio_desconhecido")
+        val taken = listOf("exercicio_desconhecido")
+
+        val candidates = sessionSwapCandidates(original, taken, catalog, equipment)
+
+        val ids = candidates.map { it.id }.toSet()
+        // Sem músculo conhecido, não filtra por músculo: todos com equipamento válido aparecem
+        assertTrue("dumb_bench aparece", ids.contains("dumb_bench"))
+        assertTrue("row aparece", ids.contains("row"))
+        assertFalse("leg_press não aparece (equipamento máquina não informado)", ids.contains("leg_press"))
+        assertFalse("próprio exercício excluído", ids.contains("exercicio_desconhecido"))
+    }
 }

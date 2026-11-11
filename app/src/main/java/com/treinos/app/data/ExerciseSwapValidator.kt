@@ -107,7 +107,7 @@ fun sessionSwapCandidates(
         .filter { it.id !in takenIds }
         .filter { candidate ->
             val equipmentOk = availableEquipment.isEmpty() || availableEquipment.contains(candidate.equipment)
-            val muscleOk = originalMuscle != null &&
+            val muscleOk = originalMuscle == null ||
                 candidate.primaryMuscles.any { it.equals(originalMuscle, ignoreCase = true) }
             equipmentOk && muscleOk
         }
