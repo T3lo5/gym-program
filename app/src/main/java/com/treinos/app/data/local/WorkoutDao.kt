@@ -39,8 +39,15 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_days WHERE id = :id")
     suspend fun getDay(id: Long): WorkoutDayEntity?
 
+    @Query("SELECT * FROM workout_sessions WHERE dayId = :dayId AND status = 'in_progress'")
+    suspend fun getInProgressSessionForDay(dayId: Long): WorkoutSessionEntity?
+
     @Query("SELECT * FROM workout_plan_exercises WHERE dayId = :dayId ORDER BY exerciseOrder")
     suspend fun getExercisesForDay(dayId: Long): List<WorkoutPlanExerciseEntity>
+
+    /** Atualiza uma linha de exercício de plano existente (H3-41: troca de exercício). */
+    @Update
+    suspend fun updatePlanExercise(exercise: WorkoutPlanExerciseEntity): Int
 
     @Query("UPDATE workout_plans SET isActive = 0 WHERE kind = :kind")
     suspend fun deactivateByKind(kind: String)

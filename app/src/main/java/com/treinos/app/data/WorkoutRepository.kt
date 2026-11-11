@@ -12,6 +12,7 @@ import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.GenerateJobAck
@@ -207,6 +208,62 @@ open class WorkoutRepository(
             ?: error("Plano não encontrado no aparelho.")
         require(plan.kind == "extra") { "Só planos complementares podem ser excluídos." }
         dao.deletePlan(planId)
+    }
+
+    // ---------------- Troca de exercício em plano salvo (H3-41) ----------------
+
+    /**
+     * Troca o exercício na [position] do dia [dayId] por [replacementExerciseId]
+     * do catálogo local, preservando séries/reps/ordem e as demais regras da
+     * spec (mesmo músculo, equipamento informado, sem duplicar, atômico).
+     *
+     * Recusa sessões em andamento: se o dia já tiver uma sessão `in_progress`,
+     * a troca é rejeitada.
+     *
+     * `catalog` e `availableEquipment` vêm do chamador (ViewModel) para manter
+     * esta função testável sem acoplar o repository ao ExerciseMediaRepository.
+     */
+    suspend fun swapExercise(
+        dayId: Long,
+        position: Int,
+        replacementExerciseId: String,
+        catalog: Map<String, ExerciseMedia>,
+        availableEquipment: List<String>,
+    ): SwapResult = withContext(Dispatchers.IO) {
+        val day = dao.getDay(dayId)
+            ?: return@withContext SwapResult.Error("Dia de treino não encontrado.")
+        val dayExercises = dao.getExercisesForDay(dayId)
+        if (position < 0 || position >= dayExercises.size) {
+            return@withContext SwapResult.Error("Posição do exercício inválida.")
+        }
+        val original = dayExercises[position]
+
+        // Não troca exercício de sessão já iniciada.
+        val inProgress = dao.getInProgressSessionForDay(dayId)
+        if (inProgress != null) {
+            return@withContext SwapResult.Error("Não é possível trocar exercício de um treino já iniciado.")
+        }
+
+        val validation = validateSwap(
+            original = original,
+            dayExercises = dayExercises,
+            replacementExerciseId = replacementExerciseId,
+            catalog = catalog,
+            availableEquipment = availableEquipment,
+        )
+        if (validation !is SwapResult.Ok) {
+            return@withContext validation
+        }
+
+        val replacement = catalog[validation.exerciseId]!!
+        val updated = original.copy(
+            exerciseId = replacement.id,
+            exerciseName = replacement.name,
+            primaryMuscles = replacement.primaryMuscles.joinToString(", "),
+            equipment = replacement.equipment,
+        )
+        dao.updatePlanExercise(updated)
+        SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)
     }
 
     // ---------------- Revisão do plano (H3-5) ----------------

@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
+import com.treinos.app.data.SwapResult
+import com.treinos.app.data.swapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
@@ -662,6 +664,37 @@ class AppViewModel(
         _selectedExerciseId.value = null
         _selectedPlanExercise.value = null
     }
+
+    /**
+     * Troca um exercício de um plano salvo (H3-41). Usa o catálogo já carregado
+     * em [`exerciseMedia`]; `availableEquipment` vem do caller (config do
+     * usuário) para validar equipamento permitido.
+     */
+    suspend fun swapExercise(
+        dayId: Long,
+        position: Int,
+        replacementExerciseId: String,
+        availableEquipment: List<String>,
+    ): SwapResult = repository.swapExercise(
+        dayId = dayId,
+        position = position,
+        replacementExerciseId = replacementExerciseId,
+        catalog = _exerciseMedia.value,
+        availableEquipment = availableEquipment,
+    )
+
+    /** Candidatos válidos para trocar o exercício [original] no mesmo dia. */
+    fun swapCandidates(
+        original: WorkoutPlanExerciseEntity,
+        dayExercises: List<WorkoutPlanExerciseEntity>,
+        availableEquipment: List<String>,
+    ): List<ExerciseMedia> =
+        swapCandidates(
+            original = original,
+            dayExercises = dayExercises,
+            catalog = _exerciseMedia.value,
+            availableEquipment = availableEquipment,
+        )
 
     private fun planExerciseById(exerciseId: String): WorkoutPlanExerciseEntity? =
         activePlans.value
