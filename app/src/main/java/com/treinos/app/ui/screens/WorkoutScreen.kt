@@ -497,8 +497,13 @@ fun WorkoutScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (mediaEmpty) {
+                        LaunchedEffect(showSwapConfirm) {
+                            if (showSwapConfirm) {
+                                onLoadCatalog()
+                            }
+                        }
                         Text(
-                            text = "Carregando catálogo de exercícios...",
+                            text = "Carregando catálogo de exercícios…",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
