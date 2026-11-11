@@ -10,7 +10,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.SwapResult
+import com.treinos.app.data.SwapScope
 import com.treinos.app.data.swapCandidates
+import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
@@ -692,6 +694,38 @@ class AppViewModel(
         swapCandidates(
             original = original,
             dayExercises = dayExercises,
+            catalog = _exerciseMedia.value,
+            availableEquipment = availableEquipment,
+        )
+
+    /**
+     * Troca o exercício de uma sessão em andamento. `scope` define se vale
+     * só este treino (`THIS_SESSION`) ou todos os treinos futuros
+     * (`ALL_FUTURE`, atualiza o plano salvo). `availableEquipment` vem do
+     * caller (config do usuário) para validar equipamento permitido.
+     */
+    suspend fun swapSessionExercise(
+        sessionExerciseId: Long,
+        replacementExerciseId: String,
+        scope: SwapScope,
+        availableEquipment: List<String>,
+    ): SwapResult = repository.swapSessionExercise(
+        sessionExerciseId = sessionExerciseId,
+        replacementExerciseId = replacementExerciseId,
+        scope = scope,
+        catalog = _exerciseMedia.value,
+        availableEquipment = availableEquipment,
+    )
+
+    /** Candidatos válidos para trocar o exercício de uma sessão em andamento. */
+    fun sessionSwapCandidates(
+        sessionExercise: SessionExerciseEntity,
+        takenExerciseIds: List<String>,
+        availableEquipment: List<String>,
+    ): List<ExerciseMedia> =
+        sessionSwapCandidates(
+            sessionExercise = sessionExercise,
+            takenExerciseIds = takenExerciseIds,
             catalog = _exerciseMedia.value,
             availableEquipment = availableEquipment,
         )

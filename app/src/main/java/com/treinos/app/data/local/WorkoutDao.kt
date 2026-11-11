@@ -159,6 +159,10 @@ interface WorkoutDao {
     @Query("UPDATE session_exercises SET endedAt = :endedAt WHERE id = :id")
     suspend fun setExerciseEndedAt(id: Long, endedAt: Long)
 
+    /** Atualiza o exercício de uma sessão em andamento (troca durante o treino). */
+    @Update
+    suspend fun updateSessionExercise(exercise: SessionExerciseEntity): Int
+
     @Query("SELECT COALESCE(MAX(setNumber), 0) FROM set_logs WHERE exerciseLogId = :exerciseLogId")
     suspend fun maxSetNumber(exerciseLogId: Long): Int
 

@@ -125,6 +125,7 @@
     <string name="workout_repeat_last">Repetir última série</string>
     <string name="workout_repeat_last_with_label">Repetir última série (%1$s)</string>
     <string name="workout_exercise_done">Exercício concluído — próximo</string>
+    <string name="workout_swap_exercise">Trocar exercício</string>
     <string name="workout_log_set">Registrar série %1$d</string>
     <string name="workout_finish_title">Finalizar treino?</string>
     <string name="workout_finish_body">%1$d de %2$d séries registradas. Finalizar encerra a sessão e salva o treino no aparelho.</string>

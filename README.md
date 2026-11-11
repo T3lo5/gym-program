@@ -262,7 +262,7 @@ spec em [docs/specs/](docs/specs/) definindo como ele deve ser feito.
 
 | Horizonte | Foco |
 |---|---|
-| Concluído | H1-1 a H1-7, H2-1 a H2-7, H3-1/H3-2/H3-3/H3-5, H3-6/H3-7/H3-10/H3-11/H3-12/H3-13/H3-15/H3-16, H3-21 a H3-24, H3-27 a H3-32, H3-36 a H3-42 (detalhes e evidência em `ROADMAP.md` §4.1) |
+| Concluído | H1-1 a H1-7, H2-1 a H2-7, H3-1/H3-2/H3-3/H3-5, H3-6/H3-7/H3-10/H3-11/H3-12/H3-13/H3-15/H3-16, H3-21 a H3-24, H3-27 a H3-32, H3-36 a H3-43 (detalhes e evidência em `ROADMAP.md` §4.1) |
 | Pendente / Won't now | H3-4 backend na nuvem com token (**Won't now** até priorização explícita); H3-8/H3-9 backup em nuvem do usuário; H3-17 a H3-20 MVP do relógio |
 
 > `docs/SPRINT-PLAN.md` é histórico e **não** deve ser usado para decidir o

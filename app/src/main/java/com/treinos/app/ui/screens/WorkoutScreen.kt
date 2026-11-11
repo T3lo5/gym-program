@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -66,7 +67,11 @@ import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.data.SwapResult
+import com.treinos.app.data.SwapScope
+import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.SetInputErrors
 import com.treinos.app.ui.SetInputValidation
@@ -111,6 +116,8 @@ fun WorkoutScreen(
     onDeleteSet: (SetLogEntity) -> Unit = {},
     onAbandon: () -> Unit = {},
     onNextExercise: () -> Unit = {},
+    availableEquipment: List<String> = emptyList(),
+    onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
 ) {
     // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
@@ -127,6 +134,10 @@ fun WorkoutScreen(
     var showAbandonConfirm by remember { mutableStateOf(false) }
     var scrollTargetIndex by remember { mutableStateOf<Int?>(null) }
     var setSavedAnnouncement by remember { mutableStateOf<String?>(null) }
+
+    // Troca de exercício durante o treino em andamento (H3-41/H3-42).
+    var showSwapConfirm by remember { mutableStateOf(false) }
+    var swapTargetId by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
 
     // Sessão ativa mantém a tela acesa (H3-26); ao sair da tela a flag é liberada.
@@ -297,6 +308,10 @@ fun WorkoutScreen(
                             }
                             onNextExercise()
                         },
+                        onSwapExercise = {
+                            swapTargetId = exercise.exercise.id
+                            showSwapConfirm = true
+                        },
                     )
                 }
 
@@ -456,6 +471,86 @@ fun WorkoutScreen(
             },
         )
     }
+
+    // Diálogo de troca de exercício durante o treino em andamento.
+    if (showSwapConfirm && swapTargetId != null && session != null) {
+        val exerciseEntity = session.exercises.firstOrNull { it.exercise.id == swapTargetId }
+        val takenExerciseIds = session.exercises.map { it.exercise.exerciseId }.toList()
+        val candidates = exerciseEntity?.let {
+            sessionSwapCandidates(
+                sessionExercise = it.exercise,
+                takenExerciseIds = takenExerciseIds,
+                catalog = exerciseMedia,
+                availableEquipment = availableEquipment,
+            )
+        } ?: emptyList()
+        AlertDialog(
+            onDismissRequest = { showSwapConfirm = false },
+            title = { Text("Trocar exercício?") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .width(300.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "Escolha um substituto com o mesmo músculo e equipamento informado."
+                    )
+                    if (candidates.isEmpty()) {
+                        Text(
+                            text = "Não há substituto disponível com o equipamento informado.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Text(
+                            text = "Substitutos sugeridos:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        candidates.forEach { candidate ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(text = candidate.name)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            showSwapConfirm = false
+                                            onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.THIS_SESSION)
+                                        },
+                                    ) {
+                                        Text("Só hoje")
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            showSwapConfirm = false
+                                            onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.ALL_FUTURE)
+                                        },
+                                    ) {
+                                        Text("Todos")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showSwapConfirm = false },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text("Cancelar")
+                }
+            },
+            dismissButton = null,
+        )
+    }
 }
 
 /**
@@ -569,6 +664,7 @@ private fun ExerciseCard(
     onOpenDetail: () -> Unit,
     onEditSet: (SetLogEntity) -> Unit,
     onNextExercise: () -> Unit,
+    onSwapExercise: (() -> Unit)? = null,
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
     // H3-27: progresso derivado das séries gravadas — editar/excluir série
@@ -702,6 +798,16 @@ private fun ExerciseCard(
                         stringResource(R.string.workout_log_set, exercise.sets.size + 1)
                     }
                 )
+            }
+
+            // Troca de exercício durante o treino em andamento (H3-41/H3-42).
+            if (onSwapExercise != null) {
+                OutlinedButton(
+                    onClick = onSwapExercise,
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
+                ) {
+                    Text(stringResource(R.string.workout_swap_exercise))
+                }
             }
         }
     }

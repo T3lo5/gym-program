@@ -125,6 +125,7 @@
     <string name="workout_repeat_last">Repeat last set</string>
     <string name="workout_repeat_last_with_label">Repeat last set (%1$s)</string>
     <string name="workout_exercise_done">Exercise completed — next</string>
+    <string name="workout_swap_exercise">Swap exercise</string>
     <string name="workout_log_set">Log set %1$d</string>
     <string name="workout_finish_title">Finish workout?</string>
     <string name="workout_finish_body">%1$d of %2$d sets recorded. Finishing ends the session and saves the workout to the device.</string>

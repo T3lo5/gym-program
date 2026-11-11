@@ -60,6 +60,14 @@ import java.time.LocalDate
  * Tudo que o usuário anota durante o treino é gravado no Room (SQLite) na hora.
  * O backend só é populado quando [sync] é chamado explicitamente.
  */
+/** Escopo de uma troca de exercício durante o treino em andamento. */
+enum class SwapScope {
+    /** Afeta apenas a sessão atual (o treino de hoje). */
+    THIS_SESSION,
+    /** Afeta o plano salvo, valendo para todos os treinos futuros. */
+    ALL_FUTURE,
+}
+
 open class WorkoutRepository(
     private val dao: WorkoutDao,
     private val backendClient: BackendApi,
@@ -265,6 +273,82 @@ open class WorkoutRepository(
         )
         dao.updatePlanExercise(updated)
         SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)
+    }
+
+    // ---------------- Troca de exercício durante o treino em andamento --------
+
+    /**
+     * Troca o exercício de uma sessão em andamento.
+     *
+     * - [SwapScope.THIS_SESSION]: atualiza só o `SessionExerciseEntity` da
+     *   sessão atual; não mexe no plano salvo.
+     * - [SwapScope.ALL_FUTURE]: atualiza o `WorkoutPlanExerciseEntity` do
+     *   plano (mesma regra do H3-41: mesmo músculo, equipamento informado,
+     *   sem duplicar no dia), valendo para os próximos treinos.
+     *
+     * `catalog` e `availableEquipment` vêm do caller para manter a função
+     * testável.
+     */
+    suspend fun swapSessionExercise(
+        sessionExerciseId: Long,
+        replacementExerciseId: String,
+        scope: SwapScope,
+        catalog: Map<String, ExerciseMedia>,
+        availableEquipment: List<String>,
+    ): SwapResult = withContext(Dispatchers.IO) {
+        val sessionExercise = dao.getSessionExercise(sessionExerciseId)
+            ?: return@withContext SwapResult.Error("Exercício da sessão não encontrado.")
+        val session = dao.getSession(sessionExercise.sessionId)
+            ?: return@withContext SwapResult.Error("Sessão não encontrada.")
+        val dayId = session.dayId
+        val dayExercises = dao.getExercisesForDay(dayId)
+
+        val originalMedia = catalog[sessionExercise.exerciseId]
+        val originalMuscle = originalMedia?.primaryMuscles?.firstOrNull()
+
+        val replacement = catalog[replacementExerciseId]
+            ?: return@withContext SwapResult.Error("Exercício não encontrado no catálogo.")
+        if (replacement.id == sessionExercise.exerciseId) {
+            return@withContext SwapResult.Error("Escolha um exercício diferente do atual.")
+        }
+        if (!availableEquipment.isEmpty() && !availableEquipment.contains(replacement.equipment)) {
+            return@withContext SwapResult.Error("Equipamento não disponível no seu treino.")
+        }
+        if (originalMuscle == null ||
+            !replacement.primaryMuscles.any { it.equals(originalMuscle, ignoreCase = true) }) {
+            return@withContext SwapResult.Error("Músculo incompatível com o exercício original.")
+        }
+        // Não duplica: já existe um exercício com este ID no dia (excluindo o original da sessão)
+        val takenIds = dayExercises.map { it.exerciseId }.toSet() - setOf(sessionExercise.exerciseId)
+        if (takenIds.contains(replacementExerciseId)) {
+            return@withContext SwapResult.Error("Este exercício já está neste dia.")
+        }
+
+        when (scope) {
+            SwapScope.THIS_SESSION -> {
+                dao.updateSessionExercise(
+                    sessionExercise.copy(
+                        exerciseId = replacement.id,
+                        exerciseName = replacement.name,
+                    )
+                )
+                SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)
+            }
+            SwapScope.ALL_FUTURE -> {
+                // Atualiza o plano salvo (futuro). Não recusa por sessão in_progress,
+                // porque a sessão atual já começou com o exercício antigo.
+                val originalPlanExercise = dayExercises.firstOrNull { it.exerciseId == sessionExercise.exerciseId }
+                    ?: return@withContext SwapResult.Error("Exercício não encontrado no plano salvo.")
+                val updated = originalPlanExercise.copy(
+                    exerciseId = replacement.id,
+                    exerciseName = replacement.name,
+                    primaryMuscles = replacement.primaryMuscles.joinToString(", "),
+                    equipment = replacement.equipment,
+                )
+                dao.updatePlanExercise(updated)
+                SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)
+            }
+        }
     }
 
     // ---------------- Uso de exercício para calibrar precisão (H3-42) ----------

@@ -35,6 +35,8 @@ import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.treinos.app.data.backup.BackupSizeGuard
 import com.treinos.app.data.backup.BackupValidator
+import com.treinos.app.data.SwapResult
+import com.treinos.app.data.SwapScope
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
@@ -337,6 +339,17 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDeleteSet = viewModel::deleteSet,
                     onAbandon = viewModel::abandonWorkout,
                     onNextExercise = viewModel::nextExercise,
+                    availableEquipment = generateConfig?.equipment.orEmpty(),
+                    onSwapExercise = { sessionExerciseId, replacementId, swapScope ->
+                        scope.launch {
+                            viewModel.swapSessionExercise(
+                                sessionExerciseId = sessionExerciseId,
+                                replacementExerciseId = replacementId,
+                                scope = swapScope,
+                                availableEquipment = generateConfig?.equipment.orEmpty(),
+                            )
+                        }
+                    },
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(
