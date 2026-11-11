@@ -296,7 +296,7 @@ adb reverse tcp:3000 tcp:3000
 
 ## 📄 Licença
 
-- **Código do app:** MIT (seu uso pessoal)
+- **Código do app e backend:** Apache License 2.0 — veja `LICENSE`. Código aberto e permanece aberto; contribuições e derivados também sob Apache 2.0.
 - **Catálogo de exercícios:** Unlicense (domínio público) — https://github.com/yuhonas/free-exercise-db
 - **SenseNova API:** Termos da plataforma (https://platform.sensenova.ai)
 
