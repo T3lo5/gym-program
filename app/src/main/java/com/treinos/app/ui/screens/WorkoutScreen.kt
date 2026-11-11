@@ -118,6 +118,7 @@ fun WorkoutScreen(
     onNextExercise: () -> Unit = {},
     availableEquipment: List<String> = emptyList(),
     onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
+    onLoadCatalog: () -> Unit = {},
 ) {
     // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
@@ -476,6 +477,7 @@ fun WorkoutScreen(
     if (showSwapConfirm && swapTargetId != null && session != null) {
         val exerciseEntity = session.exercises.firstOrNull { it.exercise.id == swapTargetId }
         val takenExerciseIds = session.exercises.map { it.exercise.exerciseId }.toList()
+        val mediaEmpty = exerciseMedia.isEmpty()
         val candidates = exerciseEntity?.let {
             sessionSwapCandidates(
                 sessionExercise = it.exercise,
@@ -494,45 +496,52 @@ fun WorkoutScreen(
                         .width(300.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(
-                        text = "Escolha um substituto com o mesmo músculo e equipamento informado."
-                    )
-                    if (candidates.isEmpty()) {
+                    if (mediaEmpty) {
                         Text(
-                            text = "Não há substituto disponível com o equipamento informado.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                            text = "Carregando catálogo de exercícios...",
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
                         Text(
-                            text = "Substitutos sugeridos:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = "Escolha um substituto com o mesmo músculo e equipamento informado."
                         )
-                        candidates.forEach { candidate ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(text = candidate.name)
+                        if (candidates.isEmpty()) {
+                            Text(
+                                text = "Não há substituto disponível com o equipamento informado.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            Text(
+                                text = "Substitutos sugeridos:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            candidates.forEach { candidate ->
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    TextButton(
-                                        onClick = {
-                                            showSwapConfirm = false
-                                            onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.THIS_SESSION)
-                                        },
+                                    Text(text = candidate.name)
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     ) {
-                                        Text("Só hoje")
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            showSwapConfirm = false
-                                            onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.ALL_FUTURE)
-                                        },
-                                    ) {
-                                        Text("Todos")
+                                        TextButton(
+                                            onClick = {
+                                                showSwapConfirm = false
+                                                onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.THIS_SESSION)
+                                            },
+                                        ) {
+                                            Text("Só hoje")
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                showSwapConfirm = false
+                                                onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.ALL_FUTURE)
+                                            },
+                                        ) {
+                                            Text("Todos")
+                                        }
                                     }
                                 }
                             }
@@ -541,11 +550,20 @@ fun WorkoutScreen(
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = { showSwapConfirm = false },
-                    modifier = Modifier.minimumInteractiveComponentSize(),
-                ) {
-                    Text("Cancelar")
+                if (mediaEmpty) {
+                    TextButton(
+                        onClick = { onLoadCatalog() },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
+                        Text("Carregar")
+                    }
+                } else {
+                    TextButton(
+                        onClick = { showSwapConfirm = false },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
+                        Text("Cancelar")
+                    }
                 }
             },
             dismissButton = null,

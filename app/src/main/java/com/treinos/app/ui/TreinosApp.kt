@@ -350,6 +350,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                             )
                         }
                     },
+                    onLoadCatalog = { viewModel.loadExerciseMedia(false) },
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(
