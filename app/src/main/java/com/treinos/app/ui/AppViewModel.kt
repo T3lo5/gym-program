@@ -964,7 +964,7 @@ class AppViewModel(
                             val source = if (result.source == "ai") "com IA" else "local"
                             val review = formatReviewDate(result.nextReviewAt) ?: result.nextReviewAt
                             val base = "Treino gerado $source e salvo no aparelho. Revisar em $review."
-                            _message.value = fallbackReasonLabel(result.fallbackReason)
+                            _message.value = fallbackReasonLabel(fallbackReason)
                                 ?.let { motivo -> "$base Motivo: $motivo." } ?: base
                         } catch (error: Exception) {
                             // O job está done no backend; falha local ao salvar não
