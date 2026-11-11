@@ -8,8 +8,8 @@
 |---|---|
 | Item do roadmap | `H3-42` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `aprovada` |
+| Implementação | `concluída` |
 
 **Depende de:** [H3-25](H3-25-selecao-por-nome.md) (catálogo como fonte de verdade), [H3-41](H3-41-troca-exercicio.md) (troca gera sinal de rejeição) e [H3-22](H3-22-robustez-geracao-ia.md) (salvamento parcial e drops já registrados).  
 **Não envia dados de uso para o backend** (local-first; só o usuário, se quiser, sincroniza snapshot via H1-7/H2-3).
