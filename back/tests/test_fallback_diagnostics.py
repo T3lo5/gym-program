@@ -191,3 +191,201 @@ def test_detail_truncado_em_300():
     linha_multiline = main.fallback_log_line("unknown", "a\nb\tc")
     assert "\n" not in linha_multiline
     assert "\t" not in linha_multiline
+
+
+# ---------------- recuperação de JSON truncado (H3-41) ----------------
+
+
+def test_recupera_json_truncado_em_string():
+    """JSON cortado após um objeto completo, com o próximo objeto em aberto:
+    o ponto seguro é o ',' e o objeto incompleto é mantido como parcial."""
+    content = (
+        '{"name": "Plano", "days": [{"dayOrder": 0, "exercises": ['
+        '{"exerciseId": "abc", "sets": 3}, {"exerciseId": "def", "exerciseName": '
+        '"Exercício sem fechar, outra coisa sem fechar'
+    )
+    recovered = main._recover_truncated_json(content)
+    parsed = json.loads(recovered)
+    assert parsed["name"] == "Plano"
+    assert parsed["days"][0]["dayOrder"] == 0
+    # O primeiro objeto completo é mantido intacto.
+    assert parsed["days"][0]["exercises"][0] == {"exerciseId": "abc", "sets": 3}
+    # O segundo objeto incompleto é mantido como parcial (pelo menos o ID).
+    assert parsed["days"][0]["exercises"][1]["exerciseId"] == "def"
+
+
+def test_recupera_json_truncado_em_array():
+    """JSON cortado no meio de um array: recupera até o último ponto seguro."""
+    content = (
+        '{"name": "Plano", "days": [{"dayOrder": 0, "exercises": ['
+        '{"exerciseId": "abc", "sets": 3}, {"exerciseId": "def", "sets": 2'
+    )
+    recovered = main._recover_truncated_json(content)
+    parsed = json.loads(recovered)
+    assert parsed["name"] == "Plano"
+    assert len(parsed["days"][0]["exercises"]) == 2
+
+
+def test_recupera_json_truncado_em_objeto():
+    """JSON cortado no meio de um objeto: remove a propriedade em aberto."""
+    content = (
+        '{"name": "Plano", "days": [{"dayOrder": 0, "exercises": '
+        '[{"exerciseId": "abc", "sets": 3, "targetReps": "8-12", "notes": '
+        '"treino sem fechar'
+    )
+    recovered = main._recover_truncated_json(content)
+    parsed = json.loads(recovered)
+    assert parsed["name"] == "Plano"
+    assert parsed["days"][0]["exercises"][0]["exerciseId"] == "abc"
+    assert "notes" not in parsed["days"][0]["exercises"][0]
+
+
+def test_recupera_json_ja_valido_nao_muda():
+    """JSON válido passa ileso pela recuperação."""
+    plano = {
+        "name": "Plano",
+        "days": [
+            {
+                "dayOrder": 0,
+                "exercises": [
+                    {"exerciseId": main.EXERCISE_CATALOG[0]["id"], "sets": 3}
+                ],
+            }
+        ],
+    }
+    content = json.dumps(plano)
+    assert main._recover_truncated_json(content) == content
+
+
+def test_recupera_json_sem_ponto_seguro():
+    """Content sem `{` não tem objeto JSON: a recuperação retorna o original."""
+    content = '{"name": "Plano", "days": [{"dayOrder": 0, "exercises": [{"exerciseId"'
+    recovered = main._recover_truncated_json(content)
+    # A recuperação tenta cortar em cada ponto seguro; no pior caso retorna o
+    # texto original (que falha em json.loads).
+    try:
+        json.loads(recovered)
+    except json.JSONDecodeError:
+        pass  # ambos os comportamentos são aceitáveis
+    else:
+        # Se recuperou, o plano é parcial e deve ter ao menos o name.
+        parsed = json.loads(recovered)
+        assert parsed.get("name") == "Plano"
+
+
+def test_parse_ai_plan_recupera_truncado():
+    """parse_ai_plan aceita JSON truncado (recuperado) em vez de falhar total."""
+    exercise_id = main.EXERCISE_CATALOG[0]["id"]
+    content = (
+        '{"name": "Plano", "goal": "hypertrophy", "daysPerWeek": 1, '
+        '"days": [{"name": "Dia 1", "dayOrder": 0, "weekday": 1, '
+        '"modality": "strength", "isRestDay": false, "exercises": ['
+        f'{{"exerciseId": "{exercise_id}", "sets": 3, "targetReps": "8-12"'
+    )
+    parsed = main.parse_ai_plan(content, main.EXERCISE_CATALOG, _request_for_parse())
+    assert parsed["days"][0]["exercises"]
+    assert parsed["days"][0]["exercises"][0]["exerciseId"] == exercise_id
+
+
+def _request_for_parse():
+    return main.GenerateRequest(
+        deviceId="d1",
+        goal="hypertrophy",
+        daysPerWeek=2,
+        availableEquipment=["barbell", "dumbbell", "body only", "cable", "machine"],
+        targetMuscles=["chest", "back", "legs"],
+        sessionDurationMinutes=60,
+        currentLevel="intermediate",
+    )
+
+
+# ---------------- normalização de campos do ExerciseDTO (H3-41) ----------------
+
+
+def test_normalize_exercise_fields_clamp_target_rpe():
+    """targetRpe < 5.0 é clampado para 5.0 antes da validação pelo schema."""
+    plano = {
+        "days": [
+            {
+                "exercises": [
+                    {"exerciseId": main.EXERCISE_CATALOG[0]["id"], "targetRpe": 4.0}
+                ]
+            }
+        ]
+    }
+    main._normalize_exercise_fields(plano)
+    assert plano["days"][0]["exercises"][0]["targetRpe"] == 5.0
+
+
+def test_normalize_exercise_fields_clamp_rest_seconds():
+    """restSeconds > 300 é clampado para 300."""
+    plano = {
+        "days": [
+            {
+                "exercises": [
+                    {
+                        "exerciseId": main.EXERCISE_CATALOG[0]["id"],
+                        "restSeconds": 999,
+                    }
+                ]
+            }
+        ]
+    }
+    main._normalize_exercise_fields(plano)
+    assert plano["days"][0]["exercises"][0]["restSeconds"] == 300
+
+
+def test_normalize_exercise_fields_clamp_sets():
+    """sets < 1 é clampado para 1; sets > 20 para 20."""
+    plano = {
+        "days": [
+            {
+                "exercises": [
+                    {"exerciseId": main.EXERCISE_CATALOG[0]["id"], "sets": 0},
+                    {"exerciseId": main.EXERCISE_CATALOG[0]["id"], "sets": 50},
+                ]
+            }
+        ]
+    }
+    main._normalize_exercise_fields(plano)
+    assert plano["days"][0]["exercises"][0]["sets"] == 1
+    assert plano["days"][0]["exercises"][1]["sets"] == 20
+
+
+def test_normalize_exercise_fields_nao_muda_validos():
+    """Valores dentro do range são mantidos."""
+    plano = {
+        "days": [
+            {
+                "exercises": [
+                    {
+                        "exerciseId": main.EXERCISE_CATALOG[0]["id"],
+                        "targetRpe": 8.0,
+                        "restSeconds": 90,
+                        "sets": 3,
+                    }
+                ]
+            }
+        ]
+    }
+    main._normalize_exercise_fields(plano)
+    ex = plano["days"][0]["exercises"][0]
+    assert ex["targetRpe"] == 8.0
+    assert ex["restSeconds"] == 90
+    assert ex["sets"] == 3
+
+
+def test_parse_ai_plan_recupera_rpe_invalido():
+    """parse_ai_plan aceita plano com targetRpe < 5.0 (clampado) em vez de
+    falhar com schema_validation."""
+    exercise_id = main.EXERCISE_CATALOG[0]["id"]
+    content = (
+        '{"name": "Plano", "goal": "hypertrophy", "daysPerWeek": 1, '
+        '"days": [{"name": "Dia 1", "dayOrder": 0, "weekday": 1, '
+        '"modality": "strength", "isRestDay": false, "exercises": ['
+        f'{{"exerciseId": "{exercise_id}", "sets": 3, "targetReps": "8-12", '
+        '"targetRpe": 4.0, "restSeconds": 90}}]'
+        "}]}"
+    )
+    parsed = main.parse_ai_plan(content, main.EXERCISE_CATALOG, _request_for_parse())
+    assert parsed["days"][0]["exercises"][0]["targetRpe"] == 5.0

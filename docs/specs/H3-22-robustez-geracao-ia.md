@@ -188,7 +188,84 @@ Testes do plano B em `back/tests/test_ai_robustez.py`:
   desequilíbrio de volume: a reconstrução usa o mesmo pool e o mesmo nº alvo
   por duração; teste cobre o caso limite.
 - Pior caso de latência com retry pode passar do read timeout do app (90 s):
-  mitigado estruturalmente pelo **orçamento total (deadline)** da IA —
-  `AI_TIMEOUT_TOTAL_SECONDS` default 80s, retry só com orçamento restante
-  (H3-25, revisão 2026-11-10). Timeouts fixos por attempt não garantem a
-  invariante: 90s+45s chegou a 135s e o app desistia antes do fallback.
+   mitigado estruturalmente pelo **orçamento total (deadline)** da IA —
+   `AI_TIMEOUT_TOTAL_SECONDS` default 80s, retry só com orçamento restante
+   (H3-25, revisão 2026-11-10). Timeouts fixos por attempt não garantem a
+   invariante: 90s+45s chegou a 135s e o app desistia antes do fallback.
+
+## Execução da recuperação de JSON truncado (2026-11-11)
+
+Mesmo com o plano B reduzindo o prompt, a IA pode atingir o `max_tokens` e
+devolver um JSON cortado no meio de uma string, objeto ou array — o erro
+`Unterminated string starting at: line N column M (char K)` que vinha
+saindo nos logs (`[fallback] reason=json_parse detail=...`). O retry não
+ajuda: a IA produz a mesma resposta longa toda vez.
+
+Dois reparos:
+
+1. `max_tokens` 8192 → 16384 (`_generate_plan_response`, main.py) — dá mais
+   folga para a resposta completa sem estourar o contexto do flash-lite.
+2. Nova `_recover_truncated_json(content)` em `back/app/main.py`:
+   - Extrai o primeiro objeto JSON (`_extract_first_json_object`) e tenta
+     `json.loads`; se já for válido, retorna sem alteração.
+   - Coleta os **pontos seguros** de corte (após cada valor completo: fim de
+     string, `,`, `}`, `]`) e, do mais longo para o mais curto, corta o texto,
+     remove a vírgula final e fecha os contêineres e strings em aberto usando
+     uma **pilha** (ordem correta, de dentro para fora).
+   - Se o resultado for `json.loads` válido, retorna; caso contrário,
+     repete com o ponto seguro anterior.
+   - `parse_ai_plan` chama `_recover_truncated_json` no `except` de
+     `json.loads` antes de lançar `AiFailure("json_parse", ...)`. O plano
+     resultante é parcial, mas o salvamento parcial de `parse_ai_plan`
+     (drop de exercícios inválidos, reconstrução de sessões) completa o que
+     sobrou — o plano sai com `source = "ai"` em vez de cair no fallback
+     total.
+
+Cobertura: `back/tests/test_fallback_diagnostics.py` com
+`test_recupera_json_truncado_em_string`, `test_recupera_json_truncado_em_array`,
+`test_recupera_json_truncado_em_objeto`, `test_recupera_json_ja_valido_nao_muda`,
+`test_recupera_json_sem_ponto_seguro` e `test_parse_ai_plan_recupera_truncado`.
+
+## Riscos e rollback
+
+- Recuperação pode manter exercícios parciais (ex.: `{"exerciseId": "def"`
+  sem os demais campos) — o salvamento parcial de `parse_ai_plan` remove os
+  inválidos e reconstrói as sessões, então o plano final é válido.
+- Se a recuperação não encontrar corte válido, retorna o texto original e o
+  comportamento é o anterior (`json_parse` → fallback total).
+
+## Execução da normalização de campos (2026-11-11)
+
+Mesmo com a recuperação de JSON truncado, a IA pode devolver um JSON **válido**
+com valores fora do range dos campos do `ExerciseDTO`. Exemplo real do log:
+`[fallback] reason=schema_validation detail=plano rejeitado pelo schema: 6
+validation errors for WorkoutPlanDTO days.2.exercises.0.targetRpe Input should be
+greater than or equal to 5 [type=greater_than_equal, input_value=4.0, ...]` — a IA
+devolveu `targetRpe = 4.0` e o DTO exige `ge=5.0`. O plano inteiro caiu no
+fallback local.
+
+Reparo em `back/app/main.py`:
+
+- Nova `_normalize_exercise_fields(raw_plan)` — clampa valores fora do range
+  antes da validação pelo schema:
+  - `targetRpe`: < 5.0 → 5.0; > 10.0 → 10.0.
+  - `restSeconds`: < 0 → 0; > 300 → 300.
+  - `sets`: < 1 → 1; > 20 → 20.
+- Chamada em `parse_ai_plan` imediatamente antes de `WorkoutPlanDTO(**raw_plan)`.
+- Mutação in-place; valores já válidos são mantidos.
+
+Cobertura: `back/tests/test_fallback_diagnostics.py` com
+`test_normalize_exercise_fields_clamp_target_rpe`,
+`test_normalize_exercise_fields_clamp_rest_seconds`,
+`test_normalize_exercise_fields_clamp_sets`,
+`test_normalize_exercise_fields_nao_muda_validos` e
+`test_parse_ai_plan_recupera_rpe_invalido`.
+
+## Riscos e rollback
+
+- Clampar valores pode mascarar um erro de lógica da IA (ex.: RPE 4 em um
+  treino de força) — o plano sai com RPE 5, que é o mínimo aceitável. Se a IA
+  repetir valores estranhos, o diagnóstico do fallback (H3-21) continua
+  registrando `schema_validation` quando o clamp não bastar.
+- Rollback: remover a chamada a `_normalize_exercise_fields` e o comportamento
+  volta ao anterior (schema_validation → fallback total).
