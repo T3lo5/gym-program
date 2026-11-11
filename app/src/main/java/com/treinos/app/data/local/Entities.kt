@@ -189,3 +189,15 @@ data class SessionExerciseWithSets(
     val exercise: SessionExerciseEntity,
     val sets: List<SetLogEntity>,
 )
+
+/** Evento de uso de um exercício (H3-42): concluído/pulado/trocado pelo usuário. */
+@Entity(tableName = "exercise_usage_events")
+data class ExerciseUsageEvent(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val exerciseId: String,
+    val outcome: String, // "completed" | "skipped" | "swapped"
+    val occurredAt: Long,
+    val planId: Long?,
+    val dayId: Long?,
+    val source: String, // "generation" | "manual" | "swap"
+)

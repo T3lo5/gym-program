@@ -1,5 +1,6 @@
 package com.treinos.app.data
 
+import com.treinos.app.data.local.ExerciseUsageEvent
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
@@ -264,6 +265,46 @@ open class WorkoutRepository(
         )
         dao.updatePlanExercise(updated)
         SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)
+    }
+
+    // ---------------- Uso de exercício para calibrar precisão (H3-42) ----------
+
+    /**
+     * Registra um evento de uso do exercício (concluído/pulado/trocado). Sinal
+     * local-only: nada sai do aparelho, usado apenas para ordenar o catálogo da
+     * próxima geração. Nunca falha o plano nem a geração se a gravação der
+     * problema.
+     */
+    suspend fun recordExerciseUsage(
+        exerciseId: String,
+        outcome: String,
+        planId: Long? = null,
+        dayId: Long? = null,
+        source: String = "generation",
+    ) = withContext(Dispatchers.IO) {
+        dao.insertUsageEvent(
+            ExerciseUsageEvent(
+                exerciseId = exerciseId,
+                outcome = outcome,
+                occurredAt = System.currentTimeMillis(),
+                planId = planId,
+                dayId = dayId,
+                source = source,
+            )
+        )
+    }
+
+    /**
+     * Peso de uso de cada exercício do catálogo, a partir dos eventos dos
+     * últimos 90 dias. Usado pelo backend para ordenar o prompt (cobertura
+     * total preservada: só reordena, nunca exclui).
+     */
+    suspend fun usageWeightsForCatalog(
+        exerciseIds: List<String>,
+    ): Map<String, Int> = withContext(Dispatchers.IO) {
+        val since = System.currentTimeMillis() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000L
+        val events = dao.getUsageEventsSince(since)
+        usageWeightsForCatalog(exerciseIds, events, System.currentTimeMillis())
     }
 
     // ---------------- Revisão do plano (H3-5) ----------------

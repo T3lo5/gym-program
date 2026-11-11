@@ -702,6 +702,7 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
 
     focus = list(getattr(request, "focusMuscles", []) or [])
     target = list(getattr(request, "targetMuscles", []) or [])
+    weights: Dict[str, int] = dict(getattr(request, "exerciseWeights", None) or {})
 
     # Agrupa por músculo primário (primeiro primaryMuscle relevante).
     by_muscle: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -741,12 +742,16 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
     def _equip_priority(ex: Dict[str, Any]) -> int:
         return 0 if str(ex.get("equipment", "")).strip().lower() in LOAD_EQUIPMENT else 1
 
+    def _weight_sort_key(ex: Dict[str, Any]) -> tuple:
+        # Peso de uso primeiro (maior = mais relevante), depois equipamento.
+        return (-weights.get(ex["id"], 0), _equip_priority(ex))
+
     for muscle in ordered_muscles:
         exercises = by_muscle.get(muscle) or []
         if not exercises:
             continue
         tier_a_lines.append(f"\n{muscle.upper()}:")
-        for ex in sorted(exercises, key=_equip_priority):
+        for ex in sorted(exercises, key=_weight_sort_key):
             if ex["id"] in tier_a_ids:
                 continue
             eq = (ex.get("equipment") or "body only").strip()
@@ -782,14 +787,14 @@ def catalog_summary_for_request(request: Any, catalog: List[Dict[str, Any]]) -> 
             if not exercises:
                 continue
             tier_a_lines.append(f"\n{muscle.upper()}:")
-            for ex in sorted(exercises, key=_equip_priority)[:tier_a_per_muscle]:
+            for ex in sorted(exercises, key=_weight_sort_key)[:tier_a_per_muscle]:
                 if ex["id"] in tier_a_ids:
                     continue
                 tier_a_ids.add(ex["id"])
                 eq = (ex.get("equipment") or "body only").strip()
                 name = _localized(ex, "namePt", ex.get("name", ex["id"]), language)
                 tier_a_lines.append(f"  - {name} ({eq})")
-            rest = sorted(exercises, key=_equip_priority)[tier_a_per_muscle:]
+            rest = sorted(exercises, key=_weight_sort_key)[tier_a_per_muscle:]
             if rest:
                 tier_b_lines.append(f"\n{muscle.upper()}:")
                 for ex in rest:

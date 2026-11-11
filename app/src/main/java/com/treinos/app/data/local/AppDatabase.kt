@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WorkoutSessionEntity::class,
         SessionExerciseEntity::class,
         SetLogEntity::class,
+        ExerciseUsageEvent::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -66,6 +67,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H3-42: eventos de uso do exercício (concluído/pulado/trocado) para
+        // calibrar a precisão da próxima geração. Tabela nova, aditiva.
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS exercise_usage_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        exerciseId TEXT NOT NULL,
+                        outcome TEXT NOT NULL,
+                        occurredAt INTEGER NOT NULL,
+                        planId INTEGER,
+                        dayId INTEGER,
+                        source TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -73,7 +94,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { instance = it }
             }

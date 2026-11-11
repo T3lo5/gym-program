@@ -247,4 +247,15 @@ interface WorkoutDao {
         if (sessionExercises.isNotEmpty()) insertSessionExercises(sessionExercises)
         if (setLogs.isNotEmpty()) insertSetLogs(setLogs)
     }
+
+    // ---------- Uso de exercício para calibrar precisão (H3-42) ----------
+
+    @Insert
+    suspend fun insertUsageEvent(event: ExerciseUsageEvent): Long
+
+    @Query(
+        "SELECT * FROM exercise_usage_events WHERE occurredAt >= :since " +
+            "ORDER BY occurredAt DESC"
+    )
+    suspend fun getUsageEventsSince(since: Long): List<ExerciseUsageEvent>
 }

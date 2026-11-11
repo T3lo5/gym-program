@@ -462,6 +462,10 @@ class GenerateRequest(BaseModel):
     # exerciseName e instructions em português, com o mesmo exerciseId.
     language: Optional[Literal["pt", "en"]] = None
 
+    # H3-42: pesos de uso do app para reordenar o catálogo no prompt (ordenação
+    # aditiva, nunca exclui exercícios). Chave = exerciseId, valor = peso.
+    exerciseWeights: Optional[Dict[str, int]] = Field(default_factory=dict)
+
     @model_validator(mode="after")
     def validate_complementary(self) -> "GenerateRequest":
         """Validações condicionais do modo complementar (H3-16).
@@ -947,6 +951,101 @@ def _extract_first_json_object(content: str) -> str:
     return text[start:]
 
 
+def _recover_truncated_json(content: str) -> str:
+    """Recupera JSON truncado (IA atingiu max_tokens) cortando no último ponto
+    seguro e fechando os contêineres abertos.
+
+    A IA pode devolver um JSON válido até um ponto e ser cortada no meio de uma
+    string, objeto ou array. Esta função encontra o último ponto seguro de corte
+    (após um valor completo: fechamento de string, `,`, `}` ou `]`), remove o
+    que veio depois e tenta fechar os contêineres e strings em aberto. Se o
+    resultado for válido, retorna; caso contrário, retrocede até o ponto seguro
+    anterior até encontrar um corte que feche como JSON válido. O plano
+    resultante é parcial, mas utilizável pelo salvamento parcial de
+    `parse_ai_plan`.
+
+    Retorna o texto original quando não há recuperação possível.
+    """
+    text = _extract_first_json_object(content)
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError:
+        pass
+
+    # Pontos seguros: após cada valor completo (fim de string, ',', '}', ']').
+    safe_positions = [0]
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+                safe_positions.append(i + 1)
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in ",}]":
+            safe_positions.append(i + 1)
+
+    for cut in reversed(safe_positions):
+        truncated = text[:cut].rstrip()
+        if not truncated:
+            continue
+        if truncated.endswith(","):
+            truncated = truncated[:-1].rstrip()
+        if not truncated:
+            continue
+
+        # Rastreia a pilha de contêineres abertos e se há string em aberto.
+        stack = []
+        in_str = False
+        esc = False
+        for ch in truncated:
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                stack.append("{")
+            elif ch == "}":
+                if stack and stack[-1] == "{":
+                    stack.pop()
+            elif ch == "[":
+                stack.append("[")
+            elif ch == "]":
+                if stack and stack[-1] == "[":
+                    stack.pop()
+
+        recovered = truncated
+        # Se há string em aberto, fecha com um " e descarta o contênero mais
+        # externo (a string estava dentro dele).
+        if in_str:
+            recovered += '"'
+            if stack:
+                stack.pop()
+
+        # Fecha os contêineres na ordem correta (de dentro para fora).
+        recovered += "".join("}" if c == "{" else "]" for c in reversed(stack))
+        try:
+            json.loads(recovered)
+            return recovered
+        except json.JSONDecodeError:
+            continue
+
+    return text
+
+
 def parse_ai_plan(
     content: str,
     catalog: List[Dict[str, Any]],
@@ -964,7 +1063,15 @@ def parse_ai_plan(
     try:
         raw_plan = json.loads(_extract_first_json_object(content))
     except (json.JSONDecodeError, TypeError) as exc:
-        raise AiFailure("json_parse", f"JSON inválido: {exc}") from exc
+        # Recupera JSON truncado (IA atingiu max_tokens) antes de cair no
+        # fallback total. O plano resultante é parcial, mas `parse_ai_plan`
+        # faz salvamento parcial (drop de exercícios inválidos, reconstrução
+        # de sessões) em vez de derrubar o plano inteiro.
+        recovered = _recover_truncated_json(content)
+        try:
+            raw_plan = json.loads(recovered)
+        except (json.JSONDecodeError, TypeError) as exc2:
+            raise AiFailure("json_parse", f"JSON inválido: {exc}") from exc2
     if not isinstance(raw_plan, dict):
         raise AiFailure(
             "json_parse", f"conteúdo não é um objeto JSON ({type(raw_plan).__name__})"
@@ -1070,11 +1177,45 @@ def parse_ai_plan(
     raw_plan["days"] = cleaned_days
     raw_plan["daysPerWeek"] = raw_plan.get("daysPerWeek") or len(cleaned_days)
 
+    # Corrige valores fora do range do ExerciseDTO (targetRpe < 5, restSeconds
+    # > 300, sets < 1) antes de validação pelo schema.
+    _normalize_exercise_fields(raw_plan)
+
     try:
         WorkoutPlanDTO(**raw_plan)
     except Exception as exc:
         raise AiFailure("schema_validation", f"plano rejeitado pelo schema: {exc}") from exc
     return raw_plan
+
+
+def _normalize_exercise_fields(raw_plan: Dict[str, Any]) -> None:
+    """Corrige valores fora do range dos campos do ExerciseDTO antes da
+    validação pelo schema (H3-41).
+
+    A IA pode devolver `targetRpe` < 5.0 (ex.: 4.0), `restSeconds` > 300 ou
+    `sets` < 1. Em vez de derrubar o plano inteiro com `schema_validation`,
+    clampamos para o range válido. Mutação in-place.
+    """
+    for day in raw_plan.get("days", []):
+        for ex in day.get("exercises", []):
+            rpe = ex.get("targetRpe")
+            if isinstance(rpe, (int, float)):
+                if rpe < 5.0:
+                    ex["targetRpe"] = 5.0
+                elif rpe > 10.0:
+                    ex["targetRpe"] = 10.0
+            rest = ex.get("restSeconds")
+            if isinstance(rest, (int, float)):
+                if rest < 0:
+                    ex["restSeconds"] = 0
+                elif rest > 300:
+                    ex["restSeconds"] = 300
+            sets = ex.get("sets")
+            if isinstance(sets, (int, float)):
+                if sets < 1:
+                    ex["sets"] = 1
+                elif sets > 20:
+                    ex["sets"] = 20
 
 
 def salvage_strength_days(
@@ -1349,7 +1490,7 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
                                 {"role": "user", "content": user_prompt},
                             ],
                             "response_format": {"type": "json_object"},
-                            "max_tokens": 8192,
+                            "max_tokens": 16384,
                             "temperature": 0.3,
                             "reasoning": {"effort": "none"},  # JSON mode
                         },

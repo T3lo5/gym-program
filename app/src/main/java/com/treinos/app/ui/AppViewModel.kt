@@ -696,6 +696,26 @@ class AppViewModel(
             availableEquipment = availableEquipment,
         )
 
+    /** Registra uso de um exercício (concluído/pulado/trocado) para calibrar a próxima geração (H3-42). */
+    suspend fun recordExerciseUsage(
+        exerciseId: String,
+        outcome: String,
+        planId: Long? = null,
+        dayId: Long? = null,
+        source: String = "generation",
+    ) = repository.recordExerciseUsage(
+        exerciseId = exerciseId,
+        outcome = outcome,
+        planId = planId,
+        dayId = dayId,
+        source = source,
+    )
+
+    /** Peso de uso de cada exercício do catálogo (últimos 90 dias), para ordenar o prompt da próxima geração. */
+    suspend fun usageWeightsForCatalog(
+        exerciseIds: List<String>,
+    ): Map<String, Int> = repository.usageWeightsForCatalog(exerciseIds)
+
     private fun planExerciseById(exerciseId: String): WorkoutPlanExerciseEntity? =
         activePlans.value
             .flatMap { it.days }
