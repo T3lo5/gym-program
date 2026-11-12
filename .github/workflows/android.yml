@@ -71,14 +71,10 @@ jobs:
       # (./scripts/verify.sh). Build + testes unitários + Android Lint +
       # verificação de assinatura + artifact com checksum.
       - name: Verify APK (build, tests, lint, signature)
+        timeout-minutes: 45
         env:
           VERSION_CODE: ${{ steps.version.outputs.code }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
-          # Espelho do Maven Central para o android-all do Robolectric. O Maven
-          # Central devolve HTTP 429 para alguns IPs do GitHub Actions, fazendo
-          # o download travar e exceder o timeout de 30 min (bug de infra, não
-          # de código). Veja AGENTS.md > Ambiente.
-          ROBOLECTRIC_REPO_URL: https://maven-central.storage-download.googleapis.com/maven2
           # Relatório de cobertura dos testes JVM (informativo: o gate reprova por
           # teste quebrado, nunca por percentual).
           COVERAGE: 1

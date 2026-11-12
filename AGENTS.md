@@ -113,11 +113,18 @@ Configuração e manutenção: `tools/mcp-memory/README.md`.
 
 - Pré-requisito: Docker com daemon acessível. O primeiro `verify.sh` baixa o
   Android SDK e pode demorar; os seguintes usam `.gradle-docker/`.
-- Robolectric baixa o `android-all` (~140 MB) do Maven Central, que devolve
-  HTTP 429 para alguns IPs. Nesse caso o gate falha por infra (`Failed to fetch
-  maven artifact`), não pelo código. Rode com um espelho:
-  `ROBOLECTRIC_REPO_URL=https://maven-central.storage-download.googleapis.com/maven2 ./scripts/verify.sh`.
-  Sem a variável o CI usa o repo padrão e o GitHub Actions não muda.
+- Robolectric **não** baixa o `android-all` em tempo de execução: o jar é
+  resolvido pelo Gradle (`robolectricAndroidApi31/Api34` em
+  `app/build.gradle.kts`) e o teste roda com `robolectric.offline=true`, usando
+  o diretório copiado por `prepareRobolectricDeps`. O download acontece uma vez,
+  no cache de dependências do Gradle (`~/.gradle` no CI, `.gradle-docker/` no
+  gate local). Se o SDK dos testes mudar
+  (`app/src/test/resources/robolectric.properties`), atualize a versão do
+  `android-all-instrumented` junto — o teste falha de forma explícita se o jar
+  não existir.
+- O teste unitário do app tem timeout de 20 min no Gradle; o passo do CI tem
+  timeout de 45 min. Assim um travamento falha rápido em vez de segurar o job
+  até 90 min e pular o release.
 - Saídas: `dist/treinos.apk`, `dist/wear.apk`, `dist/dist.sha256`,
   `app/build/reports/tests/...`, `app/build/reports/lint-results-debug.html`,
   `wear/build/reports/lint-results-debug.html`.

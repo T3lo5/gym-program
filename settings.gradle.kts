@@ -23,6 +23,14 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        // Maven Central devolve HTTP 429 para alguns IPs do GitHub Actions. O
+        // Robolectric resolve o android-all pelo Gradle (modo offline em
+        // app/build.gradle.kts); este espelho oficial evita travar o CI no
+        // download desse artefato. Restrito ao grupo para não mudar as demais
+        // dependências.
+        maven("https://maven-central.storage-download.googleapis.com/maven2") {
+            content { includeGroup("org.robolectric") }
+        }
         mavenCentral()
     }
 }

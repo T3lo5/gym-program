@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("com.android.application") version "8.5.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
@@ -8,6 +10,37 @@ plugins {
 kapt {
     correctErrorTypes = true
     arguments { arg("room.schemaLocation", "$projectDir/schemas") }
+}
+
+// Robolectric baixa o android-all (~150 MB) em TEMPO DE EXECUÇÃO do teste, na
+// Maven Central. No GitHub Actions esse download já pendurou o job por mais de
+// uma hora (Maven Central 429 / espelho sem resposta), estourando o timeout e
+// fazendo o job de release ser pulado. Aqui o jar é resolvido pelo Gradle —
+// entra no cache de dependências (`~/.gradle` no CI, `.gradle-docker` no gate
+// local) — e copiado para um diretório local, com o Robolectric em modo
+// offline. Nenhum teste toca a rede para baixar SDK.
+val robolectricAndroidApi31 by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val robolectricAndroidApi34 by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val robolectricDepsDir = layout.buildDirectory.dir("robolectric-deps")
+
+val prepareRobolectricDeps = tasks.register<Copy>("prepareRobolectricDeps") {
+    description = "Copia o android-all do Robolectric do cache do Gradle para uso offline."
+    // `clean` também roda neste build; sem a ordem, ele pode apagar o destino
+    // depois da cópia quando o build paralelo está ligado.
+    mustRunAfter("clean")
+    from(robolectricAndroidApi31)
+    from(robolectricAndroidApi34)
+    into(robolectricDepsDir)
 }
 
 // Signing configuration - same keystore for debug and release so app updates
@@ -70,16 +103,20 @@ android {
                 ?: System.getProperty("java.io.tmpdir")
             it.systemProperty("user.home", writableHome)
 
-            // O android-all (~140 MB) vem do Maven Central, que devolve HTTP 429
-            // para IPs anônimos e derruba o teste por infra, não por código. A
-            // env aponta para um espelho do mesmo artefato; o CI no GitHub não a
-            // define e continua usando o padrão.
-            System.getenv("ROBOLECTRIC_REPO_URL")?.takeIf { url -> url.isNotBlank() }?.let { url ->
-                it.systemProperty("robolectric.dependency.repo.url", url)
-            }
-            project.findProperty("robolectric.dependency.repo.url")?.let { url ->
-                it.systemProperty("robolectric.dependency.repo.url", url.toString())
-            }
+            // O android-all vem das configurações robolectricAndroidApi31/34
+            // (resolvidas pelo Gradle, cacheadas) copiadas por
+            // prepareRobolectricDeps. offline=true impede qualquer tentativa de
+            // download durante os testes.
+            it.dependsOn(prepareRobolectricDeps)
+            it.systemProperty("robolectric.offline", "true")
+            it.systemProperty(
+                "robolectric.dependency.dir",
+                robolectricDepsDir.get().asFile.absolutePath,
+            )
+
+            // Trava de segurança: se um teste travar, falha em 20 min em vez de
+            // segurar o job até o timeout de 90 min (e pular o release).
+            it.timeout.set(Duration.ofMinutes(20))
         }
     }
 
@@ -149,6 +186,14 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.12.2")
+    // android-all exigido pelo Robolectric. A API 31 vem de
+    // app/src/test/resources/robolectric.properties; a API 34 é o targetSdk do
+    // app e também é pedida em parte do ciclo de configuração. Os dois jars
+    // ficam disponíveis em app/build/robolectric-deps (modo offline). Se o SDK
+    // dos testes mudar, atualize as versões — o teste falha de forma explícita
+    // se o jar não existir.
+    robolectricAndroidApi31("org.robolectric:android-all-instrumented:12-robolectric-7732740-i6")
+    robolectricAndroidApi34("org.robolectric:android-all-instrumented:14-robolectric-10818077-i6")
     testImplementation("androidx.test:core-ktx:1.5.0")
     testImplementation("androidx.test.ext:junit:1.1.5")
     testImplementation("androidx.room:room-testing:2.6.1")

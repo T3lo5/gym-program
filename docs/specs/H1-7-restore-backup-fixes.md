@@ -26,8 +26,10 @@
   foi criado.
 - `app/build.gradle.kts` + `scripts/verify.sh` ganharam `ROBOLECTRIC_REPO_URL`:
   o Maven Central devolvia HTTP 429 para o `android-all` e derrubava o gate por
-  infra. Sem a variável o comportamento é o de antes (repo1), então o CI do
-  GitHub não muda.
+  infra. **Superado:** hoje o `android-all` é resolvido pelo Gradle e copiado
+  por `prepareRobolectricDeps`, com Robolectric em modo offline (ver
+  `AGENTS.md` > Ambiente); a variável foi removida do build, dos scripts e do
+  workflow.
 - `restSeconds` de exercício de sessão continua fora do sync — lacuna documentada
   de H1-6, a ser tratada em H3-1.
 
