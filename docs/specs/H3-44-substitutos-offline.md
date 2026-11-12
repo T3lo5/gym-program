@@ -66,7 +66,7 @@ esperar uma chamada de rede.
 | `app/src/main/assets/exercise_swap_catalog.json` (novo) | Catálogo compacto embarcado (id, nome, músculos, equipamento) para o primeiro uso offline. |
 | `scripts/gen-swap-catalog.py` (novo) | Gera o asset a partir de `back/app/exercise_catalog.json` de forma determinística. |
 | `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | `init` publica `loadLocal()` em `_exerciseMedia` antes do refresh de rede; `loadExerciseMedia` não limpa o mapa em falha; opcional `catalogReady` para a UI. |
-| `app/src/main/java/com/treinos/app/ui/screens/WorkoutScreen.kt` | Remover o ramo "Carregando catálogo…"; com catálogo vazio, mostrar estado explícito ("Catálogo offline indisponível") + ação "Atualizar", sem spinner. Candidatos derivados do catálogo local já presente. |
+| `app/src/main/java/com/treinos/app/ui/screens/WorkoutScreen.kt` | Troca em `ModalBottomSheet`: busca por nome, cartões de candidato com seleção única (rádio + destaque), escopo explícito em `FilterChip` e confirmação única; sem spinner e com estado vazio explícito quando não há catálogo. |
 | `app/src/test/java/com/treinos/app/data/media/ExerciseMediaTest.kt` | Testes puros de `mergeLocal`/`parseSwapCatalog`. |
 | `app/src/test/java/com/treinos/app/data/media/ExerciseMediaLocalTest.kt` (novo) | `loadLocal` com cache expirado/ausente/corrompido e fallback para o asset. |
 | `app/src/test/java/com/treinos/app/data/media/SwapCatalogAssetTest.kt` (novo) | Valida o asset: parse, IDs iguais ao backend, sem duplicados, campos obrigatórios. |
@@ -155,6 +155,28 @@ asset; a persistência da troca usa as entidades existentes (`SessionExercise`,
 - **Rotação/processo morto:** o diálogo reabre a partir do catálogo local já
   carregado; não há estado transitório de "carregando" que sobreviva.
 
+## Polimento de UI/UX (H3-44)
+
+O diálogo antigo era um `AlertDialog` com uma linha por candidato e dois
+botões por linha ("Só hoje"/"Todos"), o que ficava apertado e não deixava o
+escopo claro. A troca passa a ser um `ModalBottomSheet` com:
+
+- cabeçalho "Trocar exercício" + exercício atual e botão fechar;
+- busca por nome (`OutlinedTextField`) e contador "Substitutos (N)";
+- lista rolável de candidatos em cartões selecionáveis: rádio, nome,
+  músculos e equipamento; o selecionado ganha fundo `secondaryContainer` e
+  borda `primary`;
+- escopo explícito em `FilterChip`: "Só hoje" (padrão) ou "Todos os treinos",
+  com uma linha de ajuda explicando o efeito;
+- ações fixas no rodapé: "Cancelar" e "Trocar" (só habilitado após escolher);
+- estados vazios distintos: catálogo ausente (com "Atualizar catálogo"),
+  nenhum candidato para o músculo/equipamento e busca sem resultado.
+
+A busca e o escopo são estado local do sheet, reiniciados a cada abertura.
+A lista inteira é um único `LazyColumn`, então o teclado não esconde as ações
+(`imePadding`) e o usuário rola até o rodapé sem depender de um diálogo com
+altura fixa.
+
 ## Critérios de aceite
 
 1. **Dado** uma instalação nova **e** o aparelho sem internet, **quando** o
@@ -185,7 +207,7 @@ asset; a persistência da troca usa as entidades existentes (`SessionExercise`,
 | `app/src/test/java/com/treinos/app/data/media/ExerciseMediaTest.kt` | `merge_local_prioriza_cache_sobre_asset`, `parse_swap_catalog_ignora_campos_desconhecidos`, `parse_swap_catalog_rejeita_json_invalido` |
 | `app/src/test/java/com/treinos/app/data/media/ExerciseMediaLocalTest.kt` (novo) | `load_local_usa_cache_mesmo_expirado`, `load_local_cai_para_asset_quando_sem_cache`, `cache_corrompido_cai_para_asset`, `cache_vazio_cai_para_asset` |
 | `app/src/test/java/com/treinos/app/data/media/SwapCatalogAssetTest.kt` | `asset_catalogo_e_parseavel`, `asset_ids_iguais_ao_backend`, `asset_sem_ids_duplicados`, `asset_campos_obrigatorios`, `asset_ordem_deterministica` |
-| `app/src/test/java/com/treinos/app/ui/WorkoutScreenTest.kt` | `dialogo_troca_nao_mostra_carregando_quando_catalogo_presente`, `dialogo_troca_sem_catalogo_mostra_estado_vazio_sem_progresso` |
+| `app/src/test/java/com/treinos/app/ui/WorkoutScreenTest.kt` | `dialogo_troca_nao_mostra_carregando_quando_catalogo_presente`, `dialogo_troca_sem_catalogo_mostra_estado_vazio_sem_progresso`, `dialogo_troca_seleciona_substituto_e_escopo` |
 | `app/src/test/java/com/treinos/app/data/ExerciseSwapTest.kt` | (regressão, sem mudança) `candidatos_filtram_por_musculo_e_equipamento`, `candidatos_nao_incluem_exercicios_ja_presentes_no_dia` |
 | `app/src/test/java/com/treinos/app/data/SessionSwapTest.kt` | (regressão, sem mudança) `candidatos_filtram_por_musculo_e_equipamento` |
 

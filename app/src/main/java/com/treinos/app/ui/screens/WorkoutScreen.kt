@@ -1,5 +1,7 @@
 package com.treinos.app.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,36 +9,44 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -81,10 +92,12 @@ import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.decorativeContentDescription
+import com.treinos.app.ui.equipmentLabel
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
+import com.treinos.app.ui.muscleLabel
 import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.progressStateDescription
@@ -473,7 +486,7 @@ fun WorkoutScreen(
         )
     }
 
-    // Diálogo de troca de exercício durante o treino em andamento.
+    // H3-44/H3-43: troca de exercício durante o treino em andamento.
     if (showSwapConfirm && swapTargetId != null && session != null) {
         val exerciseEntity = session.exercises.firstOrNull { it.exercise.id == swapTargetId }
         val takenExerciseIds = session.exercises.map { it.exercise.exerciseId }.toList()
@@ -489,93 +502,252 @@ fun WorkoutScreen(
                 availableEquipment = availableEquipment,
             )
         } ?: emptyList()
-        AlertDialog(
-            onDismissRequest = { showSwapConfirm = false },
-            title = { Text("Trocar exercício?") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                        .width(300.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+        val currentName = exerciseEntity?.exercise?.exerciseName
+            ?.takeIf { it.isNotBlank() }
+            ?: swapTargetId.toString()
+        SwapExerciseSheet(
+            currentExerciseName = currentName,
+            candidates = candidates,
+            catalogEmpty = catalogEmpty,
+            onDismiss = { showSwapConfirm = false },
+            onConfirm = { replacementId, scope ->
+                showSwapConfirm = false
+                onSwapExercise?.invoke(swapTargetId!!, replacementId, scope)
+            },
+            onRefreshCatalog = onLoadCatalog,
+        )
+    }
+}
+
+/**
+ * Seleção do substituto de exercício (H3-44/H3-43).
+ *
+ * Bottom sheet com busca, cartões selecionáveis, escopo explícito e confirmação
+ * única — no lugar do antigo AlertDialog com um par de botões por linha.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwapExerciseSheet(
+    currentExerciseName: String,
+    candidates: List<ExerciseMedia>,
+    catalogEmpty: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String, SwapScope) -> Unit,
+    onRefreshCatalog: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var search by remember { mutableStateOf("") }
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    var scope by remember { mutableStateOf(SwapScope.THIS_SESSION) }
+
+    val filtered = if (search.isBlank()) {
+        candidates
+    } else {
+        candidates.filter { it.name.contains(search, ignoreCase = true) }
+    }
+    val selected = filtered.firstOrNull { it.id == selectedId }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .testTag("swap_sheet_list")
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (catalogEmpty) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Catálogo offline indisponível.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Trocar exercício",
+                            style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            text = "Atualize o catálogo para ver os substitutos.",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "Substituir «$currentExerciseName»",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    } else {
-                        Text(
-                            text = "Escolha um substituto com o mesmo músculo e equipamento informado."
-                        )
-                        if (candidates.isEmpty()) {
-                            Text(
-                                text = "Não há substituto disponível com o equipamento informado.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Fechar")
+                    }
+                }
+            }
+
+            if (catalogEmpty) {
+                item {
+                    Text(
+                        text = "Catálogo offline indisponível.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                item {
+                    Text(
+                        text = "Atualize o catálogo para ver os substitutos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    Button(
+                        onClick = onRefreshCatalog,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Atualizar catálogo")
+                    }
+                }
+            } else if (candidates.isEmpty()) {
+                item {
+                    Text(
+                        text = "Nenhum substituto com o mesmo músculo e equipamento.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            } else {
+                item {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Buscar substituto") },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                }
+                item {
+                    Text(
+                        text = "Substitutos (${filtered.size})",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                items(filtered, key = { it.id }) { candidate ->
+                    val isSelected = candidate.id == selectedId
+                    val muscles = candidate.primaryMuscles
+                        .joinToString(" • ") { muscleLabel(it) }
+                    val equipment = candidate.equipment
+                        .takeIf { it.isNotBlank() }
+                        ?.let { " • ${equipmentLabel(it)}" }
+                        .orEmpty()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.RadioButton,
+                                onClick = { selectedId = candidate.id },
                             )
-                        } else {
+                            .background(
+                                if (isSelected) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                                MaterialTheme.shapes.medium,
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = isSelected,
+                            onClick = null,
+                        )
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                        ) {
                             Text(
-                                text = "Substitutos sugeridos:",
+                                text = candidate.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = "$muscles$equipment",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            candidates.forEach { candidate ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(text = candidate.name)
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        TextButton(
-                                            onClick = {
-                                                showSwapConfirm = false
-                                                onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.THIS_SESSION)
-                                            },
-                                        ) {
-                                            Text("Só hoje")
-                                        }
-                                        TextButton(
-                                            onClick = {
-                                                showSwapConfirm = false
-                                                onSwapExercise?.invoke(swapTargetId!!, candidate.id, SwapScope.ALL_FUTURE)
-                                            },
-                                        ) {
-                                            Text("Todos")
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                if (catalogEmpty) {
-                    TextButton(
-                        onClick = { onLoadCatalog() },
-                        modifier = Modifier.minimumInteractiveComponentSize(),
-                    ) {
-                        Text("Atualizar")
-                    }
-                } else {
-                    TextButton(
-                        onClick = { showSwapConfirm = false },
-                        modifier = Modifier.minimumInteractiveComponentSize(),
-                    ) {
-                        Text("Cancelar")
+                if (filtered.isEmpty()) {
+                    item {
+                        Text(
+                            text = "Nenhum substituto encontrado para «$search».",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
                     }
                 }
-            },
-            dismissButton = null,
-        )
+                item {
+                    Text(
+                        text = "A troca vale para:",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = scope == SwapScope.THIS_SESSION,
+                            onClick = { scope = SwapScope.THIS_SESSION },
+                            label = { Text("Só hoje") },
+                        )
+                        FilterChip(
+                            selected = scope == SwapScope.ALL_FUTURE,
+                            onClick = { scope = SwapScope.ALL_FUTURE },
+                            label = { Text("Todos os treinos") },
+                        )
+                    }
+                }
+                item {
+                    Text(
+                        text = if (scope == SwapScope.THIS_SESSION) {
+                            "Apenas a sessão atual."
+                        } else {
+                            "Atualiza o plano salvo; vale para os próximos treinos."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancelar") }
+                    Button(
+                        onClick = { selected?.let { onConfirm(it.id, scope) } },
+                        enabled = selected != null,
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        Text("Trocar")
+                    }
+                }
+            }
+        }
     }
 }
 

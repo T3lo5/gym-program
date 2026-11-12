@@ -1,10 +1,12 @@
 package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -276,7 +278,7 @@ class WorkoutScreenTest {
 
         abrirDialogoDeTroca()
 
-        composeRule.onNodeWithText("Trocar exercício?").assertIsDisplayed()
+        composeRule.onNodeWithText("Substitutos (1)").assertIsDisplayed()
         composeRule.onNodeWithText("Carregando catálogo de exercícios…").assertDoesNotExist()
         composeRule.onNodeWithText("Supino Halter").assertIsDisplayed()
     }
@@ -297,7 +299,36 @@ class WorkoutScreenTest {
 
         composeRule.onNodeWithText("Catálogo offline indisponível.").assertIsDisplayed()
         composeRule.onNodeWithText("Carregando catálogo de exercícios…").assertDoesNotExist()
-        composeRule.onNodeWithText("Atualizar").performClick()
+        composeRule.onNodeWithText("Atualizar catálogo").performClick()
         assertTrue(pediuAtualizacao)
+    }
+
+    @Test
+    fun dialogo_troca_seleciona_substituto_e_escopo() {
+        // H3-44: seleção única + escopo explícito; confirmar só depois de
+        // escolher, enviando o id e o escopo para a camada de troca.
+        var troca: Triple<Long, String, SwapScope>? = null
+        setContent(
+            session = sessao(),
+            exerciseMedia = catalogoComSubstituto(),
+            availableEquipment = listOf("barbell", "dumbbell"),
+            onSwapExercise = { id, replacementId, scope ->
+                troca = Triple(id, replacementId, scope)
+            },
+        )
+
+        abrirDialogoDeTroca()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Supino Halter").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("swap_sheet_list").performScrollToNode(hasText("Todos os treinos"))
+        composeRule.onNodeWithText("Todos os treinos").performClick()
+        composeRule.onNodeWithTag("swap_sheet_list").performScrollToNode(hasText("Trocar"))
+        composeRule.onNodeWithText("Trocar").assertIsEnabled().performClick()
+
+        assertEquals(
+            Triple(100L, "Dumbbell_Bench_Press", SwapScope.ALL_FUTURE),
+            troca,
+        )
     }
 }
