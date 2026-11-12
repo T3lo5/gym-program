@@ -537,6 +537,11 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
+            // H3-44: publica o catálogo local (cache ou asset embarcado) antes
+            // de qualquer rede. O diálogo de troca nunca espera o backend.
+            exerciseMediaRepository?.let { repo ->
+                _exerciseMedia.value = repo.loadLocal()
+            }
             loadExerciseMedia(false)
         }
         restorePersistedRest()

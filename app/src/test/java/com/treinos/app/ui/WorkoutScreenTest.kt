@@ -14,6 +14,8 @@ import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.SwapScope
+import com.treinos.app.data.media.ExerciseMedia
 import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
@@ -93,6 +95,10 @@ class WorkoutScreenTest {
         onLoggedSet: (Int?, Double?, Double?) -> Unit = { _, _, _ -> },
         onFinished: () -> Unit = {},
         onUpdatedSet: (Int?, Double?, Double?) -> Unit = { _, _, _ -> },
+        exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
+        availableEquipment: List<String> = emptyList(),
+        onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
+        onLoadCatalog: () -> Unit = {},
     ) {
         composeRule.setContent {
             WorkoutScreen(
@@ -106,8 +112,38 @@ class WorkoutScreenTest {
                 hasInProgressSession = false,
                 restPaused = restPaused,
                 onUpdateSet = { _, reps, weight, rpe -> onUpdatedSet(reps, weight, rpe) },
+                exerciseMedia = exerciseMedia,
+                availableEquipment = availableEquipment,
+                onSwapExercise = onSwapExercise,
+                onLoadCatalog = onLoadCatalog,
             )
         }
+    }
+
+    private fun catalogoComSubstituto(): Map<String, ExerciseMedia> = mapOf(
+        "Barbell_Bench_Press" to ExerciseMedia(
+            id = "Barbell_Bench_Press",
+            name = "Supino reto",
+            primaryMuscles = listOf("chest"),
+            equipment = "barbell",
+            instructions = emptyList(),
+            imageUrl = null,
+        ),
+        "Dumbbell_Bench_Press" to ExerciseMedia(
+            id = "Dumbbell_Bench_Press",
+            name = "Supino Halter",
+            primaryMuscles = listOf("chest"),
+            equipment = "dumbbell",
+            instructions = emptyList(),
+            imageUrl = null,
+        ),
+    )
+
+    private fun abrirDialogoDeTroca() {
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Trocar exercício"))
+        composeRule.onNodeWithText("Trocar exercício").performClick()
     }
 
     /** Campo de texto localizado pelo valor atual (o rótulo fica em outro nó). */
@@ -227,4 +263,41 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("62,5").assertIsDisplayed()
     }
 
+    @Test
+    fun dialogo_troca_nao_mostra_carregando_quando_catalogo_presente() {
+        // H3-44: com o catálogo local já publicado, a troca abre direto na
+        // lista de substitutos; nada de "Carregando catálogo" nem de rede.
+        setContent(
+            session = sessao(),
+            exerciseMedia = catalogoComSubstituto(),
+            availableEquipment = listOf("barbell", "dumbbell"),
+            onSwapExercise = { _, _, _ -> },
+        )
+
+        abrirDialogoDeTroca()
+
+        composeRule.onNodeWithText("Trocar exercício?").assertIsDisplayed()
+        composeRule.onNodeWithText("Carregando catálogo de exercícios…").assertDoesNotExist()
+        composeRule.onNodeWithText("Supino Halter").assertIsDisplayed()
+    }
+
+    @Test
+    fun dialogo_troca_sem_catalogo_mostra_estado_vazio_sem_progresso() {
+        // H3-44: sem catálogo local (asset ausente/corrompido), o diálogo diz
+        // isso explicitamente e oferece "Atualizar"; não fica em spinner.
+        var pediuAtualizacao = false
+        setContent(
+            session = sessao(),
+            exerciseMedia = emptyMap(),
+            onSwapExercise = { _, _, _ -> },
+            onLoadCatalog = { pediuAtualizacao = true },
+        )
+
+        abrirDialogoDeTroca()
+
+        composeRule.onNodeWithText("Catálogo offline indisponível.").assertIsDisplayed()
+        composeRule.onNodeWithText("Carregando catálogo de exercícios…").assertDoesNotExist()
+        composeRule.onNodeWithText("Atualizar").performClick()
+        assertTrue(pediuAtualizacao)
+    }
 }

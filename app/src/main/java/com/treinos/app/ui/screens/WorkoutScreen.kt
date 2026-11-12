@@ -477,7 +477,10 @@ fun WorkoutScreen(
     if (showSwapConfirm && swapTargetId != null && session != null) {
         val exerciseEntity = session.exercises.firstOrNull { it.exercise.id == swapTargetId }
         val takenExerciseIds = session.exercises.map { it.exercise.exerciseId }.toList()
-        val mediaEmpty = exerciseMedia.isEmpty()
+        // H3-44: catálogo local (cache/asset) já deve estar pronto. Vazio aqui
+        // significa "não tenho substitutos", não "ainda estou baixando": nada de
+        // spinner nem de disparar rede ao abrir o diálogo.
+        val catalogEmpty = exerciseMedia.isEmpty()
         val candidates = exerciseEntity?.let {
             sessionSwapCandidates(
                 sessionExercise = it.exercise,
@@ -496,15 +499,15 @@ fun WorkoutScreen(
                         .width(300.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (mediaEmpty) {
-                        LaunchedEffect(showSwapConfirm) {
-                            if (showSwapConfirm) {
-                                onLoadCatalog()
-                            }
-                        }
+                    if (catalogEmpty) {
                         Text(
-                            text = "Carregando catálogo de exercícios…",
+                            text = "Catálogo offline indisponível.",
                             style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = "Atualize o catálogo para ver os substitutos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
@@ -555,12 +558,12 @@ fun WorkoutScreen(
                 }
             },
             confirmButton = {
-                if (mediaEmpty) {
+                if (catalogEmpty) {
                     TextButton(
                         onClick = { onLoadCatalog() },
                         modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
-                        Text("Carregar")
+                        Text("Atualizar")
                     }
                 } else {
                     TextButton(

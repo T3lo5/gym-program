@@ -225,4 +225,77 @@ class ExerciseMediaTest {
             parcial.resolvedFor("pt").instructions,
         )
     }
+
+    @Test
+    fun merge_local_prioriza_cache_sobre_asset() {
+        val cache = mapOf(
+            "Barbell_Bench_Press" to ExerciseMedia(
+                id = "Barbell_Bench_Press",
+                name = "Supino Barra",
+                primaryMuscles = listOf("chest"),
+                equipment = "barbell",
+                instructions = listOf("Deite no banco."),
+                imageUrl = null,
+            ),
+        )
+        val asset = mapOf(
+            "Barbell_Bench_Press" to ExerciseMedia(
+                id = "Barbell_Bench_Press",
+                name = "Barbell Bench Press",
+                primaryMuscles = listOf("chest"),
+                equipment = "barbell",
+                instructions = emptyList(),
+                imageUrl = null,
+            ),
+        )
+
+        assertEquals(cache, ExerciseMediaRepository.mergeLocal(cache, asset))
+        assertEquals(asset, ExerciseMediaRepository.mergeLocal(emptyMap(), asset))
+        assertEquals(
+            emptyMap<String, ExerciseMedia>(),
+            ExerciseMediaRepository.mergeLocal(null, emptyMap()),
+        )
+    }
+
+    @Test
+    fun parse_swap_catalog_ignora_campos_desconhecidos() {
+        val raw = """
+            {
+              "version": 1,
+              "exercises": [
+                {
+                  "id": "Barbell_Bench_Press",
+                  "name": "Barbell Bench Press",
+                  "primaryMuscles": ["chest"],
+                  "equipment": "barbell",
+                  "category": "strength",
+                  "images": ["Barbell_Bench_Press/0.jpg"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val catalog = ExerciseMediaRepository.parseSwapCatalog(raw)
+
+        assertEquals(1, catalog.size)
+        val media = catalog.getValue("Barbell_Bench_Press")
+        assertEquals("Barbell Bench Press", media.name)
+        assertEquals(listOf("chest"), media.primaryMuscles)
+        assertEquals("barbell", media.equipment)
+        // O asset é só para troca: sem imagens/instruções.
+        assertNull(media.imageUrl)
+        assertEquals(emptyList<String>(), media.instructions)
+    }
+
+    @Test
+    fun parse_swap_catalog_rejeita_json_invalido() {
+        assertEquals(
+            emptyMap<String, ExerciseMedia>(),
+            ExerciseMediaRepository.parseSwapCatalog("nao e json"),
+        )
+        assertEquals(
+            emptyMap<String, ExerciseMedia>(),
+            ExerciseMediaRepository.parseSwapCatalog("{\"version\": 2, \"exercises\": []}"),
+        )
+    }
 }

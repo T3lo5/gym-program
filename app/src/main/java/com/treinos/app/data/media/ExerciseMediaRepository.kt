@@ -66,6 +66,25 @@ private data class CachedExercise(
     val instructionsPt: List<String>? = null,
 )
 
+/**
+ * H3-44: formato do catálogo embarcado usado quando não há cache. Só os campos
+ * necessários para listar e aplicar a troca de exercício; sem imagens nem
+ * instruções (a mídia completa continua vindo do cache/backend).
+ */
+@Serializable
+private data class SwapCatalogDto(
+    val version: Int = 0,
+    val exercises: List<SwapExerciseDto> = emptyList(),
+)
+
+@Serializable
+private data class SwapExerciseDto(
+    val id: String = "",
+    val name: String = "",
+    val primaryMuscles: List<String> = emptyList(),
+    val equipment: String = "",
+)
+
 class ExerciseMediaRepository(
     private val context: Context,
     private val backendClient: BackendClient,
@@ -79,6 +98,51 @@ class ExerciseMediaRepository(
     companion object {
         const val IMAGE_BASE_URL =
             "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/"
+
+        /** H3-44: catálogo compacto embarcado, usado quando não há cache. */
+        const val BUNDLED_ASSET = "exercise_swap_catalog.json"
+
+        private val swapJson = Json { ignoreUnknownKeys = true }
+
+        /**
+         * H3-44: catálogo local sem rede. Cache vence; sem cache (ou cache
+         * inválido/vazio), usa o asset embarcado. Pura o suficiente para testar
+         * sem tocar no Android: recebe os dois mapas já lidos.
+         */
+        internal fun mergeLocal(
+            cached: Map<String, ExerciseMedia>?,
+            bundled: Map<String, ExerciseMedia>?,
+        ): Map<String, ExerciseMedia> =
+            cached?.takeIf { it.isNotEmpty() }
+                ?: bundled?.takeIf { it.isNotEmpty() }
+                ?: emptyMap()
+
+        /**
+         * H3-44: interpreta o JSON do asset embarcado. `version` diferente de 1
+         * e JSON inválido devolvem mapa vazio (a UI mostra estado explícito em
+         * vez de quebrar). Entradas sem id/nome são descartadas.
+         */
+        internal fun parseSwapCatalog(raw: String): Map<String, ExerciseMedia> {
+            val dto = runCatching {
+                swapJson.decodeFromString<SwapCatalogDto>(raw)
+            }.getOrNull() ?: return emptyMap()
+            if (dto.version != 1) return emptyMap()
+            return dto.exercises.mapNotNull { exercise ->
+                val id = exercise.id.trim()
+                val name = exercise.name.trim()
+                if (id.isEmpty() || name.isEmpty()) return@mapNotNull null
+                id to ExerciseMedia(
+                    id = id,
+                    name = name,
+                    primaryMuscles = exercise.primaryMuscles
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() },
+                    equipment = exercise.equipment.trim(),
+                    instructions = emptyList(),
+                    imageUrl = null,
+                )
+            }.toMap()
+        }
 
         /**
          * Monta a URL da primeira imagem, codificando cada segmento do path
@@ -110,29 +174,54 @@ class ExerciseMediaRepository(
             fetched?.takeIf { it.isNotEmpty() } ?: cached ?: emptyMap()
     }
 
+    /**
+     * H3-44: catálogo local, sem rede. Usado pelo `AppViewModel` assim que o
+     * processo começa para que a UI (inclusive o diálogo de troca) já tenha
+     * substitutos antes de qualquer fetch.
+     */
+    suspend fun loadLocal(): Map<String, ExerciseMedia> = withContext(Dispatchers.IO) {
+        localize(readLocalCatalog())
+    }
+
     suspend fun load(forceRefresh: Boolean = false): Map<String, ExerciseMedia> =
         withContext(Dispatchers.IO) {
-            // H3-36: o cache/merge guarda EN + PT; a resolução por idioma
-            // acontece na saída, lendo a preferência do app (default "pt").
-            val language = AppPreferences(context).language
-            fun localize(map: Map<String, ExerciseMedia>) =
-                map.mapValues { (_, media) -> media.resolvedFor(language) }
-
-            val cached = if (!forceRefresh) readCache() else null
-            if (cached != null && !isExpired()) {
-                return@withContext localize(cached)
+            val local = readLocalCatalog()
+            // H3-44: cache-first. Cache expirado ainda é catálogo válido para
+            // uso offline; o TTL só decide se vale buscar uma versão nova. Sem
+            // cache/asset, `local` é vazio e o fetch abaixo tenta preencher.
+            if (!forceRefresh && local.isNotEmpty() && !isExpired()) {
+                return@withContext localize(local)
             }
 
             val fetched = runCatching { fetchFromBackend() }.getOrNull()
             // H3-24: resposta vazia do catálogo chega como `null` e nunca vira
             // cache — o mapa anterior permanece e um vazio não é gravado por
             // 7 dias envenenando a resolução de mídia.
-            val merged = mergeCatalog(cached, fetched)
-            if (merged.isNotEmpty() && merged !== cached) {
+            val merged = mergeCatalog(local, fetched)
+            if (merged.isNotEmpty() && merged !== local) {
                 writeCache(merged)
             }
             return@withContext localize(merged)
         }
+
+    /**
+     * H3-44: cache vence; na ausência dele, o asset embarcado garante
+     * substitutos no primeiro uso offline.
+     */
+    private fun readLocalCatalog(): Map<String, ExerciseMedia> =
+        mergeLocal(readCache(), readBundled())
+
+    private fun readBundled(): Map<String, ExerciseMedia>? =
+        runCatching {
+            context.assets.open(BUNDLED_ASSET).bufferedReader().use { it.readText() }
+        }.getOrNull()?.let(::parseSwapCatalog)?.takeIf { it.isNotEmpty() }
+
+    private fun localize(map: Map<String, ExerciseMedia>): Map<String, ExerciseMedia> {
+        // H3-36: o cache/merge guarda EN + PT; a resolução por idioma acontece
+        // na saída, lendo a preferência do app (default "pt").
+        val language = AppPreferences(context).language
+        return map.mapValues { (_, media) -> media.resolvedFor(language) }
+    }
 
     private suspend fun fetchFromBackend(): Map<String, ExerciseMedia>? {
         val response: CatalogResponseDto = backendClient.catalog()
@@ -206,7 +295,14 @@ class ExerciseMediaRepository(
                 )
             }
             val cached = CachedCatalog(fetchedAt = System.currentTimeMillis(), exercises = exercises)
-            cacheFile.writeText(json.encodeToString(CachedCatalog.serializer(), cached))
+            // H3-44: gravação atômica — um leitor nunca vê um JSON pela metade
+            // se o processo morrer (ou outra thread ler) durante o refresh.
+            val temporary = File(cacheFile.path + ".tmp")
+            temporary.writeText(json.encodeToString(CachedCatalog.serializer(), cached))
+            if (!temporary.renameTo(cacheFile)) {
+                cacheFile.writeText(temporary.readText())
+                temporary.delete()
+            }
         }
     }
 
