@@ -19,7 +19,7 @@ class WearStateStore(
 
     companion object {
         private const val KEY_STATE = "wear_last_state"
-        private const val KEY_PENDING_COMMANDS = "wear_pending_commands"
+        private const val KEY_PENDING_COMMANDS = "wear_pending_commands_v2"
     }
 
     fun saveState(state: WearWorkoutState) {
@@ -41,18 +41,11 @@ class WearStateStore(
         _state.value = null
     }
 
-    fun enqueueCommand(commandId: String) {
-        val ids = (prefs.getStringSet(KEY_PENDING_COMMANDS, emptySet()) ?: emptySet()).toMutableSet()
-        ids.add(commandId)
-        if (ids.size > 20) ids.remove(ids.first())
-        prefs.edit().putStringSet(KEY_PENDING_COMMANDS, ids).apply()
+    fun savePendingCommands(queue: WearCommandQueue) {
+        prefs.edit().putString(KEY_PENDING_COMMANDS, queue.encode()).apply()
     }
 
-    fun loadPendingCommands(): List<String> {
-        return (prefs.getStringSet(KEY_PENDING_COMMANDS, emptySet()) ?: emptySet()).toList()
-    }
-
-    fun clearPendingCommands() {
-        prefs.edit().remove(KEY_PENDING_COMMANDS).apply()
+    fun loadPendingCommands(): WearCommandQueue {
+        return WearCommandQueue.decode(prefs.getString(KEY_PENDING_COMMANDS, null))
     }
 }

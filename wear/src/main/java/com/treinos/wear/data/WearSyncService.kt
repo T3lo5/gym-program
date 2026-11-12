@@ -7,10 +7,9 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.treinos.protocol.PATH_COMMAND
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
@@ -41,6 +40,7 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
 
     override fun onPeerConnected(peer: com.google.android.gms.wearable.Node) {
         super.onPeerConnected(peer)
+        resendPendingCommands()
         sendRequestState()
     }
 
@@ -67,22 +67,33 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         }
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        super.onMessageReceived(messageEvent)
-        if (messageEvent.path != "/treinos/command") return
-        val data = messageEvent.data
-        if (data.isEmpty()) return
-        val comando = try {
-            Json { ignoreUnknownKeys = true }.decodeFromString(WearCommand.serializer(), String(data))
-        } catch (e: Exception) {
-            Log.w("WearSyncService", "Falha ao decodificar comando", e)
-            return
+    private fun resendPendingCommands() {
+        val store = stateStore ?: return
+        val queue = store.loadPendingCommands()
+        if (queue.isEmpty()) return
+        val nodes = runCatching {
+            Tasks.await(Wearable.getNodeClient(this).getConnectedNodes())
+        }.getOrNull() ?: return
+        if (nodes.isEmpty()) return
+        for (comando in queue.all()) {
+            val payload = Json.encodeToString(WearCommand.serializer(), comando)
+            var delivered = false
+            for (node in nodes) {
+                try {
+                    Tasks.await(
+                        Wearable.getMessageClient(this)
+                            .sendMessage(node.id, PATH_COMMAND, payload.toByteArray()),
+                    )
+                    delivered = true
+                } catch (e: Exception) {
+                    Log.w("WearSyncService", "Falha ao reenviar ${comando.commandId}", e)
+                }
+            }
+            if (delivered) {
+                queue.removeById(comando.commandId)
+            }
         }
-        if (comando.protocolVersion != 1) {
-            Log.w("WearSyncService", "Versão de comando incompatível: ${comando.protocolVersion}")
-            return
-        }
-        stateStore?.enqueueCommand(comando.commandId)
+        store.savePendingCommands(queue)
     }
 
     private fun sendRequestState() {
@@ -95,7 +106,7 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         val payload = Json.encodeToString(WearCommand.serializer(), comando)
         for (node in nodes) {
             try {
-                Tasks.await(Wearable.getMessageClient(this).sendMessage(node.id, "/treinos/command", payload.toByteArray()))
+                Tasks.await(Wearable.getMessageClient(this).sendMessage(node.id, PATH_COMMAND, payload.toByteArray()))
             } catch (e: Exception) {
                 Log.w("WearSyncService", "Falha ao enviar REQUEST_STATE", e)
             }
