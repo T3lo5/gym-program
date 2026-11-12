@@ -40,6 +40,7 @@ object WearSessionMapper {
         return WearWorkoutState(
             sessionId = session.session.id,
             dayName = session.session.dayName,
+            modality = session.session.modality,
             exerciseIndex = idx,
             exerciseCount = exercicios.size,
             exerciseName = ex?.let { e ->

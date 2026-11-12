@@ -124,6 +124,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-34 | Acessibilidade dinâmica e contraste real | `WorkoutScreen` (`liveRegion` início do descanso + anúncio "Série N salva — X reps, Y kg"; scroll no `SetDialog`), `GenerateScreen` (`toggleable(role = Checkbox)` no Row da modalidade + `supportingText` "Inteiro de 1 a 7" com filtro 1–7), `MobilityScreen` (`liveRegion` no marco do timer; `verticalScroll`), `RunWorkoutScreen` (`verticalScroll`), `SettingsScreen`/`Common.kt` (`liveRegion = Polite` nas mensagens de `StatusText`), `Contrast.kt` (blend de alpha) + `Theme.kt` (consts de cor), `ContrastTest` (selo IA, error/tertiary, errorContainer, alpha blend) e `A11yTest` (checkbox role/rótulo, liveRegion descanso/mobilidade, supporting text sessões); testes `ContrastTest` (+3) e `A11yTest` (+4); [spec](docs/specs/H3-34-acessibilidade-dinamica.md) |
 | H3-17 | Alvo de reps e última série no pulso | Room v6 aditiva (`AppDatabase.MIGRATION_5_6`, schema `6.json`): `SessionExerciseEntity.targetReps` persistido; `WorkoutRepository.startSession` copia `WorkoutPlanExerciseEntity.targetReps` para a sessão; `WearSessionMapper` publica `targetReps` (não mais vazio) e `lastWeightKg/lastReps`; relógio mostra "Alvo: ..." só quando há valor e "Última: ..." via `WearFormat.formatLastSet` (kg inteiro/fracionário com vírgula, reps); testes `MigrationTest.migracao_5_6_preserva_linhas`, `WearSessionMapperTest` (alvo/última série), `WearFormatTest`; [spec](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md) |
 | H3-18 | Timer de descanso contando no pulso | `WearTimer.syncFromState` pura decide Reset/Skip a partir de `WearWorkoutState` com chave `sessionId:exerciseIndex:setNumber:restRemainingSeconds`; `WorkoutWearScreen` mantém `WearTimerState` com `LaunchedEffect` de tick de 1 s e renderiza o descanso local; botão "Pular Descanso" aplica `Skip` local e envia `SKIP_REST`; `AppViewModel.startRest` grava `_restRemaining` síncrono antes do loop e `skipRest` publica estado; testes `WearTimerTest` (5 novos de sincronização); [spec](docs/specs/H3-18-timer-descanso-pulso.md) |
+| H3-19 | Corrida e mobilidade no relógio | Campo aditivo `modality` em `WearWorkoutState` (default `"strength"`, `protocolVersion` 1); `WearSessionMapper` publica `session.session.modality`; `WearSessionKind.from` mapeia `run`/`mobility` (desconhecido/vazio → Strength) e `WorkoutWearScreen` ramifica: força mantém séries/alvo/descanso, corrida/mobilidade mostram `dayName` + "Em andamento" + "Finalizar Treino"; testes `WearProtocolTest` (+2), `WearSessionMapperTest` (+2) e `WearSessionKindTest` (5); [spec](docs/specs/H3-19-corrida-mobilidade-relogio.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -156,7 +157,6 @@ implementada separadamente.
 |----|------|--------|----------|------------------|---------|------------|------|
 | H3-17 | Alvo de reps e última série no pulso | **M** (concluída) | Relógio mostrava "Alvo: " vazio e ignorava a última carga/reps. | `session_exercises.targetReps` persistido (Room v6, `MIGRATION_5_6`), `startSession` copia do plano, mapper publica alvo e a tela mostra "Alvo"/"Última" (`WearFormat`). | 0,5 dia | H2-2 | [H3-17](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md) (concluída) |
 | H3-18 | Timer de descanso contando no pulso | **M** (concluída) | `WearTimer` não estava ligado à tela; o número era estático. | `WearTimer.syncFromState` pura, `WorkoutWearScreen` com tick de 1 s e descanso local, `startRest` síncrono + `skipRest` publicando estado; [spec](docs/specs/H3-18-timer-descanso-pulso.md) (concluída) | 0,5 dia | H2-2 | [H3-18](docs/specs/H3-18-timer-descanso-pulso.md) (concluída) |
-| H3-19 | Corrida e mobilidade no relógio | **M** | Sessões sem exercícios (H3-11) viram tela vazia no relógio. | Campo aditivo `modality` no `:protocol`; relógio distingue o tipo da sessão e mostra estado coerente (nome + "Em andamento" + finalizar). | 1 dia | H3-11 | [H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md) (proposta) |
 | H3-20 | Robustez de conexão do relógio | **S** | Sem selo "Sem conexão", sem debounce e fila offline guarda só IDs. | Selo via capability + debounce 2 s + fila real de comandos reenviada ao reconectar. | 1–1,5 dia | H2-2 | [H3-20](docs/specs/H3-20-robustez-conexao-relogio.md) (proposta) |
 | H3-8 | Backup na nuvem do usuário (SAF) | **C** | O usuário quer o backup no OneDrive/Drive/Dropbox dele. | Nenhum SDK, nenhum OAuth: o `CreateDocument`/`OpenDocument` já elenca os provedores do sistema. Validar com os três provedores, ligar o feedback de leitura (`BackupImportState.Reading`) e escrever o texto de ajuda. | 0,5 dia | H1-7, H3-6 | [H3-8](docs/specs/H3-8-cloud-saf-backup.md) |
 | H3-14 | ~~Imagens dos exercícios no plano~~ **substituída pela H3-24** | **C** | Coberta pela H3-24 (mídia do plano + catálogo resiliente). | Não implementar separadamente. | — | H1-3 | [H3-24](docs/specs/H3-24-midia-exercicio-plano.md) |
@@ -259,11 +259,13 @@ Concluído:  H1-1..H1-7 (core, fundação de dados, restauração/backup) + H2-1
             H3-11/H3-12/H3-13/H3-15/H3-16 (qualidade, progressão, perfil no
             backup/sexo, rules do Android ligadas, sessões híbridas por
             modalidade, volume visível, títulos por split, múltiplos planos na
-            Home e geração complementar) + H3-21/H3-22/H3-23/H3-24 (diagnóstico do
+            Home e geração complementar) + H3-17/H3-18/H3-19 (MVP do relógio: alvo e
+            última série no pulso, timer de descanso e corrida/mobilidade) +
+            H3-21/H3-22/H3-23/H3-24 (diagnóstico do
             fallback, robustez da IA, foco muscular priorizado no principal e
             mídia do exercício com plano como fonte + catálogo resiliente)
-Agora:      MVP do relógio H3-17 → H3-18 → H3-19 → H3-20 (fila de correções
-            prioritárias H3-21–H3-24 concluída)
+Agora:      H3-20 (último item do MVP do relógio: selo de conexão, debounce e
+            fila offline real)
 Depois:     H3-8 (nuvem via SAF)
             e H3-25 (seleção por nome na geração) continuam Could, sem
             prioridade agora
@@ -273,8 +275,8 @@ Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅ → **H3-21 ✅ → H3-22 ✅ → H3-23 ✅ → H3-24 ✅**.
 O elo atual é o **MVP do relógio**: com as correções prioritárias
 H3-21/H3-22/H3-23/H3-24 entregues (diagnóstico + robustez da IA + foco
-priorizado no principal + mídia do exercício), segue H3-17 → H3-18 → H3-19 →
-H3-20.
+priorizado no principal + mídia do exercício) e H3-17 ✅ → H3-18 ✅ → H3-19 ✅
+concluídos, segue H3-20.
 O elo de **qualidade/plataforma** estava em **H3-10** (concluída): com as rules
 do Android ligadas e o nome do banco conferido por teste, o backup de plataforma
 deixou de ser um caminho não escolhido — e a H3-4 perdeu seu pré-requisito.
@@ -328,14 +330,14 @@ múltiplos planos coexistindo na Home e geração complementar com foco exclusiv
 casa/peso corporal.
 
 **Agora (Must — MVP do relógio):** **H3-17** (alvo de reps e última série no
-pulso), **H3-18** (timer de descanso contando no relógio), **H3-19**
-(corrida/mobilidade com tela coerente) e **H3-20** (selo de conexão, debounce
-e fila offline real). As quatro specs foram escritas em 2026-11-07
+pulso), **H3-18** (timer de descanso contando no relógio) e **H3-19**
+(corrida/mobilidade com tela coerente) estão **concluídas** e listadas em §4.1
 ([H3-17](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md),
-[H3-18](docs/specs/H3-18-timer-descanso-pulso.md),
-[H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md) e
-[H3-20](docs/specs/H3-20-robustez-conexao-relogio.md)) e aguardam aprovação
-antes de implementar.
+[H3-18](docs/specs/H3-18-timer-descanso-pulso.md) e
+[H3-19](docs/specs/H3-19-corrida-mobilidade-relogio.md)). Resta **H3-20**
+(selo de conexão, debounce e fila offline real —
+[spec](docs/specs/H3-20-robustez-conexao-relogio.md)), ainda pendente de
+aprovação.
 **Implementado pelo dono (2026-11-10):** **H3-40** (geração assíncrona — pedir o
 treino, sair do app e receber pronto ao voltar; [spec](docs/specs/H3-40-geracao-assincrona.md))
 nasceu do uso real: a IA quase sempre estoura os 80 s e entrega fallback.
@@ -399,7 +401,7 @@ confirme antes de implementar.
 - [H3-14 — Imagens dos exercícios no plano](docs/specs/H3-14-imagens-exercicios.md) — **substituída pela H3-24** (não implementar separadamente)
 - [H3-17 — Alvo de reps e última série no pulso](docs/specs/H3-17-alvo-reps-ultima-serie-pulso.md) — proposta, aguardando aprovação (Room v5 aditiva; contrato `:protocol` intocado)
 - [H3-18 — Timer de descanso contando no pulso](docs/specs/H3-18-timer-descanso-pulso.md) — proposta, aguardando aprovação (liga o `WearTimer` à tela; ajusta `startRest`/`skipRest` no celular)
-- [H3-19 — Corrida e mobilidade no relógio](docs/specs/H3-19-corrida-mobilidade-relogio.md) — proposta, aguardando aprovação (campo aditivo `modality` no `:protocol`)
+- [H3-19 — Corrida e mobilidade no relógio](docs/specs/H3-19-corrida-mobilidade-relogio.md) — concluída (campo aditivo `modality` no `:protocol`; run/mobility sem séries, com "Em andamento" e finalizar)
 - [H3-20 — Robustez de conexão do relógio](docs/specs/H3-20-robustez-conexao-relogio.md) — proposta, aguardando aprovação (capability + debounce + fila real)
 - [H3-26 — Loop do descanso](docs/specs/H3-26-loop-descanso.md) — proposta, aguardando aprovação (vibração/beep, faixa fixa, keepScreenOn, wall-clock, repetir última série)
 - [H3-27 — Integridade do registro](docs/specs/H3-27-integridade-registro.md) — concluída (validação de série, editar/excluir, confirmar finalizar, abandonar, sessão fantasma da mobilidade)

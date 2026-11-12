@@ -128,7 +128,7 @@ fun WorkoutWearScreen(
                     Text(text = "Atualizar")
                 }
             }
-            } else {
+        } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
                 // Sincroniza com o estado publicado pelo celular: descanso novo reinicia,
                 // mesma chave não toca, descanso nulo/0 zera um timer rodando.
                 LaunchedEffect(state) {
@@ -197,6 +197,28 @@ fun WorkoutWearScreen(
                     }) {
                         Text(text = "Pular Descanso")
                     }
+                    Button(onClick = { onFinish(state.sessionId) }) {
+                        Text(text = "Finalizar Treino")
+                    }
+                }
+            } else {
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = state.dayName,
+                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                    )
+                    Text(
+                        text = "Em andamento",
+                        fontSize = 18.sp,
+                    )
                     Button(onClick = { onFinish(state.sessionId) }) {
                         Text(text = "Finalizar Treino")
                     }

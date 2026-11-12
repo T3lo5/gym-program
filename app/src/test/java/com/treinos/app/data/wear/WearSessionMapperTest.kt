@@ -50,7 +50,10 @@ class WearSessionMapperTest {
             sets = sets,
         )
 
-    private fun session(vararg exercises: SessionExerciseWithSets): SessionWithExercises =
+    private fun session(
+        vararg exercises: SessionExerciseWithSets,
+        modality: String = "strength",
+    ): SessionWithExercises =
         SessionWithExercises(
             session = WorkoutSessionEntity(
                 id = 10,
@@ -59,6 +62,7 @@ class WearSessionMapperTest {
                 planName = "Plano",
                 dayName = "Treino A",
                 status = "in_progress",
+                modality = modality,
             ),
             exercises = exercises.toList(),
         )
@@ -73,6 +77,7 @@ class WearSessionMapperTest {
 
         assertEquals(10L, estado.sessionId)
         assertEquals("Treino A", estado.dayName)
+        assertEquals("strength", estado.modality)
         assertEquals(0, estado.exerciseIndex)
         assertEquals(2, estado.exerciseCount)
         assertEquals("Supino reto", estado.exerciseName)
@@ -134,6 +139,29 @@ class WearSessionMapperTest {
         val estado = WearSessionMapper.toWearState(sessao, 0, restRemainingSeconds = null)
 
         assertEquals("finished", estado.status)
+    }
+
+    @Test
+    fun modality_da_sessao_vai_no_estado() {
+        val sessao = session(
+            sessionExercise(1, "Supino reto", 3),
+            modality = "run",
+        )
+        val estado = WearSessionMapper.toWearState(sessao, 0, restRemainingSeconds = null)
+
+        assertEquals("run", estado.modality)
+    }
+
+    @Test
+    fun sessao_de_corrida_sem_exercicios_mapeia_coerente() {
+        val sessao = session(modality = "mobility")
+        val estado = WearSessionMapper.toWearState(sessao, 0, restRemainingSeconds = null)
+
+        assertEquals("mobility", estado.modality)
+        assertEquals("Treino A", estado.dayName)
+        assertEquals(0, estado.exerciseCount)
+        assertEquals("", estado.exerciseName)
+        assertEquals("in_progress", estado.status)
     }
 
     @Test

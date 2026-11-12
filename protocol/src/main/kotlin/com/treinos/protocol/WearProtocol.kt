@@ -11,6 +11,7 @@ data class WearWorkoutState(
     @SerialName("protocolVersion") val protocolVersion: Int = 1,
     @SerialName("sessionId") val sessionId: Long,
     @SerialName("dayName") val dayName: String,
+    @SerialName("modality") val modality: String = "strength",
     @SerialName("exerciseIndex") val exerciseIndex: Int,
     @SerialName("exerciseCount") val exerciseCount: Int,
     @SerialName("exerciseName") val exerciseName: String,
