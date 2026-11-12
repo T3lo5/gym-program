@@ -139,6 +139,8 @@ data class SessionExerciseEntity(
     val plannedSets: Int = 3,
     val completedSets: Int = 0,
     val restSeconds: Int = 90,
+    @ColumnInfo(defaultValue = "")
+    val targetReps: String = "",
     val startedAt: Long = System.currentTimeMillis(),
     val endedAt: Long? = null,
 )

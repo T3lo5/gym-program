@@ -48,7 +48,7 @@ object WearSessionMapper {
             } ?: "",
             setNumber = setNumber,
             plannedSets = plannedSets,
-            targetReps = "",
+            targetReps = ex?.targetReps ?: "",
             lastWeightKg = ultimoSet?.weightKg,
             lastReps = ultimoSet?.reps,
             restSeconds = ex?.restSeconds ?: 90,

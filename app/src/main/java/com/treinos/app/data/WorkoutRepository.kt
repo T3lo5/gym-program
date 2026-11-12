@@ -435,6 +435,7 @@ open class WorkoutRepository(
                         plannedSets = exercise.sets,
                         completedSets = 0,
                         restSeconds = exercise.restSeconds,
+                        targetReps = exercise.targetReps,
                         startedAt = now,
                     )
                 }

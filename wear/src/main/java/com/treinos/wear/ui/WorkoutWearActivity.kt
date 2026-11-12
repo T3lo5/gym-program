@@ -123,52 +123,61 @@ fun WorkoutWearScreen(
                     Text(text = "Atualizar")
                 }
             }
-        } else {
-            val remaining = state.restRemainingSeconds ?: 0
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = "${state.dayName}",
-                    fontSize = 16.sp,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                )
-                Text(
-                    text = "${state.exerciseName}",
-                    fontSize = 20.sp,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 2,
-                )
-                Text(
-                    text = "Série ${state.setNumber} / ${state.plannedSets}",
-                    fontSize = 16.sp,
-                )
-                Text(
-                    text = "Alvo: ${state.targetReps}",
-                    fontSize = 16.sp,
-                )
-                if (remaining > 0) {
+            } else {
+                val remaining = state.restRemainingSeconds ?: 0
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
-                        text = "Descanso: ${remaining}s",
-                        fontSize = 18.sp,
-                        style = MaterialTheme.typography.labelLarge,
+                        text = "${state.dayName}",
+                        fontSize = 16.sp,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
                     )
-                }
-                Button(onClick = { onLogSet(state.sessionId) }) {
-                    Text(text = "Concluir Série")
-                }
-                Button(onClick = { onSkipRest(state.sessionId) }) {
-                    Text(text = "Pular Descanso")
-                }
-                Button(onClick = { onFinish(state.sessionId) }) {
-                    Text(text = "Finalizar Treino")
+                    Text(
+                        text = "${state.exerciseName}",
+                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                    )
+                    Text(
+                        text = "Série ${state.setNumber} / ${state.plannedSets}",
+                        fontSize = 16.sp,
+                    )
+                    if (state.targetReps.isNotBlank()) {
+                        Text(
+                            text = "Alvo: ${state.targetReps}",
+                            fontSize = 16.sp,
+                        )
+                    }
+                    val ultima = formatLastSet(state.lastWeightKg, state.lastReps)
+                    if (ultima != null) {
+                        Text(
+                            text = "Última: $ultima",
+                            fontSize = 16.sp,
+                        )
+                    }
+                    if (remaining > 0) {
+                        Text(
+                            text = "Descanso: ${remaining}s",
+                            fontSize = 18.sp,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    Button(onClick = { onLogSet(state.sessionId) }) {
+                        Text(text = "Concluir Série")
+                    }
+                    Button(onClick = { onSkipRest(state.sessionId) }) {
+                        Text(text = "Pular Descanso")
+                    }
+                    Button(onClick = { onFinish(state.sessionId) }) {
+                        Text(text = "Finalizar Treino")
+                    }
                 }
             }
-        }
     }
 }

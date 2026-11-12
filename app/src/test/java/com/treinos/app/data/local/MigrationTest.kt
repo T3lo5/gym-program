@@ -222,6 +222,71 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migracao_5_6_preserva_linhas() {
+        helper.createDatabase(testDb, 5).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source, kind) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local','main')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_days (id, planId, name, dayOrder, notes, isRestDay, modality, weekday) " +
+                    "VALUES (10,1,'A',0,'',0,'strength',1)"
+            )
+            db.execSQL(
+                "INSERT INTO workout_plan_exercises (id, dayId, exerciseId, exerciseName, " +
+                    "primaryMuscles, equipment, exerciseOrder, sets, targetReps, targetRpe, " +
+                    "restSeconds, notes, isSupersetWithPrevious, metricType, instructions, images) " +
+                    "VALUES (100,10,'Barbell_Bench_Press','Supino','peito','barra',0,3,'8-12',NULL,90,'',0,'reps_weight','','')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','in_progress',1,NULL,0,'','strength','plan','A')"
+            )
+            db.execSQL(
+                "INSERT INTO session_exercises (id, sessionId, exerciseId, exerciseName, " +
+                    "exerciseOrder, plannedSets, completedSets, restSeconds, startedAt, endedAt) " +
+                    "VALUES (500,50,'Barbell_Bench_Press','Supino',0,3,1,90,1,NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO set_logs (id, exerciseLogId, setNumber, reps, weightKg, rpe, " +
+                    "durationSeconds, distanceMeters, isCompleted, isWarmup, restTakenSeconds, completedAt) " +
+                    "VALUES (5000,500,1,10,40.0,8.0,NULL,NULL,1,0,90,2)"
+            )
+            db.execSQL(
+                "INSERT INTO exercise_usage_events (id, exerciseId, outcome, occurredAt, planId, dayId, source) " +
+                    "VALUES (1,'Barbell_Bench_Press','completed',1,1,10,'generation')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 6, true, AppDatabase.MIGRATION_5_6)
+
+        assertEquals(1, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_days"))
+        assertEquals(1, migrated.rowCount("workout_plan_exercises"))
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        assertEquals(1, migrated.rowCount("session_exercises"))
+        assertEquals(1, migrated.rowCount("set_logs"))
+        assertEquals(1, migrated.rowCount("exercise_usage_events"))
+
+        migrated.query(
+            "SELECT exerciseId, exerciseName, plannedSets, completedSets, targetReps " +
+                "FROM session_exercises WHERE id = 500"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Barbell_Bench_Press", cursor.getString(0))
+            assertEquals("Supino", cursor.getString(1))
+            assertEquals(3, cursor.getInt(2))
+            assertEquals(1, cursor.getInt(3))
+            assertEquals("", cursor.getString(4))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

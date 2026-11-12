@@ -33,6 +33,7 @@ class WearSessionMapperTest {
         plannedSets: Int,
         completedSets: Int = 0,
         sets: List<SetLogEntity> = emptyList(),
+        targetReps: String = "",
     ): SessionExerciseWithSets =
         SessionExerciseWithSets(
             exercise = SessionExerciseEntity(
@@ -44,6 +45,7 @@ class WearSessionMapperTest {
                 plannedSets = plannedSets,
                 completedSets = completedSets,
                 restSeconds = 90,
+                targetReps = targetReps,
             ),
             sets = sets,
         )
@@ -64,8 +66,8 @@ class WearSessionMapperTest {
     @Test
     fun mapeia_primeiro_exercicio() {
         val sessao = session(
-            sessionExercise(1, "Supino reto", 3, sets = listOf(setLog(1, 10, 60.0))),
-            sessionExercise(2, "Agachamento", 4),
+            sessionExercise(1, "Supino reto", 3, sets = listOf(setLog(1, 10, 60.0)), targetReps = "8-12"),
+            sessionExercise(2, "Agachamento", 4, targetReps = "10"),
         )
         val estado = WearSessionMapper.toWearState(sessao, 0, restRemainingSeconds = 45)
 
@@ -76,13 +78,21 @@ class WearSessionMapperTest {
         assertEquals("Supino reto", estado.exerciseName)
         assertEquals(2, estado.setNumber)
         assertEquals(3, estado.plannedSets)
-        assertEquals("", estado.targetReps)
+        assertEquals("8-12", estado.targetReps)
         assertEquals(60.0, estado.lastWeightKg!!, 0.001)
         assertEquals(10, estado.lastReps)
         assertEquals(90, estado.restSeconds)
         assertEquals(45, estado.restRemainingSeconds)
         assertEquals("Agachamento", estado.nextExerciseName)
         assertEquals("in_progress", estado.status)
+    }
+
+    @Test
+    fun alvo_vazio_quando_sessao_sem_alvo() {
+        val sessao = session(sessionExercise(1, "Supino reto", 3))
+        val estado = WearSessionMapper.toWearState(sessao, 0, restRemainingSeconds = null)
+
+        assertEquals("", estado.targetReps)
     }
 
     @Test

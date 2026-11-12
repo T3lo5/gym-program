@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SetLogEntity::class,
         ExerciseUsageEvent::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -87,6 +87,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H3-17: alvo de reps do plano passa a ser persistido na sessão para o
+        // relógio mostrar "Alvo" sem rederivar do plano. Coluna aditiva, sem
+        // destruição.
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE session_exercises ADD COLUMN targetReps TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -94,7 +105,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { instance = it }
             }
