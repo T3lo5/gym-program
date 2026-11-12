@@ -10,11 +10,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,7 @@ import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
 import com.treinos.wear.WearApplication
 import com.treinos.wear.data.WearStateStore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -102,6 +105,8 @@ fun WorkoutWearScreen(
     onFinish: (Long) -> Unit,
     onRequestState: () -> Unit,
 ) {
+    var timerState by remember { mutableStateOf(WearTimerState(0, false, false)) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -124,7 +129,22 @@ fun WorkoutWearScreen(
                 }
             }
             } else {
-                val remaining = state.restRemainingSeconds ?: 0
+                // Sincroniza com o estado publicado pelo celular: descanso novo reinicia,
+                // mesma chave não toca, descanso nulo/0 zera um timer rodando.
+                LaunchedEffect(state) {
+                    timerState = WearTimer.syncFromState(timerState, state)
+                }
+
+                // Tick local de 1 s: o descanso conta no pulso sem depender do celular.
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        delay(1_000L)
+                        if (timerState.isRunning) {
+                            timerState = WearTimer.reduce(timerState, WearTimerAction.Tick)
+                        }
+                    }
+                }
+
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -161,9 +181,9 @@ fun WorkoutWearScreen(
                             fontSize = 16.sp,
                         )
                     }
-                    if (remaining > 0) {
+                    if (timerState.remainingSeconds > 0) {
                         Text(
-                            text = "Descanso: ${remaining}s",
+                            text = "Descanso: ${timerState.remainingSeconds}s",
                             fontSize = 18.sp,
                             style = MaterialTheme.typography.labelLarge,
                         )
@@ -171,7 +191,10 @@ fun WorkoutWearScreen(
                     Button(onClick = { onLogSet(state.sessionId) }) {
                         Text(text = "Concluir Série")
                     }
-                    Button(onClick = { onSkipRest(state.sessionId) }) {
+                    Button(onClick = {
+                        onSkipRest(state.sessionId)
+                        timerState = WearTimer.reduce(timerState, WearTimerAction.Skip)
+                    }) {
                         Text(text = "Pular Descanso")
                     }
                     Button(onClick = { onFinish(state.sessionId) }) {

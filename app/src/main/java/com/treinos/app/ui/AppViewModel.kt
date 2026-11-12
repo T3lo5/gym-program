@@ -1615,6 +1615,7 @@ class AppViewModel(
         pausedRemainingSeconds = 0
         preferences.restDeadlineAtMillis = deadline
         preferences.restTotalSeconds = duration
+        _restRemaining.value = duration
         restJob = viewModelScope.launch { tickRest() }
     }
 
@@ -1644,6 +1645,7 @@ class AppViewModel(
         restJob?.cancel()
         restJob = null
         clearRestState()
+        syncWearState()
     }
 
     /** Congela a contagem; a retomada recalcula o deadline a partir do restante. */
