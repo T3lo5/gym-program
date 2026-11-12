@@ -66,7 +66,16 @@ class BackupImportTest {
             plan = WorkoutPlanEntity(id = 1, name = "Plano do backup"),
             days = listOf(WorkoutDayEntity(id = 10, planId = 1, name = "Treino A")),
             exercisesByDay = listOf(
-                listOf(WorkoutPlanExerciseEntity(id = 100, dayId = 10, exerciseId = "ex1", exerciseName = "Supino")),
+                listOf(
+                    WorkoutPlanExerciseEntity(
+                        id = 100,
+                        dayId = 10,
+                        exerciseId = "ex1",
+                        exerciseName = "Supino",
+                        instructions = "Deite no banco.\nSegure a barra.",
+                        images = "ex1/0.jpg,ex1/1.jpg",
+                    ),
+                ),
             ),
         )
         dao.insertSession(WorkoutSessionEntity(id = 50, planId = 1, dayId = 10, status = "completed"))
@@ -94,6 +103,18 @@ class BackupImportTest {
         assertEquals("celular-antigo", store.deviceId)
         assertEquals("Plano do backup", dao.getAllPlanEntities().single().name)
         assertEquals(5000L, dao.getAllSetLogs().single().id)
+    }
+
+    @Test
+    fun `import preserva instrucoes e imagens`() = runTest {
+        seedWorkout()
+        val payload = backupFromCurrentData(deviceId = "celular-antigo")
+
+        repository.importBackup(payload, FakeDeviceIdStore(deviceId = "id-deste-app"))
+
+        val exercise = dao.getAllPlanExercises().single()
+        assertEquals("Deite no banco.\nSegure a barra.", exercise.instructions)
+        assertEquals("ex1/0.jpg,ex1/1.jpg", exercise.images)
     }
 
     @Test

@@ -249,6 +249,51 @@ class GenerationJobFlowTest {
     }
 
     @Test
+    fun refresh_done_main_seleciona_novo_plano() = runTest {
+        val api = FakeJobBackendApi()
+        api.statusResponse = GenerateJobStatus(
+            jobId = "job-done",
+            status = "done",
+            createdAt = "2026-11-10T12:00:00+00:00",
+            result = GeneratePlanResponse(
+                workout = validPlanDto,
+                source = "ai",
+                nextReviewAt = "2026-11-17",
+            ),
+        )
+        val prefs = newPrefs(context)
+        withEnvelope(prefs, "job-done", kind = "main")
+        val vm = vmWith(api, prefs)
+
+        vm.refreshPendingGeneration()
+
+        assertEquals(42L, vm.selectedPlanId.value)
+    }
+
+    @Test
+    fun refresh_done_extra_preserva_selecao() = runTest {
+        val api = FakeJobBackendApi()
+        api.statusResponse = GenerateJobStatus(
+            jobId = "job-done",
+            status = "done",
+            createdAt = "2026-11-10T12:00:00+00:00",
+            result = GeneratePlanResponse(
+                workout = validPlanDto,
+                source = "ai",
+                nextReviewAt = "2026-11-17",
+            ),
+        )
+        val prefs = newPrefs(context)
+        withEnvelope(prefs, "job-done", kind = "extra")
+        val vm = vmWith(api, prefs)
+        vm.selectPlan(99L)
+
+        vm.refreshPendingGeneration()
+
+        assertEquals(99L, vm.selectedPlanId.value)
+    }
+
+    @Test
     fun refresh_done_com_fallback_persiste_motivo() = runTest {
         val api = FakeJobBackendApi()
         api.statusResponse = GenerateJobStatus(

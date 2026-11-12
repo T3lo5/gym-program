@@ -59,6 +59,8 @@ class BackupSerializationTest {
                                     exerciseName = "Supino reto",
                                     primaryMuscles = "chest",
                                     equipment = "barbell",
+                                    instructions = "Deite no banco.\nSegure a barra.",
+                                    images = "Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg",
                                     exerciseOrder = 0,
                                     sets = 3,
                                     targetReps = "8-12",
@@ -225,6 +227,14 @@ class BackupSerializationTest {
         assertEquals(1, decoded.plans.first().days.first().exercises.size)
         assertEquals(100, decoded.plans.first().days.first().exercises.first().id)
         assertEquals(10, decoded.plans.first().days.first().exercises.first().dayId)
+        assertEquals(
+            "Deite no banco.\nSegure a barra.",
+            decoded.plans.first().days.first().exercises.first().instructions,
+        )
+        assertEquals(
+            "Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg",
+            decoded.plans.first().days.first().exercises.first().images,
+        )
         assertEquals(1, decoded.sessions.size)
         assertEquals(50, decoded.sessions.first().id)
         assertEquals(1, decoded.sessions.first().exercises.size)
@@ -324,6 +334,8 @@ class BackupSerializationTest {
         assertEquals(null, file.plans[0].days[0].weekday)
         assertEquals("reps_weight", file.plans[0].days[0].exercises[0].metricType)
         assertEquals(null, file.plans[0].days[0].exercises[0].targetDurationSeconds)
+        assertEquals("", file.plans[0].days[0].exercises[0].instructions)
+        assertEquals("", file.plans[0].days[0].exercises[0].images)
     }
 
     @Test
@@ -408,5 +420,22 @@ class BackupSerializationTest {
         val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), escritoPeloAppAntigo)
 
         assertEquals("main", decoded.plans.single().kind)
+    }
+
+    @Test
+    fun midia_round_trip() {
+        val file = sampleFile().copy(schemaVersion = 3)
+
+        val encoded = backupExportEncoder.encodeToString(BackupFile.serializer(), file)
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), encoded)
+
+        val exercise = decoded.plans.single().days.single().exercises.single()
+        assertTrue(encoded.contains("\"instructions\""))
+        assertTrue(encoded.contains("\"images\""))
+        assertEquals("Deite no banco.\nSegure a barra.", exercise.instructions)
+        assertEquals(
+            "Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg",
+            exercise.images,
+        )
     }
 }

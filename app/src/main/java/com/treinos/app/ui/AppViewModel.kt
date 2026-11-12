@@ -953,6 +953,11 @@ class AppViewModel(
                     status.result?.let { result ->
                         try {
                             val planId = repository.completeGeneration(status, envelope.kind)
+                            // H3-45: um main recém-gerado passa a ser o plano
+                            // exibido; um extra preserva a seleção atual (H3-15).
+                            if (envelope.kind == "main") {
+                                _selectedPlanId.value = planId
+                            }
                             // Persistir config + motivo do fallback (regras H3-30).
                             envelope.config?.let { cfg ->
                                 preferences.generateConfigJson = GenerateConfigCodec.encode(cfg)
@@ -1142,7 +1147,7 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 val main = mainPlan()?.plan
-                repository.saveGeneratedPlan(
+                val planId = repository.saveGeneratedPlan(
                     GeneratePlanResponse(
                         workout = response.workout,
                         source = response.source,
@@ -1152,6 +1157,8 @@ class AppViewModel(
                     ),
                     kind = "main",
                 )
+                // H3-45: a revisão aprovada é o novo main; seleciona-o.
+                _selectedPlanId.value = planId
                 pendingReview = null
                 _reviewChanges.value = emptyList()
                 _reviewMessage.value = null
@@ -1876,6 +1883,9 @@ class AppViewModel(
             _backupImportState.value = BackupImportState.Importing
             try {
                 repository.importBackup(payload, preferences)
+                // H3-45: a seleção anterior pode apontar para um plano que não
+                // existe mais (ou para um extra); volta ao main restaurado.
+                _selectedPlanId.value = null
                 _deviceId.value = preferences.deviceId
                 _backupMessage.value = if (payload.deviceId.isNotBlank()) {
                     "Backup importado. O ID deste aparelho passou a ser ${payload.deviceId.trim()}."

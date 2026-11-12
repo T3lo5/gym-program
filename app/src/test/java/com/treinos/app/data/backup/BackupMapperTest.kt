@@ -44,6 +44,8 @@ class BackupMapperTest {
             exerciseName = "Supino reto",
             primaryMuscles = "chest",
             equipment = "barbell",
+            instructions = "Deite no banco.\nSegure a barra.",
+            images = "Barbell_Bench_Press/0.jpg,Barbell_Bench_Press/1.jpg",
             exerciseOrder = 0,
             sets = 3,
             targetReps = "8-12",
@@ -72,6 +74,35 @@ class BackupMapperTest {
         assertEquals(exercise.dayId, voltaEx.dayId)
         assertEquals(exercise.exerciseId, voltaEx.exerciseId)
         assertEquals(exercise.targetRpe, voltaEx.targetRpe)
+        assertEquals(exercise.instructions, voltaEx.instructions)
+        assertEquals(exercise.images, voltaEx.images)
+    }
+
+    @Test
+    fun midia_ausente_vira_vazio() {
+        val dto = BackupPlanExercise(
+            id = 100,
+            exerciseId = "e",
+            exerciseName = "Ex",
+            primaryMuscles = "chest",
+            equipment = "barbell",
+            exerciseOrder = 0,
+            sets = 3,
+            targetReps = "8-12",
+            targetRpe = null,
+            restSeconds = 90,
+            notes = "",
+            isSupersetWithPrevious = false,
+            dayId = 10,
+        )
+
+        assertEquals("", dto.instructions)
+        assertEquals("", dto.images)
+
+        val entity = BackupMapper.toEntity(dto, dayId = dto.dayId)
+
+        assertEquals("", entity.instructions)
+        assertEquals("", entity.images)
     }
 
     @Test
@@ -334,5 +365,7 @@ class BackupMapperTest {
         assertEquals(null, entity.targetDistanceMeters)
         assertEquals(null, entity.targetPaceSecondsPerKm)
         assertEquals(null, entity.targetHrZone)
+        assertEquals("", entity.instructions)
+        assertEquals("", entity.images)
     }
 }

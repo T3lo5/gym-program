@@ -68,6 +68,10 @@ data class BackupPlanExercise(
     val exerciseName: String,
     val primaryMuscles: String,
     val equipment: String,
+    // H3-45: mídia do plano (H3-24) viaja no backup. Ausente em backups antigos
+    // → decodifica como vazio.
+    val instructions: String = "",
+    val images: String = "",
     val exerciseOrder: Int,
     val sets: Int,
     val targetReps: String,

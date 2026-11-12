@@ -343,22 +343,35 @@ fun resolveExerciseMedia(
     planInstructions: String = "",
     planImages: String = "",
 ): ExerciseMedia? {
-    catalog[exerciseId]?.let { return it }
-    val instructions = planInstructions
+    val planInstructionSteps = planInstructions
         .split('\n')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-    val imagePaths = planImages
+    val planImagePaths = planImages
         .split(',')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-    if (instructions.isEmpty() && imagePaths.isEmpty()) return null
-    return ExerciseMedia(
-        id = exerciseId,
-        name = planName.ifBlank { exerciseId },
-        primaryMuscles = planPrimaryMuscles,
-        equipment = planEquipment,
-        instructions = instructions,
-        imageUrl = ExerciseMediaRepository.imageUrlFor(imagePaths),
+    val planImageUrl = ExerciseMediaRepository.imageUrlFor(planImagePaths)
+    val catalogEntry = catalog[exerciseId]
+    if (catalogEntry == null) {
+        if (planInstructionSteps.isEmpty() && planImageUrl == null) return null
+        return ExerciseMedia(
+            id = exerciseId,
+            name = planName.ifBlank { exerciseId },
+            primaryMuscles = planPrimaryMuscles,
+            equipment = planEquipment,
+            instructions = planInstructionSteps,
+            imageUrl = planImageUrl,
+        )
+    }
+    // H3-45: o catálogo é a fonte preferencial, mas o asset offline só traz
+    // nome/músculo/equipamento. Sem esta fusão, ele esconderia as instruções e
+    // a imagem que vieram no plano (restauradas do backup, por exemplo).
+    return catalogEntry.copy(
+        name = catalogEntry.name.ifBlank { planName.ifBlank { exerciseId } },
+        primaryMuscles = catalogEntry.primaryMuscles.ifEmpty { planPrimaryMuscles },
+        equipment = catalogEntry.equipment.ifBlank { planEquipment },
+        instructions = catalogEntry.instructions.ifEmpty { planInstructionSteps },
+        imageUrl = catalogEntry.imageUrl?.takeIf { it.isNotBlank() } ?: planImageUrl,
     )
 }

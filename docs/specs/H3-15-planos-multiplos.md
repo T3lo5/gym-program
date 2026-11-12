@@ -87,7 +87,9 @@ Semântica de isActive:
 ## Regras e casos de borda
 
 - Gerar um novo plano **principal** mantém todos os extras ativos e executáveis.
-- Gerar um complementar **nunca** desativa nem apaga plano algum.
+- Gerar um **complementar** nunca desativa nem apaga plano algum.
+- H3-45: ao concluir uma geração `main`, a Home seleciona o novo plano; ao
+  concluir um `extra`, a seleção atual é preservada.
 - Excluir um extra apaga plano/dias/exercícios (CASCADE) e **preserva as sessões
   do histórico** (sem FK; `planName`/`dayName` já denormalizados).
 - Excluir extra exige confirmação; o plano `main` não oferece essa ação.
@@ -107,8 +109,8 @@ Semântica de isActive:
    plano em modo "complementar", **então** a Home mostra os dois planos e ambos
    podem ser executados, com o principal intacto.
 2. **Dado** dois planos ativos, **quando** o usuário gera um novo plano
-   principal, **então** o main anterior é desativado e o complementar continua
-   ativo e selecionável.
+   principal, **então** o main anterior é desativado, o complementar continua
+   ativo e selecionável, e a Home passa a exibir o novo main.
 3. **Dado** um extra com sessões registradas, **quando** o usuário o exclui e
    confirma, **então** o plano some da Home e as sessões continuam no histórico
    com o nome do plano.

@@ -175,6 +175,67 @@ class ExerciseMediaTest {
     }
 
     @Test
+    fun catalogo_sem_midia_usa_midia_do_plano() {
+        // H3-45: o asset offline só tem metadados; não pode esconder as
+        // instruções e a imagem que vieram no plano (ex.: backup restaurado).
+        val catalogo = mapOf(
+            "Barbell_Bench_Press" to ExerciseMedia(
+                id = "Barbell_Bench_Press",
+                name = "Barbell Bench Press",
+                primaryMuscles = listOf("chest"),
+                equipment = "barbell",
+                instructions = emptyList(),
+                imageUrl = null,
+            ),
+        )
+
+        val media = resolveExerciseMedia(
+            catalog = catalogo,
+            exerciseId = "Barbell_Bench_Press",
+            planName = "Supino reto",
+            planPrimaryMuscles = listOf("peito"),
+            planEquipment = "barra",
+            planInstructions = "Deite no banco.\nSegure a barra.",
+            planImages = "Barbell_Bench_Press/0.jpg",
+        )
+
+        assertEquals("Barbell Bench Press", media?.name)
+        assertEquals(listOf("chest"), media?.primaryMuscles)
+        assertEquals("barbell", media?.equipment)
+        assertEquals(listOf("Deite no banco.", "Segure a barra."), media?.instructions)
+        assertEquals(
+            ExerciseMediaRepository.IMAGE_BASE_URL + "Barbell_Bench_Press/0.jpg",
+            media?.imageUrl,
+        )
+    }
+
+    @Test
+    fun catalogo_com_instrucoes_sem_imagem_usa_imagem_do_plano() {
+        val catalogo = mapOf(
+            "Barbell_Bench_Press" to ExerciseMedia(
+                id = "Barbell_Bench_Press",
+                name = "Barbell Bench Press",
+                primaryMuscles = listOf("chest"),
+                equipment = "barbell",
+                instructions = listOf("Lie down"),
+                imageUrl = null,
+            ),
+        )
+
+        val media = resolveExerciseMedia(
+            catalog = catalogo,
+            exerciseId = "Barbell_Bench_Press",
+            planImages = "Barbell_Bench_Press/0.jpg",
+        )
+
+        assertEquals(listOf("Lie down"), media?.instructions)
+        assertEquals(
+            ExerciseMediaRepository.IMAGE_BASE_URL + "Barbell_Bench_Press/0.jpg",
+            media?.imageUrl,
+        )
+    }
+
+    @Test
     fun instrucoes_por_idioma() {
         // H3-36: "pt" resolve nome e instruções do catálogo; "en"/null mantém
         // o EN canônico. Resolução campo a campo e pura (sem Android).
