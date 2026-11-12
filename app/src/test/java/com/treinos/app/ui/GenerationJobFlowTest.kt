@@ -1,6 +1,7 @@
 package com.treinos.app.ui
 
 import android.content.Context
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.treinos.app.data.WorkoutRepository
@@ -23,6 +24,7 @@ import com.treinos.app.data.remote.SyncResponseDto
 import com.treinos.app.data.remote.WorkoutDayDto
 import com.treinos.app.data.remote.WorkoutExerciseDto
 import com.treinos.app.data.remote.WorkoutPlanDto
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -161,6 +163,7 @@ class GenerationJobFlowTest {
 
     private lateinit var database: AppDatabase
     private lateinit var context: Context
+    private var viewModel: AppViewModel? = null
 
     @Before
     fun setUp() {
@@ -172,12 +175,17 @@ class GenerationJobFlowTest {
 
     @After
     fun tearDown() {
+        // O AppViewModel coleta `inProgressSession` do Room em viewModelScope.
+        // Sem cancelar, a coleta continua depois do close e pode travar o teste
+        // (o worker do Gradle fica pendurado até o timeout da task).
+        viewModel?.viewModelScope?.cancel()
+        viewModel = null
         database.close()
     }
 
     private fun vmWith(api: FakeJobBackendApi, prefs: AppPreferences = newPrefs(context)): AppViewModel {
         val repo = TestWorkoutRepository(database.workoutDao(), api, prefs)
-        return AppViewModel(context, repo, prefs)
+        return AppViewModel(context, repo, prefs).also { viewModel = it }
     }
 
     private fun withEnvelope(prefs: AppPreferences, jobId: String, kind: String = "main") {
