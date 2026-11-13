@@ -3,6 +3,7 @@ package com.treinos.app.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import com.treinos.app.ui.ActivityLogInput
 import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ChipGroup
+import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.formatDateTime
@@ -127,7 +129,8 @@ fun LogActivityScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .imePadding(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -268,6 +271,7 @@ fun LogActivityScreen(
                             )
                         )
                     },
+                    enabled = errors.isEmpty(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
@@ -302,23 +306,14 @@ fun LogActivityScreen(
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.history_activity_delete_title)) },
-            text = { Text(stringResource(R.string.log_activity_delete_body)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = onDelete,
+            title = stringResource(R.string.history_activity_delete_title),
+            message = stringResource(R.string.log_activity_delete_body),
+            confirmLabel = stringResource(R.string.common_delete),
+            isDestructive = true,
         )
     }
 }

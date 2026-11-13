@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-47` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-13` |
+| Implementação | `concluída` |
 
 **Origem:** pedido de criar a spec "UX FE" e achados da auditoria UX/UI de
 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md), §P2.4, P2.6, P2.9,

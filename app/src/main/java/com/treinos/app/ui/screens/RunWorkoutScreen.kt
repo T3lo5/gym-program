@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
@@ -123,7 +124,9 @@ private fun RunWorkoutForm(
     var durationMinutes by rememberSaveable { mutableStateOf("") }
     var distanceKm by rememberSaveable { mutableStateOf("") }
     var rpe by rememberSaveable { mutableStateOf("") }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var durationError by rememberSaveable { mutableStateOf<String?>(null) }
+    var distanceError by rememberSaveable { mutableStateOf<String?>(null) }
+    var rpeError by rememberSaveable { mutableStateOf<String?>(null) }
     var pace by rememberSaveable { mutableStateOf<String?>(null) }
     var showDiscardConfirm by rememberSaveable { mutableStateOf(false) }
 
@@ -139,12 +142,27 @@ private fun RunWorkoutForm(
             rpe = parseDraftNumber(rpe),
         )
         val result = validateRunLog(input)
-        // H3-31: texto presente que não parseia (ex.: "5,25") não pode passar
-        // silenciosamente por "sem distância" — mostra o erro e bloqueia.
-        error = if (km == null && distanceKm.isNotBlank()) {
+        // H3-47: o erro fica inline no campo correspondente (supportingText
+        // + isError), não em um único texto abaixo do formulário. Duração é
+        // o único campo obrigatório, então fica com toda mensagem do
+        // validador que não seja de distância ou RPE — inclusive
+        // "Informe uma duração de pelo menos 1 minuto." do campo em branco,
+        // que antes passava despercebida e liberava o envio com 0 s.
+        val error = result.error
+        durationError = error?.takeIf {
+            !it.startsWith("Distância") && !it.startsWith("RPE")
+        }
+        distanceError = if (km == null && distanceKm.isNotBlank()) {
             "Distância inválida. Use até uma casa decimal, com vírgula ou ponto (ex.: 5,2)."
+        } else if (error != null && error.startsWith("Distância")) {
+            error
         } else {
-            result.error
+            null
+        }
+        rpeError = if (error != null && error.startsWith("RPE")) {
+            error
+        } else {
+            null
         }
         pace = formatPacePerKm(dur.toLong() * 60, km?.let { it * 1000.0 })
     }
@@ -239,28 +257,38 @@ private fun RunWorkoutForm(
                     value = durationMinutes,
                     onValueChange = { durationMinutes = it; compute() },
                     label = { Text(stringResource(R.string.run_duration)) },
-                    supportingText = { Text(stringResource(R.string.run_duration_support)) },
+                    supportingText = {
+                        Text(durationError ?: stringResource(R.string.run_duration_support))
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = error != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("run_duration_field"),
+                    isError = durationError != null,
                 )
                 OutlinedTextField(
                     value = distanceKm,
                     onValueChange = { distanceKm = it; compute() },
                     label = { Text(stringResource(R.string.run_distance)) },
-                    supportingText = { Text(stringResource(R.string.run_distance_support)) },
+                    supportingText = {
+                        Text(distanceError ?: stringResource(R.string.run_distance_support))
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = error != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("run_distance_field"),
+                    isError = distanceError != null,
                 )
                 OutlinedTextField(
                     value = rpe,
                     onValueChange = { rpe = it; compute() },
                     label = { Text(stringResource(R.string.run_rpe)) },
-                    supportingText = { Text(stringResource(R.string.run_rpe_support)) },
+                    supportingText = {
+                        Text(rpeError ?: stringResource(R.string.run_rpe_support))
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     modifier = Modifier.fillMaxWidth(),
-                    isError = error != null,
+                    isError = rpeError != null,
                 )
             }
 
@@ -281,19 +309,10 @@ private fun RunWorkoutForm(
                 }
             }
 
-            error?.let { e ->
-                Text(
-                    text = e,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-
-Button(
+            Button(
                 onClick = {
                     compute()
-                    if (error == null) {
+                    if (durationError == null && distanceError == null && rpeError == null) {
                         val dur = durationMinutes.toIntOrNull() ?: 0
                         onFinish(
                             session.session.id,
@@ -305,7 +324,7 @@ Button(
                         )
                     }
                 },
-                enabled = error == null,
+                enabled = durationError == null && distanceError == null && rpeError == null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)

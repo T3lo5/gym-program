@@ -1,17 +1,23 @@
 package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.ui.RunLogInput
 import com.treinos.app.ui.UiState
 import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
 import java.util.Locale
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -78,6 +84,60 @@ class RunWorkoutScreenTest {
 
         composeRule.onNodeWithText("Finalizar corrida").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Sessão não encontrada").assertDoesNotExist()
+    }
+
+    /**
+     * H3-47: duração fora do intervalo mostra o erro no campo (supportingText)
+     * e o botão de finalizar fica desabilitado.
+     */
+    @Test
+    fun duracao_fora_do_intervalo_mostra_erro_no_campo_e_bloqueia_botao() {
+        composeRule.setContent {
+            RunWorkoutScreen(
+                state = UiState.Content(sessaoDeCorrida()),
+                onLeave = {},
+                onFinish = { _, _ -> },
+            )
+        }
+
+        composeRule.onNodeWithTag("run_duration_field").performTextInput("700")
+
+        composeRule
+            .onNodeWithText("Duração entre 1 e 600 minutos.")
+            .assertIsDisplayed()
+        composeRule
+            .onNodeWithText("Finalizar corrida")
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
+    /**
+     * H3-47: formulário válido finaliza com os valores digitados — duração em
+     * minutos convertida para segundos e distância aceita com vírgula.
+     */
+    @Test
+    fun formulario_valido_finaliza_com_valores_digitados() {
+        val finished = mutableListOf<Pair<Long, RunLogInput>>()
+        composeRule.setContent {
+            RunWorkoutScreen(
+                state = UiState.Content(sessaoDeCorrida()),
+                onLeave = {},
+                onFinish = { sessionId, input -> finished.add(sessionId to input) },
+            )
+        }
+
+        composeRule.onNodeWithTag("run_duration_field").performTextInput("45")
+        composeRule.onNodeWithTag("run_distance_field").performTextInput("5,2")
+        composeRule
+            .onNodeWithText("Finalizar corrida")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(1, finished.size)
+        assertEquals(7L, finished[0].first)
+        assertEquals(2_700L, finished[0].second.durationSeconds)
+        assertEquals(5.2, finished[0].second.distanceKm!!, 1e-9)
+        assertEquals(null, finished[0].second.rpe)
     }
 
     private fun sessaoDeCorrida(): SessionWithExercises = SessionWithExercises(

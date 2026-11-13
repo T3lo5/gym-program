@@ -162,7 +162,7 @@
     <string name="run_duration">Duration (min)</string>
     <string name="run_distance">Distance (km)</string>
     <string name="run_rpe">RPE (optional)</string>
-    <string name="run_duration_support">Optional; if left blank, uses the planned duration</string>
+    <string name="run_duration_support">Required. Between 1 and 600 minutes.</string>
     <string name="run_distance_support">Optional. Ex.: 5,2 for 5 km</string>
     <string name="run_rpe_support">From 1 to 10. Use comma or period for decimals.</string>
     <string name="run_estimated_pace">Estimated pace: %1$s</string>

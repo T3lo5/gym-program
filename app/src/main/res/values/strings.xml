@@ -162,7 +162,7 @@
     <string name="run_duration">Duração (min)</string>
     <string name="run_distance">Distância (km)</string>
     <string name="run_rpe">RPE (opcional)</string>
-    <string name="run_duration_support">Opcional; se não preencher, usa a duração do plano</string>
+    <string name="run_duration_support">Obrigatório. De 1 a 600 minutos.</string>
     <string name="run_distance_support">Opcional. Ex.: 5,2 para 5 km</string>
     <string name="run_rpe_support">De 1 a 10. Use vírgula ou ponto para decimais.</string>
     <string name="run_estimated_pace">Pace estimado: %1$s</string>

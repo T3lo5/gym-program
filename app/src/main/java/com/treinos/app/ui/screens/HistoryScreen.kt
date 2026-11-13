@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
@@ -59,6 +58,7 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ActivityModality
+import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.KeyValueRow
@@ -579,24 +579,14 @@ private fun ActivityCard(
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.history_activity_delete_title)) },
-            text = { Text(stringResource(R.string.history_activity_delete_body, title)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    },
-                    modifier = Modifier.minimumInteractiveComponentSize(),
-                ) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.minimumInteractiveComponentSize()) { Text(stringResource(R.string.common_cancel)) }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = onDelete,
+            title = stringResource(R.string.history_activity_delete_title),
+            message = stringResource(R.string.history_activity_delete_body, title),
+            confirmLabel = stringResource(R.string.common_delete),
+            isDestructive = true,
         )
     }
 }

@@ -54,6 +54,7 @@ import com.treinos.app.ui.ComplementaryValidator
 import com.treinos.app.ui.GenerateConfig
 import com.treinos.app.ui.ModalityDraft
 import com.treinos.app.ui.ProfileValidator
+import com.treinos.app.ui.ProfileValidator.ProfileField
 import com.treinos.app.ui.UiError
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.parse5k
@@ -197,7 +198,7 @@ fun GenerateScreen(
         mutableStateOf(initial.heightCmText.ifBlank { savedHeightCm?.toString() ?: "" })
     }
     var sexChoice by remember { mutableStateOf(initial.sexChoice ?: savedSex) }
-    var profileError by remember { mutableStateOf<String?>(null) }
+    var profileErrors by remember { mutableStateOf(ProfileValidator.validateFields(null, null, null)) }
     var environment by remember {
         mutableStateOf(restored(initial.environment, environmentOptions.map { it.first }, "gym"))
     }
@@ -298,7 +299,6 @@ fun GenerateScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         val ctaHint = when {
-                            profileError != null -> profileError
                             !canGenerate -> generateHint
                             else -> null
                         }
@@ -320,13 +320,12 @@ fun GenerateScreen(
                                     sexChoice,
                                 )
                                 if (!validation.valid) {
-                                    profileError = validation.error
+                                    profileErrors = ProfileValidator.validateFields(bodyWeightKgText, heightCmText, sexChoice)
                                     showMoreOptions = true
                                     return@BusyButton
                                 }
-                                profileError = null
+                                profileErrors = ProfileValidator.validateFields(bodyWeightKgText, heightCmText, sexChoice)
                                 if (!canGenerate) {
-                                    profileError = generateHint
                                     return@BusyButton
                                 }
                                 val dtoList = if (isComplementary) {
@@ -363,7 +362,7 @@ fun GenerateScreen(
                                     currentConfig(),
                                 )
                             },
-                            enabled = canGenerate,
+                            enabled = canGenerate && profileErrors.errors.isEmpty(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -704,27 +703,27 @@ fun GenerateScreen(
                         ) {
                             OutlinedTextField(
                                 value = bodyWeightKgText,
-                                onValueChange = { bodyWeightKgText = it; profileError = null },
+                                onValueChange = { bodyWeightKgText = it; profileErrors = ProfileValidator.validateFields(it, heightCmText, sexChoice) },
                                 label = { Text(stringResource(R.string.generate_weight_label)) },
-                                                            supportingText = { Text(stringResource(R.string.common_optional)) },
+                                supportingText = profileErrors.errors[ProfileField.Weight]?.let { { Text(it) } },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Next,
                                 ),
-                                isError = profileError != null && bodyWeightKgText.isNotBlank(),
+                                isError = profileErrors.errors.containsKey(ProfileField.Weight),
                                 modifier = Modifier.weight(1f),
                             )
                             OutlinedTextField(
                                 value = heightCmText,
-                                onValueChange = { heightCmText = it; profileError = null },
+                                onValueChange = { heightCmText = it; profileErrors = ProfileValidator.validateFields(bodyWeightKgText, it, sexChoice) },
                                 label = { Text(stringResource(R.string.generate_height_label)) },
-                                                            supportingText = { Text(stringResource(R.string.common_optional)) },
+                                supportingText = profileErrors.errors[ProfileField.Height]?.let { { Text(it) } },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Done,
                                 ),
                                 keyboardActions = KeyboardActions(onDone = { }),
-                                isError = profileError != null && heightCmText.isNotBlank(),
+                                isError = profileErrors.errors.containsKey(ProfileField.Height),
                                 modifier = Modifier.weight(1f),
                             )
                         }

@@ -1,14 +1,16 @@
 package com.treinos.app.ui.screens
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.backup.BackupApp
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
@@ -48,7 +50,9 @@ class SettingsScreenTest {
         backupImportState: BackupImportState = BackupImportState.Idle,
         syncError: UiError? = null,
         downloadError: UiError? = null,
+        restoreDeviceId: String = "",
         onConfirmImport: () -> Unit = {},
+        onRestoreByDeviceId: (String) -> Unit = {},
     ) = composeRule.setContent {
         SettingsScreen(
             backendUrl = "http://192.168.0.10:3000",
@@ -63,7 +67,7 @@ class SettingsScreenTest {
             backupImportState = backupImportState,
             backupMessage = null,
             isRestoring = false,
-            restoreDeviceId = "",
+            restoreDeviceId = restoreDeviceId,
             restoreMessage = null,
             onBack = {},
             onSaveUrl = {},
@@ -71,7 +75,7 @@ class SettingsScreenTest {
             onSync = {},
             onDownload = {},
             onRestoreDeviceIdChanged = {},
-            onRestoreByDeviceId = {},
+            onRestoreByDeviceId = onRestoreByDeviceId,
             onExportBackup = {},
             onImportFileSelected = {},
             onPrepareImport = {},
@@ -122,5 +126,74 @@ class SettingsScreenTest {
         screen()
         composeRule.waitForIdle()
         // Tela renderiza sem exceção (copy sem jargão aplicada).
+    }
+
+    @Test
+    fun restaurar_backend_exige_confirmacao_e_cancelar_e_neutro() {
+        var restored = false
+        screen(
+            restoreDeviceId = "abc-123",
+            onRestoreByDeviceId = { restored = true },
+        )
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Sincronização"))
+        composeRule.onNodeWithText("Sincronização").performClick()
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Restaurar de outro aparelho"))
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Restaurar"))
+        composeRule.onAllNodesWithText("Restaurar", useUnmergedTree = true).onLast().performClick()
+        // O diálogo de confirmação aparece e NÃO executa a ação.
+        composeRule.onNodeWithText("Assumir este aparelho?").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Cancelar", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("Assumir este aparelho?").assertCountEquals(0)
+        assertFalse(restored)
+
+        // Reabre e confirma: a ação é acionada.
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Restaurar"))
+        composeRule.onAllNodesWithText("Restaurar", useUnmergedTree = true).onLast().performClick()
+        composeRule.onNodeWithText("Assumir este aparelho?").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Restaurar", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        assertTrue(restored)
+    }
+
+    @Test
+    fun importar_exige_confirmacao_e_cancelar_nao_substitui() {
+        val backupFile = BackupFile(
+            schemaVersion = 3,
+            exportedAt = "2024-01-01T00:00:00Z",
+            app = BackupApp("com.treinos.app", "1.0", 1),
+            deviceId = "test-device",
+            plans = emptyList(),
+            sessions = emptyList(),
+        )
+        var confirmed = false
+        screen(
+            backupImportState = BackupImportState.Ready(
+                preview = BackupPreview(1, 1, 1, 1, 1, 1),
+                payload = backupFile,
+            ),
+            onConfirmImport = { confirmed = true },
+        )
+        composeRule.waitForIdle()
+        // O botão "Substituir tudo" exige o toque em um diálogo de confirmação.
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Substituir tudo"))
+        composeRule.onNodeWithText("Substituir tudo").performClick()
+        composeRule.onNodeWithText("Substituir tudo?").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Cancelar", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("Substituir tudo?").assertCountEquals(0)
+        assertFalse(confirmed)
+
+        // Confirma: a ação é acionada.
+        composeRule.onNodeWithText("Substituir tudo").performClick()
+        composeRule.onNodeWithText("Substituir tudo?").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Substituir tudo", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        assertTrue(confirmed)
     }
 }

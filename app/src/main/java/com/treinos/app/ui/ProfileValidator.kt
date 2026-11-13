@@ -56,6 +56,34 @@ object ProfileValidator {
         return Result(true, null, weight, height, sex)
     }
 
+    /**
+     * H3-47: validação separada por campo, para que o erro apareça inline
+     * ([supportingText]/`isError`) junto a cada `OutlinedTextField` em vez de
+     * um único texto no rodapé. O sexo é opcional e nunca gera erro.
+     */
+    enum class ProfileField { Weight, Height, Sex }
+
+    data class ProfileFieldErrors(val errors: Map<ProfileField, String> = emptyMap())
+
+    fun validateFields(weightText: String?, heightText: String?, sexText: String? = null): ProfileFieldErrors {
+        val map = linkedMapOf<ProfileField, String>()
+        val weight = parseWeight(weightText)
+        val height = parseHeight(heightText)
+        if (weightText?.isNotBlank() == true && weight == null) {
+            map[ProfileField.Weight] = "Peso inválido."
+        }
+        if (weight != null && (weight.isNaN() || weight.isInfinite() || weight < MIN_WEIGHT_KG || weight > MAX_WEIGHT_KG)) {
+            map[ProfileField.Weight] = "Peso fora da faixa permitida (30–300 kg)."
+        }
+        if (heightText?.isNotBlank() == true && height == null) {
+            map[ProfileField.Height] = "Altura inválida."
+        }
+        if (height != null && (height < MIN_HEIGHT_CM || height > MAX_HEIGHT_CM)) {
+            map[ProfileField.Height] = "Altura fora da faixa permitida (120–250 cm)."
+        }
+        return ProfileFieldErrors(map)
+    }
+
     /** Rótulo da UI (ou valor já normalizado) → valor de contrato; `null` quando vazio ou não reconhecido. */
     fun normalizeSex(text: String?): String? {
         val key = text?.trim()?.lowercase()

@@ -160,4 +160,51 @@ class ProfileValidatorTest {
         assertEquals(178, soPesoEAltura.heightCm)
         assertNull(soPesoEAltura.sex)
     }
+
+    @Test
+    fun validateFields_valido_ou_vazio_nao_gera_erro() {
+        assertTrue(ProfileValidator.validateFields("82,5", "178").errors.isEmpty())
+        assertTrue(ProfileValidator.validateFields("", "").errors.isEmpty())
+        assertTrue(ProfileValidator.validateFields(null, null).errors.isEmpty())
+        // Sexo é opcional e nunca gera erro (regra da H3-7 preservada).
+        assertTrue(ProfileValidator.validateFields("82,5", "178", "female").errors.isEmpty())
+        assertTrue(ProfileValidator.validateFields("", "", "qualquer-coisa").errors.isEmpty())
+    }
+
+    @Test
+    fun validateFields_erro_inline_fica_no_campo_afetado() {
+        val pesoInvalido = ProfileValidator.validateFields("abc", "178")
+        assertEquals(
+            mapOf(ProfileValidator.ProfileField.Weight to "Peso inválido."),
+            pesoInvalido.errors,
+        )
+
+        val pesoForaDaFaixa = ProfileValidator.validateFields("400", "178")
+        assertEquals(
+            mapOf(ProfileValidator.ProfileField.Weight to "Peso fora da faixa permitida (30–300 kg)."),
+            pesoForaDaFaixa.errors,
+        )
+
+        val alturaInvalida = ProfileValidator.validateFields("82,5", "abc")
+        assertEquals(
+            mapOf(ProfileValidator.ProfileField.Height to "Altura inválida."),
+            alturaInvalida.errors,
+        )
+
+        val alturaForaDaFaixa = ProfileValidator.validateFields("82,5", "100")
+        assertEquals(
+            mapOf(ProfileValidator.ProfileField.Height to "Altura fora da faixa permitida (120–250 cm)."),
+            alturaForaDaFaixa.errors,
+        )
+    }
+
+    @Test
+    fun validateFields_reporta_ambos_os_campos_de_uma_vez() {
+        // Motivação da H3-47: `validate` para no primeiro erro; o inline precisa
+        // marcar peso e altura ao mesmo tempo.
+        val ambos = ProfileValidator.validateFields("abc", "abc")
+        assertEquals(2, ambos.errors.size)
+        assertEquals("Peso inválido.", ambos.errors[ProfileValidator.ProfileField.Weight])
+        assertEquals("Altura inválida.", ambos.errors[ProfileValidator.ProfileField.Height])
+    }
 }

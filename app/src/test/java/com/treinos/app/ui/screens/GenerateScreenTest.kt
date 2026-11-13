@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import com.treinos.app.data.remote.ModalityDto
 import com.treinos.app.ui.GenerateConfig
 import com.treinos.app.ui.ModalityDraft
@@ -24,6 +25,7 @@ import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -34,6 +36,9 @@ import org.robolectric.RobolectricTestRunner
 /**
  * H3-30: geração sem atrito — defaults, CTA fixo com hint, seções de força
  * condicionais e overlay de progresso com cancelar.
+ *
+ * H3-47: erros de perfil vêm inline no campo (supportingText/isError) e o
+ * submit é bloqueado enquanto houver algum erro.
  */
 @RunWith(RobolectricTestRunner::class)
 class GenerateScreenTest {
@@ -181,6 +186,64 @@ class GenerateScreenTest {
 
         // Há modalidade inclusa: o CTA restaurado nasce habilitado.
         composeRule.onNodeWithText("Gerar semana híbrida").assertIsEnabled()
+    }
+
+    @Test
+    fun campo_peso_invalido_mostra_erro_inline_e_bloqueia() {
+        var gerou = false
+        composeRule.setContent {
+            GenerateScreen(
+                isGenerating = false,
+                onBack = {},
+                onGenerate = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> gerou = true },
+            )
+        }
+
+        // Expande "Mais opções" para ver o perfil.
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Mais opções"))
+        composeRule.onNodeWithText("Mais opções").performClick()
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Peso (kg)"))
+        // Peso inválido: o erro aparece junto ao campo e o CTA é desabilitado.
+        composeRule.onNodeWithText("Peso (kg)").performTextReplacement("abc")
+        composeRule.onNodeWithText("Peso inválido.").assertIsDisplayed()
+        composeRule.onNodeWithText("Gerar semana híbrida").assertIsNotEnabled()
+
+        // Corrige o peso: o erro some e o CTA volta a ficar habilitado.
+        composeRule.onNodeWithText("Peso (kg)").performTextReplacement("75")
+        composeRule.onNodeWithText("Peso inválido.").assertDoesNotExist()
+        composeRule.onNodeWithText("Gerar semana híbrida").assertIsEnabled()
+
+        // Mesmo com o perfil válido, o submit não é acionado com dados inválidos.
+        composeRule.onNodeWithText("Peso (kg)").performTextReplacement("abc")
+        composeRule.onNodeWithText("Gerar semana híbrida").performClick()
+        composeRule.waitForIdle()
+        assertFalse(gerou)
+    }
+
+    @Test
+    fun submit_bloqueado_com_erro_de_perfil() {
+        var gerou = false
+        composeRule.setContent {
+            GenerateScreen(
+                isGenerating = false,
+                onBack = {},
+                onGenerate = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> gerou = true },
+            )
+        }
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Mais opções"))
+        composeRule.onNodeWithText("Mais opções").performClick()
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText("Altura (cm)"))
+        composeRule.onNodeWithText("Altura (cm)").performTextReplacement("9999")
+        composeRule.onNodeWithText("Altura fora da faixa permitida (120–250 cm).")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Gerar semana híbrida").assertIsNotEnabled()
+        composeRule.onNodeWithText("Gerar semana híbrida").performClick()
+        composeRule.waitForIdle()
+        assertFalse(gerou)
     }
 
     private fun onGenerateNoop(

@@ -2,7 +2,6 @@ package com.treinos.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -18,22 +17,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.ui.Modifier
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -45,9 +48,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.treinos.app.ui.exerciseContentDescription
-import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
+import com.treinos.app.ui.exerciseContentDescription
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -331,3 +333,49 @@ private val SUCCESS_PREFIXES = listOf(
     "Catálogo atualizado",
 )
 
+/**
+ * H3-47: diálogo de confirmação para ações destrutivas ou que substituem dados.
+ * Reuso do mesmo padrão (título descritivo, mensagem de impacto, Cancelar neutro
+ * e ação rotulada explicitamente) para evitar variação entre telas.
+ *
+ * - `onConfirm` é acionado apenas após o toque explícito; o `onDismiss` (ou
+ *   toque fora) é sempre neutro.
+ * - `confirmLabel` é um `stringResource`; o chamador passa o rótulo para que
+ *   o diálogo seja testado sem depender de um estado interno.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConfirmationDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    title: String,
+    message: String,
+    confirmLabel: String,
+    dismissLabel: String = stringResource(R.string.common_cancel),
+    confirmTint: Color = MaterialTheme.colorScheme.error,
+    isDestructive: Boolean = true,
+) {
+    if (!visible) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm()
+                    onDismiss()
+                },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(confirmLabel, color = if (isDestructive) confirmTint else MaterialTheme.colorScheme.primary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
+                Text(dismissLabel)
+            }
+        },
+    )
+}

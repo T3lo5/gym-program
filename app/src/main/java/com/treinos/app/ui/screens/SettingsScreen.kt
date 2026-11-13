@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material.icons.Icons
@@ -56,6 +55,7 @@ import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.UiError
 import com.treinos.app.ui.components.BusyButton
+import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.StatusText
@@ -121,89 +121,41 @@ fun SettingsScreen(
     var backupExpanded by remember { mutableStateOf(true) }
 
     if (showDownloadConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDownloadConfirm = false },
-            title = { Text(stringResource(R.string.settings_dialog_replace_title)) },
-            text = {
-                Text(
-                    stringResource(R.string.settings_dialog_replace_body)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDownloadConfirm = false
-                        onDownload()
-                    },
-                ) {
-                    Text(stringResource(R.string.settings_btn_restore_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDownloadConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showDownloadConfirm = false },
+            onConfirm = onDownload,
+            title = stringResource(R.string.settings_dialog_replace_title),
+            message = stringResource(R.string.settings_dialog_replace_body),
+            confirmLabel = stringResource(R.string.settings_btn_restore_action),
+            isDestructive = true,
         )
     }
 
     if (showRestoreConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRestoreConfirm = false },
-            title = { Text(stringResource(R.string.settings_dialog_restore_title)) },
-            text = {
-                Text(
-                    "Os dados locais serão substituídos pelo snapshot de " +
-                        "$restoreDeviceId e este app passará a usar esse deviceId. " +
-                        "Se o deviceId estiver errado, nada muda.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showRestoreConfirm = false
-                        onRestoreByDeviceId(restoreDeviceId)
-                    },
-                ) {
-                    Text(stringResource(R.string.settings_btn_restore_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRestoreConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showRestoreConfirm = false },
+            onConfirm = { onRestoreByDeviceId(restoreDeviceId) },
+            title = stringResource(R.string.settings_dialog_restore_title),
+            message = "Os dados locais serão substituídos pelo snapshot de " +
+                "$restoreDeviceId e este app passará a usar esse deviceId. " +
+                "Se o deviceId estiver errado, nada muda.",
+            confirmLabel = stringResource(R.string.settings_btn_restore_action),
+            isDestructive = true,
         )
     }
 
     // H3-35: confirmação destrutiva antes de qualquer escrita no import.
     if (showReplaceConfirm) {
-        AlertDialog(
-            onDismissRequest = { showReplaceConfirm = false },
-            title = { Text(stringResource(R.string.settings_dialog_replace_all_title)) },
-            text = {
-                Text(
-                    "Isso apaga os planos, treinos, séries e o perfil (peso, altura e " +
-                        "sexo) salvos neste aparelho e grava no lugar o conteúdo do " +
-                        "arquivo selecionado. A operação não pode ser desfeita. " +
-                        "Exporte um backup atual antes, se quiser um caminho de volta.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showReplaceConfirm = false
-                        onConfirmImport()
-                    },
-                ) {
-                    Text(stringResource(R.string.settings_btn_replace_all))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReplaceConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showReplaceConfirm = false },
+            onConfirm = onConfirmImport,
+            title = stringResource(R.string.settings_dialog_replace_all_title),
+            message = stringResource(R.string.settings_dialog_replace_all_body),
+            confirmLabel = stringResource(R.string.settings_btn_replace_all),
+            isDestructive = true,
         )
     }
 

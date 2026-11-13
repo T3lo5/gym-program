@@ -1,10 +1,13 @@
 package com.treinos.app.ui
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -269,5 +272,29 @@ class HistoryScreenTest {
             val right = node.positionInRoot.x + node.size.width
             assertTrue("chip '$label' não pode transbordar a largura ($right > $rootWidth)", right <= rootWidth + 1)
         }
+    }
+
+    @Test
+    fun excluirRegistro_exige_confirmacao() {
+        // H3-47: a exclusão de um registro avulso só é disparada após
+        // confirmação explícita; o toque em "Excluir" sozinho abre o diálogo.
+        var excluido: Long? = null
+        composeRule.setContent {
+            HistoryScreen(
+                sessions = listOf(atividadeAvulsa),
+                onBack = { },
+                onDeleteActivity = { excluido = it },
+            )
+        }
+        // O botão "Excluir" do card abre o diálogo; a confirmação é outro toque.
+        composeRule.onAllNodesWithText("Excluir", useUnmergedTree = true).onFirst().performClick()
+        composeRule.onNodeWithText("Excluir o registro?").assertIsDisplayed()
+        composeRule.onNodeWithText("Caminhada sai do histórico e do próximo backup. Não dá para desfazer.")
+            .assertIsDisplayed()
+        // Confirmar: o último nó "Excluir" é o botão do diálogo.
+        composeRule.onAllNodesWithText("Excluir", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Excluir o registro?").assertDoesNotExist()
+        assertEquals(2L, excluido)
     }
 }

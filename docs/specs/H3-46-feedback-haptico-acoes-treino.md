@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-46` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-13` |
+| Implementação | `concluída` |
 
 **Origem:** pedido de criar a spec de háptico, a partir das lacunas observadas
 na auditoria UX/UI de 2026-11-07

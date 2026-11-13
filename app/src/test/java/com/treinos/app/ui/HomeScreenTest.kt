@@ -6,7 +6,9 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -16,8 +18,8 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
-import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutPlanEntity
+import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ModalityTab
@@ -34,6 +36,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import java.time.LocalDate
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -340,6 +343,43 @@ class HomeScreenTest {
         composeRule.onNode(hasScrollAction())
             .performScrollToNode(hasText("Atividade avulsa", substring = true))
         composeRule.onNodeWithText("Atividade avulsa", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun excluir_plano_complementar_exige_confirmacao() {
+        // H3-47: a exclusão de um plano complementar sai do menu (overflow) e
+        // só é disparada após confirmação explícita — nunca um toque único
+        // acidental no corpo da lista.
+        val extra = WorkoutPlanWithDetails(
+            plan = WorkoutPlanEntity(id = 99, name = "Complementar — Casa", kind = "extra", daysPerWeek = 3),
+            days = emptyList(),
+        )
+        var excluido: Long? = null
+        composeRule.setContent {
+            HomeScreen(
+                plan = extra,
+                inProgressSession = null,
+                plans = listOf(extra),
+                onSelectPlan = {},
+                onDeletePlan = { excluido = it },
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+        // O botão de mais opções abre o menu; o item "Excluir plano complementar"
+        // só abre o diálogo, não apaga.
+        composeRule.onNodeWithContentDescription("Mais opções do plano").performClick()
+        composeRule.onNodeWithText("Excluir plano complementar").performClick()
+        composeRule.onNodeWithText("Excluir plano?").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Excluir").onLast().performClick()
+        composeRule.onNodeWithText("Excluir plano?").assertDoesNotExist()
+        composeRule.waitForIdle()
+        assertEquals(99L, excluido)
     }
 
     @Test
