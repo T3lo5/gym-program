@@ -6,8 +6,19 @@
 |---|---|
 | Item do roadmap | `H3-26` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-07` (spec e implementação no mesmo commit, `4649848`) |
+| Implementação | `concluída em 2026-11-07` (commit `4649848`) |
+
+### Notas da implementação
+
+- Os testes Robolectric de UI previstos em "Testes a criar" foram entregues com
+  nomes diferentes em `WorkoutScreenTest`
+  (`sem_serie_anterior_o_botao_repetir_nao_existe`,
+  `descanso_zerado_entra_em_destaque_e_so_pular`,
+  `descanso_pausado_mostra_continuar`); a lógica pura ficou em `RestTimerTest`
+  e `FeedbackRuleTest` (pacote `ui`).
+- `keepScreenOn` não tem teste automatizado: implementado em `ui/KeepScreenOn.kt`
+  e aplicado em `WorkoutScreen`/`MobilityScreen` via `KeepScreenOnEffect`.
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P0.5, §P1.1–1.5 e 1.7).
 

@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-35` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-09` (implementada no commit `95d6709`) |
+| Implementação | `concluída em 2026-11-09` (commit `95d6709`) |
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P2.8, P2.9 e P4.9).
 

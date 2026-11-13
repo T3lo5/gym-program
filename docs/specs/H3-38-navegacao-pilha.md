@@ -6,8 +6,19 @@
 |---|---|
 | Item do roadmap | `H3-38` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-07) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-09` (implementada no commit `3dc5e1d`) |
+| Implementação | `concluída em 2026-11-09` (commit `3dc5e1d`; shortcut de retomada entregue pela H3-35 no mesmo dia, commit `95d6709`) |
+
+### Notas da implementação
+
+- Testes entregues como `NavigationBackTest` (`back_retorna_a_origem`,
+  `back_target_default_home`,
+  `pilha_multipla_home_historico_ajustes_volta_na_ordem`) e
+  `NavigationBottomBarTest` (`bottom_bar_navega_entre_hubs`,
+  `back_target_default_home`), em vez dos nomes previstos em "Testes a criar";
+  o caso "salvar edição vinda do Histórico volta ao Histórico" é coberto pela
+  pilha de origem→destino (`back_retorna_a_origem` e
+  `pilha_multipla_home_historico_ajustes_volta_na_ordem`).
 
 **Origem:** auditoria UX/UI de 2026-11-07 ([relatório](../auditoria-ux-ui-2026-11-07.md) §P2.2 e P2.8).
 

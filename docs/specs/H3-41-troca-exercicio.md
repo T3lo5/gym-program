@@ -8,8 +8,8 @@
 |---|---|
 | Item do roadmap | `H3-41` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-11` (spec e implementação no mesmo commit, `e6b51fa`) |
+| Implementação | `concluída em 2026-11-11` (commit `e6b51fa`) |
 
 **Depende de:** [H3-25](H3-25-selecao-por-nome.md) (catálogo como fonte de verdade e resolução nome→ID) e [H3-24](H3-24-midia-exercicio-plano.md) (mídia/instruções do exercício persistem no plano).  
 **Não altera contrato de API/DTO do backend** (troca é decisão local no app; o `exercise_catalog.json` já é fonte local).
