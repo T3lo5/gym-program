@@ -3,6 +3,7 @@ package com.treinos.app.ui
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.lifecycle.ViewModel
@@ -65,6 +66,7 @@ import com.treinos.app.ui.progression.progressionHistory
 import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.progressText
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -79,12 +81,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
+import com.treinos.app.updater.ReleaseChecker
+import com.treinos.app.updater.ReleaseParser
+import com.treinos.app.updater.UpdateInstaller
+import com.treinos.app.updater.UpdateState
+import com.treinos.app.updater.VersionCompare
 import com.treinos.app.R
 
 enum class Screen {
@@ -1978,6 +1986,109 @@ class AppViewModel(
             } finally {
                 _isConnectingBackend.value = false
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // H3-51: atualização in-app via GitHub Releases.
+    // Checagem sob demanda (uma vez por processo ao abrir Ajustes + botão
+    // manual); download e instalação só com toque do usuário, sempre via
+    // instalador do sistema.
+    // ------------------------------------------------------------------
+
+    private val releaseChecker = ReleaseChecker()
+    private val updateInstaller = UpdateInstaller(context)
+
+    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
+
+    /** A checagem automática roda uma única vez por processo — nunca polling. */
+    private var updateCheckedThisProcess = false
+
+    /**
+     * Consulta o release `latest` e mostra o card só se o `versionCode`
+     * remoto for maior que o local. Falha silenciosa no automático; o botão
+     * manual mostra o erro discreto.
+     */
+    fun checkForUpdate(manual: Boolean) {
+        val current = _updateState.value
+        if (current is UpdateState.Checking || current is UpdateState.Downloading) return
+        _updateState.value = UpdateState.Checking
+        viewModelScope.launch {
+            val release = withContext(Dispatchers.IO) {
+                ReleaseParser.parse(releaseChecker.fetchLatest())
+            }
+            val localCode = try {
+                PackageInfoCompat.getLongVersionCode(
+                    context.packageManager.getPackageInfo(context.packageName, 0),
+                )
+            } catch (_: Exception) {
+                0L
+            }
+            _updateState.value = when {
+                release == null ->
+                    if (manual) {
+                        UpdateState.Failed(
+                            context.getString(R.string.settings_update_error_check),
+                        )
+                    } else {
+                        UpdateState.Idle
+                    }
+                VersionCompare.shouldShowCard(release.versionCode, localCode) ->
+                    UpdateState.Available(release)
+                manual -> UpdateState.UpToDate
+                else -> UpdateState.Idle
+            }
+            updateCheckedThisProcess = true
+        }
+    }
+
+    /** Gatilho da checagem automática ao abrir Ajustes (uma vez por processo). */
+    fun maybeCheckForUpdateOnOpen() {
+        if (!updateCheckedThisProcess) checkForUpdate(manual = false)
+    }
+
+    /** Baixa o APK verificado e abre o instalador do sistema. */
+    fun downloadAndInstallUpdate() {
+        val available = _updateState.value as? UpdateState.Available ?: return
+        val release = available.release
+        _updateState.value = UpdateState.Downloading(0)
+        viewModelScope.launch {
+            updateInstaller.downloadAndVerify(
+                release.apkUrl,
+                release.sha256Url,
+            ) { progress ->
+                _updateState.value = UpdateState.Downloading(progress)
+            }.fold(
+                onSuccess = { file ->
+                    _updateState.value = UpdateState.Available(
+                        release,
+                        note = context.getString(R.string.settings_update_started),
+                    )
+                    try {
+                        context.startActivity(updateInstaller.installIntent(file))
+                    } catch (_: Exception) {
+                        _updateState.value = UpdateState.Failed(
+                            context.getString(R.string.settings_update_error_installer),
+                        )
+                    }
+                },
+                onFailure = { failure ->
+                    _updateState.value = UpdateState.Failed(
+                        context.getString(
+                            R.string.settings_update_error_download,
+                            failure.message ?: "erro desconhecido",
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    /** Dispensa o erro discreto / o aviso "já está atualizado" do updater. */
+    fun clearUpdateMessage() {
+        if (_updateState.value is UpdateState.Failed || _updateState.value is UpdateState.UpToDate) {
+            _updateState.value = UpdateState.Idle
         }
     }
 

@@ -117,6 +117,11 @@ Pronto. O app abre na tela **Treinos**. Na primeira vez não há plano: toque em
 > Para o relógio Wear OS, baixe também o `wear.apk` no mesmo link de release
 > (`.../releases/latest/download/wear.apk`) e instale no relógio.
 
+> Com o dispositivo ligado no computador, dá para instalar/atualizar com um
+> comando: `./scripts/install.sh` (celular) e `./scripts/install-wear.sh <ip>`
+> (relógio). Passo a passo em
+> [Instalar/atualizar pelo computador](#321-instalaratualizar-pelo-computador-script).
+
 > Detalhes e solução de problemas: [Parte A](#parte-a--app-android-front).
 
 ### 2.2 Quero subir o backend
@@ -201,7 +206,9 @@ Actions. Ele não vem da Play Store e é assinado com uma chave de teste.
 2. Baixe `treinos.apk`.
 3. Transfira para o celular por cabo USB, Google Drive, Telegram ou e-mail.
 
-> Para o relógio, baixe `wear.apk` na mesma página de releases.
+> Para o relógio, baixe `wear.apk` na mesma página de releases — ou instale
+> pelo computador com `./scripts/install-wear.sh <ip>`
+> ([seção 3.2.2](#322-instalaratualizar-no-relogio-script)).
 
 **Conferir o checksum (opcional, mas recomendado):**
 
@@ -251,6 +258,75 @@ sempre o mesmo.
   desconhecidos**.
 - Alguns fabricantes: **Configurações → Segurança → Instalar apps
   desconhecidos** ou **Privacidade → Instalação de apps desconhecidos**.
+
+#### 3.2.1 Instalar/atualizar pelo computador (script)
+
+Com o celular ligado no computador, um comando instala ou atualiza o app
+preservando os dados:
+
+```bash
+./scripts/install.sh                         # instala dist/treinos.apk
+./scripts/install.sh /caminho/treinos.apk    # outro APK
+```
+
+O script usa `adb install -r` (reinstala por cima, sem desinstalar) e **nunca
+desinstala nada sozinho** — desinstalar apaga os dados locais do app (planos,
+treinos e séries).
+
+**Pré-requisitos:**
+
+- `adb` no PATH (pacote **platform-tools**: `sudo apt install adb`,
+  `brew install --cask android-platform-tools` ou
+  [download manual](https://developer.android.com/tools/releases/platform-tools));
+- cabo USB e **Depuração USB** ativa no celular (Configurações → Opções do
+  desenvolvedor; para liberar o menu, toque 7x em **Número da versão** em
+  Configurações → Sobre o telefone);
+- o APK em `dist/treinos.apk` (gerado por `./scripts/verify.sh`) ou o caminho
+  passado como argumento.
+
+**Mensagens de erro e o que fazer:**
+
+| Mensagem | O que fazer |
+|---|---|
+| `adb não encontrado no PATH` | Instale o platform-tools (comandos na própria mensagem) e rode de novo. |
+| `Nenhum celular Android conectado` | Conecte o cabo, ative a Depuração USB e aceite o diálogo "Permitir depuração USB". |
+| `NÃO AUTORIZADO` | Desbloqueie o celular e aceite o diálogo "Permitir depuração USB" (marque "Sempre permitir deste computador"). |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | A assinatura mudou. **Primeiro exporte o backup** (Ajustes → Backup → Exportar backup), depois desinstale manualmente (Configurações → Apps → Treinos → Desinstalar), rode o script de novo e importe o backup. A causa definitiva é a assinatura estável (H3-48): depois desta reinstalação única, os próximos updates instalam por cima sem perder dados. |
+
+#### 3.2.2 Instalar/atualizar no relógio (script)
+
+O relógio recebe o `wear.apk` por ADB. Preparar o relógio (uma vez):
+
+1. No relógio: **Configurações → Sistema → Sobre** → toque 7x em **Número da
+   versão** para liberar as **Opções do desenvolvedor**.
+2. Em **Opções do desenvolvedor**, ative **Depuração ADB**.
+3. Escolha a rota de conexão:
+   - **Wi-Fi (recomendada):** ative **Depuração por Wi-Fi** — o relógio mostra
+     o IP na tela. Relógio e computador precisam estar na mesma rede.
+   - **Bluetooth:** ative **Depuração por Bluetooth** no relógio **e**, no
+     celular ligado ao computador por USB, no app Wear OS (Configurações
+     avançadas → Depuração por Bluetooth).
+
+Depois:
+
+```bash
+./scripts/install-wear.sh 192.168.0.42    # rota Wi-Fi (IP mostrado no relógio)
+./scripts/install-wear.sh --bt            # rota Bluetooth (via celular)
+```
+
+O script conecta (`adb connect <ip>:5555` na rota Wi-Fi; `adb forward tcp:4444
+localabstract:/adb-hub` + `adb connect localhost:4444` na rota Bluetooth),
+espera o relógio aparecer (até 10 s) e instala `dist/wear.apk` com
+`adb install -r` — por cima, sem desinstalar.
+
+**Mensagens de erro e o que fazer:**
+
+| Mensagem | O que fazer |
+|---|---|
+| `Informe o IP do relógio` | Veja o IP na tela do relógio (Depuração por Wi-Fi) ou use a rota `--bt`. |
+| `O relógio não respondeu em <ip>` | Relógio e computador na mesma rede Wi-Fi? Toque em "Depuração por Wi-Fi" de novo no relógio para refrescar a conexão e rode de novo. |
+| `O relógio não apareceu via Bluetooth` | Confirme a Depuração por Bluetooth no relógio e no app Wear OS do celular; se persistir, use a rota Wi-Fi. |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | A assinatura mudou: exporte o backup no celular, desinstale o app do relógio manualmente e rode o script de novo (o relógio refaz os dados pelo Data Layer). |
 
 ### 3.3 Primeiro uso
 
@@ -455,6 +531,39 @@ atualização instala por cima, preservando os dados.
    **Configurações → Apps → Treinos → Desinstalar**.
 2. Instale o novo APK.
 3. Atenção: desinstalar apaga os dados locais do app.
+
+**Outros caminhos de atualização:**
+
+- **Pelo computador:** o mesmo `./scripts/install.sh` da
+  [seção 3.2.1](#321-instalaratualizar-pelo-computador-script) atualiza por
+  cima, preservando os dados.
+- **No próprio app:** em **Ajustes**, o botão **Verificar atualização** baixa
+  o APK do release `latest`, confere o SHA-256 e abre a instalação do sistema
+  (nada é instalado sem a sua confirmação).
+- **Automático:** com o Obtainium instalado, o app se atualiza sozinho quando
+  sai release novo — veja a seguir.
+
+#### 3.4.1 Atualização automática (Obtainium)
+
+O [Obtainium](https://github.com/ImranR98/Obtainium) acompanha o release
+`latest` deste repositório e oferece a atualização quando há build novo — sem
+computador e sem Play Store:
+
+1. Instale o Obtainium no celular
+   ([releases](https://github.com/ImranR98/Obtainium/releases/latest)); ele
+   também pede a permissão de "instalar apps desconhecidos".
+2. No Obtainium, toque em **Adicionar app** e cole a URL do repositório:
+   `https://github.com/T3lo5/gym-program`.
+3. Em **Opções adicionais**, confirme que o APK escolhido é o asset
+   `treinos.apk` (nome estável publicado pelo CI — não o pacote combinado).
+4. Ative a verificação periódica de atualizações nas configurações do
+   Obtainium.
+
+Quando o workflow publicar um release novo, o Obtainium baixa o `treinos.apk`
+e instala por cima, preservando os dados (requer a assinatura estável da
+H3-48). Limitações: a verificação periódica pode ser atrasada por restrições
+de bateria do fabricante, e o Obtainium não faz rollback de versão — o botão
+**Verificar atualização** nos Ajustes do app é a alternativa sob demanda.
 
 ### 3.5 Desinstalar o app
 

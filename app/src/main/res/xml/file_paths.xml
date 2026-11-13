@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- H3-51: escopo mínimo para compartilhar o APK da atualização com o
+     instalador do sistema via FileProvider. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="updater"
+        path="updater/" />
+</paths>

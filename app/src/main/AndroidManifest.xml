@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- Vibração do fim do descanso (H3-26); permissão normal, sem prompt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- H3-51: o app dispara a instalação do APK baixado via instalador do
+         sistema; sem essa permissão o toggle "instalar apps desconhecidos"
+         não existe para o app e o update falha. O Android pede a permissão
+         ao usuário no momento do primeiro update. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".TreinosApplication"
@@ -52,6 +57,17 @@
             <meta-data
                 android:name="com.google.android.wearable.standalone"
                 android:value="false" />
+
+        <!-- H3-51: compartilha o APK baixado com o instalador do sistema. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- Persistência da escolha de idioma por app em versões < Android 13.
              autoStoreLocales=true é lido pelo AppCompat no attachBaseContext; sem esse

@@ -407,4 +407,19 @@
     <string name="settings_dialog_replace_all_body">Isso apaga os planos, treinos, séries e o perfil (peso, altura e sexo) salvos neste aparelho e grava no lugar o conteúdo do arquivo selecionado. A operação não pode ser desfeita. Exporte um backup atual antes, se quiser um caminho de volta.</string>
     <string name="settings_btn_replace_all">Substituir tudo</string>
     <string name="settings_btn_dismiss">Dispensar</string>
+
+    <!-- H3-51: atualização in-app (GitHub Releases) -->
+    <string name="settings_update_title">Atualização do app</string>
+    <string name="settings_update_idle_hint">Verifique se há uma versão nova publicada no GitHub Releases.</string>
+    <string name="settings_update_btn_check">Verificar atualização</string>
+    <string name="settings_update_checking">Verificando…</string>
+    <string name="settings_update_available_title">Nova versão disponível</string>
+    <string name="settings_update_available_body">Versão %1$s disponível.</string>
+    <string name="settings_update_btn_download">Baixar e instalar</string>
+    <string name="settings_update_downloading">Baixando… %1$d%%</string>
+    <string name="settings_update_started">Instalação iniciada — confirme na tela do sistema.</string>
+    <string name="settings_update_uptodate">Você já está na versão mais recente.</string>
+    <string name="settings_update_error_check">Não foi possível verificar (sem rede ou limite da API do GitHub).</string>
+    <string name="settings_update_error_download">Falha ao baixar a atualização: %1$s</string>
+    <string name="settings_update_error_installer">Não foi possível abrir o instalador do sistema.</string>
 </resources>

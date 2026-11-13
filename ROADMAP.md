@@ -191,6 +191,14 @@ implementada separadamente.
 | H3-49 | Instalação e atualização por script (celular e relógio) | **S** | Instalar exige lembrar comandos `adb`, e o relógio exige connect/forward que ninguém decora; o manual não explica a depuração do relógio. | `scripts/install.sh` (`adb install -r dist/treinos.apk`) e `scripts/install-wear.sh` (Wi-Fi/Bluetooth) com mensagens de erro acionáveis (backup antes de desinstalar, nunca desinstalar automaticamente) e seção nova no `docs/MANUAL.md`. | 0,5 dia | H3-48 | [H3-49](docs/specs/H3-49-instalacao-por-script.md) (proposta) |
 | H3-50 | Auto-update do celular via Obtainium (docs) | **S** | Atualizar exige computador ou baixar o APK na mão a cada release. | Seção "Atualização automática (Obtainium)" no manual: acompanhar o release `latest` (assets com nome estável já publicados pelo workflow) e instalar por cima. Sem código. | 0,5 dia | H3-48 | [H3-50](docs/specs/H3-50-obtainium-auto-update.md) (proposta) |
 | H3-51 | Atualização dentro do app (in-app updater) | **C** | Mesmo com Obtainium, quem usa só o app não fica sabendo que existe versão nova. | Ajustes mostra "Nova versão disponível" consultando `releases/latest` da API do GitHub, baixa o APK, confere o SHA-256 publicado e dispara a instalação do sistema; silencioso offline, sem polling em loop. | 1–1,5 dia | H3-48 | [H3-51](docs/specs/H3-51-atualizacao-in-app.md) (proposta) |
+| H3-52 | i18n: extrair as strings hardcoded restantes | **S** | Com o idioma English, ~88 literais em PT ainda aparecem (diálogos do treino, Histórico, quase toda a tela de Ajustes) — a paridade da H3-37 está incompleta. | Extrair todos os literais de UI para `strings.xml`/`values-en` (placeholders posicionais, plurais quando couber); copy de PT permanece idêntica; `StringParityTest` cobre a paridade. | 0,5–1 dia | — | [H3-52](docs/specs/H3-52-i18n-strings-restantes.md) (proposta) |
+| H3-53 | Resumo pós-treino | **S** | Finalizar o treino hoje só mostra um snackbar — não há fechamento do que foi feito. | Card de conclusão na Home (séries realizadas/planejadas, volume, duração) gerado por função pura; efêmero, dispensável com "Fechar". | 0,5 dia | — | [H3-53](docs/specs/H3-53-resumo-pos-treino.md) (proposta) |
+| H3-54 | Correção de séries em sessões concluídas (Histórico) | **S** | O Histórico é somente leitura: erro de registro (carga/reps, série duplicada) fica permanente. | "Editar séries" no card do Histórico reusa o diálogo de série da H3-27 extraído para componente; mesmas validações; métricas recalculam; só sessões concluídas. | 1 dia | — | [H3-54](docs/specs/H3-54-correcao-series-historico.md) (proposta) |
+| H3-55 | Mobilidade: sessão sobrevive à morte do processo | **S** | Fora de escopo da H3-31: matar o app no meio da rotina perde movimento e tempo. | Persistir em `AppPreferences` (padrão do descanso, wall-clock) rotina/índice/deadline; retomar via função pura `resume`; vencidos encadeiam; "Encerrar" limpa. | 0,5–1 dia | — | [H3-55](docs/specs/H3-55-mobilidade-sobrevive-processo.md) (proposta) |
+| H3-56 | Rascunho do registro avulso sobrevive à morte do processo | **C** | O rascunho do registro avulso sobrevive a rotação, não a morte do processo. | Persistir o `ActivityLogDraft` em `AppPreferences`; `prefill` (editar/copiar) vence; limpa ao salvar/excluir. | 0,25 dia | — | [H3-56](docs/specs/H3-56-rascunho-registro-avulso.md) (proposta) |
+| H3-57 | Predictive back (Android 14) na pilha de navegação | **C** | Com `targetSdk 34`, o gesto de voltar não mostra a prévia animada do sistema. | `enableOnBackInvokedCallback` no manifest + `PredictiveBackHandler` na pilha (fallback clássico < API 33); gesto cancelado não navega. | 0,5–1 dia | — | [H3-57](docs/specs/H3-57-predictive-back.md) (proposta) |
+| H3-58 | Notificação do fim do descanso em segundo plano | **C** | Fora de escopo da H3-26: quem sai do app durante o descanso não é avisado quando o timer zera. | Notificação local (canal `rest_timer`, `POST_NOTIFICATIONS` em API 33+): restante ao ir para background, "concluído" ao zerar, cancela ao voltar/pular; sem foreground service. | 1 dia | — | [H3-58](docs/specs/H3-58-notificacao-descanso-background.md) (proposta) |
+| H3-59 | Wear: i18n completa e TalkBack | **C** | O relógio tem literais em PT fora dos recursos e rótulos ausentes para TalkBack. | `values-en` no wear, literais de `WorkoutWearActivity` para recursos, `contentDescription` nos controles; paridade coberta por teste JVM do módulo. | 0,5–1 dia | — | [H3-59](docs/specs/H3-59-wear-i18n-talkback.md) (proposta) |
 
 > H3-26..H3-39 nasceram da auditoria UX/UI de 2026-11-07
 > ([docs/auditoria-ux-ui-2026-11-07.md](docs/auditoria-ux-ui-2026-11-07.md)) e do
@@ -201,6 +209,13 @@ implementada separadamente.
 > "desinstalar para atualizar" tem causa raiz no caminho errado da keystore
 > versionada em `app/build.gradle.kts` (H3-48); H3-49/H3-50 são facilitação de
 > instalação e H3-51 é conveniência opcional — todas dependem da H3-48.
+
+> H3-52..H3-59 nasceram da varredura de polimento UX/UI de 2026-11-13: resíduos
+> de i18n da H3-37 (H3-52), fechamento do treino (H3-53), correção de treinos
+> passados fora de escopo da H3-27 (H3-54), continuidade de mobilidade e
+> registro avulso fora de escopo da H3-31 (H3-55/H3-56), gesto preditivo do
+> Android 14 (H3-57), descanso fora do app fora de escopo da H3-26 (H3-58) e
+> wear fora de escopo da H3-34/H3-37 (H3-59).
 
 H3-1..H3-3, H3-5, **H3-6**, **H3-7**, **H3-10**, **H3-11**, **H3-12**, **H3-13**, **H3-15**
 e **H3-16**, além de **H3-40**, **H3-41**, **H3-42**, **H3-43**, **H3-44**, **H3-45**, **H3-46**, **H3-47**
@@ -455,6 +470,14 @@ confirme antes de implementar.
 - [H3-49 — Instalação e atualização por script (celular e relógio)](docs/specs/H3-49-instalacao-por-script.md) — proposta, aguardando aprovação
 - [H3-50 — Auto-update do celular via Obtainium](docs/specs/H3-50-obtainium-auto-update.md) — proposta, aguardando aprovação (só documentação)
 - [H3-51 — Atualização dentro do app (in-app updater)](docs/specs/H3-51-atualizacao-in-app.md) — proposta, aguardando aprovação (Could)
+- [H3-52 — i18n: extrair as strings hardcoded restantes](docs/specs/H3-52-i18n-strings-restantes.md) — proposta, aguardando aprovação (Should)
+- [H3-53 — Resumo pós-treino](docs/specs/H3-53-resumo-pos-treino.md) — proposta, aguardando aprovação (Should)
+- [H3-54 — Correção de séries em sessões concluídas (Histórico)](docs/specs/H3-54-correcao-series-historico.md) — proposta, aguardando aprovação (Should)
+- [H3-55 — Mobilidade: sessão sobrevive à morte do processo](docs/specs/H3-55-mobilidade-sobrevive-processo.md) — proposta, aguardando aprovação (Should)
+- [H3-56 — Rascunho do registro avulso sobrevive à morte do processo](docs/specs/H3-56-rascunho-registro-avulso.md) — proposta, aguardando aprovação (Could)
+- [H3-57 — Predictive back (Android 14) na pilha de navegação](docs/specs/H3-57-predictive-back.md) — proposta, aguardando aprovação (Could)
+- [H3-58 — Notificação do fim do descanso em segundo plano](docs/specs/H3-58-notificacao-descanso-background.md) — proposta, aguardando aprovação (Could)
+- [H3-59 — Wear: i18n completa e TalkBack](docs/specs/H3-59-wear-i18n-talkback.md) — proposta, aguardando aprovação (Could)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

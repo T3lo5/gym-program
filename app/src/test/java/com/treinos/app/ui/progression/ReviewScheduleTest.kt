@@ -57,10 +57,12 @@ class ReviewScheduleTest {
 
     @Test
     fun ciclo_comeca_na_semana_1() {
+        // toMillis usa UTC; o zoneId precisa casar, senão o fuso do ambiente
+        // (ex.: America/Sao_Paulo) desloca a data para o dia anterior.
         val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        assertEquals(1, cycleWeek(toMillis(monday), toMillis(monday.plusDays(4))))
-        assertEquals(2, cycleWeek(toMillis(monday), toMillis(monday.plusDays(7))))
-        assertEquals(1, cycleWeek(toMillis(monday.plusDays(30)), toMillis(monday)))
+        assertEquals(1, cycleWeek(toMillis(monday), toMillis(monday.plusDays(4)), ZoneOffset.UTC))
+        assertEquals(2, cycleWeek(toMillis(monday), toMillis(monday.plusDays(7)), ZoneOffset.UTC))
+        assertEquals(1, cycleWeek(toMillis(monday.plusDays(30)), toMillis(monday), ZoneOffset.UTC))
     }
 
     @Test
@@ -68,12 +70,13 @@ class ReviewScheduleTest {
         val firstMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val createdAt = toMillis(firstMonday)
         val sessions = List(8) { index -> completedSession(id = index + 1L, startedAt = createdAt + index) }
-        assertEquals(6, cycleWeek(createdAt, toMillis(firstMonday.plusWeeks(5))))
+        assertEquals(6, cycleWeek(createdAt, toMillis(firstMonday.plusWeeks(5)), ZoneOffset.UTC))
         assertTrue(
             deloadSuggested(
                 planCreatedAtMillis = createdAt,
                 nowMillis = toMillis(firstMonday.plusWeeks(5)),
                 completedSessionsSincePlan = completedSessionsSincePlan(sessions, createdAt),
+                zoneId = ZoneOffset.UTC,
             ),
         )
     }
@@ -88,6 +91,7 @@ class ReviewScheduleTest {
                 planCreatedAtMillis = createdAt,
                 nowMillis = toMillis(firstMonday.plusWeeks(5).minusDays(1)),
                 completedSessionsSincePlan = completedSessionsSincePlan(sessions, createdAt),
+                zoneId = ZoneOffset.UTC,
             ),
         )
         assertFalse(
@@ -95,6 +99,7 @@ class ReviewScheduleTest {
                 planCreatedAtMillis = createdAt,
                 nowMillis = toMillis(firstMonday.plusWeeks(5)),
                 completedSessionsSincePlan = completedSessionsSincePlan(sessions.take(7), createdAt),
+                zoneId = ZoneOffset.UTC,
             ),
         )
         assertEquals(7, completedSessionsSincePlan(sessions.take(7) + inProgressSession(99L, createdAt), createdAt))

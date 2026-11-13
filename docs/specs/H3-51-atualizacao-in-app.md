@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-51` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-13` |
+| Implementação | `concluída` |
 
 ## Objetivo
 

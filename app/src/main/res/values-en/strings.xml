@@ -407,4 +407,19 @@
     <string name="settings_dialog_replace_all_body">This erases the plans, workouts, sets and profile (weight, height, sex) saved on this device and writes the selected file\'s content in their place. The operation cannot be undone. Export a current backup first if you want a way back.</string>
     <string name="settings_btn_replace_all">Replace everything</string>
     <string name="settings_btn_dismiss">Dismiss</string>
+
+    <!-- H3-51: in-app update (GitHub Releases) -->
+    <string name="settings_update_title">App update</string>
+    <string name="settings_update_idle_hint">Check whether a new version was published on GitHub Releases.</string>
+    <string name="settings_update_btn_check">Check for updates</string>
+    <string name="settings_update_checking">Checking…</string>
+    <string name="settings_update_available_title">New version available</string>
+    <string name="settings_update_available_body">Version %1$s is available.</string>
+    <string name="settings_update_btn_download">Download and install</string>
+    <string name="settings_update_downloading">Downloading… %1$d%%</string>
+    <string name="settings_update_started">Install started — confirm on the system screen.</string>
+    <string name="settings_update_uptodate">You are already on the latest version.</string>
+    <string name="settings_update_error_check">Could not check (no network or GitHub API rate limit).</string>
+    <string name="settings_update_error_download">Update download failed: %1$s</string>
+    <string name="settings_update_error_installer">Could not open the system installer.</string>
 </resources>

@@ -84,6 +84,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
+    // H3-51: estado do updater in-app (checagem sob demanda em Ajustes).
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     // H3-40: estado da geração pendente (envelope + status do job).
     val pendingGeneration by viewModel.pendingGeneration.collectAsStateWithLifecycle()
     val pendingGenerationStatus by viewModel.pendingGenerationStatus.collectAsStateWithLifecycle()
@@ -468,6 +470,12 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onRetrySync = viewModel::syncNow,
                     downloadError = downloadError,
                     onRetryDownload = viewModel::downloadNow,
+                    // H3-51: atualização in-app via GitHub Releases.
+                    updateState = updateState,
+                    onCheckUpdateOnOpen = viewModel::maybeCheckForUpdateOnOpen,
+                    onCheckForUpdate = { viewModel.checkForUpdate(manual = true) },
+                    onDownloadUpdate = viewModel::downloadAndInstallUpdate,
+                    onClearUpdateMessage = viewModel::clearUpdateMessage,
                 )
             }
             }

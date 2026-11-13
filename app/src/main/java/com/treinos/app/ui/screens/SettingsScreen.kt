@@ -61,6 +61,7 @@ import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.StatusText
 import com.treinos.app.ui.components.statusIsSuccess
 import com.treinos.app.ui.formatIsoDateTime
+import com.treinos.app.updater.UpdateState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,6 +110,12 @@ fun SettingsScreen(
     onRetrySync: () -> Unit = {},
     downloadError: UiError? = null,
     onRetryDownload: () -> Unit = {},
+    // H3-51: atualização in-app via GitHub Releases (checagem sob demanda).
+    updateState: UpdateState = UpdateState.Idle,
+    onCheckUpdateOnOpen: () -> Unit = {},
+    onCheckForUpdate: () -> Unit = {},
+    onDownloadUpdate: () -> Unit = {},
+    onClearUpdateMessage: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
@@ -119,6 +126,16 @@ fun SettingsScreen(
     var treinoExpanded by remember { mutableStateOf(true) }
     var syncExpanded by remember { mutableStateOf(false) }
     var backupExpanded by remember { mutableStateOf(true) }
+    // H3-51: seção de atualização inicia colapsada; expande sozinha quando a
+    // checagem automática encontra uma versão nova.
+    var updateExpanded by remember { mutableStateOf(false) }
+
+    // H3-51: checagem sob demanda — uma vez por processo ao abrir Ajustes;
+    // nunca polling. O botão manual repete a checagem quando o usuário quiser.
+    LaunchedEffect(Unit) { onCheckUpdateOnOpen() }
+    LaunchedEffect(updateState) {
+        if (updateState is UpdateState.Available) updateExpanded = true
+    }
 
     if (showDownloadConfirm) {
         ConfirmationDialog(
@@ -586,6 +603,104 @@ fun SettingsScreen(
 
                         backupMessage?.let {
                             StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
+                        }
+                    }
+                }
+            }
+
+            // H3-51: atualização in-app — checagem sob demanda (uma vez por
+            // processo ao abrir Ajustes + botão manual), download só com toque
+            // e instalação sempre pelo instalador do sistema.
+            CollapsibleSection(
+                title = stringResource(R.string.settings_update_title),
+                expanded = updateExpanded,
+                onToggle = { updateExpanded = it },
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        when (val state = updateState) {
+                            is UpdateState.Available -> {
+                                Text(
+                                    text = stringResource(R.string.settings_update_available_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_update_available_body,
+                                        state.release.versionName ?: state.release.tagName,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                state.note?.let {
+                                    StatusText(text = it, isSuccess = true, announce = true)
+                                }
+                                BusyButton(
+                                    busy = false,
+                                    idleText = stringResource(R.string.settings_update_btn_download),
+                                    busyText = stringResource(R.string.settings_update_btn_download),
+                                    onClick = onDownloadUpdate,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            is UpdateState.Downloading -> {
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_update_downloading,
+                                        state.progress,
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                LinearProgressIndicator(
+                                    progress = { state.progress / 100f },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = stringResource(R.string.settings_update_idle_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                when (state) {
+                                    is UpdateState.Checking -> { }
+                                    is UpdateState.UpToDate -> StatusText(
+                                        text = stringResource(R.string.settings_update_uptodate),
+                                        isSuccess = true,
+                                        announce = true,
+                                    )
+                                    is UpdateState.Failed -> Text(
+                                        text = state.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                    else -> { }
+                                }
+                                BusyButton(
+                                    busy = state is UpdateState.Checking,
+                                    idleText = stringResource(R.string.settings_update_btn_check),
+                                    busyText = stringResource(R.string.settings_update_checking),
+                                    onClick = onCheckForUpdate,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                if (state is UpdateState.Failed || state is UpdateState.UpToDate) {
+                                    OutlinedButton(
+                                        onClick = onClearUpdateMessage,
+                                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                    ) {
+                                        Text(stringResource(R.string.settings_btn_dismiss))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
