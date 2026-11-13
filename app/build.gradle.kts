@@ -114,9 +114,10 @@ android {
                 robolectricDepsDir.get().asFile.absolutePath,
             )
 
-            // Trava de segurança: se um teste travar, falha em 20 min em vez de
+            // Trava de segurança: se um teste travar, falha em 35 min em vez de
             // segurar o job até o timeout de 90 min (e pular o release).
-            it.timeout.set(Duration.ofMinutes(20))
+            // GitHub Actions runners são mais lentos que o Docker local (~5.5 min).
+            it.timeout.set(Duration.ofMinutes(35))
         }
     }
 
