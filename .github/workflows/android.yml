@@ -40,14 +40,6 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # Mantém a mesma chave de debug entre execuções. Assim um APK novo
-      # instala por cima do anterior, sem precisar desinstalar.
-      - name: Cache debug signing key
-        uses: actions/cache@v6
-        with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
-
       - name: Make scripts executable
         run: |
           chmod +x ./gradlew

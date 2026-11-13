@@ -4,16 +4,26 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
 }
 
+// Mesma keystore versionada do :app (H3-48): a assinatura do relógio passa a ser
+// estável em qualquer ambiente e updates instalam por cima sem desinstalar.
+val debugKeystoreFile = file("../app/debug.keystore")
+val debugKeystorePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: "treinos123"
+val debugKeyAlias = System.getenv("DEBUG_KEY_ALIAS") ?: "treinos-debug"
+val debugKeyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: "treinos123"
+
 android {
     namespace = "com.treinos.wear"
     compileSdk = 34
+
+    val wearVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+    val wearVersionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
 
     defaultConfig {
         applicationId = "com.treinos.wear"
         minSdk = 30
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = wearVersionCode
+        versionName = wearVersionName
     }
 
     compileOptions {
@@ -32,6 +42,25 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    signingConfigs {
+        if (debugKeystoreFile.exists()) {
+            signingConfigs.named("debug").configure {
+                storeFile = debugKeystoreFile
+                storePassword = debugKeystorePassword
+                keyAlias = debugKeyAlias
+                keyPassword = debugKeyPassword
+            }
+        }
+        // Sem keystore versionada (checkout parcial): mantém a keystore do
+        // ambiente — o gate reprova pelo fingerprint esperado (ci-android.sh).
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.named("debug").get()
+        }
     }
 
     packaging {

@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-48` |
 | MoSCoW | `M` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-13` |
+| Implementação | `concluída` |
 
 ## Objetivo
 
@@ -52,7 +52,8 @@ A keystore versionada abre com as credenciais do build (`treinos123`, alias
 |---|---|
 | `app/build.gradle.kts` | `debugKeystoreFile = file("debug.keystore")` (caminho correto relativo ao módulo) |
 | `wear/build.gradle.kts` | `signingConfigs` com a mesma keystore versionada (`file("../app/debug.keystore")`) aplicada ao `buildType` debug; `versionCode`/`versionName` lendo `-PversionCode`/`-PversionName` com default `1`/`"1.0.0"` |
-| `scripts/ci-android.sh` | `VERSION_CODE` local derivado de `git rev-list --count HEAD` (em vez de `1` fixo na linha 19); `VERSION_NAME` local mantém sufixo `-local` |
+| `scripts/ci-android.sh` | `VERSION_CODE` local derivado de `git rev-list --count HEAD` (em vez de `1` fixo na linha 19); `VERSION_NAME` local mantém sufixo `-local`; verificação do fingerprint do certificado esperado nos dois APKs |
+| `scripts/verify.sh` | repassa `VERSION_CODE`/`VERSION_NAME` ao container só quando definidos — forçar `1` anularia a derivação local do `ci-android.sh` |
 | `.github/workflows/android.yml` | remover o passo "Cache debug signing key" (redundante com a keystore versionada) |
 
 ## Modelo de dados / contrato

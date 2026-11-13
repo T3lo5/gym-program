@@ -42,16 +42,26 @@ echo "==> [1/3] Construindo imagem do CI local ($IMAGE)"
 docker build -t "$IMAGE" "$ROOT"
 
 echo "==> [2/3] Rodando CI Android dentro do container"
+# VERSION_CODE/VERSION_NAME só são repassados quando definidos explicitamente
+# (o CI define os dois). Sem override, scripts/ci-android.sh deriva o
+# versionCode local de `git rev-list --count HEAD` (H3-48) — forçar 1 aqui
+# anularia essa derivação.
+DOCKER_ENV=()
+if [[ -n "${VERSION_CODE:-}" ]]; then
+  DOCKER_ENV+=(-e "VERSION_CODE=$VERSION_CODE")
+fi
+if [[ -n "${VERSION_NAME:-}" ]]; then
+  DOCKER_ENV+=(-e "VERSION_NAME=$VERSION_NAME")
+fi
 # --user evita arquivos root-owned em app/build e dist no host.
 docker run --rm \
   --user "$(id -u):$(id -g)" \
+  "${DOCKER_ENV[@]}" \
   -e HOME=/tmp \
   -e ANDROID_USER_HOME=/tmp/.android \
   -e XDG_CACHE_HOME=/tmp/.cache \
   -e GRADLE_USER_HOME=/home/ci/.gradle \
   -e ANDROID_HOME=/opt/android-sdk \
-  -e VERSION_CODE="${VERSION_CODE:-1}" \
-  -e VERSION_NAME="${VERSION_NAME:-0.0.0-local}" \
   -e SKIP_TESTS="${SKIP_TESTS:-0}" \
   -e SKIP_LINT="${SKIP_LINT:-0}" \
   -e COVERAGE="${COVERAGE:-0}" \

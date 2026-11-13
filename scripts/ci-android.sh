@@ -16,7 +16,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-VERSION_CODE="${VERSION_CODE:-1}"
+# versionCode local cresce a cada commit (H3-48), então `adb install -r` de um
+# build local mais novo nunca é rejeitado por versão. O CI passa VERSION_CODE
+# (run_number) explicitamente; sem ele, deriva do histórico git — fallback 1
+# quando git não está disponível (comportamento antigo, com aviso).
+if [[ -z "${VERSION_CODE:-}" ]]; then
+  VERSION_CODE="$(git rev-list --count HEAD 2>/dev/null || true)"
+  if [[ -z "$VERSION_CODE" ]]; then
+    echo "AVISO: git indisponível; usando versionCode=1." >&2
+    VERSION_CODE=1
+  fi
+fi
 VERSION_NAME="${VERSION_NAME:-0.0.0-local}"
 APP_APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 WEAR_APK="$ROOT/wear/build/outputs/apk/debug/wear-debug.apk"
@@ -72,6 +82,31 @@ echo "    app APK assinado OK"
 echo "==> [3/5] Verificando assinatura do APK do wear"
 "$BUILD_TOOLS/apksigner" verify --verbose "$WEAR_APK"
 echo "    wear APK assinado OK"
+
+# Assinatura estável (H3-48): a keystore versionada (app/debug.keystore,
+# alias treinos-debug) tem este certificado. Se o build cair na keystore
+# efêmera do ambiente (checkout parcial, caminho errado), o fingerprint muda
+# e o gate reprova aqui — em vez de só aparecer quando o update falhar no
+# aparelho com "signature mismatch".
+EXPECTED_CERT_SHA256="71a5a2acb0d142b6e24582ea8c2458f69d69e84586b9ac0c4938c1f109ea746f"
+
+check_cert_fingerprint() {
+  local apk="$1" actual
+  actual="$("$BUILD_TOOLS/apksigner" verify --print-certs "$apk" 2>/dev/null \
+    | awk '/certificate SHA-256 digest:/ {print $NF; exit}')"
+  if [[ "$actual" != "$EXPECTED_CERT_SHA256" ]]; then
+    echo "ERRO: certificado inesperado em $(basename "$apk")." >&2
+    echo "  Esperado: $EXPECTED_CERT_SHA256" >&2
+    echo "  Obtido:   ${actual:-<nenhum>}" >&2
+    echo "  A keystore versionada (app/debug.keystore) não foi aplicada —" >&2
+    echo "  o build assinou com a keystore efêmera do ambiente." >&2
+    exit 1
+  fi
+  echo "    $(basename "$apk"): certificado esperado OK"
+}
+
+check_cert_fingerprint "$APP_APK"
+check_cert_fingerprint "$WEAR_APK"
 
 echo "==> [4/5] Preparando artefatos (dist/)"
 rm -rf "$DIST"

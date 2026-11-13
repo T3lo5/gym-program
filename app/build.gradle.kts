@@ -43,9 +43,11 @@ val prepareRobolectricDeps = tasks.register<Copy>("prepareRobolectricDeps") {
     into(robolectricDepsDir)
 }
 
-// Signing configuration - same keystore for debug and release so app updates
-// install over each other without requiring uninstall.
-val debugKeystoreFile = file("app/debug.keystore")
+// Assinatura estável: a keystore é versionada no repositório (caminho relativo
+// ao DIRETÓRIO DO MÓDULO, ou seja, app/debug.keystore na raiz), então o APK
+// tem a mesma assinatura em qualquer ambiente (local, Docker, CI) e updates
+// instalam por cima sem desinstalar — sem perder os dados do Room.
+val debugKeystoreFile = file("debug.keystore")
 val debugKeystorePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: "treinos123"
 val debugKeyAlias = System.getenv("DEBUG_KEY_ALIAS") ?: "treinos-debug"
 val debugKeyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: "treinos123"
