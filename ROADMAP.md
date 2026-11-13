@@ -186,11 +186,20 @@ implementada separadamente.
 | H3-43 | Troca de exercício durante o treino em andamento | **M** | Durante o treino não há como trocar um exercício que o usuário não quer/pode fazer; a única opção é abandonar a sessão inteira. | Botão "Trocar exercício" em cada card da sessão ativa (WorkoutScreen): substituto do mesmo músculo primário e equipamento informado, 1-para-1, sem mudar séries/reps/ordem. Diálogo de escopo: "Só hoje" (atualiza só a sessão atual, não mexe no plano) ou "Todos" (atualiza o plano salvo = todos os treinos futuros). Não afeta sessão em andamento quando escopo é ALL_FUTURE. Evento de uso registrado para calibrar a próxima geração (H3-42). Testes `SessionSwapTest` (JVM). | 1,5 dias | H3-41, H3-42 | (concluída; pedido do usuário, sem spec formal) |
 | H3-44 | Substitutos de exercício disponíveis offline | **M** | O diálogo "Trocar exercício" mostra "Carregando catálogo…" e depende de rede: com o cache expirado o app espera o timeout do backend e, sem cache/na primeira instalação, não há substituto nenhum. | `loadLocal()` cache-primeiro (cache expirado ou ausente → asset embarcado compacto), TTL só dispara refresh em background; `AppViewModel` publica o catálogo local antes da rede; `WorkoutScreen` não mostra spinner e, sem catálogo, exibe estado explícito com "Atualizar". Sem mudança de Room. | 1 dia | H3-41, H3-43, H3-24, H1-3 | [H3-44](docs/specs/H3-44-substitutos-offline.md) (concluída) |
 | H3-45 | Backup preserva mídia e a troca de plano reflete na Home | **M** | Exportar/importar backup perdia instruções e imagens dos exercícios; `resolveExerciseMedia` deixava o catálogo offline (sem mídia) esconder a mídia do plano; e um novo `main` não era selecionado quando um `extra` estava selecionado. | `BackupPlanExercise` ganha `instructions`/`images` (aditivo, sem bump); `resolveExerciseMedia` funde catálogo + plano campo a campo; import limpa a seleção e geração/aceitação de `main` seleciona o novo plano; `extra` preserva. | 1 dia | H3-24, H3-15 | [H3-45](docs/specs/H3-45-backup-midia-e-substituicao.md) (concluída) |
+| H3-48 | Assinatura estável e versionamento dos APKs (celular e relógio) | **M** | O mecanismo de assinatura estável está quebrado: `app/build.gradle.kts` procura `app/app/debug.keystore` (inexistente) e cai na keystore efêmera do ambiente — cada build local muda de assinatura e exige desinstalar (perdendo os dados); o CI depende de cache evictável de keystore; e o `:wear` nunca teve assinatura/versionamento próprios (`versionCode` fixo em 1). | Corrigir o caminho para a keystore versionada (`app/debug.keystore`), aplicar a mesma assinatura ao `:wear`, `versionCode`/`versionName` do wear via `-P`, `versionCode` local derivado de `git rev-list --count HEAD` e remover o cache de keystore do workflow. | 0,5 dia | — | [H3-48](docs/specs/H3-48-assinatura-estavel-versionamento.md) (proposta) |
+| H3-49 | Instalação e atualização por script (celular e relógio) | **S** | Instalar exige lembrar comandos `adb`, e o relógio exige connect/forward que ninguém decora; o manual não explica a depuração do relógio. | `scripts/install.sh` (`adb install -r dist/treinos.apk`) e `scripts/install-wear.sh` (Wi-Fi/Bluetooth) com mensagens de erro acionáveis (backup antes de desinstalar, nunca desinstalar automaticamente) e seção nova no `docs/MANUAL.md`. | 0,5 dia | H3-48 | [H3-49](docs/specs/H3-49-instalacao-por-script.md) (proposta) |
+| H3-50 | Auto-update do celular via Obtainium (docs) | **S** | Atualizar exige computador ou baixar o APK na mão a cada release. | Seção "Atualização automática (Obtainium)" no manual: acompanhar o release `latest` (assets com nome estável já publicados pelo workflow) e instalar por cima. Sem código. | 0,5 dia | H3-48 | [H3-50](docs/specs/H3-50-obtainium-auto-update.md) (proposta) |
+| H3-51 | Atualização dentro do app (in-app updater) | **C** | Mesmo com Obtainium, quem usa só o app não fica sabendo que existe versão nova. | Ajustes mostra "Nova versão disponível" consultando `releases/latest` da API do GitHub, baixa o APK, confere o SHA-256 publicado e dispara a instalação do sistema; silencioso offline, sem polling em loop. | 1–1,5 dia | H3-48 | [H3-51](docs/specs/H3-51-atualizacao-in-app.md) (proposta) |
 
 > H3-26..H3-39 nasceram da auditoria UX/UI de 2026-11-07
 > ([docs/auditoria-ux-ui-2026-11-07.md](docs/auditoria-ux-ui-2026-11-07.md)) e do
 > pedido de app bilíngue PT/EN. Todos os itens dessa faixa estão concluídos e
 > listados em §4.1; as specs foram atualizadas para refletir o que foi entregue.
+
+> H3-48..H3-51 nasceram do levantamento de distribuição de 2026-11-13: o
+> "desinstalar para atualizar" tem causa raiz no caminho errado da keystore
+> versionada em `app/build.gradle.kts` (H3-48); H3-49/H3-50 são facilitação de
+> instalação e H3-51 é conveniência opcional — todas dependem da H3-48.
 
 H3-1..H3-3, H3-5, **H3-6**, **H3-7**, **H3-10**, **H3-11**, **H3-12**, **H3-13**, **H3-15**
 e **H3-16**, além de **H3-40**, **H3-41**, **H3-42**, **H3-43**, **H3-44**, **H3-45**, **H3-46** e **H3-47**, estão concluídos e listados em §4.1 — com H3-6, restaurar um backup
@@ -359,7 +368,11 @@ H3-22 (robustez da geração por IA), H3-23 (foco muscular no plano principal) e
 H3-24 (imagens e descrição do exercício vindas do plano + catálogo resiliente;
 substitui a H3-14) — todas listadas em §4.1.
 **Could (specs prontas, sem prioridade agora):** **H3-8** (validar/documentar
-SAF com Drive/OneDrive/Dropbox — sem SDK).
+SAF com Drive/OneDrive/Dropbox — sem SDK) e **H3-51** (in-app updater).
+**Facilitação de distribuição (specs prontas, aguardando aprovação):**
+**H3-48** (assinatura estável — causa raiz do "desinstalar para atualizar"),
+**H3-49** (instalação por script, celular e relógio) e **H3-50** (Obtainium,
+docs) — H3-49/H3-50/H3-51 dependem da H3-48.
 **Won't now:** H3-4 (backend na nuvem com token — pré-requisito H3-10 já
 cumprido), H3-9 (backup automático) e as funções futuras do relógio
 (tiles/complicação, standalone, edição no pulso, métricas de corrida).
@@ -435,6 +448,10 @@ confirme antes de implementar.
 - [H3-45 — Backup preserva mídia e a troca de plano reflete na Home](docs/specs/H3-45-backup-midia-e-substituicao.md) — concluída (mídia no backup, fusão catálogo+plano e seleção do novo main)
 - [H3-46 — Feedback háptico nas ações de treino](docs/specs/H3-46-feedback-haptico-acoes-treino.md) — concluída (`HapticEvent`/`hapticFeedbackForEvent` em `Feedback.kt`, ligado em Workout/Run/Mobility; sem duplicar o alerta de fim de descanso da H3-26)
 - [H3-47 — UX frontend: formulários, diálogos e ações destrutivas](docs/specs/H3-47-ux-frontend-formularios-acoes.md) — concluída (erro inline por campo com submit bloqueado, `ConfirmationDialog` padronizado nas ações destrutivas, teclado com `imePadding`)
+- [H3-48 — Assinatura estável e versionamento dos APKs (celular e relógio)](docs/specs/H3-48-assinatura-estavel-versionamento.md) — proposta, aguardando aprovação (causa raiz do "desinstalar para atualizar")
+- [H3-49 — Instalação e atualização por script (celular e relógio)](docs/specs/H3-49-instalacao-por-script.md) — proposta, aguardando aprovação
+- [H3-50 — Auto-update do celular via Obtainium](docs/specs/H3-50-obtainium-auto-update.md) — proposta, aguardando aprovação (só documentação)
+- [H3-51 — Atualização dentro do app (in-app updater)](docs/specs/H3-51-atualizacao-in-app.md) — proposta, aguardando aprovação (Could)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
