@@ -83,6 +83,7 @@ import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.sessionSwapCandidates
+import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.SetInputErrors
 import com.treinos.app.ui.SetInputValidation
@@ -97,6 +98,7 @@ import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
+import com.treinos.app.ui.hapticFeedbackForEvent
 import com.treinos.app.ui.muscleLabel
 import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
@@ -429,6 +431,7 @@ fun WorkoutScreen(
     if (showFinishConfirm) {
         val done = session?.exercises?.sumOf { it.sets.size } ?: 0
         val planned = session?.exercises?.sumOf { it.exercise.plannedSets } ?: 0
+        val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showFinishConfirm = false },
             title = { Text("Finalizar treino?") },
@@ -441,6 +444,7 @@ fun WorkoutScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.WorkoutFinished))
                         showFinishConfirm = false
                         onFinish()
                     },
@@ -458,6 +462,7 @@ fun WorkoutScreen(
     }
 
     if (showAbandonConfirm) {
+        val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showAbandonConfirm = false },
             title = { Text("Abandonar treino?") },
@@ -470,6 +475,7 @@ fun WorkoutScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.WorkoutAbandoned))
                         showAbandonConfirm = false
                         onAbandon()
                     },
@@ -781,6 +787,7 @@ private fun RestBar(
         paused -> stringResource(R.string.workout_rest_paused, formatSeconds(remaining))
         else -> stringResource(R.string.workout_rest_running, formatSeconds(remaining))
     }
+    val haptics = LocalHapticFeedback.current
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (finished) {
@@ -829,20 +836,29 @@ private fun RestBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(
-                    onClick = onSkip,
+                    onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RestAdjusted))
+                        onSkip()
+                    },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Text("Pular")
                 }
                 if (!finished) {
                     OutlinedButton(
-                        onClick = onExtend,
+                        onClick = {
+                            haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RestAdjusted))
+                            onExtend()
+                        },
                         modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
                         Text(stringResource(R.string.workout_rest_extend))
                     }
                     OutlinedButton(
-                        onClick = onTogglePause,
+                        onClick = {
+                            haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RestAdjusted))
+                            onTogglePause()
+                        },
                         modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
                         Text(if (paused) stringResource(R.string.workout_rest_resume) else stringResource(R.string.workout_rest_pause))
@@ -868,6 +884,7 @@ private fun ExerciseCard(
     // H3-27: progresso derivado das séries gravadas — editar/excluir série
     // reflete aqui sem agregado extra.
     val completed = exerciseIsCompleted(exercise)
+    val haptics = LocalHapticFeedback.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -961,10 +978,9 @@ private fun ExerciseCard(
                 // da última série e dispara o descanso, sem abrir o diálogo.
                 val lastSet = sets.maxByOrNull { it.setNumber }
                 if (lastSet != null) {
-                    val haptics = LocalHapticFeedback.current
                     OutlinedButton(
                         onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RepeatLastSet))
                             onRepeatLastSet(lastSet.reps, lastSet.weightKg, lastSet.rpe)
                         },
                         modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
@@ -976,7 +992,12 @@ private fun ExerciseCard(
             }
 
             Button(
-                onClick = if (completed) onNextExercise else onLogSet,
+                onClick = if (completed) {
+                    {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.ExerciseAdvanced))
+                        onNextExercise()
+                    }
+                } else onLogSet,
                 modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
             ) {
                 // H3-32: ícone de add na ação principal de registrar série.
@@ -1071,8 +1092,8 @@ private fun SetDialog(
         when (val result = validateSetInput(repsText = reps, weightText = weight, rpeText = rpe)) {
             is SetInputValidation.Invalid -> errors = result.errors
             is SetInputValidation.Valid -> {
-                // Háptico curto ao confirmar o salvamento (H3-26).
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                // Háptico curto ao confirmar o salvamento (H3-46).
+                haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.SetSaved))
                 onConfirm(result.input.reps, result.input.weightKg, result.input.rpe)
             }
         }
@@ -1154,7 +1175,10 @@ private fun SetDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onDelete != null) {
                     TextButton(
-                        onClick = onDelete,
+                        onClick = {
+                            haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.SetDeleted))
+                            onDelete()
+                        },
                         modifier = Modifier.minimumInteractiveComponentSize(),
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,

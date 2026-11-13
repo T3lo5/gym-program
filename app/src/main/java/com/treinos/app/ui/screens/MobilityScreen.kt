@@ -34,11 +34,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.timerShouldAnnounce
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.MobilityRoutine
@@ -50,6 +53,7 @@ import com.treinos.app.ui.components.AppIcons
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.formatDuration
+import com.treinos.app.ui.hapticFeedbackForEvent
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 
@@ -113,6 +117,7 @@ fun MobilityScreen(
     }
 
     if (showDiscardDialog) {
+        val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
             title = { Text(stringResource(R.string.mobility_discard_title)) },
@@ -124,6 +129,7 @@ fun MobilityScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityDiscarded))
                         showDiscardDialog = false
                         // Volta para a lista de rotinas (como antes), mas só
                         // depois da confirmação — nada é descartado em silêncio.
@@ -273,6 +279,8 @@ private fun MobilityPlayer(
         onClearSession()
     }
 
+    val haptics = LocalHapticFeedback.current
+
     Scaffold(
         topBar = {
             ScreenTopBar(
@@ -348,7 +356,10 @@ private fun MobilityPlayer(
                             )
                         }
                         TextButton(
-                            onClick = onNextMovement,
+                            onClick = {
+                                haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityControl))
+                                onNextMovement()
+                            },
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
                             Text(stringResource(R.string.mobility_skip_transition))
@@ -375,14 +386,20 @@ private fun MobilityPlayer(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(
-                    onClick = onPreviousMovement,
+                    onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityControl))
+                        onPreviousMovement()
+                    },
                     modifier = Modifier.weight(1f),
                     enabled = session.movementIndex > 0,
                 ) {
                     Text(stringResource(R.string.common_back))
                 }
                 Button(
-                    onClick = onTogglePause,
+                    onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityControl))
+                        onTogglePause()
+                    },
                     modifier = Modifier.weight(1f),
                     enabled = session.running,
                 ) {
@@ -401,6 +418,7 @@ private fun MobilityPlayer(
                 }
                 OutlinedButton(
                     onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityControl))
                         when {
                             session.inTransition -> onNextMovement()
                             !isLast -> onNextMovement()
@@ -427,7 +445,10 @@ private fun MobilityPlayer(
             }
 
             OutlinedButton(
-                onClick = ::finalize,
+                onClick = {
+                    haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityFinished))
+                    finalize()
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.mobility_finish_early))

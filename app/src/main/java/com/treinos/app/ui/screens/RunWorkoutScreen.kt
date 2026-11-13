@@ -25,6 +25,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
@@ -32,12 +34,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
 import com.treinos.app.ui.RunPlanTarget
 import com.treinos.app.ui.UiState
 import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatRunPlanTarget
+import com.treinos.app.ui.hapticFeedbackForEvent
 import com.treinos.app.ui.parseDraftNumber
 import com.treinos.app.ui.parseDistanceKm
 import com.treinos.app.ui.validateRunLog
@@ -286,7 +290,7 @@ private fun RunWorkoutForm(
                 )
             }
 
-            Button(
+Button(
                 onClick = {
                     compute()
                     if (error == null) {
@@ -320,6 +324,7 @@ private fun RunWorkoutForm(
     }
 
     if (showDiscardConfirm) {
+        val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
             title = { Text(stringResource(R.string.run_discard_title)) },
@@ -331,6 +336,7 @@ private fun RunWorkoutForm(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RunDiscarded))
                         showDiscardConfirm = false
                         onLeave()
                     },
@@ -343,9 +349,9 @@ private fun RunWorkoutForm(
                 TextButton(
                     onClick = { showDiscardConfirm = false },
                     modifier = Modifier.minimumInteractiveComponentSize(),
-            ) {
-                Text(stringResource(R.string.common_continue))
-            }
+                ) {
+                    Text(stringResource(R.string.common_continue))
+                }
             },
         )
     }

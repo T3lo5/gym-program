@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 /** O que o aparelho deve fazer quando o descanso chega a 0. */
 data class RestFeedbackAction(val vibrate: Boolean, val sound: Boolean)
@@ -76,4 +77,53 @@ class RestFeedbackPlayer(context: Context) {
         const val BEEP_VOLUME = 100
         const val RELEASE_DELAY_MS = 300L
     }
+}
+
+/**
+ * Eventos de háptico durante a sessão de treino (H3-46).
+ *
+ * Cada evento mapeia para um tipo de feedback consistente. A regra é pura
+ * (sem depender de dispositivo) para ser testável em JVM.
+ */
+sealed interface HapticEvent {
+    data object SetSaved : HapticEvent
+    data object SetEdited : HapticEvent
+    data object SetDeleted : HapticEvent
+    data object RepeatLastSet : HapticEvent
+    data object RestAdjusted : HapticEvent
+    data object ExerciseAdvanced : HapticEvent
+    data object WorkoutFinished : HapticEvent
+    data object WorkoutAbandoned : HapticEvent
+    data object RunFinished : HapticEvent
+    data object RunDiscarded : HapticEvent
+    data object MobilityControl : HapticEvent
+    data object MobilityFinished : HapticEvent
+    data object MobilityDiscarded : HapticEvent
+}
+
+/**
+ * Mapeia evento de treino para tipo de háptico do Compose.
+ *
+ * Regras (H3-46):
+ * - Confirmação de ação concluída (salvar, avançar, finalizar) = [LongPress]
+ * - Controle leve durante descanso/ajuste = [TextHandleMove]
+ * - Ação destrutiva confirmada (excluir, abandonar, descartar) = [LongPress]
+ * - Player de mobilidade (pausar, avançar, pular) = [TextHandleMove]
+ *
+ * Pura — testável sem dispositivo nem Robolectric.
+ */
+fun hapticFeedbackForEvent(event: HapticEvent): HapticFeedbackType = when (event) {
+    is HapticEvent.SetSaved -> HapticFeedbackType.LongPress
+    is HapticEvent.SetEdited -> HapticFeedbackType.LongPress
+    is HapticEvent.SetDeleted -> HapticFeedbackType.LongPress
+    is HapticEvent.RepeatLastSet -> HapticFeedbackType.LongPress
+    is HapticEvent.RestAdjusted -> HapticFeedbackType.TextHandleMove
+    is HapticEvent.ExerciseAdvanced -> HapticFeedbackType.LongPress
+    is HapticEvent.WorkoutFinished -> HapticFeedbackType.LongPress
+    is HapticEvent.WorkoutAbandoned -> HapticFeedbackType.LongPress
+    is HapticEvent.RunFinished -> HapticFeedbackType.LongPress
+    is HapticEvent.RunDiscarded -> HapticFeedbackType.LongPress
+    is HapticEvent.MobilityControl -> HapticFeedbackType.TextHandleMove
+    is HapticEvent.MobilityFinished -> HapticFeedbackType.LongPress
+    is HapticEvent.MobilityDiscarded -> HapticFeedbackType.LongPress
 }
