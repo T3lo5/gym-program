@@ -163,6 +163,12 @@
     <string name="workout_rest_resume">Continuar</string>
     <string name="workout_rest_pause">Pausar</string>
 
+    <!-- H3-58: notificação do descanso com o app em segundo plano -->
+    <string name="rest_notification_title">Descanso</string>
+    <string name="rest_notification_running">Descanso: %1$d s restantes</string>
+    <string name="rest_notification_finished">Descanso concluído — próxima série</string>
+    <string name="rest_notification_skip">Pular descanso</string>
+
     <!-- Corrida -->
     <string name="run_session_not_found">Sessão não encontrada</string>
     <string name="run_session_not_found_body">A corrida em andamento não foi encontrada no aparelho. Ela pode ter sido abandonada ou finalizada em outra tela.</string>

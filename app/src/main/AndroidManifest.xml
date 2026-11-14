@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- Vibração do fim do descanso (H3-26); permissão normal, sem prompt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- H3-58: notificação do fim do descanso com o app em segundo plano;
+         permissão runtime em API 33+, pedida quando um descanso começa. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- H3-51: o app dispara a instalação do APK baixado via instalador do
          sistema; sem essa permissão o toggle "instalar apps desconhecidos"
          não existe para o app e o update falha. O Android pede a permissão

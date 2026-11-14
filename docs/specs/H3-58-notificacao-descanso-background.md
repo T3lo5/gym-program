@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-58` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` |
+| Implementação | `concluída (2026-11-14)` |
 
 **Origem:** fora de escopo declarado da H3-26 (que cobriu vibração/beep com
 o app em primeiro plano, keepScreenOn e wall-clock) + varredura de polimento

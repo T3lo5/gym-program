@@ -95,6 +95,8 @@ import com.treinos.app.updater.UpdateInstaller
 import com.treinos.app.updater.UpdateState
 import com.treinos.app.updater.VersionCompare
 import com.treinos.app.R
+import com.treinos.app.notify.RestNotifier
+import com.treinos.app.notify.RestNotifierPolicy
 
 enum class Screen {
     Home,
@@ -139,6 +141,7 @@ class AppViewModel(
     private val healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
     private val wearSyncRepository: WearSyncRepository? = null,
     private val restFeedback: RestFeedbackPlayer? = null,
+    private val restNotifier: RestNotifier? = null,
 ) : ViewModel() {
 
     // H3-35: atalho dinâmico "Retomar treino".
@@ -516,6 +519,19 @@ class AppViewModel(
      * `= null` sobrescreveria o job restaurado.
      */
     private var restJob: Job? = null
+
+    /**
+     * H3-58: app em segundo plano? A notificação do descanso só existe nesse
+     * estado; ao voltar, é cancelada. Sinalizado pela MainActivity.
+     */
+    private var isAppInBackground = false
+
+    /**
+     * H3-58: contador de pedidos de permissão de notificação. Incrementa quando
+     * um descanso começa; a MainActivity observa e executa o pedido (API 33+).
+     */
+    private val _notificationPermissionRequests = MutableStateFlow(0)
+    val notificationPermissionRequest: StateFlow<Int> = _notificationPermissionRequests.asStateFlow()
 
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
@@ -1060,11 +1076,39 @@ class AppViewModel(
 
     /** Chamado pelo onResume da MainActivity: consulta o status se houver envelope. */
     fun onAppResumed() {
+        isAppInBackground = false
+        syncRestNotification()
         if (_pendingGeneration.value != null) {
             viewModelScope.launch {
                 refreshPendingGeneration()
             }
         }
+    }
+
+    /**
+     * Chamado pelo onStop da MainActivity (H3-58): com descanso ativo, posta a
+     * notificação com o restante atual — sem tick por segundo.
+     */
+    fun onAppBackgrounded() {
+        isAppInBackground = true
+        syncRestNotification()
+    }
+
+    /**
+     * H3-58: recalcula a notificação do descanso a partir do estado atual.
+     * Chamado só em transições (ir/voltar do background, zerar, pular, pausar,
+     * retomar) — nunca a cada tick do descanso.
+     */
+    private fun syncRestNotification() {
+        val notifier = restNotifier ?: return
+        notifier.apply(
+            RestNotifierPolicy.decide(
+                remainingSeconds = _restRemaining.value,
+                paused = _restPaused.value,
+                inBackground = isAppInBackground,
+                notificationsEnabled = notifier.notificationsEnabled(),
+            )
+        )
     }
 
     /** Retry de job failed: reenvia o request persistido no envelope. */
@@ -1716,6 +1760,9 @@ class AppViewModel(
         preferences.restTotalSeconds = duration
         _restRemaining.value = duration
         restJob = viewModelScope.launch { tickRest() }
+        // H3-58: um descanso começou — momento contextual para pedir a permissão.
+        _notificationPermissionRequests.value = _notificationPermissionRequests.value + 1
+        syncRestNotification()
     }
 
     /**
@@ -1733,6 +1780,9 @@ class AppViewModel(
             if (remaining <= 0) {
                 preferences.restDeadlineAtMillis = 0L
                 restFeedback?.onRestFinished()
+                // H3-58: zerou — em background, a notificação vira "concluído"
+                // exatamente uma vez (o loop termina aqui).
+                syncRestNotification()
                 return
             }
             val millisToZero = deadline - now
@@ -1759,6 +1809,8 @@ class AppViewModel(
         // Pausa não sobrevive a processo morto: sem deadline em disco, o app
         // reaberto não restaura um descanso que o usuário congelou.
         preferences.restDeadlineAtMillis = 0L
+        // H3-58: contagem congelada não tem notificação (nunca chegaria a zero).
+        syncRestNotification()
     }
 
     fun resumeRest() {
@@ -1768,6 +1820,7 @@ class AppViewModel(
         val deadline = RestTimer.resume(remaining, System.currentTimeMillis()) ?: return
         preferences.restDeadlineAtMillis = deadline
         restJob = viewModelScope.launch { tickRest() }
+        syncRestNotification()
     }
 
     /** "+15 s" sem teto: empurra o deadline (ou o restante congelado, se pausado). */
@@ -1783,6 +1836,8 @@ class AppViewModel(
         val total = (preferences.restTotalSeconds + seconds).coerceAtLeast(0)
         preferences.restTotalSeconds = total
         _restTotal.value = total
+        // H3-58: estender limpa a notificação (mesmos caminhos da H3-26).
+        restNotifier?.cancel()
     }
 
     private fun clearRestState() {
@@ -1791,6 +1846,8 @@ class AppViewModel(
         _restPaused.value = false
         pausedRemainingSeconds = 0
         preferences.restDeadlineAtMillis = 0L
+        // H3-58: pular/finalizar limpa a notificação, inclusive via Wear.
+        syncRestNotification()
     }
 
     /**
@@ -2279,6 +2336,7 @@ class AppViewModel(
             healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
             wearSyncRepository: WearSyncRepository? = null,
             restFeedback: RestFeedbackPlayer? = null,
+            restNotifier: RestNotifier? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2291,6 +2349,7 @@ class AppViewModel(
                     healthChecker,
                     wearSyncRepository,
                     restFeedback,
+                    restNotifier,
                 ) as T
             }
         }

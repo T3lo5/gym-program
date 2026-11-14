@@ -10,6 +10,7 @@ import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 import com.treinos.app.data.wear.WearCommandListenerService
 import com.treinos.app.data.wear.WearSyncRepository
+import com.treinos.app.notify.RestNotifier
 import com.treinos.app.ui.RestFeedbackPlayer
 
 /**
@@ -49,6 +50,9 @@ class AppContainer(context: Context) {
     /** Vibração/beep do fim do descanso (H3-26); regra por ringer em `Feedback.kt`. */
     val restFeedback: RestFeedbackPlayer = RestFeedbackPlayer(context)
 
+    /** Notificação do descanso em segundo plano (H3-58); canal em `RestNotifier.kt`. */
+    val restNotifier: RestNotifier = RestNotifier(context)
+
     init {
         WearCommandListenerService.WearSyncRepositoryHolder.instance = wearSyncRepository
     }
@@ -62,5 +66,7 @@ class TreinosApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // H3-58: canal da notificação de descanso criado no startup do processo.
+        container.restNotifier.createChannel()
     }
 }

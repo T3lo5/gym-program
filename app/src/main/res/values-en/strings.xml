@@ -162,6 +162,12 @@
     <string name="workout_rest_resume">Resume</string>
     <string name="workout_rest_pause">Pause</string>
 
+    <!-- H3-58: rest notification while the app is in the background -->
+    <string name="rest_notification_title">Rest</string>
+    <string name="rest_notification_running">Rest: %1$d s left</string>
+    <string name="rest_notification_finished">Rest completed — next set</string>
+    <string name="rest_notification_skip">Skip rest</string>
+
     <!-- Run -->
     <string name="run_session_not_found">Session not found</string>
     <string name="run_session_not_found_body">The run in progress was not found on the device. It may have been abandoned or finished on another screen.</string>
