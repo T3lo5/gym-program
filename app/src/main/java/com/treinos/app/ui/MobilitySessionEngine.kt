@@ -42,6 +42,94 @@ object MobilitySessionEngine {
         )
     }
 
+    /**
+     * Restaura a sessão de mobilidade a partir do estado persistido (H3-55).
+     *
+     * @param routine Rotina atual do catálogo (pode ter mudado desde a persistência).
+     * @param saved Estado salvo: routineId, movementIndex, movementDeadlineAtMillis, startedAtMillis.
+     * @param nowMillis Tempo atual em epoch millis (wall-clock).
+     * @return Estado restaurado ou `null` se a rotina não existir mais ou o estado for inválido.
+     */
+    fun resume(
+        routine: MobilityRoutine,
+        saved: SavedMobilityState,
+        nowMillis: Long,
+    ): MobilitySessionState? {
+        if (saved.routineId != routine.id) return null
+        if (saved.movementIndex !in routine.movements.indices) return null
+
+        val movement = routine.movements[saved.movementIndex]
+        val deadline = saved.movementDeadlineAtMillis
+        val startedAt = saved.startedAtMillis
+
+        if (deadline <= 0L || startedAt <= 0L) return null
+
+        val remaining = when {
+            deadline <= nowMillis -> 0
+            else -> ((deadline - nowMillis + 999) / 1000).toInt().coerceAtMost(movement.durationSeconds)
+        }
+
+        val elapsed = ((nowMillis - startedAt) / 1000L).coerceAtLeast(0L)
+
+        // Se o movimento atual já venceu, avança encadeando os vencidos.
+        var index = saved.movementIndex
+        var rem = remaining
+        var isRunning = true
+        var isPaused = false
+
+        while (index < routine.movements.size) {
+            val mv = routine.movements[index]
+            if (index == saved.movementIndex) {
+                // Movimento atual: usa o deadline salvo
+                if (deadline > nowMillis) {
+                    rem = ((deadline - nowMillis + 999) / 1000).toInt().coerceAtMost(mv.durationSeconds)
+                    break
+                }
+                // Venceu: avança para o próximo
+            } else {
+                // Movimentos subsequentes: deadline seria o início + duração, mas não temos o início.
+                // Como só temos o deadline do movimento salvo, assumimos que os seguintes
+                // ainda não começaram se o atual venceu — então paramos no próximo com duração cheia.
+                rem = mv.durationSeconds
+                break
+            }
+            index++
+        }
+
+        // Se todos os movimentos passaram, a sessão terminou.
+        if (index >= routine.movements.size) {
+            return MobilitySessionState(
+                routineId = routine.id,
+                movementIndex = routine.movements.size - 1,
+                secondsRemaining = 0,
+                elapsedSeconds = elapsed,
+                running = false,
+            )
+        }
+
+        // Verifica se o movimento restaurado estava em transição.
+        // Não persistimos transitionSecondsRemaining, então assumimos que não estava em transição.
+        // O tick seguinte cuidará de entrar em transição quando secondsRemaining chegar a 0.
+
+        return MobilitySessionState(
+            routineId = routine.id,
+            movementIndex = index,
+            secondsRemaining = rem,
+            elapsedSeconds = elapsed,
+            running = isRunning,
+            paused = isPaused,
+            transitionSecondsRemaining = 0,
+        )
+    }
+
+    /** Estado persistido da mobilidade (H3-55). Puro para testes. */
+    data class SavedMobilityState(
+        val routineId: String,
+        val movementIndex: Int,
+        val movementDeadlineAtMillis: Long,
+        val startedAtMillis: Long,
+    )
+
     /** Um segundo de relógio; congelado em pausa e após o fim da rotina. */
     fun tick(state: MobilitySessionState, routine: MobilityRoutine): MobilitySessionState {
         if (!state.running || state.paused) return state

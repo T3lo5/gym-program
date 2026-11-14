@@ -113,6 +113,10 @@ fun MobilityScreen(
             onNextMovement = onNextMovement,
             onClearSession = onClearSession,
             onAskDiscard = { showDiscardDialog = true },
+            onRestartRoutine = {
+                onClearSession()
+                onStartRoutine(routine)
+            },
         )
     }
 
@@ -258,6 +262,7 @@ private fun MobilityPlayer(
     onNextMovement: () -> Unit,
     onClearSession: () -> Unit,
     onAskDiscard: () -> Unit,
+    onRestartRoutine: () -> Unit = {},
 ) {
     val movement = routine.movements.getOrNull(session.movementIndex)
     val nextMovement = routine.movements.getOrNull(session.movementIndex + 1)
@@ -442,6 +447,17 @@ private fun MobilityPlayer(
                         }
                     )
                 }
+            }
+
+            // H3-55: botão para recomeçar a rotina do início (útil ao restaurar estado).
+            OutlinedButton(
+                onClick = {
+                    haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.MobilityControl))
+                    onRestartRoutine()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.mobility_restart))
             }
 
             OutlinedButton(

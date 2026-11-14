@@ -94,6 +94,50 @@ class AppPreferences private constructor(
         }
 
     /**
+     * ID da rotina de mobilidade em andamento (H3-55). Null = nenhuma rotina ativa.
+     * Sobrevive à morte do processo; limpo ao encerrar ou finalizar.
+     */
+    var mobilityRoutineId: String?
+        get() = prefs.getString(KEY_MOBILITY_ROUTINE_ID, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_MOBILITY_ROUTINE_ID).apply()
+            } else {
+                prefs.edit().putString(KEY_MOBILITY_ROUTINE_ID, value).apply()
+            }
+        }
+
+    /**
+     * Índice do movimento atual na rotina de mobilidade (H3-55).
+     * Apenas válido quando `mobilityRoutineId` não é null.
+     */
+    var mobilityMovementIndex: Int
+        get() = prefs.getInt(KEY_MOBILITY_MOVEMENT_INDEX, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_MOBILITY_MOVEMENT_INDEX, value).apply()
+        }
+
+    /**
+     * Deadline do movimento atual em epoch millis (H3-55).
+     * Wall-clock: sobrevive à morte do processo; 0 = sem deadline ativo.
+     */
+    var mobilityMovementDeadlineAtMillis: Long
+        get() = prefs.getLong(KEY_MOBILITY_MOVEMENT_DEADLINE_AT, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_MOBILITY_MOVEMENT_DEADLINE_AT, value).apply()
+        }
+
+    /**
+     * Momento de início da sessão de mobilidade em epoch millis (H3-55).
+     * Usado para calcular `elapsedSeconds` ao restaurar.
+     */
+    var mobilityStartedAtMillis: Long
+        get() = prefs.getLong(KEY_MOBILITY_STARTED_AT, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_MOBILITY_STARTED_AT, value).apply()
+        }
+
+    /**
      * Última configuração da tela "Gerar" (H3-30), como JSON
      * (`GenerateConfigCodec`). null = nenhuma config salva ainda.
      */
@@ -190,6 +234,10 @@ class AppPreferences private constructor(
         private const val KEY_LANGUAGE = "language"
         private const val KEY_REST_DEADLINE_AT = "rest_deadline_at"
         private const val KEY_REST_TOTAL = "rest_total"
+        private const val KEY_MOBILITY_ROUTINE_ID = "mobility_routine_id"
+        private const val KEY_MOBILITY_MOVEMENT_INDEX = "mobility_movement_index"
+        private const val KEY_MOBILITY_MOVEMENT_DEADLINE_AT = "mobility_movement_deadline_at"
+        private const val KEY_MOBILITY_STARTED_AT = "mobility_started_at"
         private const val KEY_BODY_WEIGHT_KG = "body_weight_kg"
         private const val KEY_HEIGHT_CM = "height_cm"
         private const val KEY_SEX = "sex"

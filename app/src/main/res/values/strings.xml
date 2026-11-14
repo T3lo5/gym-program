@@ -209,6 +209,7 @@
     <string name="mobility_advance">Avançar</string>
     <string name="mobility_finish">Finalizar</string>
     <string name="mobility_finish_early">Finalizar antes do fim</string>
+    <string name="mobility_restart">Recomeçar do início</string>
     <string name="mobility_discard_title">Descartar rotina?</string>
     <string name="mobility_discard_body">A rotina em andamento será interrompida e o tempo decorrido não será registrado no histórico.</string>
     <string name="mobility_discard_confirm">Descartar</string>

@@ -208,6 +208,7 @@
     <string name="mobility_advance">Advance</string>
     <string name="mobility_finish">Finish</string>
     <string name="mobility_finish_early">Finish before the end</string>
+    <string name="mobility_restart">Restart from beginning</string>
     <string name="mobility_discard_title">Discard routine?</string>
     <string name="mobility_discard_body">The routine in progress will be interrupted and the elapsed time will not be recorded in the history.</string>
     <string name="mobility_discard_confirm">Discard</string>

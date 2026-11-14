@@ -565,6 +565,7 @@ class AppViewModel(
             loadExerciseMedia(false)
         }
         restorePersistedRest()
+        restorePersistedMobility()
         // H3-40: restaura o envelope persistido (sobrevive a processo morto).
         preferences.pendingGenerationV1?.let { raw ->
             PendingGenerationCodec.decode(raw)?.let { envelope ->
@@ -1578,6 +1579,7 @@ class AppViewModel(
     fun startMobilityRoutine(routine: MobilityRoutine) {
         val session = MobilitySessionEngine.start(routine) ?: return
         _mobilityState.value = MobilityScreenState(routine = routine, session = session)
+        persistMobilityState(routine, session)
         startMobilityTicker()
     }
 
@@ -1590,8 +1592,11 @@ class AppViewModel(
 
     fun toggleMobilityPause() {
         val current = _mobilityState.value
+        val routine = current.routine ?: return
         val session = current.session ?: return
-        _mobilityState.value = current.copy(session = MobilitySessionEngine.togglePause(session))
+        val toggled = MobilitySessionEngine.togglePause(session)
+        _mobilityState.value = current.copy(session = toggled)
+        persistMobilityState(routine, toggled)
     }
 
     fun mobilityPreviousMovement() {
@@ -1599,9 +1604,9 @@ class AppViewModel(
         val routine = current.routine ?: return
         val session = current.session ?: return
         if (session.movementIndex == 0) return
-        _mobilityState.value = current.copy(
-            session = MobilitySessionEngine.goTo(session, routine, session.movementIndex - 1) ?: session,
-        )
+        val next = MobilitySessionEngine.goTo(session, routine, session.movementIndex - 1) ?: return
+        _mobilityState.value = current.copy(session = next)
+        persistMobilityState(routine, next)
     }
 
     /** "Avançar" manual ou toque na transição (H3-31): pula direto ao próximo. */
@@ -1615,18 +1620,21 @@ class AppViewModel(
             MobilitySessionEngine.goTo(session, routine, session.movementIndex + 1) ?: return
         }
         _mobilityState.value = current.copy(session = next)
+        persistMobilityState(routine, next)
     }
 
     /** Limpa a rotina em andamento (finalização ou descarte confirmado). */
     fun clearMobilitySession() {
         mobilityJob?.cancel()
         mobilityJob = null
+        clearPersistedMobility()
         _mobilityState.value = MobilityScreenState()
     }
 
     private fun startMobilityTicker() {
         mobilityJob?.cancel()
         mobilityJob = viewModelScope.launch {
+            var lastMovementIndex = -1
             while (true) {
                 delay(1_000)
                 val current = _mobilityState.value
@@ -1636,6 +1644,11 @@ class AppViewModel(
                 val routine = current.routine ?: break
                 val ticked = MobilitySessionEngine.tick(session, routine)
                 _mobilityState.value = current.copy(session = ticked)
+                // Persiste quando o movimento muda (incluindo transição → próximo movimento)
+                if (ticked.movementIndex != lastMovementIndex) {
+                    persistMobilityState(routine, ticked)
+                    lastMovementIndex = ticked.movementIndex
+                }
                 if (!ticked.running) break
             }
         }
@@ -1789,6 +1802,66 @@ class AppViewModel(
         _restTotal.value = total
         _restRemaining.value = RestTimer.remainingSeconds(deadline, now)
         restJob = viewModelScope.launch { tickRest() }
+    }
+
+    /**
+     * Processo morto com mobilidade em andamento: restaura o movimento e tempo
+     * restante via deadline wall-clock (H3-55). Se a rotina não existir mais no
+     * catálogo, descarta o estado salvo.
+     */
+    private fun restorePersistedMobility() {
+        val routineId = preferences.mobilityRoutineId ?: return
+        val movementIndex = preferences.mobilityMovementIndex
+        val deadline = preferences.mobilityMovementDeadlineAtMillis
+        val startedAt = preferences.mobilityStartedAtMillis
+        if (deadline <= 0L || startedAt <= 0L) return
+
+        val routine = MobilityRoutineTemplates.getRoutine(routineId) ?: run {
+            // Rotina removida do catálogo: descarta estado salvo.
+            clearPersistedMobility()
+            return
+        }
+
+        val saved = MobilitySessionEngine.SavedMobilityState(
+            routineId = routineId,
+            movementIndex = movementIndex,
+            movementDeadlineAtMillis = deadline,
+            startedAtMillis = startedAt,
+        )
+        val now = System.currentTimeMillis()
+        val restored = MobilitySessionEngine.resume(routine, saved, now) ?: run {
+            clearPersistedMobility()
+            return
+        }
+
+        _mobilityState.value = MobilityScreenState(routine = routine, session = restored)
+        startMobilityTicker()
+    }
+
+    /** Limpa as chaves de persistência da mobilidade (H3-55). */
+    private fun clearPersistedMobility() {
+        preferences.mobilityRoutineId = null
+        preferences.mobilityMovementIndex = 0
+        preferences.mobilityMovementDeadlineAtMillis = 0L
+        preferences.mobilityStartedAtMillis = 0L
+    }
+
+    /** Persiste o estado atual da mobilidade (H3-55). */
+    private fun persistMobilityState(routine: MobilityRoutine, session: MobilitySessionState) {
+        val now = System.currentTimeMillis()
+        // Calcula o deadline do movimento atual: now + secondsRemaining
+        val deadline = if (session.running && session.secondsRemaining > 0) {
+            now + session.secondsRemaining.toLong() * 1000L
+        } else {
+            0L
+        }
+        // startedAt = now - elapsedSeconds
+        val startedAt = now - session.elapsedSeconds * 1000L
+
+        preferences.mobilityRoutineId = routine.id
+        preferences.mobilityMovementIndex = session.movementIndex
+        preferences.mobilityMovementDeadlineAtMillis = deadline
+        preferences.mobilityStartedAtMillis = startedAt
     }
 
     // ---------------- Navegacao por exercicio (fluxo nao-circuito) ----------------
