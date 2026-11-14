@@ -1495,6 +1495,9 @@ class AppViewModel(
             _message.value = context.getString(R.string.msg_only_manual_editable)
             return
         }
+        // H3-56: ao entrar em edição o `prefill` vence; o rascunho salvo não
+        // deve vazar para a edição de uma sessão antiga.
+        preferences.activityDraftV1 = null
         _activityEditingId.value = sessionId
         _activityPrefill.value = session.session.toActivityLogInput()
         _activityErrors.value = emptyMap()
@@ -1536,10 +1539,12 @@ class AppViewModel(
                     repository.logActivity(input.toManualSession())
                     _message.value = context.getString(R.string.msg_activity_saved)
                 }
-                    _activityEditingId.value = null
-                    _activityPrefill.value = null
-                    // H3-38: salvar edição retorna à origem (Histórico quando veio dele).
-                    _screen.value = _backTarget.value ?: Screen.Home
+                // H3-56: registro concluído — o rascunho some.
+                preferences.activityDraftV1 = null
+                _activityEditingId.value = null
+                _activityPrefill.value = null
+                // H3-38: salvar edição retorna à origem (Histórico quando veio dele).
+                _screen.value = _backTarget.value ?: Screen.Home
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_save_activity_error)
             } finally {
@@ -1555,6 +1560,8 @@ class AppViewModel(
                 if (_activityEditingId.value == sessionId) {
                     _activityEditingId.value = null
                     _activityPrefill.value = null
+                    // H3-56: confirmar "Excluir" da edição também limpa o rascunho.
+                    preferences.activityDraftV1 = null
                     _screen.value = Screen.History
                 }
                 _message.value = context.getString(R.string.msg_activity_deleted)

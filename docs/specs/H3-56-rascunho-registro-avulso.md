@@ -7,7 +7,7 @@
 | Item do roadmap | `H3-56` |
 | MoSCoW | `C` |
 | Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Implementação | `concluída` (2026-11-14) |
 
 **Origem:** fora de escopo declarado da H3-31 + varredura de polimento de
 2026-11-13. O rascunho de `LogActivityScreen` (`ActivityLogDraft` +
@@ -64,7 +64,7 @@ morte do processo. Nada em Room — o registro só vira sessão ao salvar.
 
 | Arquivo | Testes |
 |---|---|
-| `app/src/test/java/com/treinos/app/ui/ActivityLogSaverTest.kt` | `ida_e_volta_preserva_campos`, `campos_novos_tem_default`, `prefill_vence_rascunho` |
+| `app/src/test/java/com/treinos/app/ui/ActivityLogSaverTest.kt` | `codec_ida_e_volta_preserva_campos`, `codec_entrada_vazia_devolve_null`, `codec_entrada_corrompida_devolve_null`, `codec_campos_novos_tem_default`, `codec_modalidade_desconhecida_cai_em_other`, `saver_e_codec_estao_em_sincronia` |
 
 ## Verificação manual
 
@@ -82,3 +82,30 @@ morte do processo. Nada em Room — o registro só vira sessão ao salvar.
 ## Riscos e rollback
 
 Baixo; aditivo. Rollback por `git revert`; nenhum dado novo.
+
+## Implementação (2026-11-14)
+
+- `ActivityLogDraft` tornou-se `@Serializable`; `ActivityModalitySerializer`
+  codifica a enum pelo `storageValue` (valor desconhecido cai em `OTHER`).
+- `ActivityLogDraftCodec` (em `ActivityLog.kt`) é o par de
+  `encode`/`decode` tolerante (`ignoreUnknownKeys`, entrada vazia/corrompida
+  devolve `null`).
+- `AppPreferences.activityDraftV1` (chave `activity_draft_v1`) persiste o JSON
+  do rascunho; sobrevive à morte do processo.
+- `LogActivityScreen`: sem `prefill`, o `draft` inicial lê o rascunho persistido
+  (`activityLogDraftFrom(prefill, persistedDraft)`); um
+  `LaunchedEffect` com `snapshotFlow { draft }.debounce(300 ms)` reescreve o
+  rascunho a cada mudança. A rotação continua usando `ActivityLogDraftSaver`.
+- `AppViewModel.saveActivity` e `deleteLogActivity` limpam
+  `preferences.activityDraftV1 = null` ao concluir; `editLogActivity` também
+  limpa (o `prefill` vence sobre o rascunho).
+- Testes em `ActivityLogSaverTest.kt`: round-trip do `Saver`, round-trip do
+  codec, entrada vazia/corrompida, campos novos com default, modalidade
+  desconhecida e sincronia entre `Saver` e `codec`.
+
+## Verificação
+
+```bash
+./scripts/verify.sh
+# VERIFICAÇÃO COMPLETA OK — build, testes, lint e assinatura
+```

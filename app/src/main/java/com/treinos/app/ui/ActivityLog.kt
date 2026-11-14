@@ -2,6 +2,13 @@ package com.treinos.app.ui
 
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.WorkoutSessionEntity
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.serialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -35,8 +42,11 @@ data class ActivityLogInput(
     val notes: String = "",
 )
 
-/** O mesmo formulário, ainda como texto editável. */
+/** O mesmo formulário, ainda como texto editável. Sobrevive a rotação (Saver)
+ * e a morte do processo (ActivityLogDraftCodec em `activity_draft_v1`). */
+@Serializable
 data class ActivityLogDraft(
+    @Serializable(ActivityModalitySerializer::class)
     val modality: ActivityModality = ActivityModality.SWIM,
     val title: String = "",
     val dateText: String = "",
@@ -302,3 +312,46 @@ fun WorkoutSessionEntity.toActivityLogInput(): ActivityLogInput = ActivityLogInp
     rpe = sessionRpe,
     notes = notes,
 )
+
+/**
+ * Serializa `ActivityModality` pelo seu `storageValue` ("swim", "run", …).
+ * Valor desconhecido cai em `OTHER` — o rascunho nunca crasha.
+ */
+internal object ActivityModalitySerializer : KSerializer<ActivityModality> {
+    override val descriptor = serialDescriptor<String>()
+
+    override fun serialize(encoder: Encoder, value: ActivityModality) {
+        encoder.encodeString(value.storageValue)
+    }
+
+    override fun deserialize(decoder: Decoder): ActivityModality =
+        ActivityModality.fromStorageValue(decoder.decodeString())
+}
+
+/**
+ * H3-56: codec JSON do rascunho do registro avulso, persistido em
+ * `AppPreferences.activityDraftV1` (`activity_draft_v1`).
+ *
+ * Mesmo padrão de `GenerateConfigCodec`: `ignoreUnknownKeys` tolera campos de
+ * versões futuras; entrada vazia/corrompida devolve `null` — o chamador cai no
+ * default (formulário vazio). A versão do formato vive no nome da chave de prefs.
+ */
+internal object ActivityLogDraftCodec {
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        explicitNulls = false
+    }
+
+    fun encode(draft: ActivityLogDraft): String = json.encodeToString(draft)
+
+    fun decode(raw: String?): ActivityLogDraft? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            json.decodeFromString(ActivityLogDraft.serializer(), raw)
+        } catch (_: Exception) {
+            null
+        }
+    }
+}

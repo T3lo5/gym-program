@@ -17,18 +17,24 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.ui.ActivityLogDraft
+import com.treinos.app.ui.ActivityLogDraftCodec
 import com.treinos.app.ui.ActivityLogField
 import com.treinos.app.ui.ActivityLogInput
 import com.treinos.app.ui.ActivityModality
@@ -40,7 +46,8 @@ import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.swimStrokeOptions
 import com.treinos.app.ui.validPoolLengths
-import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.FlowPreview
 import com.treinos.app.R
 
 /**
@@ -106,22 +113,30 @@ val ActivityLogDraftSaver: Saver<ActivityLogDraft, Any> = listSaver(
     },
 )
 
-/** Estado inicial do formulário: preenchido quando há prefill (edição/copiar). */
-internal fun activityLogDraftFrom(prefill: ActivityLogInput?): ActivityLogDraft {
-    val input = prefill ?: return ActivityLogDraft(
-        dateText = formatDateTime(System.currentTimeMillis()),
-    )
-    return ActivityLogDraft(
-        modality = input.modality,
-        title = input.title,
-        dateText = formatDateTime(input.startedAt),
-        durationText = input.durationMinutes.toString(),
-        distanceText = input.distanceMeters?.toLong()?.toString() ?: "",
-        poolLengthMeters = input.poolLengthMeters,
-        stroke = input.stroke,
-        rpeText = input.rpe?.toString() ?: "",
-        notes = input.notes,
-    )
+/**
+ * Estado inicial do formulário: prefill (edição/copiar último) vence sobre o
+ * rascunho persistido (H3-56). Sem prefill, tenta o rascunho salvo em
+ * `AppPreferences.activityDraftV1`; se ilegível, cai no vazio com data de hoje.
+ */
+internal fun activityLogDraftFrom(
+    prefill: ActivityLogInput?,
+    persistedDraft: ActivityLogDraft?,
+): ActivityLogDraft {
+    val input = prefill
+    if (input != null) {
+        return ActivityLogDraft(
+            modality = input.modality,
+            title = input.title,
+            dateText = formatDateTime(input.startedAt),
+            durationText = input.durationMinutes.toString(),
+            distanceText = input.distanceMeters?.toLong()?.toString() ?: "",
+            poolLengthMeters = input.poolLengthMeters,
+            stroke = input.stroke,
+            rpeText = input.rpe?.toString() ?: "",
+            notes = input.notes,
+        )
+    }
+    return persistedDraft ?: ActivityLogDraft(dateText = formatDateTime(System.currentTimeMillis()))
 }
 
 @Composable
@@ -137,13 +152,32 @@ fun LogActivityScreen(
     onSave: (ActivityLogDraft) -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+
     // H3-31: um único rascunho saveable; mudar o prefill (edição/copiar último)
     // reinicia o formulário, girar a tela preserva tudo que foi digitado.
+    // H3-56: sem prefill, o rascunho persistido em `AppPreferences` sobrevive à
+    // morte do processo; `prefill` (editar/copiar) vence sobre o rascunho.
+    val persistedDraft = remember(preferences) {
+        ActivityLogDraftCodec.decode(preferences.activityDraftV1)
+    }
     var draft by rememberSaveable(
         inputs = arrayOf(prefill),
         stateSaver = ActivityLogDraftSaver,
-    ) { mutableStateOf(activityLogDraftFrom(prefill)) }
+    ) { mutableStateOf(activityLogDraftFrom(prefill, persistedDraft)) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+
+    // Persiste o rascunho a cada mudança (debounce 300 ms) — sobrevive à morte
+    // do processo. A rotação já é coberta pelo `ActivityLogDraftSaver`.
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    LaunchedEffect(draft, preferences) {
+        snapshotFlow { draft }
+            .debounce(300L)
+            .collect { current ->
+                preferences.activityDraftV1 = ActivityLogDraftCodec.encode(current)
+            }
+    }
 
     Scaffold(
         topBar = {

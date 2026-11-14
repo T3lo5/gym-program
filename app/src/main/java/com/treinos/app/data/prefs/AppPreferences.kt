@@ -177,6 +177,23 @@ class AppPreferences private constructor(
         }
 
     /**
+     * Rascunho do registro avulso (H3-56): o último estado digitado em
+     * `LogActivityScreen`, serializado como JSON (`ActivityLogDraftCodec`).
+     * Sobrevive a morte do processo; null quando não há rascunho (formulário
+     * limpo ao salvar/excluir ou nunca aberto com dados). `prefill`
+     * (editar/copiar último) vence sobre este valor.
+     */
+    var activityDraftV1: String?
+        get() = prefs.getString(KEY_ACTIVITY_DRAFT_V1, null)
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove(KEY_ACTIVITY_DRAFT_V1).apply()
+            } else {
+                prefs.edit().putString(KEY_ACTIVITY_DRAFT_V1, value).apply()
+            }
+        }
+
+    /**
      * Idioma do conteúdo de exercício (H3-36): "pt" ou "en". Default "pt" —
      * planos novos já nascem em português antes do seletor da H3-37. Valor
      * desconhecido cai para o default.
@@ -245,5 +262,6 @@ class AppPreferences private constructor(
         private const val KEY_GENERATE_CONFIG_V1 = "generate_config_v1"
         private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"
         private const val KEY_PENDING_GENERATION_V1 = "pending_generation_v1"
+        private const val KEY_ACTIVITY_DRAFT_V1 = "activity_draft_v1"
     }
 }
