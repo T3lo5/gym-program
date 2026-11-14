@@ -43,7 +43,34 @@ import com.treinos.app.ui.validPoolLengths
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 
-private val modalityOptions = ActivityModality.entries.map { it.storageValue to it.label }
+/**
+ * H3-52: rótulos localizados para os dados que o app persiste com valor de
+ * storage (`ActivityModality.label` e os nomes de nado continuam como estão —
+ * são dados gravados no banco, não literais de UI). A UI resolve o rótulo no
+ * idioma escolhido a partir do valor de storage.
+ */
+@Composable
+internal fun activityModalityLabel(modality: ActivityModality): String = stringResource(
+    when (modality) {
+        ActivityModality.STRENGTH -> R.string.generate_modality_strength
+        ActivityModality.RUN -> R.string.generate_modality_run
+        ActivityModality.SWIM -> R.string.activity_modality_swim
+        ActivityModality.MOBILITY -> R.string.generate_modality_mobility
+        ActivityModality.OTHER -> R.string.activity_modality_other
+    },
+)
+
+/** Rótulo localizado do nado; valor desconhecido aparece como veio do registro. */
+@Composable
+internal fun strokeDisplayName(stroke: String): String = when (stroke) {
+    "crawl" -> stringResource(R.string.log_stroke_crawl)
+    "costas" -> stringResource(R.string.log_stroke_backstroke)
+    "peito" -> stringResource(R.string.log_stroke_breaststroke)
+    "borboleta" -> stringResource(R.string.log_stroke_butterfly)
+    "misto" -> stringResource(R.string.log_stroke_medley)
+    "outro" -> stringResource(R.string.log_stroke_other)
+    else -> stroke
+}
 
 /**
  * H3-31: rascunho do registro avulso como um único valor saveable — girar o
@@ -121,7 +148,11 @@ fun LogActivityScreen(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = if (editingSessionId != null) "Editar registro" else "Registrar atividade",
+                title = if (editingSessionId != null) {
+                    stringResource(R.string.log_edit_title)
+                } else {
+                    stringResource(R.string.screen_log_activity)
+                },
                 onBack = onBack,
             )
         },
@@ -134,10 +165,10 @@ fun LogActivityScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { SectionTitle("Modalidade") }
+            item { SectionTitle(stringResource(R.string.log_section_modality)) }
             item {
                 ChipGroup(
-                    options = modalityOptions,
+                    options = ActivityModality.entries.map { it.storageValue to activityModalityLabel(it) },
                     selected = setOf(draft.modality.storageValue),
                     onToggle = { value ->
                         ActivityModality.entries.firstOrNull { it.storageValue == value }?.let {
@@ -153,12 +184,12 @@ fun LogActivityScreen(
                         onClick = { onCopyLast(draft.modality) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.log_copy_last, draft.modality.label.lowercase()))
+                        Text(stringResource(R.string.log_copy_last, activityModalityLabel(draft.modality).lowercase()))
                     }
                 }
             }
 
-            item { SectionTitle("Como foi") }
+            item { SectionTitle(stringResource(R.string.log_section_how)) }
             item {
                 OutlinedTextField(
                     value = draft.title,
@@ -206,7 +237,7 @@ fun LogActivityScreen(
             }
             item {
                 Text(
-                    text = "Esforço de 1 (leve) a 10 (máximo). Deixe vazio se não souber informar.",
+                    text = stringResource(R.string.log_rpe_support),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
@@ -225,18 +256,19 @@ fun LogActivityScreen(
             }
 
             if (draft.modality == ActivityModality.SWIM) {
-                item { SectionTitle("Piscina") }
+                item { SectionTitle(stringResource(R.string.log_pool_section)) }
                 item {
                     ChipGroup(
-                        options = validPoolLengths.map { it.toString() to "${it} m" } + ("" to "Sem piscina"),
+                        options = validPoolLengths.map { it.toString() to stringResource(R.string.log_pool_length, it) } +
+                            ("" to stringResource(R.string.log_pool_none)),
                         selected = setOf(draft.poolLengthMeters?.toString() ?: ""),
                         onToggle = { value -> draft = draft.copy(poolLengthMeters = value.toIntOrNull()) },
                     )
                 }
-                item { SectionTitle("Nado (opcional)") }
+                item { SectionTitle(stringResource(R.string.log_stroke_section)) }
                 item {
                     ChipGroup(
-                        options = swimStrokeOptions,
+                        options = swimStrokeOptions.map { (value, _) -> value to strokeDisplayName(value) },
                         selected = setOf(draft.stroke ?: ""),
                         onToggle = { value ->
                             draft = draft.copy(stroke = if (value == draft.stroke) null else value)
@@ -245,7 +277,7 @@ fun LogActivityScreen(
                 }
             }
 
-            item { SectionTitle("Notas") }
+            item { SectionTitle(stringResource(R.string.log_notes_section)) }
             item {
                 OutlinedTextField(
                     value = draft.notes,
@@ -261,8 +293,12 @@ fun LogActivityScreen(
             item {
                 BusyButton(
                     busy = isSaving,
-                    idleText = if (editingSessionId != null) "Salvar alterações" else "Salvar",
-                    busyText = "Salvando…",
+                    idleText = if (editingSessionId != null) {
+                        stringResource(R.string.workout_set_dialog_save_changes)
+                    } else {
+                        stringResource(R.string.common_save)
+                    },
+                    busyText = stringResource(R.string.log_btn_saving),
                     onClick = {
                         onSave(
                             draft.copy(
@@ -285,7 +321,7 @@ fun LogActivityScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
-                            "Excluir este registro",
+                            stringResource(R.string.log_delete_record),
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -295,8 +331,7 @@ fun LogActivityScreen(
 
             item {
                 Text(
-                    text = "O registro fica salvo apenas neste aparelho. Ele aparece no histórico com " +
-                        "duração, distância e pace, mas sem séries.",
+                    text = stringResource(R.string.log_info),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 12.dp),

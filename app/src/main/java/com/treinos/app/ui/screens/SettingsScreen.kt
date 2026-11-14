@@ -155,9 +155,7 @@ fun SettingsScreen(
             onDismiss = { showRestoreConfirm = false },
             onConfirm = { onRestoreByDeviceId(restoreDeviceId) },
             title = stringResource(R.string.settings_dialog_restore_title),
-            message = "Os dados locais serão substituídos pelo snapshot de " +
-                "$restoreDeviceId e este app passará a usar esse deviceId. " +
-                "Se o deviceId estiver errado, nada muda.",
+            message = stringResource(R.string.settings_dialog_restore_body, restoreDeviceId),
             confirmLabel = stringResource(R.string.settings_btn_restore_action),
             isDestructive = true,
         )
@@ -177,7 +175,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = { ScreenTopBar(title = "Ajustes", onBack = onBack) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_settings), onBack = onBack) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -189,7 +187,7 @@ fun SettingsScreen(
         ) {
             // H3-35: seção Treino (catálogo de exercícios).
             CollapsibleSection(
-                title = "Treino",
+                title = stringResource(R.string.settings_section_training),
                 expanded = treinoExpanded,
                 onToggle = { treinoExpanded = it },
             ) {
@@ -199,11 +197,11 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            text = "Catálogo de exercícios",
+                            text = stringResource(R.string.settings_catalog),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Imagens e instruções via catálogo do servidor (free-exercise-db).",
+                            text = stringResource(R.string.settings_catalog_desc),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         if (isUpdatingCatalog) {
@@ -218,7 +216,10 @@ fun SettingsScreen(
                                 enabled = !isUpdatingCatalog,
                                 modifier = Modifier.minimumInteractiveComponentSize(),
                             ) {
-                                Text(if (isUpdatingCatalog) "Atualizando..." else "Atualizar catálogo")
+                                Text(
+                                    if (isUpdatingCatalog) stringResource(R.string.settings_catalog_updating)
+                                    else stringResource(R.string.settings_btn_update_catalog)
+                                )
                             }
                             TextButton(onClick = onClearCatalogMessage, modifier = Modifier.minimumInteractiveComponentSize()) {
                                 Text(stringResource(R.string.settings_btn_clear))
@@ -230,7 +231,7 @@ fun SettingsScreen(
 
             // H3-35: seção Sincronização — colapsada por padrão.
             CollapsibleSection(
-                title = "Sincronização",
+                title = stringResource(R.string.settings_section_sync),
                 expanded = syncExpanded,
                 onToggle = { syncExpanded = it },
             ) {
@@ -240,13 +241,11 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            text = "Seu servidor (computador com o Treinos)",
+                            text = stringResource(R.string.settings_server_desc),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Endereço usado para gerar treinos e sincronizar. " +
-                                "No celular, use o IP do computador na rede local (ex.: http://192.168.0.10:3000). " +
-                                "Veja o Manual para o endereço do emulador.",
+                            text = stringResource(R.string.settings_server_url_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -271,8 +270,8 @@ fun SettingsScreen(
                             }
                             BusyButton(
                                 busy = isTesting,
-                                idleText = "Testar conexão",
-                                busyText = "Testando…",
+                                idleText = stringResource(R.string.settings_btn_test),
+                                busyText = stringResource(R.string.settings_btn_testing),
                                 onClick = {
                                     onSaveUrl(url)
                                     onTest()
@@ -284,7 +283,7 @@ fun SettingsScreen(
                             StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                         }
                         Text(
-                            text = "Código deste aparelho (para restaurar): $deviceId",
+                            text = stringResource(R.string.settings_device_id, deviceId),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -298,12 +297,11 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            text = "Servidor na rede local",
+                            text = stringResource(R.string.settings_section_local),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "O app procura o servidor na mesma Wi-Fi e conecta com um toque. " +
-                                "Não encontrou? Use o endereço manual acima.",
+                            text = stringResource(R.string.settings_local_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -338,8 +336,7 @@ fun SettingsScreen(
 
                         if (discoveredBackends.isEmpty() && hasSearched && !isDiscovering) {
                             Text(
-                                text = "Nenhum servidor encontrado. Ligue o servidor no computador " +
-                                    "e confirme que o celular está na mesma Wi-Fi.",
+                                text = stringResource(R.string.settings_no_server),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -362,7 +359,7 @@ fun SettingsScreen(
                                     )
                                     if (!backend.isVersionKnown) {
                                         Text(
-                                            text = "versão não informada",
+                                            text = stringResource(R.string.settings_server_version_unknown),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.tertiary,
                                         )
@@ -370,15 +367,15 @@ fun SettingsScreen(
                                 }
                                 if (isConnected) {
                                     Text(
-                                            text = "Conectado",
+                                            text = stringResource(R.string.settings_server_connected),
                                             style = MaterialTheme.typography.labelLarge,
                                             color = MaterialTheme.colorScheme.primary,
                                     )
                                 } else {
                                     BusyButton(
                                         busy = isConnectingBackend,
-                                        idleText = "Conectar",
-                                        busyText = "Conectando…",
+                                        idleText = stringResource(R.string.settings_btn_connect),
+                                        busyText = stringResource(R.string.settings_btn_connecting),
                                         onClick = { onConnectBackend(backend) },
                                         enabled = !isDiscovering,
                                     )
@@ -403,24 +400,24 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            text = "Sincronizar com o servidor",
+                            text = stringResource(R.string.settings_btn_sync),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Os treinos e as séries ficam no SQLite do aparelho. " +
-                                "Enviar ao servidor grava um snapshot completo (planos, treinos e séries) " +
-                                "no banco do servidor. Restaurar do servidor baixa o snapshot deste " +
-                                "código e substitui os dados locais — exporte um backup JSON antes.",
+                            text = stringResource(R.string.settings_sync_body),
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
-                            text = "Último envio: ${formatIsoDateTime(lastSyncAt) ?: "nunca"}",
+                            text = stringResource(
+                                R.string.settings_last_upload,
+                                formatIsoDateTime(lastSyncAt) ?: stringResource(R.string.settings_upload_never),
+                            ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         BusyButton(
                             busy = isSyncing,
-                            idleText = "Enviar ao servidor",
-                            busyText = "Enviando…",
+                            idleText = stringResource(R.string.settings_btn_send),
+                            busyText = stringResource(R.string.settings_btn_sending),
                             onClick = onSync,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -437,8 +434,8 @@ fun SettingsScreen(
                         }
                         BusyButton(
                             busy = isDownloading,
-                            idleText = "Restaurar do servidor",
-                            busyText = "Baixando…",
+                            idleText = stringResource(R.string.settings_btn_restore),
+                            busyText = stringResource(R.string.settings_btn_restoring),
                             onClick = { showDownloadConfirm = true },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -467,13 +464,11 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            text = "Restaurar de outro aparelho",
+                            text = stringResource(R.string.settings_section_restore_device),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = "Informe o código que aparece nos Ajustes do outro celular. " +
-                                "O app baixa o snapshot daquele aparelho, substitui os dados locais " +
-                                "e passa a usar esse código.",
+                            text = stringResource(R.string.settings_restore_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
@@ -481,7 +476,15 @@ fun SettingsScreen(
                             value = restoreDeviceId,
                             onValueChange = onRestoreDeviceIdChanged,
                             label = { Text(stringResource(R.string.settings_label_other_code)) },
-                            supportingText = { Text(if (restoreDeviceId.isBlank()) "Obrigatório para restaurar" else "Pronto para restaurar") },
+                            supportingText = {
+                                Text(
+                                    if (restoreDeviceId.isBlank()) {
+                                        stringResource(R.string.settings_support_required)
+                                    } else {
+                                        stringResource(R.string.settings_support_ready)
+                                    }
+                                )
+                            },
                             isError = restoreDeviceId.isBlank() && restoreMessage != null,
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -492,8 +495,8 @@ fun SettingsScreen(
                         )
                         BusyButton(
                             busy = isRestoring,
-                            idleText = "Restaurar",
-                            busyText = "Restaurando…",
+                            idleText = stringResource(R.string.settings_btn_restore_device),
+                            busyText = stringResource(R.string.settings_btn_restoring_device),
                             onClick = { showRestoreConfirm = true },
                             enabled = restoreDeviceId.isNotBlank(),
                             modifier = Modifier.fillMaxWidth(),
@@ -507,7 +510,7 @@ fun SettingsScreen(
 
             // H3-35: seção Backup (exportar/importar/restaurar por deviceId).
             CollapsibleSection(
-                title = "Backup",
+                title = stringResource(R.string.settings_section_backup),
                 expanded = backupExpanded,
                 onToggle = { backupExpanded = it },
             ) {
@@ -526,14 +529,12 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Backup e restauração (JSON)",
+                                text = stringResource(R.string.settings_backup_title),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
                         Text(
-                            text = "Exporte seus planos, treinos, séries e o perfil (peso, altura e sexo) para um " +
-                                "arquivo JSON. Restaure depois, mesmo após desinstalar o app. Quem tiver o " +
-                                "arquivo lê esses dados — inclua peso, altura e sexo.",
+                            text = stringResource(R.string.settings_backup_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -542,15 +543,15 @@ fun SettingsScreen(
                         ) {
                             BusyButton(
                                 busy = backupImportState is BackupImportState.Importing,
-                                idleText = "Exportar backup",
-                                busyText = "Exportando…",
+                                idleText = stringResource(R.string.settings_btn_export),
+                                busyText = stringResource(R.string.settings_btn_exporting),
                                 onClick = onExportBackup,
                                 modifier = Modifier.weight(1f),
                             )
                             BusyButton(
                                 busy = backupImportState is BackupImportState.Importing,
-                                idleText = "Importar backup",
-                                busyText = "Importando…",
+                                idleText = stringResource(R.string.settings_btn_import),
+                                busyText = stringResource(R.string.settings_btn_importing),
                                 onClick = onImportFileSelected,
                                 modifier = Modifier.weight(1f),
                             )
@@ -559,12 +560,15 @@ fun SettingsScreen(
                         when (val state = backupImportState) {
                             is BackupImportState.Ready -> {
                                 Text(
-                                    text = "Pré-visualização: ${state.preview.plans} plano(s), " +
-                                        "${state.preview.days} dia(s), " +
-                                        "${state.preview.planExercises} exercício(s) de plano, " +
-                                        "${state.preview.sessions} sessão(ões), " +
-                                        "${state.preview.sessionExercises} exercício(s) de sessão, " +
-                                        "${state.preview.setLogs} série(s).",
+                                    text = stringResource(
+                                        R.string.settings_backup_preview,
+                                        state.preview.plans,
+                                        state.preview.days,
+                                        state.preview.planExercises,
+                                        state.preview.sessions,
+                                        state.preview.sessionExercises,
+                                        state.preview.setLogs,
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -718,7 +722,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "Escolha o idioma da interface do app. A mudança é aplicada imediatamente.",
+                        text = stringResource(R.string.settings_language_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -139,11 +139,13 @@ fun TreinosApp(viewModel: AppViewModel) {
                 val cacheFile = File(context.cacheDir, "backup-treinos.json")
                 cacheFile.writeText(json)
                 val output = context.contentResolver.openOutputStream(uri)
-                    ?: error("Não foi possível abrir o arquivo escolhido para escrita.")
+                    ?: error(context.getString(com.treinos.app.R.string.backup_file_open_error))
                 output.use { out -> cacheFile.inputStream().use { it.copyTo(out) } }
-                viewModel.setBackupMessage("Backup exportado no arquivo escolhido.")
+                viewModel.setBackupMessage(context.getString(com.treinos.app.R.string.backup_exported_message))
             } catch (error: Exception) {
-                viewModel.setBackupMessage(uiErrorMessage(error, "Não foi possível exportar o backup."))
+                viewModel.setBackupMessage(
+                    uiErrorMessage(error, context, com.treinos.app.R.string.backup_export_error),
+                )
             }
         }
     }
@@ -163,7 +165,7 @@ fun TreinosApp(viewModel: AppViewModel) {
             }
             val input = context.contentResolver.openInputStream(uri)
             if (input == null) {
-                viewModel.setBackupMessage("Não foi possível ler o arquivo escolhido.")
+                viewModel.setBackupMessage(context.getString(com.treinos.app.R.string.backup_file_read_error))
                 return@launch
             }
             val json = input.use { BackupSizeGuard.readLimited(it) }
@@ -280,7 +282,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDeletePlan = viewModel::deleteExtraPlan,
                     // H3-30: o selo do plano local cita o motivo persistido do
                     // fallback até a próxima geração da IA.
-                    fallbackReasonLabel = fallbackReasonLabel(lastFallbackReason),
+                    fallbackReasonLabel = fallbackReasonLabelRes(lastFallbackReason)
+                        ?.let { context.getString(it) },
                     // H3-40: card de geração pendente (em andamento / falhou).
                     pendingGeneration = pendingGeneration,
                     pendingGenerationStatus = pendingGenerationStatus,

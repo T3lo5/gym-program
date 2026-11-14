@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-52` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` (aprovada pelo dono antes da implementação) |
+| Implementação | `implementada (2026-11-14)` |
 
 **Origem:** varredura de polimento UX/UI de 2026-11-13. A H3-37 criou a
 infraestrutura de idioma (385 chaves + `values-en` + `StringParityTest`), mas
@@ -44,6 +44,24 @@ mostra português — a paridade prometida pela H3-37 fica completa.
 | `app/src/main/res/values/strings.xml` | novas chaves (PT com o texto atual, byte a byte) |
 | `app/src/main/res/values-en/strings.xml` | mesmas chaves em inglês |
 | `app/src/test/java/com/treinos/app/ui/StringParityTest.kt` | existente; valida a paridade das novas chaves automaticamente |
+
+Entregue também (consequência direta das regras acima, descoberta na
+implementação):
+
+| Arquivo | Mudança |
+|---|---|
+| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | mensagens de snackbar/status resolvem via `context.getString(R.string.…)`; `fallbackReasonLabel` vira `fallbackReasonLabelRes` (devolve o recurso); atalho "Retomar treino" usa os recursos da H3-35 |
+| `app/src/main/java/com/treinos/app/ui/RestoreByDeviceId.kt` | recebe `Context` e resolve a mensagem de falha via recursos |
+| `app/src/main/java/com/treinos/app/ui/components/Common.kt` | `statusIsSuccess` reconhece os prefixos de sucesso em PT **e** EN (as mensagens agora nascem de recursos) |
+| `app/src/test/java/com/treinos/app/ui/UiErrorTest.kt` | Robolectric em pt-BR; mesmas asserções de texto contra os recursos |
+| `app/src/test/java/com/treinos/app/ui/RestoreDeviceIdTest.kt` | Robolectric em pt-BR; `RestoreByDeviceId` recebe o `Context` |
+| `app/src/test/java/com/treinos/app/ui/FallbackReasonLabelTest.kt` | afirma o mapeamento código → recurso (`fallbackReasonLabelRes`) |
+
+Fora do escopo mantido (literais que não são texto de tela desta lista):
+`A11y.kt` (descrições de TalkBack acopladas aos helpers puros), mensagens de
+validação pura (`ActivityLog.kt`, `ProfileValidator`, `ComplementaryValidator`,
+`RunLog`) e `RunWorkoutScreen`/`MobilityScreen` (fora da lista da spec; corrida
+e wear têm itens próprios no roadmap).
 
 ## Modelo de dados / contrato
 

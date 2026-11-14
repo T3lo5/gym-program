@@ -107,22 +107,25 @@ enum class Screen {
 }
 
 /**
- * Rótulo em português do motivo do fallback local (H3-21).
+ * Recurso do motivo do fallback local (H3-21).
  *
  * Os códigos são os valores fechados do contrato (`fallbackReason`):
  * `no_api_key`, `http_error`, `timeout`, `json_parse`, `unresolved_ids`,
  * `schema_validation` e `unknown`. Retorna null quando não há motivo —
  * plano veio da IA (`source == "ai"`) ou o backend é antigo sem o campo.
+ *
+ * H3-52: a função devolve o recurso; quem chama resolve com `getString`
+ * (fora da composição, o texto acompanha o idioma escolhido).
  */
-fun fallbackReasonLabel(reason: String?): String? = when (reason) {
+fun fallbackReasonLabelRes(reason: String?): Int? = when (reason) {
     null, "" -> null
-    "no_api_key" -> "chave da IA não configurada"
-    "http_error" -> "a API de IA respondeu com erro"
-    "timeout" -> "tempo limite ou erro de rede na IA"
-    "json_parse" -> "resposta da IA sem JSON válido"
-    "unresolved_ids" -> "resposta da IA sem IDs válidos"
-    "schema_validation" -> "resposta da IA fora do formato esperado"
-    else -> "motivo desconhecido ($reason)"
+    "no_api_key" -> R.string.fallback_no_api_key
+    "http_error" -> R.string.fallback_http_error
+    "timeout" -> R.string.fallback_timeout
+    "json_parse" -> R.string.fallback_json_parse
+    "unresolved_ids" -> R.string.fallback_unresolved_ids
+    "schema_validation" -> R.string.fallback_schema_validation
+    else -> R.string.fallback_unknown
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -145,8 +148,8 @@ class AppViewModel(
                 putExtra(EXTRA_RESUME_SESSION, true)
             }
             val shortcut = ShortcutInfoCompat.Builder(context, SHORTCUT_ID_RESUME)
-                .setShortLabel("Retomar treino")
-                .setLongLabel("Retomar o treino em andamento")
+                .setShortLabel(context.getString(com.treinos.app.R.string.shortcut_resume_short_label))
+                .setLongLabel(context.getString(com.treinos.app.R.string.shortcut_resume_long_label))
                 .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(
                     context, com.treinos.app.R.mipmap.ic_launcher))
                 .setIntent(intent)
@@ -211,9 +214,9 @@ class AppViewModel(
                 if (_selectedPlanId.value == planId) {
                     _selectedPlanId.value = null
                 }
-                _message.value = "Plano complementar excluído. O histórico foi preservado."
+                _message.value = context.getString(R.string.msg_extra_plan_deleted)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível excluir o plano.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_plan_delete_error)
             }
         }
     }
@@ -645,11 +648,11 @@ class AppViewModel(
                         "dd/MM/yyyy HH:mm",
                         java.util.Locale.getDefault(),
                     ).format(java.util.Date())
-                    _catalogMessage.value = "Catálogo atualizado em $now"
+                    _catalogMessage.value = context.getString(R.string.msg_catalog_updated, now)
                 }
             } catch (error: Exception) {
                 if (forceRefresh) {
-                    _catalogMessage.value = uiErrorMessage(error, "Não foi possível atualizar o catálogo.")
+                    _catalogMessage.value = uiErrorMessage(error, context, R.string.msg_catalog_update_error)
                 }
             } finally {
                 if (forceRefresh) {
@@ -775,6 +778,7 @@ class AppViewModel(
     private val deviceRestore = RestoreByDeviceId(
         downloader = repository,
         devices = preferences,
+        context = context,
     )
 
     // ---------------- Navegação ----------------
@@ -866,7 +870,7 @@ class AppViewModel(
             try {
                 val validation = ProfileValidator.validate(bodyWeightKgText, heightCmText, sexChoice)
                 if (!validation.valid) {
-                    _message.value = validation.error ?: "Perfil inválido."
+                    _message.value = validation.error ?: context.getString(R.string.msg_profile_invalid)
                     return@launch
                 }
                 // Persist profile quando pelo menos um campo estiver preenchido.
@@ -889,7 +893,7 @@ class AppViewModel(
                         modalityTypes = effectiveModalities.map { it.type },
                     )
                     if (!complementary.valid) {
-                        _message.value = complementary.error ?: "Plano complementar inválido."
+                        _message.value = complementary.error ?: context.getString(R.string.msg_complementary_invalid)
                         return@launch
                     }
                 }
@@ -932,12 +936,12 @@ class AppViewModel(
                 _pendingGeneration.value = envelope
 
                 _screen.value = Screen.Home
-                _message.value = "Treino sendo preparado. Toque em Atualizar quando voltar."
+                _message.value = context.getString(R.string.msg_generation_submitted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 Log.w(TAG, "Falha ao submeter geração", error)
-                _generateError.value = uiErrorFrom(error, "gerar o treino")
+                _generateError.value = uiErrorFrom(error, context, R.string.verb_generate_workout)
             } finally {
                 _isGenerating.value = false
             }
@@ -979,32 +983,45 @@ class AppViewModel(
                             preferences.lastFallbackReason = fallbackReason
                             _lastFallbackReason.value = fallbackReason
                             // Não navega se o usuário estiver em outra tela — só mensagem.
-                            val source = if (result.source == "ai") "com IA" else "local"
+                            val source = if (result.source == "ai") {
+                                context.getString(R.string.msg_source_ai)
+                            } else {
+                                context.getString(R.string.msg_source_local)
+                            }
                             val review = formatReviewDate(result.nextReviewAt) ?: result.nextReviewAt
-                            val base = "Treino gerado $source e salvo no aparelho. Revisar em $review."
-                            _message.value = fallbackReasonLabel(fallbackReason)
-                                ?.let { motivo -> "$base Motivo: $motivo." } ?: base
+                            _message.value = fallbackReasonLabelRes(fallbackReason)
+                                ?.let { motivoRes ->
+                                    context.getString(
+                                        R.string.msg_plan_generated_reason,
+                                        source,
+                                        review,
+                                        context.getString(motivoRes),
+                                    )
+                                }
+                                ?: context.getString(R.string.msg_plan_generated, source, review)
                         } catch (error: Exception) {
                             // O job está done no backend; falha local ao salvar não
                             // deve manter o envelope travado.
                             Log.w(TAG, "Falha ao salvar plano do job concluído", error)
-                            _generateError.value = uiErrorFrom(error, "salvar o treino")
+                            _generateError.value = uiErrorFrom(error, context, R.string.verb_save_workout)
                         }
                         clearPendingEnvelope()
                     } ?: run {
-                        _message.value = "Job concluído sem plano."
+                        _message.value = context.getString(R.string.msg_job_no_plan)
                         clearPendingEnvelope()
                     }
                 }
                 "failed" -> {
                     // Mantém o envelope para o retry ("Tentar de novo").
                     _generateError.value = uiErrorFrom(
-                        Exception(status.error ?: "Falha na geração"), "gerar o treino"
+                        Exception(status.error ?: context.getString(R.string.msg_generation_failed)),
+                        context,
+                        R.string.verb_generate_workout,
                     )
                 }
                 "cancelled" -> {
                     clearPendingEnvelope()
-                    _message.value = "Geração cancelada."
+                    _message.value = context.getString(R.string.msg_generation_cancelled)
                 }
                 else -> {
                     // pending/running: ainda em andamento, nada a fazer.
@@ -1013,7 +1030,7 @@ class AppViewModel(
         } catch (error: Exception) {
             // 404 (job sumido) ou erro de rede: falha com retry, envelope mantido.
             Log.w(TAG, "Falha ao consultar status do job", error)
-            _generateError.value = uiErrorFrom(error, "consultar a geração")
+            _generateError.value = uiErrorFrom(error, context, R.string.verb_check_generation)
         } finally {
             _isPolling.value = false
         }
@@ -1102,7 +1119,7 @@ class AppViewModel(
 
     fun reviewPlan() {
         val plan = mainPlan() ?: run {
-            _message.value = "Nenhum plano ativo para revisar."
+            _message.value = context.getString(R.string.msg_no_plan_to_review)
             return
         }
         if (_isReviewing.value) return
@@ -1138,12 +1155,15 @@ class AppViewModel(
                 _reviewChanges.value = response.changes
                 _reviewMessage.value =
                     if (response.changes.isEmpty()) {
-                        "Sem mudanças propostas. O plano permanece como está."
+                        context.getString(R.string.msg_review_no_changes)
                     } else {
-                        "Revisão proposta: ${response.changes.joinToString(" • ")}. Confirme para aplicar."
+                        context.getString(
+                            R.string.msg_review_proposed,
+                            response.changes.joinToString(" • "),
+                        )
                     }
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível revisar o plano.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_review_error)
             } finally {
                 _isReviewing.value = false
             }
@@ -1170,9 +1190,9 @@ class AppViewModel(
                 pendingReview = null
                 _reviewChanges.value = emptyList()
                 _reviewMessage.value = null
-                _message.value = "Plano atualizado com a revisão."
+                _message.value = context.getString(R.string.msg_review_applied)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível aplicar a revisão.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_review_apply_error)
             }
         }
     }
@@ -1181,7 +1201,7 @@ class AppViewModel(
         pendingReview = null
         _reviewChanges.value = emptyList()
         _reviewMessage.value = null
-        _message.value = "Revisão descartada. O plano permanece como está."
+        _message.value = context.getString(R.string.msg_review_discarded)
     }
 
     fun clearReviewMessage() {
@@ -1194,9 +1214,9 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 repository.postponeReview(planId, weeks)
-                _message.value = "Revisão adiada em $weeks semanas."
+                _message.value = context.getString(R.string.msg_review_postponed, weeks)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível adiar a revisão.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_review_postpone_error)
             }
         }
     }
@@ -1205,12 +1225,12 @@ class AppViewModel(
 
     fun startWorkout(dayId: Long) {
         val plan = activePlan.value ?: run {
-            _message.value = "Nenhum plano ativo no aparelho."
+            _message.value = context.getString(R.string.msg_no_plan_on_device)
             return
         }
         val day = plan.days.firstOrNull { it.day.id == dayId }
             ?: run {
-                _message.value = "Dia de treino não encontrado."
+                _message.value = context.getString(R.string.msg_workout_day_not_found)
                 return
             }
         viewModelScope.launch {
@@ -1225,19 +1245,19 @@ class AppViewModel(
                     SessionKind.STRENGTH -> _screen.value = Screen.Workout
                 }
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível iniciar o treino.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_start_workout_error)
             }
         }
     }
 
     fun leaveWorkout() {
         _screen.value = Screen.Home
-        _message.value = "Treino continua salvo no aparelho. Toque em Retomar treino para voltar."
+        _message.value = context.getString(R.string.msg_workout_left_open)
     }
 
     fun resumeWorkout() {
         val session = inProgressSession.value ?: run {
-            _message.value = "Nenhum treino em andamento."
+            _message.value = context.getString(R.string.msg_no_workout_in_progress)
             return
         }
         _activeSessionId.value = session.session.id
@@ -1265,7 +1285,7 @@ class AppViewModel(
                 startRest(exercise.restSeconds)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível salvar a série.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
             }
         }
     }
@@ -1287,7 +1307,7 @@ class AppViewModel(
                 startRest(exercise.restSeconds)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível salvar a série.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
             }
         }
     }
@@ -1300,9 +1320,9 @@ class AppViewModel(
                 skipRest()
                 _activeSessionId.value = null
                 _screen.value = Screen.Home
-                _message.value = "Treino finalizado e salvo no aparelho."
+                _message.value = context.getString(R.string.msg_workout_finished)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível finalizar o treino.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_finish_workout_error)
             }
         }
     }
@@ -1317,7 +1337,7 @@ class AppViewModel(
                 repository.updateSet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível atualizar a série.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_update_set_error)
             }
         }
     }
@@ -1332,7 +1352,7 @@ class AppViewModel(
                 repository.deleteSet(set.id)
                 syncWearState()
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível excluir a série.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_delete_set_error)
             }
         }
     }
@@ -1357,9 +1377,9 @@ class AppViewModel(
                 _wearState.value = null
                 skipRest()
                 _screen.value = Screen.Home
-                _message.value = "Treino abandonado."
+                _message.value = context.getString(R.string.msg_workout_abandoned)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível abandonar o treino.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_abandon_error)
             }
         }
     }
@@ -1371,9 +1391,9 @@ class AppViewModel(
                 repository.finishRunSession(sessionId, durationSeconds, distanceMeters, rpe)
                 _activeSessionId.value = null
                 _screen.value = Screen.Home
-                _message.value = "Corrida registrada e salva no aparelho."
+                _message.value = context.getString(R.string.msg_run_finished)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível finalizar a corrida.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_finish_run_error)
             }
         }
     }
@@ -1400,9 +1420,9 @@ class AppViewModel(
                     repository.logPlannedMobility(planId, dayId, routineId, elapsedSeconds)
                 }
                 _screen.value = Screen.Home
-                _message.value = "Mobilidade finalizada e salva no histórico."
+                _message.value = context.getString(R.string.msg_mobility_finished)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível salvar a mobilidade.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_save_mobility_error)
             }
         }
     }
@@ -1420,7 +1440,7 @@ class AppViewModel(
     fun editLogActivity(sessionId: Long) {
         val session = sessions.value.firstOrNull { it.session.id == sessionId } ?: return
         if (!session.session.isManualActivity()) {
-            _message.value = "Só um registro manual pode ser editado."
+            _message.value = context.getString(R.string.msg_only_manual_editable)
             return
         }
         _activityEditingId.value = sessionId
@@ -1459,17 +1479,17 @@ class AppViewModel(
             try {
                 if (editingId != null) {
                     repository.updateActivity(input.toManualSession(id = editingId))
-                    _message.value = "Registro atualizado no aparelho."
+                    _message.value = context.getString(R.string.msg_activity_updated)
                 } else {
                     repository.logActivity(input.toManualSession())
-                    _message.value = "Atividade registrada e salva no aparelho."
+                    _message.value = context.getString(R.string.msg_activity_saved)
                 }
                     _activityEditingId.value = null
                     _activityPrefill.value = null
                     // H3-38: salvar edição retorna à origem (Histórico quando veio dele).
                     _screen.value = _backTarget.value ?: Screen.Home
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível salvar a atividade.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_save_activity_error)
             } finally {
                 _isSavingActivity.value = false
             }
@@ -1485,9 +1505,9 @@ class AppViewModel(
                     _activityPrefill.value = null
                     _screen.value = Screen.History
                 }
-                _message.value = "Registro manual excluído."
+                _message.value = context.getString(R.string.msg_activity_deleted)
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível excluir o registro.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_delete_activity_error)
             }
         }
     }
@@ -1592,10 +1612,10 @@ class AppViewModel(
                     notes = routine?.focus ?: "",
                 )
                 repository.logActivity(session)
-                _message.value = "Mobilidade finalizada e salva no histórico."
+                _message.value = context.getString(R.string.msg_mobility_finished)
                 _screen.value = Screen.Home
             } catch (error: Exception) {
-                _message.value = uiErrorMessage(error, "Não foi possível salvar a mobilidade.")
+                _message.value = uiErrorMessage(error, context, R.string.msg_save_mobility_error)
                 _screen.value = Screen.Home
             }
         }
@@ -1758,17 +1778,20 @@ class AppViewModel(
             _isRestoring.value = true
             val outcome = deviceRestore(deviceId)
             _restoreMessage.value = when (outcome) {
-                RestoreOutcome.InvalidDeviceId -> "Informe um ID de aparelho válido."
+                RestoreOutcome.InvalidDeviceId -> context.getString(R.string.msg_restore_invalid_id)
                 RestoreOutcome.Empty ->
-                    "Nenhum dado encontrado para o dispositivo ${deviceId.trim()}; " +
-                        "seus dados locais e o ID atual foram mantidos."
+                    context.getString(R.string.msg_restore_empty, deviceId.trim())
                 is RestoreOutcome.Failed -> outcome.message
                 is RestoreOutcome.Success -> {
                     _deviceId.value = preferences.deviceId
                     _lastSyncAt.value = preferences.lastSyncAt
                     _restoreDeviceId.value = ""
-                    "Restaurado: ${outcome.planCount} plano(s) e ${outcome.sessionCount} " +
-                        "sessão(ões) do aparelho ${deviceId.trim()}. O ID deste aparelho foi atualizado."
+                    context.getString(
+                        R.string.msg_restore_success,
+                        outcome.planCount,
+                        outcome.sessionCount,
+                        deviceId.trim(),
+                    )
                 }
             }
             _isRestoring.value = false
@@ -1799,10 +1822,13 @@ class AppViewModel(
             try {
                 val health = repository.testConnection()
                 _connectionMessage.value =
-                    "Conectado. Modelo: ${health.model.ifBlank { "—" }} • " +
-                    "Catálogo: ${health.catalogSize} exercícios."
+                    context.getString(
+                        R.string.msg_connection_ok,
+                        health.model.ifBlank { "—" },
+                        health.catalogSize,
+                    )
             } catch (error: Exception) {
-                _connectionMessage.value = uiErrorMessage(error, "Falha ao conectar.")
+                _connectionMessage.value = uiErrorMessage(error, context, R.string.msg_connection_error)
             } finally {
                 _isTesting.value = false
             }
@@ -1819,11 +1845,10 @@ class AppViewModel(
                 val result = repository.sync()
                 _lastSyncAt.value = preferences.lastSyncAt
                 _syncMessage.value =
-                    "Enviado: ${result.plans} plano(s), ${result.sessions} treino(s) " +
-                    "e ${result.setLogs} série(s)."
+                    context.getString(R.string.msg_sync_done, result.plans, result.sessions, result.setLogs)
             } catch (error: Exception) {
                 Log.w(TAG, "Falha ao enviar ao backend", error)
-                _syncError.value = uiErrorFrom(error, "enviar ao backend")
+                _syncError.value = uiErrorFrom(error, context, R.string.verb_send_to_backend)
             } finally {
                 _isSyncing.value = false
             }
@@ -1842,15 +1867,18 @@ class AppViewModel(
                 ) {
                     is SyncDownloadResult.Restored -> {
                         _lastSyncAt.value = preferences.lastSyncAt
-                        "Restaurado: ${result.planCount} plano(s) e ${result.sessionCount} " +
-                            "sessão(ões) do backend."
+                        context.getString(
+                            R.string.msg_download_restored,
+                            result.planCount,
+                            result.sessionCount,
+                        )
                     }
                     SyncDownloadResult.Empty ->
-                        "Nenhum dado encontrado; seus dados locais foram mantidos."
+                        context.getString(R.string.msg_download_empty)
                 }
             } catch (error: Exception) {
                 Log.w(TAG, "Falha ao baixar dados do backend", error)
-                _downloadError.value = uiErrorFrom(error, "baixar dados do backend")
+                _downloadError.value = uiErrorFrom(error, context, R.string.verb_download_from_backend)
             } finally {
                 _isDownloading.value = false
             }
@@ -1871,7 +1899,7 @@ class AppViewModel(
                 val file = backupImportDecoder.decodeFromString(BackupFile.serializer(), json)
                 val result = BackupValidator.validate(file)
                 if (!result.valid) {
-                    _backupImportState.value = BackupImportState.Error(result.message ?: "Backup inválido")
+                    _backupImportState.value = BackupImportState.Error(result.message ?: context.getString(R.string.msg_backup_invalid))
                     pendingBackupPayload = null
                     return@launch
                 }
@@ -1880,7 +1908,7 @@ class AppViewModel(
                 pendingBackupPayload = file
                 _backupImportState.value = BackupImportState.Ready(preview = preview, payload = file)
             } catch (e: Exception) {
-                _backupImportState.value = BackupImportState.Error("Arquivo de backup inválido")
+                _backupImportState.value = BackupImportState.Error(context.getString(R.string.msg_backup_file_invalid))
                 pendingBackupPayload = null
             }
         }
@@ -1898,14 +1926,14 @@ class AppViewModel(
                 _selectedPlanId.value = null
                 _deviceId.value = preferences.deviceId
                 _backupMessage.value = if (payload.deviceId.isNotBlank()) {
-                    "Backup importado. O ID deste aparelho passou a ser ${payload.deviceId.trim()}."
+                    context.getString(R.string.msg_backup_imported_with_id, payload.deviceId.trim())
                 } else {
-                    "Backup importado com sucesso."
+                    context.getString(R.string.msg_backup_imported)
                 }
                 _backupImportState.value = BackupImportState.Idle
                 pendingBackupPayload = null
             } catch (error: Exception) {
-                _backupImportState.value = BackupImportState.Error(uiErrorMessage(error, "Não foi possível importar o backup."))
+                _backupImportState.value = BackupImportState.Error(uiErrorMessage(error, context, R.string.msg_import_error))
             }
         }
     }
@@ -1928,7 +1956,7 @@ class AppViewModel(
         if (_isDiscovering.value) return
         val manager = discoveryManager
         if (manager == null) {
-            _discoveryMessage.value = "Descoberta de rede indisponível neste aparelho. Use o endereço manual."
+            _discoveryMessage.value = context.getString(R.string.msg_discovery_unavailable)
             return
         }
         _discoveredBackends.value = emptyList()
@@ -1970,9 +1998,13 @@ class AppViewModel(
                         _connectionMessage.value = null
                         _syncMessage.value = null
                         _discoveryMessage.value =
-                            "Conectado a ${outcome.backend.name} (${outcome.backend.endpoint}). " +
-                            "Modelo: ${outcome.model.ifBlank { "—" }} • " +
-                            "Catálogo: ${outcome.catalogSize} exercícios."
+                            context.getString(
+                                R.string.msg_connected_to_backend,
+                                outcome.backend.name,
+                                outcome.backend.endpoint,
+                                outcome.model.ifBlank { "—" },
+                                outcome.catalogSize,
+                            )
                         // H3-24: backend novo conectado, catálogo recarrega em
                         // fundo (sem bloquear a UI; sem forçar refresh).
                         loadExerciseMedia(false)
@@ -2077,7 +2109,7 @@ class AppViewModel(
                     _updateState.value = UpdateState.Failed(
                         context.getString(
                             R.string.settings_update_error_download,
-                            failure.message ?: "erro desconhecido",
+                            failure.message ?: context.getString(R.string.msg_unknown_error),
                         ),
                     )
                 },

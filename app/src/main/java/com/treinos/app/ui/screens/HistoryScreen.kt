@@ -89,7 +89,6 @@ import com.treinos.app.ui.history.lastDayOfMonth
 import com.treinos.app.ui.history.sessionDates
 import com.treinos.app.ui.history.sessionDay
 import com.treinos.app.ui.history.weekDayLabels
-import com.treinos.app.ui.swimStrokeOptions
 import com.treinos.app.ui.UiState
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
@@ -138,13 +137,12 @@ fun HistoryScreen(
     val visible = selectedDate?.let { day -> monthSessions.filter { sessionDay(it) == day } } ?: monthSessions
 
     Scaffold(
-        topBar = { ScreenTopBar(title = "Histórico", onBack = onBack) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_history), onBack = onBack) },
     ) { padding ->
         if (sessions.isEmpty()) {
             EmptyState(
-                title = "Nenhum treino registrado",
-                description = "Inicie um treino na tela inicial ou registre uma atividade avulsa. " +
-                    "Tudo aparece aqui mesmo sem conexão.",
+                title = stringResource(R.string.history_empty_title),
+                description = stringResource(R.string.history_empty_body),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
@@ -204,7 +202,7 @@ fun HistoryScreen(
                                     selected = modalityFilter == modality,
                                     onClick = { modalityFilter = modality },
                                     label = {
-                                        Text(ActivityModality.fromStorageValue(modality).label)
+                                        Text(activityModalityLabel(ActivityModality.fromStorageValue(modality)))
                                     },
                                 )
                             }
@@ -235,10 +233,12 @@ fun HistoryScreen(
                     item {
                         Text(
                             text = if (monthSessions.isEmpty()) {
-                                "Nenhum treino em ${formatMonthYear(month.year, month.monthValue)}. " +
-                                    "Use as setas para ver outros meses."
+                                stringResource(
+                                    R.string.history_no_train_month,
+                                    formatMonthYear(month.year, month.monthValue),
+                                )
                             } else {
-                                "Nenhum registro neste dia."
+                                stringResource(R.string.history_no_record_day)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -278,7 +278,7 @@ private fun VolumeByMuscle(metrics: HistoryMetrics) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SectionTitle("Volume por músculo")
+        SectionTitle(stringResource(R.string.history_volume_section))
         metrics.volumeByMuscle.entries
             .sortedByDescending { it.value }
             .forEach { (muscle, volume) ->
@@ -322,7 +322,7 @@ private fun MonthNavigator(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         IconButton(onClick = { onNavigate(-1L) }) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Mês anterior")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.history_nav_prev))
         }
         Text(
             text = formatMonthYear(month.year, month.monthValue),
@@ -332,7 +332,7 @@ private fun MonthNavigator(
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = { onNavigate(1L) }, enabled = canGoNext) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Próximo mês")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.history_nav_next))
         }
     }
 }
@@ -403,6 +403,11 @@ private fun DayCell(
         else -> MaterialTheme.colorScheme.onSurface
     }
     val workoutCount = (if (hasCompleted) 1 else 0) + (if (hasInProgress) 1 else 0)
+    // H3-52: descrições de estado resolvidas na composição — o bloco de
+    // semântica roda fora dela e não pode chamar `stringResource`.
+    val selectedDesc = stringResource(R.string.history_session_selected)
+    val inProgressDesc = stringResource(R.string.history_session_in_progress)
+    val completedDesc = stringResource(R.string.history_session_done)
     val dayDescription = date?.let {
         val label = it.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("pt-BR")))
         if (workoutCount > 0) "$label, $workoutCount treino${if (workoutCount > 1) "s" else ""}" else label
@@ -423,8 +428,8 @@ private fun DayCell(
                             role = Role.Button
                             contentDescription = dayDescription.orEmpty()
                             stateDescription = when {
-                                isSelected -> "Selecionado"
-                                else -> if (hasInProgress && !hasCompleted) "Em andamento" else "Concluído"
+                                isSelected -> selectedDesc
+                                else -> if (hasInProgress && !hasCompleted) inProgressDesc else completedDesc
                             }
                         }
                 } else {
@@ -473,19 +478,22 @@ private fun MetricsCards(metrics: HistoryMetrics) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             MetricCard(
-                label = "Treinos",
+                label = stringResource(R.string.history_metric_workouts),
                 value = metrics.completedCount.toString(),
                 detail = if (metrics.sessionCount > metrics.completedCount) {
-                    "${metrics.sessionCount - metrics.completedCount} em andamento"
+                    stringResource(
+                        R.string.history_metric_sets_progress,
+                        metrics.sessionCount - metrics.completedCount,
+                    )
                 } else {
                     null
                 },
                 modifier = Modifier.weight(1f),
             )
             MetricCard(
-                label = "Séries",
+                label = stringResource(R.string.history_metric_sets),
                 value = metrics.totalSets.toString(),
-                detail = "${metrics.totalReps} reps",
+                detail = stringResource(R.string.history_metric_sets_reps, metrics.totalReps),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -494,13 +502,13 @@ private fun MetricsCards(metrics: HistoryMetrics) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             MetricCard(
-                label = "Volume",
+                label = stringResource(R.string.history_metric_volume),
                 value = formatVolumeKg(metrics.totalVolumeKg),
-                detail = "com carga registrada",
+                detail = stringResource(R.string.history_metric_volume_detail),
                 modifier = Modifier.weight(1f),
             )
             MetricCard(
-                label = "Duração",
+                label = stringResource(R.string.history_metric_duration),
                 value = formatDuration(metrics.totalDurationSeconds),
                 modifier = Modifier.weight(1f),
             )
@@ -517,7 +525,7 @@ private fun ActivityCard(
 ) {
     var showDeleteDialog by remember(session.id) { mutableStateOf(false) }
     val modality = ActivityModality.fromStorageValue(session.modality)
-    val title = session.title.ifBlank { session.dayName }.ifBlank { modality.label }
+    val title = session.title.ifBlank { session.dayName }.ifBlank { activityModalityLabel(modality) }
     // H3-31: corrida em km como o corredor pensa; demais modalidades em metros.
     val distance = if (modality == ActivityModality.RUN) {
         formatRunDistanceKm(session.totalDistanceMeters)
@@ -554,11 +562,11 @@ private fun ActivityCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             session.poolLengthMeters?.let {
-                Text(text = "Piscina ${it} m", style = MaterialTheme.typography.bodySmall)
+                Text(text = stringResource(R.string.history_pool_length, it), style = MaterialTheme.typography.bodySmall)
             }
             session.stroke?.let { stroke ->
                 Text(
-                    text = strokeLabel(stroke),
+                    text = stringResource(R.string.history_stroke_label, strokeDisplayName(stroke)),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -591,9 +599,6 @@ private fun ActivityCard(
     }
 }
 
-private fun strokeLabel(stroke: String): String =
-    "Nado: ${swimStrokeOptions.firstOrNull { it.first == stroke }?.second ?: stroke}"
-
 @Composable
 private fun SessionCard(
     session: SessionWithExercises,
@@ -603,13 +608,23 @@ private fun SessionCard(
     var expanded by remember(session.session.id) { mutableStateOf(false) }
     val totalSets = session.exercises.sumOf { it.sets.size }
     val completed = session.session.status == STATUS_COMPLETED
+    // H3-52: estados de acessibilidade resolvidos na composição.
+    val expandedDesc = stringResource(R.string.history_state_expanded)
+    val collapsedDesc = stringResource(R.string.history_state_collapsed)
+    val durationText = stringResource(
+        R.string.history_session_duration,
+        formatDuration(session.session.totalDurationSeconds),
+    )
+    val setsText = stringResource(R.string.history_series_count, totalSets)
+    val completedDesc = stringResource(R.string.history_session_done)
+    val inProgressDesc = stringResource(R.string.history_session_in_progress)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 role = Role.Button
-                stateDescription = if (expanded) "Expandido" else "Recolhido"
+                stateDescription = if (expanded) expandedDesc else collapsedDesc
             }
             .clickable { expanded = !expanded },
     ) {
@@ -623,7 +638,7 @@ private fun SessionCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = session.session.dayName.ifBlank { "Treino" },
+                    text = session.session.dayName.ifBlank { stringResource(R.string.screen_workout) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -632,7 +647,7 @@ private fun SessionCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = if (completed) "Concluído" else "Em andamento",
+                        text = if (completed) completedDesc else inProgressDesc,
                         style = MaterialTheme.typography.labelMedium,
                         color = if (completed) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.tertiary,
@@ -653,12 +668,12 @@ private fun SessionCard(
             Text(
                 text = buildString {
                     append("${formatDateTime(session.session.startedAt)} • ")
-                    append("duração ${formatDuration(session.session.totalDurationSeconds)}")
+                    append(durationText)
                     // H3-31: corrida planejada mostra a distância em km.
                     session.session.totalDistanceMeters
                         ?.takeIf { it > 0.0 }
                         ?.let { append(" • ${formatRunDistanceKm(it)}") }
-                    append(" • $totalSets série(s)")
+                    append(" • $setsText")
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -674,7 +689,7 @@ private fun SessionCard(
                                 .minimumInteractiveComponentSize()
                                 .semantics { role = Role.Button }
                                 .clickable(
-                                    onClickLabel = "Abrir detalhes do exercício",
+                                    onClickLabel = stringResource(R.string.a11y_open_exercise_details),
                                     onClick = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
                                 ),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -694,7 +709,7 @@ private fun SessionCard(
                                 )
                                 if (exercise.sets.isEmpty()) {
                                     Text(
-                                        text = "Sem séries registradas",
+                                        text = stringResource(R.string.history_series_empty),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -702,8 +717,8 @@ private fun SessionCard(
                                     exercise.sets.sortedBy { it.setNumber }.forEach { set ->
                                         Text(
                                             text = buildString {
-                                                append("Série ${set.setNumber}")
-                                                set.reps?.let { append(" • $it reps") }
+                                                append(stringResource(R.string.workout_set, set.setNumber))
+                                                set.reps?.let { append(" • ${stringResource(R.string.history_metric_sets_reps, it)}") }
                                                 set.weightKg?.let { append(" • ${formatKg(it)}") }
                                                 set.rpe?.let { append(" • RPE ${formatDecimal(it, 1)}") }
                                             },

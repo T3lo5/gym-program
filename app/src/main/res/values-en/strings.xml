@@ -422,4 +422,174 @@
     <string name="settings_update_error_check">Could not check (no network or GitHub API rate limit).</string>
     <string name="settings_update_error_download">Update download failed: %1$s</string>
     <string name="settings_update_error_installer">Could not open the system installer.</string>
+
+    <!-- H3-52: i18n das strings restantes -->
+    <string name="common_close">Close</string>
+    <string name="common_reps_short">%1$d reps</string>
+    <string name="common_state_on">On</string>
+    <string name="common_state_off">Off</string>
+    <string name="a11y_open_exercise_details">Open exercise details</string>
+
+    <!-- Workout: diálogos e folha de troca -->
+    <string name="workout_finish_confirm">Finish</string>
+    <string name="workout_set_delete_title">Delete set?</string>
+    <string name="workout_set_saved">Set %1$d saved</string>
+    <string name="workout_set_saved_detail">Set %1$d saved — %2$s</string>
+    <string name="workout_rest_started_announcement">Rest of %1$s s started</string>
+    <string name="workout_swap_replace_label">Replace «%1$s»</string>
+    <string name="workout_swap_catalog_offline">Offline catalog unavailable.</string>
+    <string name="workout_swap_catalog_update_hint">Update the catalog to see substitutes.</string>
+    <string name="workout_swap_none_same_muscle">No substitute with the same muscle and equipment.</string>
+    <string name="workout_swap_search_label">Search substitute</string>
+    <string name="workout_swap_count">Substitutes (%1$d)</string>
+    <string name="workout_swap_search_empty">No substitute found for «%1$s».</string>
+    <string name="workout_swap_scope_label">The swap applies to:</string>
+    <string name="workout_swap_scope_session">This session</string>
+    <string name="workout_swap_scope_all">All workouts</string>
+    <string name="workout_swap_scope_session_desc">Only the current session.</string>
+    <string name="workout_swap_scope_all_desc">Updates the saved plan; applies to future workouts.</string>
+    <string name="workout_swap_confirm">Swap</string>
+
+    <!-- Ajustes: corpo do card de sincronização -->
+    <string name="settings_sync_body">Workouts and sets stay in the device\'s SQLite. Sending to the server writes a full snapshot (plans, workouts and sets) to the server database. Restoring from the server downloads this ID\'s snapshot and replaces the local data — export a JSON backup first.</string>
+
+    <!-- Histórico -->
+    <string name="history_pool_length">Pool %1$d m</string>
+    <string name="history_stroke_label">Stroke: %1$s</string>
+    <string name="history_session_duration">duration %1$s</string>
+    <string name="history_state_expanded">Expanded</string>
+    <string name="history_state_collapsed">Collapsed</string>
+
+    <!-- Home -->
+    <string name="home_blocks_count">%1$d block(s)</string>
+    <string name="home_routines_count">%1$d routine(s) • %2$d min</string>
+    <string name="home_sets_by_reps">%1$d sets × %2$s</string>
+    <plurals name="home_exercises_count">
+        <item quantity="one">%1$d exercise</item>
+        <item quantity="other">%1$d exercises</item>
+    </plurals>
+    <plurals name="home_sets_count">
+        <item quantity="one">%1$d set</item>
+        <item quantity="other">%1$d sets</item>
+    </plurals>
+
+    <!-- Geração -->
+    <string name="generate_hint_no_modality">Include at least one modality.</string>
+    <string name="generate_hint_focus_or_environment">Choose the exclusive focus or an environment other than gym.</string>
+    <string name="generate_hint_adjust">Adjust the complementary plan options.</string>
+    <string name="generate_sessions_week_short">%1$dx/week</string>
+
+    <!-- Registro avulso -->
+    <string name="log_edit_title">Edit entry</string>
+    <string name="activity_modality_swim">Swimming</string>
+    <string name="activity_modality_other">Other</string>
+    <string name="log_stroke_crawl">Crawl</string>
+    <string name="log_stroke_backstroke">Backstroke</string>
+    <string name="log_stroke_breaststroke">Breaststroke</string>
+    <string name="log_stroke_butterfly">Butterfly</string>
+    <string name="log_stroke_medley">Medley</string>
+    <string name="log_stroke_other">Other</string>
+
+    <!-- Backup (snackbars e erros de arquivo) -->
+    <string name="backup_exported_message">Backup exported to the chosen file.</string>
+    <string name="backup_export_error">Could not export the backup.</string>
+    <string name="backup_file_read_error">Could not read the chosen file.</string>
+    <string name="backup_file_open_error">Could not open the chosen file for writing.</string>
+
+    <!-- Erros de rede/backend (UiError) -->
+    <string name="error_could_not">Could not %1$s</string>
+    <string name="error_http">The server responded with error (%1$d). Try again in a moment.</string>
+    <string name="error_timeout">The server took too long to respond. Check the connection and try again.</string>
+    <string name="error_offline">No connection to the server. Check the Wi-Fi and try again.</string>
+    <string name="error_parse">Unexpected response from the server. Try again.</string>
+    <string name="error_comms">Communication with the server failed. Check the connection and try again.</string>
+    <string name="error_unexpected">An unexpected error occurred. Try again.</string>
+
+    <!-- Verbos dos títulos de erro ("Não foi possível …") -->
+    <string name="verb_generate_workout">generate the workout</string>
+    <string name="verb_save_workout">save the workout</string>
+    <string name="verb_check_generation">check the generation</string>
+    <string name="verb_send_to_backend">send to the backend</string>
+    <string name="verb_download_from_backend">download data from the backend</string>
+
+    <!-- Mensagens do AppViewModel (snackbars e status) -->
+    <string name="msg_extra_plan_deleted">Complementary plan deleted. History was preserved.</string>
+    <string name="msg_plan_delete_error">Could not delete the plan.</string>
+    <string name="msg_catalog_updated">Catalog updated at %1$s</string>
+    <string name="msg_catalog_update_error">Could not update the catalog.</string>
+    <string name="msg_profile_invalid">Invalid profile.</string>
+    <string name="msg_complementary_invalid">Invalid complementary plan.</string>
+    <string name="msg_generation_submitted">Workout being prepared. Tap Refresh when you return.</string>
+    <string name="msg_plan_generated">Workout generated %1$s and saved on the device. Review by %2$s.</string>
+    <string name="msg_plan_generated_reason">Workout generated %1$s and saved on the device. Review by %2$s. Reason: %3$s.</string>
+    <string name="msg_source_ai">by AI</string>
+    <string name="msg_source_local">locally</string>
+    <string name="msg_job_no_plan">Job finished without a plan.</string>
+    <string name="msg_generation_cancelled">Generation cancelled.</string>
+    <string name="msg_generation_failed">Generation failed</string>
+    <string name="msg_no_plan_to_review">No active plan to review.</string>
+    <string name="msg_review_no_changes">No changes proposed. The plan stays as is.</string>
+    <string name="msg_review_proposed">Review proposed: %1$s. Confirm to apply.</string>
+    <string name="msg_restore_invalid_id">Enter a valid device ID.</string>
+    <string name="msg_restore_empty">No data found for device %1$s; your local data and current ID were kept.</string>
+    <string name="msg_restore_success">Restored: %1$d plan(s) and %2$d session(s) from device %3$s. This device\'s ID was updated.</string>
+    <string name="msg_restore_device_error">Could not restore the backup from device %1$s.</string>
+    <string name="msg_connection_error">Connection failed.</string>
+    <string name="msg_import_error">Could not import the backup.</string>
+    <string name="msg_start_workout_error">Could not start the workout.</string>
+    <string name="msg_save_set_error">Could not save the set.</string>
+    <string name="msg_finish_workout_error">Could not finish the workout.</string>
+    <string name="msg_update_set_error">Could not update the set.</string>
+    <string name="msg_delete_set_error">Could not delete the set.</string>
+    <string name="msg_abandon_error">Could not abandon the workout.</string>
+    <string name="msg_finish_run_error">Could not finish the run.</string>
+    <string name="msg_save_mobility_error">Could not save the mobility session.</string>
+    <string name="msg_save_activity_error">Could not save the activity.</string>
+    <string name="msg_delete_activity_error">Could not delete the entry.</string>
+    <string name="msg_review_error">Could not review the plan.</string>
+    <string name="msg_review_apply_error">Could not apply the review.</string>
+    <string name="msg_review_postpone_error">Could not postpone the review.</string>
+    <string name="msg_review_applied">Plan updated with the review.</string>
+    <string name="msg_review_discarded">Review discarded. The plan stays as is.</string>
+    <string name="msg_review_postponed">Review postponed by %1$d weeks.</string>
+    <string name="msg_no_plan_on_device">No active plan on the device.</string>
+    <string name="msg_workout_day_not_found">Workout day not found.</string>
+    <string name="msg_workout_left_open">The workout stays saved on the device. Tap Resume workout to return.</string>
+    <string name="msg_no_workout_in_progress">No workout in progress.</string>
+    <string name="msg_workout_finished">Workout finished and saved on the device.</string>
+    <string name="msg_workout_abandoned">Workout abandoned.</string>
+    <string name="msg_run_finished">Run logged and saved on the device.</string>
+    <string name="msg_mobility_finished">Mobility finished and saved to history.</string>
+    <string name="msg_only_manual_editable">Only a manual entry can be edited.</string>
+    <string name="msg_activity_updated">Entry updated on the device.</string>
+    <string name="msg_activity_saved">Activity logged and saved on the device.</string>
+    <string name="msg_activity_deleted">Manual entry deleted.</string>
+    <string name="msg_backup_invalid">Invalid backup</string>
+    <string name="msg_backup_file_invalid">Invalid backup file</string>
+    <string name="msg_backup_imported">Backup imported successfully.</string>
+    <string name="msg_backup_imported_with_id">Backup imported. This device\'s ID is now %1$s.</string>
+    <string name="msg_connection_ok">Connected. Model: %1$s • Catalog: %2$d exercises.</string>
+    <string name="msg_connected_to_backend">Connected to %1$s (%2$s). Model: %3$s • Catalog: %4$d exercises.</string>
+    <string name="msg_sync_done">Sent: %1$d plan(s), %2$d workout(s) and %3$d set(s).</string>
+    <string name="msg_download_restored">Restored: %1$d plan(s) and %2$d session(s) from the backend.</string>
+    <string name="msg_download_empty">No data found; your local data was kept.</string>
+    <string name="msg_discovery_unavailable">Network discovery unavailable on this device. Use the manual address.</string>
+    <string name="msg_unknown_error">unknown error</string>
+
+    <!-- Motivos do fallback local (H3-21) -->
+    <string name="fallback_no_api_key">AI key not configured</string>
+    <string name="fallback_http_error">the AI API responded with an error</string>
+    <string name="fallback_timeout">timeout or network error on the AI</string>
+    <string name="fallback_json_parse">AI response without valid JSON</string>
+    <string name="fallback_unresolved_ids">AI response without valid IDs</string>
+    <string name="fallback_schema_validation">AI response in an unexpected format</string>
+    <string name="fallback_unknown">unknown reason (%1$s)</string>
+
+    <!-- Folha de detalhes do exercício -->
+    <string name="exercise_detail_fallback_name">Exercise</string>
+    <string name="exercise_detail_image_desc">Exercise image %1$s</string>
+    <string name="exercise_detail_muscles">Primary muscles: %1$s</string>
+    <string name="exercise_detail_equipment">Equipment: %1$s</string>
+    <string name="exercise_detail_instructions">Instructions</string>
+    <string name="exercise_detail_no_instructions">No instructions available.</string>
 </resources>

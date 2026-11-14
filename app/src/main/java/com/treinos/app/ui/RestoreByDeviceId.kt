@@ -1,5 +1,7 @@
 package com.treinos.app.ui
 
+import android.content.Context
+import com.treinos.app.R
 import com.treinos.app.data.DeviceIdStore
 import com.treinos.app.data.SnapshotDownloader
 import com.treinos.app.data.SyncDownloadResult
@@ -19,10 +21,14 @@ sealed interface RestoreOutcome {
  * Restaura o snapshot de outro aparelho sem assumir a identidade dele antes da
  * hora: o `deviceId` digitado vale apenas para a chamada de rede e só é
  * persistido depois que um snapshot válido foi aplicado.
+ *
+ * H3-52: as mensagens nascem de recursos e são resolvidas com o [Context]
+ * recebido — a classe continua sem saber de rede além do downloader.
  */
 class RestoreByDeviceId(
     private val downloader: SnapshotDownloader,
     private val devices: DeviceIdStore,
+    private val context: Context,
 ) {
     suspend operator fun invoke(deviceId: String): RestoreOutcome {
         val requested = deviceId.trim()
@@ -33,7 +39,8 @@ class RestoreByDeviceId(
         } catch (error: Exception) {
             return RestoreOutcome.Failed(
                 // H3-29: mensagem acionável; o detalhe técnico fica no Logcat.
-                uiErrorMessage(error, "Não foi possível restaurar o backup do dispositivo $requested."),
+                knownErrorResource(error)?.resolve(context)
+                    ?: context.getString(R.string.msg_restore_device_error, requested),
             )
         }
 

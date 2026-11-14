@@ -169,7 +169,8 @@ fun WorkoutScreen(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = session?.session?.dayName?.ifBlank { "Treino" } ?: "Treino",
+                title = session?.session?.dayName?.ifBlank { stringResource(R.string.screen_workout) }
+                    ?: stringResource(R.string.screen_workout),
                 onBack = onLeave,
                 actions = {
                     if (session != null) {
@@ -178,7 +179,7 @@ fun WorkoutScreen(
                             modifier = Modifier.minimumInteractiveComponentSize(),
                         ) {
                             Text(
-                                text = "Abandonar",
+                                text = stringResource(R.string.home_abandon_confirm),
                                 color = MaterialTheme.colorScheme.error,
                             )
                         }
@@ -237,20 +238,20 @@ fun WorkoutScreen(
                 ) {
                     CircularProgressIndicator()
                     Text(
-                        text = "Carregando treino…",
+                        text = stringResource(R.string.workout_loading),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 12.dp),
                     )
                 }
             } else {
                 EmptyState(
-                    title = "Nenhum treino em andamento",
-                    description = "Escolha um dia de treino na tela inicial para começar.",
+                    title = stringResource(R.string.workout_none_title),
+                    description = stringResource(R.string.workout_none_body),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
                     action = {
-                        OutlinedButton(onClick = onLeave) { Text("Voltar") }
+                        OutlinedButton(onClick = onLeave) { Text(stringResource(R.string.common_back)) }
                     },
                 )
             }
@@ -279,7 +280,7 @@ fun WorkoutScreen(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "Iniciado em ${formatDateTime(current.session.startedAt)}",
+                                text = stringResource(R.string.workout_started, formatDateTime(current.session.startedAt)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             val done = current.exercises.sumOf { it.exercise.completedSets }
@@ -333,8 +334,7 @@ fun WorkoutScreen(
 
                 item {
                     Text(
-                        text = "Cada série é gravada no SQLite do aparelho assim que você confirma. " +
-                            "Nada vai para o backend até você sincronizar.",
+                        text = stringResource(R.string.workout_footer),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 8.dp),
@@ -346,12 +346,21 @@ fun WorkoutScreen(
 
     exerciseToLog?.let { exercise ->
         val last = exercise.sets.maxByOrNull { it.setNumber }
+        // H3-52: os templates do anúncio são resolvidos na composição — o
+        // callback roda fora dela e não pode chamar `stringResource`.
+        val savedDetailTemplate = stringResource(R.string.workout_set_saved_detail)
+        val savedTemplate = stringResource(R.string.workout_set_saved)
+        val repsTemplate = stringResource(R.string.common_reps_short)
         SetDialog(
             // H3-31: chave por diálogo — reabrir para outra série não herda o
             // rascunho da anterior, e girar não perde o que foi digitado.
             key = "log-${exercise.exercise.id}-${exercise.sets.size + 1}",
-            title = "Série ${exercise.sets.size + 1} — ${exercise.exercise.exerciseName}",
-            helper = "Planejado: ${exercise.exercise.plannedSets} séries. Preencha o que você fez.",
+            title = stringResource(
+                R.string.workout_set_dialog_title,
+                exercise.sets.size + 1,
+                exercise.exercise.exerciseName,
+            ),
+            helper = stringResource(R.string.workout_set_dialog_helper, exercise.exercise.plannedSets),
             suggestion = progressionSuggestions[exercise.exercise.exerciseId]
                 ?.takeIf { it.action != ProgressionAction.NONE },
             initialReps = last?.reps?.toString().orEmpty(),
@@ -362,17 +371,21 @@ fun WorkoutScreen(
                     ?.let { formatDecimal(it, 1) }
                     .orEmpty(),
             initialRpe = last?.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
-            confirmLabel = "Salvar série",
+            confirmLabel = stringResource(R.string.workout_set_dialog_save),
             onDelete = null,
             onDismiss = { exerciseToLogId = null },
             onConfirm = { reps, weight, rpe ->
                 val nextSetNumber = exercise.sets.size + 1
                 val partes = mutableListOf<String>()
-                reps?.let { partes.add("$it reps") }
+                reps?.let { partes.add(String.format(repsTemplate, it)) }
                 weight?.let { partes.add(formatKg(it)) }
                 val detalhe = partes.joinToString(" • ")
                 setSavedAnnouncement =
-                    "Série $nextSetNumber salva${if (detalhe.isNotBlank()) " — $detalhe" else ""}"
+                    if (detalhe.isNotBlank()) {
+                        String.format(savedDetailTemplate, nextSetNumber, detalhe)
+                    } else {
+                        String.format(savedTemplate, nextSetNumber)
+                    }
                 onLogSet(exercise, reps, weight, rpe)
                 exerciseToLogId = null
             },
@@ -382,13 +395,13 @@ fun WorkoutScreen(
     editTarget?.let { (exercise, set) ->
         SetDialog(
             key = "edit-${set.id}",
-            title = "Editar série ${set.setNumber} — ${exercise.exercise.exerciseName}",
-            helper = "Corrija o que você fez: a série já registrada é atualizada no lugar.",
+            title = stringResource(R.string.workout_set_edit_title, set.setNumber, exercise.exercise.exerciseName),
+            helper = stringResource(R.string.workout_set_dialog_edit_helper),
             suggestion = null,
             initialReps = set.reps?.toString().orEmpty(),
             initialWeight = set.weightKg?.let { formatDecimal(it, 1) }.orEmpty(),
             initialRpe = set.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
-            confirmLabel = "Salvar alterações",
+            confirmLabel = stringResource(R.string.workout_set_dialog_save_changes),
             onDelete = { setToDelete = set },
             onDismiss = { editSetId = null },
             onConfirm = { reps, weight, rpe ->
@@ -401,11 +414,10 @@ fun WorkoutScreen(
     setToDelete?.let { set ->
         AlertDialog(
             onDismissRequest = { setToDelete = null },
-            title = { Text("Excluir série?") },
+            title = { Text(stringResource(R.string.workout_set_delete_title)) },
             text = {
                 Text(
-                    "A série ${set.setNumber} será removida do treino e o progresso do " +
-                        "exercício será recalculado. Essa ação não pode ser desfeita."
+                    stringResource(R.string.workout_set_delete_body, set.setNumber)
                 )
             },
             confirmButton = {
@@ -417,12 +429,12 @@ fun WorkoutScreen(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { setToDelete = null }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -434,11 +446,10 @@ fun WorkoutScreen(
         val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showFinishConfirm = false },
-            title = { Text("Finalizar treino?") },
+            title = { Text(stringResource(R.string.workout_finish_title)) },
             text = {
                 Text(
-                    "$done de $planned séries registradas. Finalizar encerra a sessão e " +
-                        "salva o treino no aparelho."
+                    stringResource(R.string.workout_finish_body, done, planned)
                 )
             },
             confirmButton = {
@@ -450,12 +461,12 @@ fun WorkoutScreen(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Finalizar")
+                    Text(stringResource(R.string.workout_finish_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showFinishConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -465,11 +476,10 @@ fun WorkoutScreen(
         val haptics = LocalHapticFeedback.current
         AlertDialog(
             onDismissRequest = { showAbandonConfirm = false },
-            title = { Text("Abandonar treino?") },
+            title = { Text(stringResource(R.string.home_abandon_title)) },
             text = {
                 Text(
-                    "O treino em andamento e as séries já registradas serão excluídos do " +
-                        "aparelho. Essa ação não pode ser desfeita."
+                    stringResource(R.string.home_abandon_body)
                 )
             },
             confirmButton = {
@@ -481,12 +491,12 @@ fun WorkoutScreen(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Abandonar", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.home_abandon_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAbandonConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -574,17 +584,17 @@ private fun SwapExerciseSheet(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Trocar exercício",
+                            text = stringResource(R.string.workout_swap_exercise),
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            text = "Substituir «$currentExerciseName»",
+                            text = stringResource(R.string.workout_swap_replace_label, currentExerciseName),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Fechar")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                     }
                 }
             }
@@ -592,13 +602,13 @@ private fun SwapExerciseSheet(
             if (catalogEmpty) {
                 item {
                     Text(
-                        text = "Catálogo offline indisponível.",
+                        text = stringResource(R.string.workout_swap_catalog_offline),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 item {
                     Text(
-                        text = "Atualize o catálogo para ver os substitutos.",
+                        text = stringResource(R.string.workout_swap_catalog_update_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -608,13 +618,13 @@ private fun SwapExerciseSheet(
                         onClick = onRefreshCatalog,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Atualizar catálogo")
+                        Text(stringResource(R.string.settings_btn_update_catalog))
                     }
                 }
             } else if (candidates.isEmpty()) {
                 item {
                     Text(
-                        text = "Nenhum substituto com o mesmo músculo e equipamento.",
+                        text = stringResource(R.string.workout_swap_none_same_muscle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -625,14 +635,14 @@ private fun SwapExerciseSheet(
                         value = search,
                         onValueChange = { search = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Buscar substituto") },
+                        label = { Text(stringResource(R.string.workout_swap_search_label)) },
                         singleLine = true,
                         shape = MaterialTheme.shapes.medium,
                     )
                 }
                 item {
                     Text(
-                        text = "Substitutos (${filtered.size})",
+                        text = stringResource(R.string.workout_swap_count, filtered.size),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -697,7 +707,7 @@ private fun SwapExerciseSheet(
                 if (filtered.isEmpty()) {
                     item {
                         Text(
-                            text = "Nenhum substituto encontrado para «$search».",
+                            text = stringResource(R.string.workout_swap_search_empty, search),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -706,7 +716,7 @@ private fun SwapExerciseSheet(
                 }
                 item {
                     Text(
-                        text = "A troca vale para:",
+                        text = stringResource(R.string.workout_swap_scope_label),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -716,21 +726,21 @@ private fun SwapExerciseSheet(
                         FilterChip(
                             selected = scope == SwapScope.THIS_SESSION,
                             onClick = { scope = SwapScope.THIS_SESSION },
-                            label = { Text("Só hoje") },
+                            label = { Text(stringResource(R.string.workout_swap_scope_session)) },
                         )
                         FilterChip(
                             selected = scope == SwapScope.ALL_FUTURE,
                             onClick = { scope = SwapScope.ALL_FUTURE },
-                            label = { Text("Todos os treinos") },
+                            label = { Text(stringResource(R.string.workout_swap_scope_all)) },
                         )
                     }
                 }
                 item {
                     Text(
                         text = if (scope == SwapScope.THIS_SESSION) {
-                            "Apenas a sessão atual."
+                            stringResource(R.string.workout_swap_scope_session_desc)
                         } else {
-                            "Atualiza o plano salvo; vale para os próximos treinos."
+                            stringResource(R.string.workout_swap_scope_all_desc)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -743,13 +753,13 @@ private fun SwapExerciseSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancelar") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
                     Button(
                         onClick = { selected?.let { onConfirm(it.id, scope) } },
                         enabled = selected != null,
                         modifier = Modifier.padding(start = 8.dp),
                     ) {
-                        Text("Trocar")
+                        Text(stringResource(R.string.workout_swap_confirm))
                     }
                 }
             }
@@ -775,9 +785,14 @@ private fun RestBar(
     val finished = remaining <= 0
     val restStarted = remaining == total && remaining > 0 && !paused && !finished
     var restStartedAnnouncement by remember { mutableStateOf<String?>(null) }
+    // H3-52: o template do anúncio é resolvido na composição; o efeito roda
+    // fora dela e formata com o template já traduzido.
+    val restStartedTemplate = stringResource(R.string.workout_rest_started_announcement)
+    val restStateDone = stringResource(R.string.workout_rest_state_done)
+    val restStatePaused = stringResource(R.string.workout_rest_state_paused)
     LaunchedEffect(remaining, total, paused, finished) {
         if (restStarted) {
-            restStartedAnnouncement = "Descanso de ${formatSeconds(remaining)} s iniciado"
+            restStartedAnnouncement = String.format(restStartedTemplate, formatSeconds(remaining))
         } else {
             restStartedAnnouncement = null
         }
@@ -801,8 +816,8 @@ private fun RestBar(
         Column(
             modifier = Modifier.padding(16.dp).semantics(mergeDescendants = true) {
                 stateDescription = when {
-                    finished -> "Descanso concluído"
-                    paused -> "Descanso pausado"
+                    finished -> restStateDone
+                    paused -> restStatePaused
                     else -> restStateDescription(remaining, total)
                 }
                 if (announce) liveRegion = LiveRegionMode.Polite
@@ -842,7 +857,7 @@ private fun RestBar(
                     },
                     modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
-                    Text("Pular")
+                    Text(stringResource(R.string.common_skip))
                 }
                 if (!finished) {
                     OutlinedButton(
@@ -901,7 +916,10 @@ private fun ExerciseCard(
                         .fillMaxWidth()
                         .minimumInteractiveComponentSize()
                         .semantics { role = Role.Button }
-                        .clickable(onClickLabel = "Abrir detalhes do exercício", onClick = onOpenDetail),
+                        .clickable(
+                            onClickLabel = stringResource(R.string.a11y_open_exercise_details),
+                            onClick = onOpenDetail,
+                        ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -985,7 +1003,7 @@ private fun ExerciseCard(
                         },
                         modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
                     ) {
-                        val label = lastSetLabel(lastSet)
+                        val label = lastSetLabel(lastSet, stringResource(R.string.common_reps_short))
                         Text(if (label == null) stringResource(R.string.workout_repeat_last) else stringResource(R.string.workout_repeat_last_with_label, label))
                     }
                 }
@@ -1056,9 +1074,9 @@ private fun exerciseIsCompleted(exercise: SessionExerciseWithSets): Boolean =
     ).isCompleted
 
 /** Rótulo da última série: "60 kg × 10", "10 reps" ou "60 kg"; `null` sem dados. */
-private fun lastSetLabel(set: SetLogEntity): String? = when {
+private fun lastSetLabel(set: SetLogEntity, repsTemplate: String): String? = when {
     set.weightKg != null && set.reps != null -> "${formatKg(set.weightKg)} × ${set.reps}"
-    set.reps != null -> "${set.reps} reps"
+    set.reps != null -> String.format(repsTemplate, set.reps)
     set.weightKg != null -> formatKg(set.weightKg)
     else -> null
 }
@@ -1128,9 +1146,15 @@ private fun SetDialog(
                         reps = it.filter(Char::isDigit)
                         errors = errors.copy(reps = null)
                     },
-                    label = { Text("Repetições") },
+                    label = { Text(stringResource(R.string.workout_set_dialog_reps)) },
                     supportingText = {
-                        Text(errors.reps ?: if (reps.isBlank()) "Opcional" else "Número inteiro, de 1 a 100")
+                        Text(
+                            errors.reps ?: if (reps.isBlank()) {
+                                stringResource(R.string.common_optional)
+                            } else {
+                                stringResource(R.string.workout_set_dialog_support_reps)
+                            }
+                        )
                     },
                     isError = errors.reps != null,
                     singleLine = true,
@@ -1143,8 +1167,8 @@ private fun SetDialog(
                         weight = value.filter { it.isDigit() || it == ',' || it == '.' }
                         errors = errors.copy(weight = null)
                     },
-                    label = { Text("Carga (kg)") },
-                    supportingText = { Text(errors.weight ?: "Opcional. Use vírgula ou ponto.") },
+                    label = { Text(stringResource(R.string.workout_set_dialog_weight)) },
+                    supportingText = { Text(errors.weight ?: stringResource(R.string.workout_set_dialog_support_weight)) },
                     isError = errors.weight != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
@@ -1156,8 +1180,8 @@ private fun SetDialog(
                         rpe = value.filter { it.isDigit() || it == ',' || it == '.' }
                         errors = errors.copy(rpe = null)
                     },
-                    label = { Text("RPE (opcional)") },
-                    supportingText = { Text(errors.rpe ?: "Opcional, de 1 a 10.") },
+                    label = { Text(stringResource(R.string.workout_set_dialog_rpe)) },
+                    supportingText = { Text(errors.rpe ?: stringResource(R.string.workout_set_dialog_support_rpe)) },
                     isError = errors.rpe != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
@@ -1184,10 +1208,12 @@ private fun SetDialog(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
                     ) {
-                        Text("Excluir série")
+                        Text(stringResource(R.string.workout_set_dialog_delete_set))
                     }
                 }
-                TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) { Text("Cancelar") }
+                TextButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             }
         },
     )

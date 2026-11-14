@@ -1,5 +1,7 @@
 package com.treinos.app.ui
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.treinos.app.data.DeviceIdStore
 import com.treinos.app.data.SnapshotDownloader
 import com.treinos.app.data.SyncDownloadResult
@@ -7,13 +9,26 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.IOException
 
+/**
+ * H3-52: as mensagens de erro nascem de recursos e são resolvidas com o
+ * `Context` — o teste roda com Robolectric em pt-BR para ler os mesmos textos
+ * que o usuário vê.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "pt-rBR")
 class RestoreDeviceIdTest {
 
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val devices = FakeDeviceIdStore(deviceId = "id-atual")
     private val downloader = FakeDownloader()
-    private val restore by lazy { RestoreByDeviceId(downloader = downloader, devices = devices) }
+    private val restore by lazy {
+        RestoreByDeviceId(downloader = downloader, devices = devices, context = context)
+    }
 
     @Test
     fun `id vazio nao chama rede`() = runTest {

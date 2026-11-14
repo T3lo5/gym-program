@@ -67,41 +67,43 @@ import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 import kotlinx.coroutines.delay
 
+// H3-52: as opções guardam o valor do contrato + o recurso do rótulo; o texto
+// é resolvido na composição (`stringResource`) para seguir o idioma do app.
 private val goalOptions = listOf(
-    "hypertrophy" to "Hipertrofia",
-    "strength" to "Força",
-    "endurance" to "Resistência",
-    "power" to "Potência",
-    "fat_loss" to "Perda de gordura",
-    "general" to "Condicionamento",
+    "hypertrophy" to R.string.generate_goal_hypertrophy,
+    "strength" to R.string.generate_goal_strength,
+    "endurance" to R.string.generate_goal_endurance,
+    "power" to R.string.generate_goal_power,
+    "fat_loss" to R.string.generate_goal_fat_loss,
+    "general" to R.string.generate_goal_general,
 )
 
 private val levelOptions = listOf(
-    "beginner" to "Iniciante",
-    "intermediate" to "Intermediário",
-    "advanced" to "Avançado",
+    "beginner" to R.string.generate_level_beginner,
+    "intermediate" to R.string.generate_level_intermediate,
+    "advanced" to R.string.generate_level_advanced,
 )
 
 private val equipmentOptions = listOf(
-    "body only" to "Peso corporal",
-    "dumbbell" to "Halteres",
-    "barbell" to "Barra",
-    "cable" to "Polia",
-    "machine" to "Máquina",
-    "kettlebells" to "Kettlebell",
-    "bands" to "Elásticos",
-    "other" to "Outros",
+    "body only" to R.string.generate_equipment_body_only,
+    "dumbbell" to R.string.generate_equipment_dumbbell,
+    "barbell" to R.string.generate_equipment_barbell,
+    "cable" to R.string.generate_equipment_cable,
+    "machine" to R.string.generate_equipment_machine,
+    "kettlebells" to R.string.generate_equipment_kettlebells,
+    "bands" to R.string.generate_equipment_bands,
+    "other" to R.string.generate_equipment_other,
 )
 
 private val muscleOptions = listOf(
-    "chest" to "Peito",
-    "back" to "Costas",
-    "legs" to "Pernas",
-    "shoulders" to "Ombros",
-    "biceps" to "Bíceps",
-    "triceps" to "Tríceps",
-    "abs" to "Abdômen",
-    "glutes" to "Glúteos",
+    "chest" to R.string.generate_muscle_chest,
+    "back" to R.string.generate_muscle_back,
+    "legs" to R.string.generate_muscle_legs,
+    "shoulders" to R.string.generate_muscle_shoulders,
+    "biceps" to R.string.generate_muscle_biceps,
+    "triceps" to R.string.generate_muscle_triceps,
+    "abs" to R.string.generate_muscle_abs,
+    "glutes" to R.string.generate_muscle_glutes,
 )
 
 private val durationOptions = listOf(30, 45, 60, 90)
@@ -110,25 +112,30 @@ private val durationOptions = listOf(30, 45, 60, 90)
 private val complementaryDurationOptions = listOf(15, 20, 30, 45)
 private val reviewOptions = listOf(2, 4, 6, 8)
 
-/** Rótulos pt-BR → valores de contrato (H3-7); o valor escolhido é o que viaja no request. */
+/** Rótulos localizados → valores de contrato (H3-7); o valor escolhido é o que viaja no request. */
 private val sexOptions = listOf(
-    "female" to "Feminino",
-    "male" to "Masculino",
-    "other" to "Outro",
-    "undisclosed" to "Prefiro não informar",
+    "female" to R.string.generate_sex_female,
+    "male" to R.string.generate_sex_male,
+    "other" to R.string.generate_sex_other,
+    "undisclosed" to R.string.generate_sex_undisclosed,
 )
 
 private val environmentOptions = listOf(
-    "gym" to "Academia",
-    "home" to "Casa",
-    "bodyweight" to "Peso corporal",
+    "gym" to R.string.generate_environment_gym,
+    "home" to R.string.generate_environment_home,
+    "bodyweight" to R.string.generate_environment_bodyweight,
 )
 
 private val modalityTypes = listOf(
-    "strength" to "Musculação",
-    "run" to "Corrida",
-    "mobility" to "Mobilidade",
+    "strength" to R.string.generate_modality_strength,
+    "run" to R.string.generate_modality_run,
+    "mobility" to R.string.generate_modality_mobility,
 )
+
+/** Rótulos localizados para as opções (`ChipGroup` recebe texto pronto). */
+@Composable
+private fun labeledOptions(options: List<Pair<String, Int>>): List<Pair<String, String>> =
+    options.map { (value, resId) -> value to stringResource(resId) }
 
 /** Valor restaurado só é aceito se ainda for uma opção válida; senão, default. */
 private fun <T> restored(value: T, allowed: List<T>, fallback: T): T =
@@ -238,10 +245,10 @@ fun GenerateScreen(
     val complementaryReady = complementaryValidation?.valid == true && hasFocusOrAlternativeEnvironment
     val canGenerate = if (isComplementary) complementaryReady else hasModalities
     val generateHint = when {
-        !isComplementary -> "Inclua pelo menos uma modalidade."
+        !isComplementary -> stringResource(R.string.generate_hint_no_modality)
         !hasFocusOrAlternativeEnvironment ->
-            "Escolha o foco exclusivo ou um ambiente diferente de academia."
-        else -> complementaryValidation?.error ?: "Ajuste as opções do plano complementar."
+            stringResource(R.string.generate_hint_focus_or_environment)
+        else -> complementaryValidation?.error ?: stringResource(R.string.generate_hint_adjust)
     }
 
     fun modalityToDto(type: String, draft: ModalityDraft): ModalityDto? {
@@ -311,8 +318,12 @@ fun GenerateScreen(
                         }
                         BusyButton(
                             busy = isGenerating,
-                            idleText = if (isComplementary) "Gerar plano complementar" else "Gerar semana híbrida",
-                            busyText = "Gerando…",
+                            idleText = if (isComplementary) {
+                                stringResource(R.string.generate_btn_generate_extra)
+                            } else {
+                                stringResource(R.string.generate_btn_generate_main)
+                            },
+                            busyText = stringResource(R.string.generate_btn_generating),
                             onClick = {
                                 val validation = ProfileValidator.validate(
                                     bodyWeightKgText,
@@ -402,7 +413,7 @@ fun GenerateScreen(
                     }
                 }
 
-                item { SectionTitle("O que gerar") }
+                item { SectionTitle(stringResource(R.string.generate_section_what)) }
                 item {
                     ChipGroup(
                         options = listOf(
@@ -423,10 +434,9 @@ fun GenerateScreen(
                 item {
                     Text(
                         text = if (planKind == "extra") {
-                            "O plano complementar aparece ao lado do principal na Home; nada é desativado. " +
-                                "Complementar é só de força, com foco exclusivo e sessões curtas."
+                            stringResource(R.string.generate_plan_extra_desc)
                         } else {
-                            "O plano principal anterior é desativado; planos complementares continuam ativos."
+                            stringResource(R.string.generate_plan_main_desc)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -437,7 +447,7 @@ fun GenerateScreen(
                     item { SectionTitle(stringResource(R.string.generate_modalities_section)) }
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            modalityTypes.forEach { (type, label) ->
+                            modalityTypes.forEach { (type, labelRes) ->
                                 key(type) {
                                     val draft = modalityDrafts[type] ?: ModalityDraft(type = type)
                                     var included by remember(type) { mutableStateOf(draft.included) }
@@ -447,7 +457,12 @@ fun GenerateScreen(
                                         mutableStateOf(draft.recent5kSeconds?.toString() ?: "")
                                     }
                                     var focusText by remember(type) { mutableStateOf(draft.focus ?: "") }
+                                    val label = stringResource(labelRes)
                                     val includeContentDesc = stringResource(R.string.generate_include_label, label)
+                                    // H3-52: estados de acessibilidade resolvidos na
+                                    // composição — o bloco de semântica não é composable.
+                                    val stateOn = stringResource(R.string.common_state_on)
+                                    val stateOff = stringResource(R.string.common_state_off)
 
                                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                                         Column(
@@ -468,7 +483,7 @@ fun GenerateScreen(
                                                         },
                                                     )
                                                         .semantics {
-                                                            stateDescription = if (included) "Ligado" else "Desligado"
+                                                            stateDescription = if (included) stateOn else stateOff
                                                             contentDescription = includeContentDesc
                                                         },
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -491,7 +506,7 @@ fun GenerateScreen(
                                                     modifier = Modifier.weight(1f),
                                                 )
                                                 Text(
-                                                    text = "${draft.sessionsPerWeek}x/semana",
+                                                    text = stringResource(R.string.generate_sessions_week_short, draft.sessionsPerWeek),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -570,7 +585,7 @@ fun GenerateScreen(
 
                     item {
                         Text(
-                            text = "Natação não entra no plano: registre-a como atividade avulsa no histórico.",
+                            text = stringResource(R.string.generate_swim_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -582,7 +597,7 @@ fun GenerateScreen(
                     item { SectionTitle(stringResource(R.string.generate_goal_section)) }
                     item {
                         ChipGroup(
-                            options = goalOptions,
+                            options = labeledOptions(goalOptions),
                             selected = setOf(goal),
                             onToggle = { goal = it },
                         )
@@ -591,7 +606,7 @@ fun GenerateScreen(
                     item { SectionTitle(stringResource(R.string.generate_level_section)) }
                     item {
                         ChipGroup(
-                            options = levelOptions,
+                            options = labeledOptions(levelOptions),
                             selected = setOf(level),
                             onToggle = { level = it },
                         )
@@ -600,7 +615,7 @@ fun GenerateScreen(
                     item { SectionTitle(stringResource(R.string.generate_equipment_section)) }
                     item {
                         ChipGroup(
-                            options = equipmentOptions,
+                            options = labeledOptions(equipmentOptions),
                             selected = equipment,
                             onToggle = { value ->
                                 equipment = if (value in equipment) equipment - value else equipment + value
@@ -617,7 +632,7 @@ fun GenerateScreen(
                     if (isComplementary) {
                         item {
                             Text(
-                                text = "Todo exercício do plano será deste foco — nada de outros grupos entra junto.",
+                                text = stringResource(R.string.generate_focus_exclusive_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -625,7 +640,7 @@ fun GenerateScreen(
                     }
                     item {
                         ChipGroup(
-                            options = muscleOptions,
+                            options = labeledOptions(muscleOptions),
                             selected = muscles,
                             onToggle = { value ->
                                 muscles = if (value in muscles) muscles - value else muscles + value
@@ -739,7 +754,7 @@ fun GenerateScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             ChipGroup(
-                                options = sexOptions,
+                                options = labeledOptions(sexOptions),
                                 selected = sexChoice?.let { setOf(it) } ?: emptySet(),
                                 onToggle = { value -> sexChoice = if (value == sexChoice) null else value },
                             )
@@ -761,7 +776,7 @@ fun GenerateScreen(
                     item { SectionTitle(stringResource(R.string.generate_environment_section)) }
                     item {
                         ChipGroup(
-                            options = environmentOptions,
+                            options = labeledOptions(environmentOptions),
                             selected = setOf(environment),
                             onToggle = { environment = it },
                         )
@@ -780,25 +795,40 @@ fun GenerateScreen(
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 Text(
-                                    text = "Perfil salvo",
+                                    text = stringResource(R.string.generate_profile_saved),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 savedBodyWeightKg?.let {
-                                    Text(text = "Peso: $it kg", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = stringResource(R.string.generate_profile_weight, it.toString()),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
                                 savedHeightCm?.let {
-                                    Text(text = "Altura: $it cm", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = stringResource(R.string.generate_profile_height, it.toString()),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
                                 savedSex?.let { value ->
-                                    val label = sexOptions.firstOrNull { it.first == value }?.second
+                                    val label = sexOptions
+                                        .firstOrNull { it.first == value }
+                                        ?.second
+                                        ?.let { stringResource(it) }
                                     if (label != null) {
-                                        Text(text = "Sexo: $label", style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            text = stringResource(R.string.generate_profile_sex, label),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
                                     }
                                 }
                                 if (savedBodyWeightKg != null && savedHeightCm != null) {
                                     val bmi = savedBodyWeightKg / ((savedHeightCm / 100.0) * (savedHeightCm / 100.0))
-                                    Text(text = "IMC: ${formatDecimal(bmi, 1)}", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = stringResource(R.string.generate_profile_imc, formatDecimal(bmi, 1)),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
                             }
                         }
@@ -807,8 +837,7 @@ fun GenerateScreen(
 
                 item {
                     Text(
-                        text = "Se a IA não estiver disponível, o backend monta uma semana híbrida válida " +
-                            "com os templates locais de corrida e mobilidade. Você sempre recebe um plano utilizável.",
+                        text = stringResource(R.string.generate_ai_fallback),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp),

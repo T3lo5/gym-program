@@ -321,6 +321,9 @@ fun StatusText(
  * Convenção de classificação das mensagens de Ajustes (H3-32): só os prefixos
  * de sucesso conhecidos são verdes; qualquer outra mensagem (falha de rede,
  * dado ausente, validação) é erro. Pura para poder ser testada em JVM.
+ *
+ * H3-52: as mensagens do ViewModel agora nascem de recursos — os prefixos de
+ * sucesso existem em português (`values/`) e em inglês (`values-en`).
  */
 fun statusIsSuccess(message: String): Boolean =
     SUCCESS_PREFIXES.any { message.startsWith(it) }
@@ -331,6 +334,12 @@ private val SUCCESS_PREFIXES = listOf(
     "Restaurado:",
     "Backup importado",
     "Catálogo atualizado",
+    // values-en
+    "Connected",
+    "Sent:",
+    "Restored:",
+    "Backup imported",
+    "Catalog updated",
 )
 
 /**

@@ -1,5 +1,7 @@
 package com.treinos.app.ui
 
+import android.content.Context
+import com.treinos.app.R
 import com.treinos.app.data.remote.BackendConnectionException
 import com.treinos.app.data.remote.BackendHttpException
 import com.treinos.app.data.remote.BackendResponseException
@@ -26,18 +28,24 @@ sealed interface UiState<out T> {
  * Erro persistente e acionável (H3-29): fica na tela de origem até o usuário
  * tentar de novo ou voltar — em vez de sumir com o snackbar de ~4 s. O título
  * diz qual ação falhou; a mensagem diz o porquê em linguagem de usuário.
+ *
+ * H3-52: os textos nascem de recursos — a construção resolve via [Context]
+ * (`application.getString`), porque o erro é montado fora da composição.
  */
 data class UiError(
     val title: String,
     val message: String,
-    val retryLabel: String? = "Tentar de novo",
+    val retryLabel: String? = null,
 )
 
-private const val OFFLINE_MESSAGE = "Sem conexão com o servidor. Verifique o Wi-Fi e tente de novo."
-private const val TIMEOUT_MESSAGE =
-    "O servidor demorou demais para responder. Verifique a conexão e tente de novo."
-private const val PARSE_MESSAGE = "Resposta inesperada do servidor. Tente de novo."
-private const val COMMS_MESSAGE = "Falha de comunicação com o servidor. Verifique a conexão e tente de novo."
+/**
+ * Erro de rede/backend conhecido, como par recurso + argumentos: a tradução
+ * acontece onde há [Context], nunca aqui (função pura, testável em JVM).
+ */
+data class KnownError(val resId: Int, val args: List<Any> = emptyList())
+
+fun KnownError.resolve(context: Context): String =
+    context.getString(resId, *args.toTypedArray())
 
 /**
  * Traduz uma exceção para [UiError] com mensagem curta e acionável. O detalhe
@@ -48,26 +56,28 @@ private const val COMMS_MESSAGE = "Falha de comunicação com o servidor. Verifi
  * A ordem do `when` importa: as exceções de backend e `SocketTimeoutException`
  * são subclasses de [IOException] e precisam ser testadas antes.
  */
-fun uiErrorFrom(throwable: Throwable, contexto: String): UiError = UiError(
-    title = "Não foi possível $contexto",
-    message = knownErrorMessage(throwable) ?: "Ocorreu um erro inesperado. Tente de novo.",
-    retryLabel = "Tentar de novo",
+fun uiErrorFrom(throwable: Throwable, context: Context, verbResId: Int): UiError = UiError(
+    title = context.getString(R.string.error_could_not, context.getString(verbResId)),
+    message = knownErrorResource(throwable)?.resolve(context)
+        ?: context.getString(R.string.error_unexpected),
+    retryLabel = context.getString(R.string.common_retry),
 )
 
 /**
  * Mensagem curta para os caminhos que continuam de snackbar: erros de
  * rede/backend recebem o texto acionável; erros locais (Room, validação)
- * mantêm o texto específico da ação via [fallback].
+ * mantêm o texto específico da ação via [fallbackRes].
  */
-fun uiErrorMessage(throwable: Throwable, fallback: String): String =
-    knownErrorMessage(throwable) ?: fallback
+fun uiErrorMessage(throwable: Throwable, context: Context, fallbackRes: Int, vararg fallbackArgs: Any): String =
+    knownErrorResource(throwable)?.resolve(context)
+        ?: context.getString(fallbackRes, *fallbackArgs)
 
-private fun knownErrorMessage(throwable: Throwable): String? = when (throwable) {
-    is BackendHttpException ->
-        "O servidor respondeu com erro (${throwable.code}). Tente de novo em instantes."
-    is BackendTimeoutException, is SocketTimeoutException -> TIMEOUT_MESSAGE
-    is BackendConnectionException, is UnknownHostException, is ConnectException -> OFFLINE_MESSAGE
-    is BackendResponseException, is SerializationException -> PARSE_MESSAGE
-    is IOException -> COMMS_MESSAGE
+/** Mapeia a exceção para o recurso de mensagem acionável; `null` quando local. */
+fun knownErrorResource(throwable: Throwable): KnownError? = when (throwable) {
+    is BackendHttpException -> KnownError(R.string.error_http, listOf(throwable.code))
+    is BackendTimeoutException, is SocketTimeoutException -> KnownError(R.string.error_timeout)
+    is BackendConnectionException, is UnknownHostException, is ConnectException -> KnownError(R.string.error_offline)
+    is BackendResponseException, is SerializationException -> KnownError(R.string.error_parse)
+    is IOException -> KnownError(R.string.error_comms)
     else -> null
 }

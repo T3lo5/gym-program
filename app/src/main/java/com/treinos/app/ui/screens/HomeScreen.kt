@@ -87,6 +87,7 @@ import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.components.StatusText
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 
@@ -275,7 +276,7 @@ fun HomeScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.MoreVert,
-                                            contentDescription = "Mais opções do plano",
+                                            contentDescription = stringResource(R.string.home_plan_more_options),
                                         )
                                     }
                                     DropdownMenu(
@@ -285,7 +286,7 @@ fun HomeScreen(
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    "Excluir plano complementar",
+                                                    stringResource(R.string.home_plan_delete_menu),
                                                     color = MaterialTheme.colorScheme.error,
                                                 )
                                             },
@@ -347,7 +348,7 @@ fun HomeScreen(
                     val currentTab = selectedTab ?: presentTabs.first()
                     item {
                         val currentTabLabel = stringResource(tabLabel(currentTab))
-                        SectionTitle("Sessões de $currentTabLabel")
+                        SectionTitle(stringResource(R.string.home_sessions_of, currentTabLabel))
                     }
                     items(currentSessions, key = { it.day.id }) { day ->
                         ModalityDayCard(
@@ -358,7 +359,7 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    item { SectionTitle("Dias de treino") }
+                    item { SectionTitle(stringResource(R.string.home_workout_days)) }
                     items(plan.days.sortedBy { it.day.dayOrder }, key = { it.day.id }) { day ->
                         DayCard(
                             day = day,
@@ -373,7 +374,7 @@ fun HomeScreen(
                     it.session.source == MANUAL_SESSION_SOURCE && isToday(it.session.startedAt)
                 }
                 if (todayManual.isNotEmpty()) {
-                    item { SectionTitle("Atividades de hoje") }
+                    item { SectionTitle(stringResource(R.string.home_today_activities)) }
                     items(todayManual, key = { it.session.id }) { session ->
                         ActivitySummaryCard(session)
                     }
@@ -388,11 +389,10 @@ fun HomeScreen(
     if (showDeletePlanDialog && plan != null) {
         AlertDialog(
             onDismissRequest = { showDeletePlanDialog = false },
-            title = { Text("Excluir plano?") },
+            title = { Text(stringResource(R.string.home_plan_delete_title)) },
             text = {
                 Text(
-                    "O plano \"${plan.plan.name}\" e seus dias serão apagados. " +
-                        "As sessões já registradas continuam no histórico."
+                    stringResource(R.string.home_plan_delete_body, plan.plan.name)
                 )
             },
             confirmButton = {
@@ -402,12 +402,12 @@ fun HomeScreen(
                         onDeletePlan(plan.plan.id)
                     },
                 ) {
-                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeletePlanDialog = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -687,7 +687,7 @@ private fun ModalityDayCard(
                             val pace = day.exercises.firstOrNull()?.targetPaceSecondsPerKm
                             Text(
                                 text = buildList {
-                                    add("${day.exercises.size} bloco(s)")
+                                    add(stringResource(R.string.home_blocks_count, day.exercises.size))
                                     distance?.let { add(formatDistanceMeters(it)) }
                                     pace?.let { add(com.treinos.app.ui.formatMinuteSecond(pace.toLong()) + "/km") }
                                 }.joinToString(" • "),
@@ -699,7 +699,11 @@ private fun ModalityDayCard(
                         SessionKind.MOBILITY -> {
                             val duration = day.exercises.firstOrNull()?.targetDurationSeconds?.let { it / 60 }
                             Text(
-                                text = "${day.exercises.size} rotina(s) • ${duration ?: 0} min",
+                                text = stringResource(
+                                    R.string.home_routines_count,
+                                    day.exercises.size,
+                                    duration ?: 0,
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -707,7 +711,11 @@ private fun ModalityDayCard(
                         }
                         SessionKind.STRENGTH -> {
                             Text(
-                                text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
+                                text = pluralStringResource(
+                                    R.plurals.home_exercises_count,
+                                    day.exercises.size,
+                                    day.exercises.size,
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -753,14 +761,18 @@ private fun ModalityDayCard(
                                     )
                                     if (exercise.targetReps.isNotBlank()) {
                                         Text(
-                                            text = "${exercise.sets} séries × ${exercise.targetReps}",
+                                            text = stringResource(R.string.home_sets_by_reps, exercise.sets, exercise.targetReps),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     } else if (exercise.sets > 0) {
                                         Text(
-                                            text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
+                                            text = pluralStringResource(
+                                                R.plurals.home_sets_count,
+                                                exercise.sets,
+                                                exercise.sets,
+                                            ),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -1031,7 +1043,11 @@ private fun DayCard(
                         TodayBadge()
                     }
                     Text(
-                        text = "${day.exercises.size} exercício${if (day.exercises.size != 1) "s" else ""}",
+                        text = pluralStringResource(
+                            R.plurals.home_exercises_count,
+                            day.exercises.size,
+                            day.exercises.size,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -1075,14 +1091,18 @@ private fun DayCard(
                                     )
                                     if (exercise.targetReps.isNotBlank()) {
                                         Text(
-                                            text = "${exercise.sets} séries × ${exercise.targetReps}",
+                                            text = stringResource(R.string.home_sets_by_reps, exercise.sets, exercise.targetReps),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         )
                                     } else if (exercise.sets > 0) {
                                         Text(
-                                            text = "${exercise.sets} série${if (exercise.sets != 1) "s" else ""}",
+                                            text = pluralStringResource(
+                                                R.plurals.home_sets_count,
+                                                exercise.sets,
+                                                exercise.sets,
+                                            ),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -1106,7 +1126,7 @@ private fun DayCard(
 @Composable
 private fun ActivitySummaryCard(session: SessionWithExercises) {
     val modality = ActivityModality.fromStorageValue(session.session.modality)
-    val title = session.session.title.ifBlank { session.session.dayName }.ifBlank { modality.label }
+    val title = session.session.title.ifBlank { session.session.dayName }.ifBlank { activityModalityLabel(modality) }
     // H3-31: corrida em km como o corredor pensa; demais modalidades em metros.
     val distance = if (modality == ActivityModality.RUN) {
         formatRunDistanceKm(session.session.totalDistanceMeters)

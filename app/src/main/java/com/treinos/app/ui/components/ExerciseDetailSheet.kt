@@ -25,12 +25,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.R
 import com.treinos.app.ui.equipmentLabel
 import com.treinos.app.ui.muscleLabel
 
@@ -41,6 +43,11 @@ fun ExerciseDetailSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val fallbackName = stringResource(R.string.exercise_detail_fallback_name)
+    val imageDescription = stringResource(
+        R.string.exercise_detail_image_desc,
+        media?.name.orEmpty().ifBlank { fallbackName.lowercase() },
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -59,11 +66,11 @@ fun ExerciseDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = media?.name?.takeIf { it.isNotBlank() } ?: "Exercício",
+                    text = media?.name?.takeIf { it.isNotBlank() } ?: fallbackName,
                     style = MaterialTheme.typography.titleLarge,
                 )
                 IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Icon(Icons.Default.Close, contentDescription = "Fechar")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                 }
             }
 
@@ -90,8 +97,7 @@ fun ExerciseDetailSheet(
                     model = request,
                     contentDescription = null,
                     modifier = imageModifier.semantics {
-                        contentDescription =
-                            "Imagem do exercício ${media?.name.orEmpty().ifBlank { "exercício" }}"
+                        contentDescription = imageDescription
                     },
                     contentScale = ContentScale.Crop,
                     loading = { ExerciseImageFallback(media?.name.orEmpty(), 240.dp) },
@@ -101,16 +107,28 @@ fun ExerciseDetailSheet(
 
             val muscles = media?.primaryMuscles?.joinToString(", ") { muscleLabel(it) }.orEmpty()
             if (muscles.isNotBlank()) {
-                Text(text = "Músculos principais: $muscles", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = stringResource(R.string.exercise_detail_muscles, muscles),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             if (media != null && !media.equipment.isNullOrBlank()) {
-                Text(text = "Equipamento: ${equipmentLabel(media.equipment)}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = stringResource(R.string.exercise_detail_equipment, equipmentLabel(media.equipment)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
-            Text(text = "Instruções", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(R.string.exercise_detail_instructions),
+                style = MaterialTheme.typography.titleMedium,
+            )
             val instructions = media?.instructions.orEmpty()
             if (instructions.isEmpty()) {
-                Text(text = "Sem instruções disponíveis.", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = stringResource(R.string.exercise_detail_no_instructions),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             } else {
                 instructions.forEachIndexed { index, instruction ->
                     Text(
