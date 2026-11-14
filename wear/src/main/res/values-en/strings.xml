@@ -1,0 +1,22 @@
+<resources>
+    <string name="wear_app_name">Treinos Watch</string>
+    <string name="current_exercise">Current Exercise</string>
+    <string name="next_exercise">Next</string>
+    <string name="rest_timer">Rest</string>
+    <string name="series">Sets</string>
+    <string name="reps">Reps</string>
+    <string name="set_format">%d of %d</string>
+    <string name="workout_finished">Workout Complete!</string>
+    <string name="skip_rest">Skip Rest</string>
+    <string name="next_set">Next Set</string>
+    <!-- H3-59: literals extracted from WorkoutWearActivity. -->
+    <string name="refresh">Update</string>
+    <string name="no_connection">No connection</string>
+    <string name="set_progress_format">Set %1$d / %2$d</string>
+    <string name="target_reps_format">Target: %1$s</string>
+    <string name="last_set_format">Last: %1$s</string>
+    <string name="rest_remaining_format">Rest: %1$ds</string>
+    <string name="complete_set">Complete Set</string>
+    <string name="finish_workout">Finish Workout</string>
+    <string name="in_progress">In progress</string>
+</resources>

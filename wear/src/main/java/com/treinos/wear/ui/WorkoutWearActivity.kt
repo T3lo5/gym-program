@@ -19,6 +19,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Button
@@ -28,6 +31,7 @@ import com.treinos.protocol.PATH_COMMAND
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
+import com.treinos.wear.R
 import com.treinos.wear.WearApplication
 import com.treinos.wear.data.WearStateStore
 import kotlinx.coroutines.delay
@@ -162,13 +166,18 @@ fun WorkoutWearScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
             ) {
+                val finishedLabel = stringResource(R.string.workout_finished)
+                val refreshLabel = stringResource(R.string.refresh)
                 Text(
-                    text = "Treino Concluído!",
+                    text = finishedLabel,
                     fontSize = 20.sp,
                     style = MaterialTheme.typography.titleLarge,
                 )
-                Button(onClick = onRequestState) {
-                    Text(text = "Atualizar")
+                Button(
+                    onClick = onRequestState,
+                    modifier = Modifier.semantics { contentDescription = refreshLabel },
+                ) {
+                    Text(text = refreshLabel)
                 }
             }
         } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
@@ -196,11 +205,13 @@ fun WorkoutWearScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     if (!connected) {
+                        val noConnectionLabel = stringResource(R.string.no_connection)
                         Text(
-                            text = "Sem conexão",
+                            text = noConnectionLabel,
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 14.sp,
                             style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.semantics { contentDescription = noConnectionLabel },
                         )
                     }
                     Text(
@@ -216,35 +227,40 @@ fun WorkoutWearScreen(
                         maxLines = 2,
                     )
                     Text(
-                        text = "Série ${state.setNumber} / ${state.plannedSets}",
+                        text = stringResource(R.string.set_progress_format, state.setNumber, state.plannedSets),
                         fontSize = 16.sp,
                     )
                     if (state.targetReps.isNotBlank()) {
                         Text(
-                            text = "Alvo: ${state.targetReps}",
+                            text = stringResource(R.string.target_reps_format, state.targetReps),
                             fontSize = 16.sp,
                         )
                     }
                     val ultima = formatLastSet(state.lastWeightKg, state.lastReps)
                     if (ultima != null) {
                         Text(
-                            text = "Última: $ultima",
+                            text = stringResource(R.string.last_set_format, ultima),
                             fontSize = 16.sp,
                         )
                     }
                     if (timerState.remainingSeconds > 0) {
+                        val restLabel = stringResource(R.string.rest_remaining_format, timerState.remainingSeconds)
                         Text(
-                            text = "Descanso: ${timerState.remainingSeconds}s",
+                            text = restLabel,
                             fontSize = 18.sp,
                             style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.semantics { contentDescription = restLabel },
                         )
                     }
+                    val completeSetLabel = stringResource(R.string.complete_set)
                     Button(
                         onClick = { dispatch { onLogSet(state.sessionId) } },
                         enabled = buttonsEnabled,
+                        modifier = Modifier.semantics { contentDescription = completeSetLabel },
                     ) {
-                        Text(text = "Concluir Série")
+                        Text(text = completeSetLabel)
                     }
+                    val skipRestLabel = stringResource(R.string.skip_rest)
                     Button(
                         onClick = {
                             dispatch {
@@ -253,14 +269,17 @@ fun WorkoutWearScreen(
                             }
                         },
                         enabled = buttonsEnabled,
+                        modifier = Modifier.semantics { contentDescription = skipRestLabel },
                     ) {
-                        Text(text = "Pular Descanso")
+                        Text(text = skipRestLabel)
                     }
+                    val finishLabel = stringResource(R.string.finish_workout)
                     Button(
                         onClick = { dispatch { onFinish(state.sessionId) } },
                         enabled = buttonsEnabled,
+                        modifier = Modifier.semantics { contentDescription = finishLabel },
                     ) {
-                        Text(text = "Finalizar Treino")
+                        Text(text = finishLabel)
                     }
                 }
             } else {
@@ -272,11 +291,13 @@ fun WorkoutWearScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     if (!connected) {
+                        val noConnectionLabel = stringResource(R.string.no_connection)
                         Text(
-                            text = "Sem conexão",
+                            text = noConnectionLabel,
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 14.sp,
                             style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.semantics { contentDescription = noConnectionLabel },
                         )
                     }
                     Text(
@@ -286,14 +307,16 @@ fun WorkoutWearScreen(
                         maxLines = 2,
                     )
                     Text(
-                        text = "Em andamento",
+                        text = stringResource(R.string.in_progress),
                         fontSize = 18.sp,
                     )
+                    val finishLabel = stringResource(R.string.finish_workout)
                     Button(
                         onClick = { dispatch { onFinish(state.sessionId) } },
                         enabled = buttonsEnabled,
+                        modifier = Modifier.semantics { contentDescription = finishLabel },
                     ) {
-                        Text(text = "Finalizar Treino")
+                        Text(text = finishLabel)
                     }
                 }
             }

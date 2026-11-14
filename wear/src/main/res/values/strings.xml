@@ -9,4 +9,14 @@
     <string name="workout_finished">Treino Concluído!</string>
     <string name="skip_rest">Pular Descanso</string>
     <string name="next_set">Próxima Série</string>
+    <!-- H3-59: literais extraídos de WorkoutWearActivity. -->
+    <string name="refresh">Atualizar</string>
+    <string name="no_connection">Sem conexão</string>
+    <string name="set_progress_format">Série %1$d / %2$d</string>
+    <string name="target_reps_format">Alvo: %1$s</string>
+    <string name="last_set_format">Última: %1$s</string>
+    <string name="rest_remaining_format">Descanso: %1$ds</string>
+    <string name="complete_set">Concluir Série</string>
+    <string name="finish_workout">Finalizar Treino</string>
+    <string name="in_progress">Em andamento</string>
 </resources>

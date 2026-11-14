@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-59` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` |
+| Implementação | `concluída` |
 
 **Origem:** fora de escopo declarado da H3-34/H3-37 (que cobriram só o
 celular) + varredura de polimento de 2026-11-13. O wear tem `strings.xml`
