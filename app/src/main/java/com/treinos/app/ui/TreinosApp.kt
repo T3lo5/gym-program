@@ -391,6 +391,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDeleteActivity = viewModel::deleteLogActivity,
                     muscleByExerciseId = historyMuscleByExerciseId,
                     onGenerate = viewModel::openGenerate,
+                    // H3-54: corrigir séries de sessão concluída direto do Histórico.
+                    onUpdateSet = viewModel::updateHistorySet,
+                    onDeleteSet = viewModel::deleteHistorySet,
                 )
 
                 Screen.LogActivity -> LogActivityScreen(

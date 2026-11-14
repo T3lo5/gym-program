@@ -22,15 +22,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
+import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ActivityModality
@@ -66,6 +72,7 @@ import com.treinos.app.ui.components.LoadingState
 import com.treinos.app.ui.components.MetricCard
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import com.treinos.app.ui.components.SetEditDialog
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDateShort
@@ -109,6 +116,8 @@ fun HistoryScreen(
     onDeleteActivity: (Long) -> Unit = {},
     muscleByExerciseId: Map<String, String> = emptyMap(),
     onGenerate: () -> Unit = {},
+    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit = { _, _, _, _ -> },
+    onDeleteSet: (SetLogEntity) -> Unit = {},
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino registrado") só aparece quando o banco realmente está vazio.
@@ -253,6 +262,8 @@ fun HistoryScreen(
                         onOpenExerciseDetail = onOpenExerciseDetail,
                         onEditActivity = onEditActivity,
                         onDeleteActivity = onDeleteActivity,
+                        onUpdateSet = onUpdateSet,
+                        onDeleteSet = onDeleteSet,
                     )
                 }
 
@@ -294,6 +305,8 @@ private fun HistorySessionRow(
     onOpenExerciseDetail: (String) -> Unit,
     onEditActivity: (Long) -> Unit,
     onDeleteActivity: (Long) -> Unit,
+    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
+    onDeleteSet: (SetLogEntity) -> Unit,
 ) {
     if (session.session.source == MANUAL_SESSION_SOURCE) {
         ActivityCard(
@@ -306,6 +319,8 @@ private fun HistorySessionRow(
             session = session,
             exerciseMedia = exerciseMedia,
             onOpenExerciseDetail = onOpenExerciseDetail,
+            onUpdateSet = onUpdateSet,
+            onDeleteSet = onDeleteSet,
         )
     }
 }
@@ -604,8 +619,16 @@ private fun SessionCard(
     session: SessionWithExercises,
     exerciseMedia: Map<String, ExerciseMedia>,
     onOpenExerciseDetail: (String) -> Unit,
+    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
+    onDeleteSet: (SetLogEntity) -> Unit,
 ) {
     var expanded by remember(session.session.id) { mutableStateOf(false) }
+    // H3-54: a folha "Editar séries" só existe para sessão concluída. Como na
+    // H3-31, guardamos ids (Bundle-friendly) e rederivamos os objetos a cada
+    // composição — girar não perde o alvo e série recém-excluída fecha o diálogo.
+    var showEditSheet by rememberSaveable(session.session.id) { mutableStateOf(false) }
+    var editSetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deleteSetId by rememberSaveable { mutableStateOf<Long?>(null) }
     val totalSets = session.exercises.sumOf { it.sets.size }
     val completed = session.session.status == STATUS_COMPLETED
     // H3-52: estados de acessibilidade resolvidos na composição.
@@ -716,12 +739,7 @@ private fun SessionCard(
                                 } else {
                                     exercise.sets.sortedBy { it.setNumber }.forEach { set ->
                                         Text(
-                                            text = buildString {
-                                                append(stringResource(R.string.workout_set, set.setNumber))
-                                                set.reps?.let { append(" • ${stringResource(R.string.history_metric_sets_reps, it)}") }
-                                                set.weightKg?.let { append(" • ${formatKg(it)}") }
-                                                set.rpe?.let { append(" • RPE ${formatDecimal(it, 1)}") }
-                                            },
+                                            text = historySetLabel(set),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -731,7 +749,163 @@ private fun SessionCard(
                         }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     }
+
+                // H3-54: corrigir registro de treino passado — só sessão concluída.
+                if (completed) {
+                    TextButton(
+                        onClick = { showEditSheet = true },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
+                        Text(stringResource(R.string.history_edit_sets))
+                    }
+                }
             }
         }
     }
+
+    if (showEditSheet) {
+        SessionSetsEditSheet(
+            session = session,
+            onDismiss = {
+                showEditSheet = false
+                editSetId = null
+                deleteSetId = null
+            },
+            onEditSet = { _, set -> editSetId = set.id },
+        )
+    }
+
+    val editTarget = editSetId?.let { id ->
+        session.exercises.firstNotNullOfOrNull { exercise ->
+            exercise.sets.firstOrNull { it.id == id }?.let { exercise to it }
+        }
+    }
+    editTarget?.let { (exercise, set) ->
+        SetEditDialog(
+            key = "history-edit-${set.id}",
+            title = stringResource(R.string.workout_set_edit_title, set.setNumber, exercise.exercise.exerciseName),
+            helper = stringResource(R.string.workout_set_dialog_edit_helper),
+            suggestion = null,
+            initialReps = set.reps?.toString().orEmpty(),
+            initialWeight = set.weightKg?.let { formatDecimal(it, 1) }.orEmpty(),
+            initialRpe = set.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
+            confirmLabel = stringResource(R.string.workout_set_dialog_save_changes),
+            onDelete = {
+                editSetId = null
+                deleteSetId = set.id
+            },
+            onDismiss = { editSetId = null },
+            onConfirm = { reps, weight, rpe ->
+                onUpdateSet(set, reps, weight, rpe)
+                editSetId = null
+            },
+        )
+    }
+
+    val deleteTarget = deleteSetId?.let { id ->
+        session.exercises.flatMap { it.sets }.firstOrNull { it.id == id }
+    }
+    if (deleteTarget != null) {
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { deleteSetId = null },
+            onConfirm = {
+                onDeleteSet(deleteTarget)
+                deleteSetId = null
+            },
+            title = stringResource(R.string.workout_set_delete_title),
+            message = stringResource(R.string.workout_set_delete_body, deleteTarget.setNumber),
+            confirmLabel = stringResource(R.string.common_delete),
+        )
+    }
+}
+
+/**
+ * H3-54: folha "Editar séries" da sessão concluída — lista os exercícios e as
+ * séries gravadas; tocar numa série abre o mesmo diálogo da H3-27, com as
+ * mesmas validações. A lista vem do Room: editar/excluir recalcula na hora.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionSetsEditSheet(
+    session: SessionWithExercises,
+    onDismiss: () -> Unit,
+    onEditSet: (SessionExerciseWithSets, SetLogEntity) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.history_edit_sets_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.history_edit_sets_helper),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (session.exercises.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.history_series_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            session.exercises
+                .sortedBy { it.exercise.exerciseOrder }
+                .forEach { exercise ->
+                    Text(
+                        text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (exercise.sets.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.history_series_empty),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        exercise.sets.sortedBy { it.setNumber }.forEach { set ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .minimumInteractiveComponentSize()
+                                    .semantics { role = Role.Button }
+                                    .clickable(onClick = { onEditSet(exercise, set) }),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = historySetLabel(set),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = decorativeContentDescription(),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                }
+        }
+    }
+}
+
+/** H3-54: linha "Série N • reps • carga • RPE", reusada pelo card e pela folha. */
+@Composable
+private fun historySetLabel(set: SetLogEntity): String = buildString {
+    append(stringResource(R.string.workout_set, set.setNumber))
+    set.reps?.let { append(" • ${stringResource(R.string.history_metric_sets_reps, it)}") }
+    set.weightKg?.let { append(" • ${formatKg(it)}") }
+    set.rpe?.let { append(" • RPE ${formatDecimal(it, 1)}") }
 }

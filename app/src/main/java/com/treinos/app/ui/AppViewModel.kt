@@ -1380,6 +1380,35 @@ class AppViewModel(
     }
 
     /**
+     * H3-54: edita uma série de sessão concluída direto do Histórico. O
+     * repositório recusa sessão em andamento; o relógio não é reenviado
+     * porque ele espelha a sessão em andamento, que não mudou.
+     */
+    fun updateHistorySet(set: SetLogEntity, reps: Int?, weightKg: Double?, rpe: Double?) {
+        viewModelScope.launch {
+            try {
+                repository.updateHistorySet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_update_set_error)
+            }
+        }
+    }
+
+    /**
+     * H3-54: exclui uma série de sessão concluída direto do Histórico. Sem
+     * séries, o exercício sai da sessão e as métricas recalculam pelo Room.
+     */
+    fun deleteHistorySet(set: SetLogEntity) {
+        viewModelScope.launch {
+            try {
+                repository.deleteHistorySet(set.id)
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_delete_set_error)
+            }
+        }
+    }
+
+    /**
      * "Abandonar treino" (H3-27): apaga a sessão em andamento — exercícios e
      * séries caem por CASCADE — e limpa descanso e estado do relógio. A UI
      * pede confirmação antes de chamar este método.

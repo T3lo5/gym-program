@@ -340,6 +340,9 @@
     <string name="history_session_selected">Selecionado</string>
     <string name="history_series_count">%1$d série(s)</string>
     <string name="history_series_empty">Sem séries registradas</string>
+    <string name="history_edit_sets">Editar séries</string>
+    <string name="history_edit_sets_title">Editar séries</string>
+    <string name="history_edit_sets_helper">Toque em uma série para editar carga, repetições ou RPE.</string>
 
     <!-- Registro de Atividade -->
     <string name="screen_log_activity">Registrar atividade</string>

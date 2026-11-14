@@ -104,6 +104,15 @@ class HistoryScreenTest {
     /** Card expansível: único nó com a combinação "Treino A" + ação de clique. */
     private fun cardSessao() = composeRule.onNode(hasClickAction() and hasText("Treino A"))
 
+    /**
+     * Alterna expandir/recolher clicando no título do card (árvore não
+     * mesclada): `performClick` injeta o toque no centro do nó, e o centro do
+     * card expandido cai na linha clicável do exercício (H3-54), que consumiria
+     * o toque sem recolher. O título fica na área exclusiva do card.
+     */
+    private fun alternarCardSessao() =
+        composeRule.onNodeWithText("Treino A", useUnmergedTree = true).performClick()
+
     /** Atividade avulsa de outra modalidade, para o seletor de modalidades aparecer. */
     private val atividadeAvulsa = SessionWithExercises(
         session = WorkoutSessionEntity(
@@ -156,13 +165,13 @@ class HistoryScreenTest {
             HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })
         }
 
-        cardSessao().performClick()
+        alternarCardSessao()
         composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Série 1", substring = true, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("10 reps • 40,0 kg • RPE 8,0", substring = true, useUnmergedTree = true)
             .assertExists()
 
-        cardSessao().performClick()
+        alternarCardSessao()
         composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertDoesNotExist()
     }
 

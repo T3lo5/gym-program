@@ -194,6 +194,10 @@ interface WorkoutDao {
     )
     suspend fun recalculateCompletedSets(exerciseLogId: Long)
 
+    /** H3-54: exclui a entrada de um exercício que ficou sem séries na sessão. */
+    @Query("DELETE FROM session_exercises WHERE id = :id")
+    suspend fun deleteSessionExercise(id: Long)
+
     @Query("SELECT COALESCE(SUM(completedSets), 0) FROM session_exercises WHERE sessionId = :sessionId")
     suspend fun completedSetsForSession(sessionId: Long): Int
 

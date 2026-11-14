@@ -339,6 +339,9 @@
     <string name="history_session_selected">Selected</string>
     <string name="history_series_count">%1$d set(s)</string>
     <string name="history_series_empty">No sets recorded</string>
+    <string name="history_edit_sets">Edit sets</string>
+    <string name="history_edit_sets_title">Edit sets</string>
+    <string name="history_edit_sets_helper">Tap a set to edit weight, reps or RPE.</string>
 
     <!-- Log Activity -->
     <string name="screen_log_activity">Record activity</string>

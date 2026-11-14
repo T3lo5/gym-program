@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-54` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` |
+| Implementação | `concluída` |
 
 **Origem:** fora de escopo declarado da H3-27 ("corrigir treinos antigos")
 + varredura de polimento de 2026-11-13. O Histórico é somente leitura: um
@@ -34,7 +34,9 @@ Histórico, com as mesmas validações do treino em andamento.
 | `app/src/main/java/com/treinos/app/ui/screens/WorkoutScreen.kt` | usar o diálogo extraído, sem mudança de comportamento |
 | `app/src/main/java/com/treinos/app/ui/screens/HistoryScreen.kt` | card da sessão (~linha 598) ganha "Editar séries" → folha com os exercícios e séries da sessão; cada série abre `SetEditDialog` |
 | `app/src/main/java/com/treinos/app/data/WorkoutRepository.kt` | `updateSet` (:511) e `deleteSet` (:526) já operam por id sem guarda de status; o caminho do Histórico passa a exigir sessão `completed` (função dedicada ou parâmetro explícito) e mantém o realinhamento de `completedSets` |
+| `app/src/main/java/com/treinos/app/data/local/WorkoutDao.kt` | `deleteSessionExercise(id)` para remover a entrada do exercício que ficou sem séries |
 | `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | funções de edição de sessão concluída + recarga das métricas do dia |
+| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | liga `onUpdateSet`/`onDeleteSet` do Histórico às funções novas do ViewModel |
 | `app/src/main/res/values/strings.xml` + `values-en/strings.xml` | chaves novas |
 | `app/src/test/java/com/treinos/app/data/WorkoutRepositorySessionTest.kt` | novos casos de edição em sessão concluída |
 

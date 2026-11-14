@@ -530,6 +530,51 @@ open class WorkoutRepository(
     }
 
     /**
+     * H3-54: edita uma série de sessão já concluída, direto do Histórico.
+     * Mesmo contrato do [updateSet] (H3-27) — vínculo com o exercício e
+     * `setNumber` preservados — mas com guarda explícita: só sessão
+     * `completed` é editável por esse caminho; a sessão em andamento continua
+     * sendo editada pela tela de treino.
+     */
+    suspend fun updateHistorySet(set: SetLogEntity) = withContext(Dispatchers.IO) {
+        val existing = dao.getSetLog(set.id)
+            ?: error("Série não encontrada no aparelho.")
+        requireCompletedSessionForHistory(existing.exerciseLogId)
+        dao.updateSetLog(
+            set.copy(
+                exerciseLogId = existing.exerciseLogId,
+                setNumber = existing.setNumber,
+            )
+        )
+    }
+
+    /**
+     * H3-54: exclui uma série de sessão concluída pelo Histórico. Realinha o
+     * contador de séries concluídas e, se o exercício ficar sem séries, a
+     * entrada dele sai da sessão (o card passa a listar só o que tem série).
+     */
+    suspend fun deleteHistorySet(setId: Long) = withContext(Dispatchers.IO) {
+        val existing = dao.getSetLog(setId) ?: return@withContext
+        requireCompletedSessionForHistory(existing.exerciseLogId)
+        dao.deleteSetLog(setId)
+        dao.recalculateCompletedSets(existing.exerciseLogId)
+        if (dao.maxSetNumber(existing.exerciseLogId) == 0) {
+            dao.deleteSessionExercise(existing.exerciseLogId)
+        }
+    }
+
+    /** H3-54: guarda do caminho do Histórico — apenas sessão `completed`. */
+    private suspend fun requireCompletedSessionForHistory(exerciseLogId: Long) {
+        val exercise = dao.getSessionExercise(exerciseLogId)
+            ?: error("Exercício não encontrado na sessão.")
+        val session = dao.getSession(exercise.sessionId)
+            ?: error("Sessão não encontrada.")
+        if (session.status != "completed") {
+            error("Só sessões concluídas podem ser editadas pelo Histórico.")
+        }
+    }
+
+    /**
      * Exclui a sessão inteira ("Abandonar treino", H3-27). Exercícios e séries
      * caem por CASCADE; o histórico das demais sessões fica intacto.
      */
