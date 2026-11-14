@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-57` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` |
+| Implementação | `implementada (2026-11-14)` |
 
 **Origem:** varredura de polimento UX/UI de 2026-11-13. O app já roda com
 `targetSdk 34` e `activity-compose 1.8.2` (que traz `PredictiveBackHandler`),

@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -52,6 +53,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 @Composable
@@ -196,11 +198,26 @@ fun TreinosApp(viewModel: AppViewModel) {
         if (screen != Screen.Settings) viewModel.stopDiscovery()
     }
 
-    BackHandler(enabled = screen != Screen.Home) {
+    // H3-57: predictive back — o sistema mostra a prévia animada do gesto e o
+    // app só navega quando o gesto é confirmado; soltar no meio (cancelar)
+    // lança CancellationException e a navegação não roda. API < 33 mantém o
+    // back clássico: no activity-compose 1.8.2 o fluxo do PredictiveBackHandler
+    // só completa com eventos de gesto preditivo.
+    val onBackFromStack = {
         when (screen) {
             Screen.Workout -> viewModel.leaveWorkout()
             else -> viewModel.voltar()
         }
+    }
+    if (Build.VERSION.SDK_INT >= 33) {
+        PredictiveBackHandler(enabled = screen != Screen.Home) { progress ->
+            // O fluxo completa quando o gesto é confirmado; cancelar cancela a
+            // coroutine e o bloco abaixo não executa.
+            progress.collect { }
+            onBackFromStack()
+        }
+    } else {
+        BackHandler(enabled = screen != Screen.Home, onBack = onBackFromStack)
     }
 
     val isHub = screen == Screen.Home || screen == Screen.History || screen == Screen.Settings
