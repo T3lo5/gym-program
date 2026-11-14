@@ -111,6 +111,18 @@
     <string name="home_pending_btn_descartar">Descartar</string>
     <string name="home_pending_msg_sem_plano">O job terminou, mas não trouxe plano.</string>
 
+    <!-- H3-53: resumo pós-treino na Home -->
+    <string name="home_summary_title">Treino concluído</string>
+    <string name="home_summary_sets_of">%1$d de %2$d séries</string>
+    <string name="home_summary_volume">Volume: %1$s</string>
+    <string name="home_summary_duration">Duração: %1$s</string>
+    <string name="home_summary_duration_under_minute">menos de 1 min</string>
+    <plurals name="home_summary_exercises">
+        <item quantity="one">%1$d de %2$d exercício</item>
+        <item quantity="many">%1$d de %2$d exercícios</item>
+        <item quantity="other">%1$d de %2$d exercícios</item>
+    </plurals>
+
     <!-- Workout -->
     <string name="workout_loading">Carregando treino…</string>
     <string name="workout_none_title">Nenhum treino em andamento</string>

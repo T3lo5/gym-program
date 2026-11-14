@@ -111,6 +111,17 @@
     <string name="home_pending_btn_descartar">Discard</string>
     <string name="home_pending_msg_sem_plano">The job finished but returned no plan.</string>
 
+    <!-- H3-53: post-workout summary on Home -->
+    <string name="home_summary_title">Workout complete</string>
+    <string name="home_summary_sets_of">%1$d of %2$d sets</string>
+    <string name="home_summary_volume">Volume: %1$s</string>
+    <string name="home_summary_duration">Duration: %1$s</string>
+    <string name="home_summary_duration_under_minute">less than 1 min</string>
+    <plurals name="home_summary_exercises">
+        <item quantity="one">%1$d of %2$d exercise</item>
+        <item quantity="other">%1$d of %2$d exercises</item>
+    </plurals>
+
     <!-- Workout -->
     <string name="workout_loading">Loading workout…</string>
     <string name="workout_none_title">No workout in progress</string>

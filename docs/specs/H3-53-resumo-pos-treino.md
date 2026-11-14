@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-53` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-14` |
+| Implementação | `concluída` |
 
 **Origem:** varredura de polimento UX/UI de 2026-11-13. Hoje
 `AppViewModel.finishWorkout()` (linha ~1295) só emite o snackbar "Treino
@@ -31,8 +31,9 @@ com um toque.
 
 | Arquivo | Mudança |
 |---|---|
-| `app/src/main/java/com/treinos/app/ui/WorkoutSummary.kt` (novo) | função pura `WorkoutSummary.from(...)` sobre os dados da sessão já carregados no VM |
-| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | `finishWorkout()` captura os dados antes de finalizar e expõe `postWorkoutSummary: StateFlow<WorkoutSummary?>`; `dismissPostWorkoutSummary()` limpa |
+| `app/src/main/java/com/treinos/app/ui/WorkoutSummary.kt` (novo) | função pura `WorkoutSummary.from(...)` sobre a sessão já gravada no banco |
+| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | `finishWorkout()` lê a sessão finalizada pelo `id` (com a duração gravada por `finishSession`) e expõe `postWorkoutSummary: StateFlow<WorkoutSummary?>`; `dismissPostWorkoutSummary()` limpa |
+| `app/src/main/java/com/treinos/app/ui/TreinosApp.kt` | coleta `postWorkoutSummary` e liga o card à Home |
 | `app/src/main/java/com/treinos/app/ui/screens/HomeScreen.kt` | card/banner de conclusão no topo (padrão visual do card-herói da H3-28) com botão "Fechar" |
 | `app/src/main/res/values/strings.xml` + `values-en/strings.xml` | chaves do card |
 | `app/src/test/java/com/treinos/app/ui/WorkoutSummaryTest.kt` (novo) | testes puros |
@@ -58,6 +59,10 @@ data class WorkoutSummary(
 
 - Volume = Σ (carga × reps) das séries com carga > 0; séries sem carga contam
   como feitas e somam zero. Nunca NaN/Infinity.
+- Séries contam pelo mesmo critério métrico do histórico (H3-28): concluídas e
+  que não sejam aquecimento (`isCompleted && !isWarmup`).
+- Exercício concluído conta uma vez: séries contáveis ≥ alvo do exercício
+  (sem alvo, basta uma série registrada).
 - Duração = `totalDurationSeconds` da sessão finalizada; < 60 s mostra
   "menos de 1 min".
 - `setsPlanned` vem do alvo do plano do dia; sem alvo (sessão híbrida sem
@@ -82,7 +87,7 @@ data class WorkoutSummary(
 
 | Arquivo | Testes |
 |---|---|
-| `app/src/test/java/com/treinos/app/ui/WorkoutSummaryTest.kt` | `volume_soma_carga_x_reps`, `sem_carga_volume_zero`, `sem_alvo_mostra_so_realizadas`, `duracao_menor_que_um_minuto`, `exercicios_concluidos_contam_uma_vez` |
+| `app/src/test/java/com/treinos/app/ui/WorkoutSummaryTest.kt` | `volume_soma_carga_x_reps`, `sem_carga_volume_zero`, `sem_alvo_mostra_so_realizadas`, `duracao_menor_que_um_minuto`, `exercicios_concluidos_contam_uma_vez`, `series_de_aquecimento_nao_contam`, `volume_ignora_carga_nao_finita`, `resumo_oito_de_dez_series` |
 
 ## Verificação manual
 

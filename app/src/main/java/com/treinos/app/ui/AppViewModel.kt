@@ -75,6 +75,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -344,6 +345,14 @@ class AppViewModel(
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    /**
+     * H3-53: resumo do treino recém-finalizado, exibido como card na Home.
+     * Efêmero por decisão: vive só em memória, aparece uma vez por treino
+     * finalizado e some com "Fechar" (a morte do processo não o restaura).
+     */
+    private val _postWorkoutSummary = MutableStateFlow<WorkoutSummary?>(null)
+    val postWorkoutSummary: StateFlow<WorkoutSummary?> = _postWorkoutSummary.asStateFlow()
 
     /**
      * H3-29: erro persistente da geração — vive na GenerateScreen com
@@ -1320,11 +1329,24 @@ class AppViewModel(
                 skipRest()
                 _activeSessionId.value = null
                 _screen.value = Screen.Home
+                // H3-53: lê a sessão já finalizada pelo `id` (com a duração
+                // gravada por `finishSession`) em vez do fluxo
+                // `inProgressSession`, que sai de "in_progress" e viria nulo.
+                // Só musculação gera card de séries; corrida e mobilidade ficam
+                // fora de escopo.
+                _postWorkoutSummary.value = repository.observeSession(sessionId).first()
+                    ?.takeIf { SessionKind.fromModality(it.session.modality) == SessionKind.STRENGTH }
+                    ?.let { WorkoutSummary.from(it) }
                 _message.value = context.getString(R.string.msg_workout_finished)
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_finish_workout_error)
             }
         }
+    }
+
+    /** H3-53: "Fechar" do card de resumo pós-treino na Home. */
+    fun dismissPostWorkoutSummary() {
+        _postWorkoutSummary.value = null
     }
 
     /**

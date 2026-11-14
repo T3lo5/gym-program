@@ -88,6 +88,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     // H3-40: estado da geração pendente (envelope + status do job).
     val pendingGeneration by viewModel.pendingGeneration.collectAsStateWithLifecycle()
+    // H3-53: resumo do treino recém-finalizado, exibido uma vez na Home.
+    val postWorkoutSummary by viewModel.postWorkoutSummary.collectAsStateWithLifecycle()
     val pendingGenerationStatus by viewModel.pendingGenerationStatus.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val generateError by viewModel.generateError.collectAsStateWithLifecycle()
@@ -291,6 +293,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onCancelPending = { scope.launch { viewModel.cancelGeneration() } },
                     onRetryPending = { viewModel.retryFromEnvelope() },
                     onDismissPending = { viewModel.dismissPendingGeneration() },
+                    // H3-53: card de conclusão do treino na Home.
+                    postWorkoutSummary = postWorkoutSummary,
+                    onDismissPostWorkoutSummary = viewModel::dismissPostWorkoutSummary,
                 )
 
                 Screen.Generate -> GenerateScreen(

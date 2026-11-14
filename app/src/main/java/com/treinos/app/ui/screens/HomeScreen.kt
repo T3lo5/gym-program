@@ -64,6 +64,7 @@ import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.PendingGeneration
 import com.treinos.app.ui.SessionKind
 import com.treinos.app.ui.TodaySession
+import com.treinos.app.ui.WorkoutSummary
 import com.treinos.app.ui.defaultModalityTab
 import com.treinos.app.ui.groupSessionsByModality
 import com.treinos.app.ui.formatDateTime
@@ -73,6 +74,7 @@ import com.treinos.app.ui.formatDuration
 import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
 import com.treinos.app.ui.formatRunDistanceKm
+import com.treinos.app.ui.formatVolumeKg
 import com.treinos.app.ui.isToday
 import com.treinos.app.ui.goalLabel
 import com.treinos.app.ui.planVolumeLabel
@@ -123,6 +125,9 @@ fun HomeScreen(
     onCancelPending: () -> Unit = {},
     onRetryPending: () -> Unit = {},
     onDismissPending: () -> Unit = {},
+    // H3-53: resumo do treino recém-finalizado, efêmero, dispensável com "Fechar".
+    postWorkoutSummary: WorkoutSummary? = null,
+    onDismissPostWorkoutSummary: () -> Unit = {},
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
@@ -166,6 +171,17 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // H3-53: resumo do treino recém-finalizado no topo — o fechamento
+            // mostra o que foi feito e some com "Fechar".
+            postWorkoutSummary?.let { summary ->
+                item {
+                    PostWorkoutSummaryCard(
+                        summary = summary,
+                        onClose = onDismissPostWorkoutSummary,
+                    )
+                }
+            }
+
             // H3-40: card de geração pendente no topo — em andamento ou falhou.
             pendingGeneration?.let {
                 item {
@@ -564,6 +580,83 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
                     )
                 }
                 TodaySession.Rest -> Unit
+            }
+        }
+    }
+}
+
+/**
+ * H3-53: card de conclusão do treino, no topo da Home. Segue o padrão visual
+ * do card-herói da H3-28 e é dispensável com "Fechar" — o resumo é efêmero e
+ * não volta depois de fechado ou de o processo morrer.
+ */
+@Composable
+private fun PostWorkoutSummaryCard(
+    summary: WorkoutSummary,
+    onClose: () -> Unit,
+) {
+    val setsText = when (val planned = summary.setsPlanned) {
+        null -> pluralStringResource(R.plurals.home_sets_count, summary.setsDone, summary.setsDone)
+        else -> stringResource(R.string.home_summary_sets_of, summary.setsDone, planned)
+    }
+    val exercisesText = pluralStringResource(
+        R.plurals.home_summary_exercises,
+        summary.exercisesDone,
+        summary.exercisesDone,
+        summary.exercisesTotal,
+    )
+    val volumeText = stringResource(
+        R.string.home_summary_volume,
+        formatVolumeKg(summary.volumeKg),
+    )
+    // Regra da spec: abaixo de 60 s a duração vira "menos de 1 min".
+    val durationValue = if (summary.durationSeconds < 60) {
+        stringResource(R.string.home_summary_duration_under_minute)
+    } else {
+        formatDuration(summary.durationSeconds)
+    }
+    val durationText = stringResource(R.string.home_summary_duration, durationValue)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.home_summary_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = setsText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = exercisesText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = volumeText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = durationText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            TextButton(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+            ) {
+                Text(stringResource(R.string.common_close))
             }
         }
     }
