@@ -381,6 +381,22 @@ def test_retry_unico_em_429(monkeypatch):
     assert _SequenceClient.calls == 2
 
 
+def test_retry_em_json_parse(monkeypatch):
+    """JSON inválido na 1ª tentativa → retry → plano da IA na resposta seguinte."""
+    monkeypatch.setattr(main, "SENSENOVA_API_KEY", "chave-de-teste")
+    _SequenceClient.calls = 0
+    _SequenceClient.steps = [
+        "isto nao e json",
+        json.dumps(_strength_plan(_valid_ids(4))),
+    ]
+    monkeypatch.setattr(main.httpx, "AsyncClient", _SequenceClient)
+
+    result = run_job(_client(), _payload())
+    assert result["source"] == "ai"
+    assert result["fallbackReason"] == ""
+    assert _SequenceClient.calls == 2
+
+
 # ---------------- retry content vazio (T5) ----------------
 
 

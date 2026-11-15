@@ -13,7 +13,7 @@
 | Item do roadmap | `H3-25` |
 | MoSCoW | `C` (prioridade de execução elevada pelos achados do experimento: fallback estrutural por timeout) |
 | Spec aprovada em | `2026-11-10` |
-| Implementação | `pendente` |
+| Implementação | `concluída em 2026-11-15` (núcleo em `b8e35ea`; lacunas de observabilidade e teste fechadas no commit da fila) |
 
 **Depende de:** [H3-22](H3-22-robustez-geracao-ia.md) (salvamento parcial,
 check ID↔nome, parse tolerante) e [H3-21](H3-21-diagnostico-fallback-ia.md)

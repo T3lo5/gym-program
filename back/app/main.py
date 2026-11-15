@@ -1091,16 +1091,22 @@ def parse_ai_plan(
 
     # H3-25: Resolve exerciseName → exerciseId ANTES de resolve_plan_ids.
     # Usa o pool elegível do request para restringir a resolução.
-    resolution_count = 0
     name_drops: List[Dict[str, Any]] = []
     if request is not None:
-        raw_plan, name_drops = resolve_exercise_names(raw_plan, catalog, request)
-        resolution_count = sum(
-            1
+        # Snapshot dos IDs de força antes da resolução para contar quantos
+        # exercícios tiveram o exerciseId preenchido/corrigido pelo nome.
+        strength_before = [
+            (ex, str(ex.get("exerciseId", "")).strip())
             for day in raw_plan.get("days", [])
+            if str(day.get("modality", "strength")) == "strength" and not day.get("isRestDay")
             for ex in day.get("exercises", [])
             if str(ex.get("metricType", "reps_weight")) == "reps_weight" or not ex.get("metricType")
+        ]
+        raw_plan, name_drops = resolve_exercise_names(raw_plan, catalog, request)
+        resolved_by_name = sum(
+            1 for ex, old_id in strength_before if str(ex.get("exerciseId", "")).strip() != old_id
         )
+        print(f"[ai] nomes_resolvidos={resolved_by_name} nomes_drops={len(name_drops)}")
         for drop in name_drops:
             print(fallback_log_line("dropped_ids", f"{drop.get('exerciseName', 'unknown')}:{drop.get('reason', 'unresolved_name')}"))
 
@@ -1453,6 +1459,7 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
 
     fallback_reason = ""
     fallback_detail = ""
+    attempts_used = 0
     if not SENSENOVA_API_KEY:
         fallback_reason = "no_api_key"
         fallback_detail = "SENSENOVA_API_KEY ausente"
@@ -1475,6 +1482,7 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
             remaining = ai_budget - (monotonic() - ai_started)
             if remaining < 3.0:
                 break
+            attempts_used += 1
             attempt_timeout = remaining
             try:
                 timeout = httpx.Timeout(
@@ -1593,7 +1601,10 @@ async def _generate_plan_response(request: GenerateRequest) -> GenerateResponse:
         print(f"Failed to persist generated plan: {exc}")
 
     generation_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-    print(f"[generation] source={source} generationTimeMs={generation_time} model={model_used}")
+    print(
+        f"[generation] source={source} generationTimeMs={generation_time} "
+        f"model={model_used} tentativas={attempts_used}"
+    )
 
     # Invariante do contrato (H3-21): source == "local" ⇒ fallbackReason
     # nunca vazio (no mínimo "unknown"); source == "ai" ⇒ sempre vazio.
