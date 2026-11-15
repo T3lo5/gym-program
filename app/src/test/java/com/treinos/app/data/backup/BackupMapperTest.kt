@@ -1,5 +1,7 @@
 package com.treinos.app.data.backup
 
+import com.treinos.app.data.local.SET_TYPE_AMRAP
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutDayEntity
@@ -7,9 +9,60 @@ import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackupMapperTest {
+
+    @Test
+    fun set_type_e_rir_sobrevivem_ao_round_trip() {
+        // H4-4: tipo e RIR atravessam entidade → DTO → entidade sem perda.
+        val amrap = SetLogEntity(
+            id = 5000,
+            exerciseLogId = 500,
+            setNumber = 1,
+            reps = 12,
+            weightKg = 60.0,
+            setType = SET_TYPE_AMRAP,
+            rir = 2,
+        )
+        val dto = BackupMapper.toDto(amrap, exerciseLogId = 500)
+        assertEquals(SET_TYPE_AMRAP, dto.setType)
+        assertEquals(2, dto.rir)
+        val volta = BackupMapper.toEntity(dto, exerciseLogId = 500)
+        assertEquals(SET_TYPE_AMRAP, volta.setType)
+        assertEquals(2, volta.rir)
+        assertFalse(volta.isWarmup)
+
+        // Backup antigo: sem setType, mas isWarmup=true → vira 'warmup' e a
+        // dupla nunca fica divergente no banco.
+        val antigo = BackupSetLog(
+            id = 5001,
+            setNumber = 2,
+            reps = 10,
+            weightKg = 40.0,
+            rpe = null,
+            durationSeconds = null,
+            distanceMeters = null,
+            isCompleted = true,
+            isWarmup = true,
+            restTakenSeconds = null,
+            completedAt = null,
+            exerciseLogId = 500,
+        )
+        val entityAntigo = BackupMapper.toEntity(antigo, exerciseLogId = 500)
+        assertEquals(SET_TYPE_WARMUP, entityAntigo.setType)
+        assertTrue(entityAntigo.isWarmup)
+        assertNull(entityAntigo.rir)
+
+        // setType explícito vence: isWarmup é rederivado.
+        val divergente = antigo.copy(setType = SET_TYPE_AMRAP, isWarmup = true)
+        val entityDivergente = BackupMapper.toEntity(divergente, exerciseLogId = 500)
+        assertEquals(SET_TYPE_AMRAP, entityDivergente.setType)
+        assertFalse(entityDivergente.isWarmup)
+    }
 
     @Test
     fun entityParaDtoEVolta() {

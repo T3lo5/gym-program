@@ -1,5 +1,8 @@
 package com.treinos.app.ui
 
+import com.treinos.app.data.local.SET_TYPE_AMRAP
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -7,12 +10,24 @@ import org.junit.Test
 
 /**
  * Regras puras do diálogo de série (H3-27): valor preenchido e inválido
- * bloqueia o salvamento — nada vira `null` em silêncio.
+ * bloqueia o salvamento — nada vira `null` em silêncio. H4-4: RIR em 0..10
+ * (vazio = `null`) e tipo desconhecido normaliza para `normal`.
  */
 class SetValidationTest {
 
-    private fun valido(reps: String = "10", weight: String = "60", rpe: String = "") =
-        validateSetInput(repsText = reps, weightText = weight, rpeText = rpe)
+    private fun valido(
+        reps: String = "10",
+        weight: String = "60",
+        rpe: String = "",
+        rir: String = "",
+        setType: String = SET_TYPE_NORMAL,
+    ) = validateSetInput(
+        repsText = reps,
+        weightText = weight,
+        rpeText = rpe,
+        rirText = rir,
+        setType = setType,
+    )
 
     @Test
     fun carga_invalida_rejeitada() {
@@ -104,5 +119,68 @@ class SetValidationTest {
         assertNull(input.reps)
         assertNull(input.weightKg)
         assertNull(input.rpe)
+    }
+
+    // ---------- H4-4: RIR ----------
+
+    @Test
+    fun rir_vazio_e_null() {
+        // Vazio é "não informado", nunca 0.
+        val input = (valido(rir = "") as SetInputValidation.Valid).input
+        assertNull(input.rir)
+    }
+
+    @Test
+    fun rir_0_a_10_valido() {
+        val zero = (valido(rir = "0") as SetInputValidation.Valid).input
+        val dez = (valido(rir = "10") as SetInputValidation.Valid).input
+        val dois = (valido(rir = "2") as SetInputValidation.Valid).input
+
+        assertEquals(0, zero.rir)
+        assertEquals(10, dez.rir)
+        assertEquals(2, dois.rir)
+    }
+
+    @Test
+    fun rir_fora_da_faixa_bloqueia() {
+        val acima = valido(rir = "11")
+        val abaixo = valido(rir = "-1")
+
+        assertEquals(
+            "RIR deve estar entre 0 e 10.",
+            (acima as SetInputValidation.Invalid).errors.rir,
+        )
+        assertEquals(
+            "RIR deve estar entre 0 e 10.",
+            (abaixo as SetInputValidation.Invalid).errors.rir,
+        )
+    }
+
+    @Test
+    fun rir_nao_inteiro_bloqueia() {
+        val quebrado = valido(rir = "7,5")
+        val texto = valido(rir = "muito")
+
+        assertEquals(
+            "Informe o RIR como número inteiro.",
+            (quebrado as SetInputValidation.Invalid).errors.rir,
+        )
+        assertEquals(
+            "Informe o RIR como número inteiro.",
+            (texto as SetInputValidation.Invalid).errors.rir,
+        )
+    }
+
+    // ---------- H4-4: tipo da série ----------
+
+    @Test
+    fun set_type_desconhecido_vira_normal() {
+        val desconhecido = (valido(setType = "gigante") as SetInputValidation.Valid).input
+        val conhecido = (valido(setType = SET_TYPE_WARMUP) as SetInputValidation.Valid).input
+        val amrap = (valido(setType = SET_TYPE_AMRAP) as SetInputValidation.Valid).input
+
+        assertEquals(SET_TYPE_NORMAL, desconhecido.setType)
+        assertEquals(SET_TYPE_WARMUP, conhecido.setType)
+        assertEquals(SET_TYPE_AMRAP, amrap.setType)
     }
 }

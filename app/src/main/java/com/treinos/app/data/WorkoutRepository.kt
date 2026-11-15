@@ -2,6 +2,8 @@ package com.treinos.app.data
 
 import com.treinos.app.data.local.ExerciseUsageEvent
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
@@ -13,6 +15,8 @@ import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutPlanWithDetails
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.local.normalizeSetType
+import com.treinos.app.data.local.resolveSetType
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
@@ -444,13 +448,22 @@ open class WorkoutRepository(
         sessionId
     }
 
+    /**
+     * Registra uma série (H4-4): o tipo (`normal`/`warmup`/`drop`/`amrap`)
+     * deriva `isWarmup` na escrita, e só série de trabalho incrementa
+     * `completedSets` — aquecimento não "completa" o exercício.
+     */
     suspend fun logSet(
         exerciseLogId: Long,
         reps: Int?,
         weightKg: Double?,
         rpe: Double?,
         restTakenSeconds: Int? = null,
+        setType: String = SET_TYPE_NORMAL,
+        rir: Int? = null,
     ): Int = withContext(Dispatchers.IO) {
+        val type = normalizeSetType(setType)
+        val isWarmup = type == SET_TYPE_WARMUP
         val setNumber = dao.maxSetNumber(exerciseLogId) + 1
         val now = System.currentTimeMillis()
         dao.insertSetLog(
@@ -461,12 +474,16 @@ open class WorkoutRepository(
                 weightKg = weightKg,
                 rpe = rpe,
                 isCompleted = true,
-                isWarmup = false,
+                isWarmup = isWarmup,
+                setType = type,
+                rir = rir,
                 restTakenSeconds = restTakenSeconds,
                 completedAt = now,
             )
         )
-        dao.incrementCompletedSets(exerciseLogId)
+        if (!isWarmup) {
+            dao.incrementCompletedSets(exerciseLogId)
+        }
         dao.setExerciseEndedAt(exerciseLogId, now)
         setNumber
     }
@@ -506,17 +523,24 @@ open class WorkoutRepository(
     /**
      * Atualiza uma série já registrada pelo `id` (H3-27). O vínculo com o
      * exercício da sessão e o número da série não mudam na edição — só
-     * reps/carga/RPE.
+     * reps/carga/RPE/tipo/RIR (H4-4). Mudar o tipo recalcula `completedSets`:
+     * virar warm-up tira a série do progresso; voltar a ser de trabalho
+     * devolve ela ao progresso.
      */
     suspend fun updateSet(set: SetLogEntity) = withContext(Dispatchers.IO) {
         val existing = dao.getSetLog(set.id)
             ?: error("Série não encontrada no aparelho.")
-        dao.updateSetLog(
-            set.copy(
-                exerciseLogId = existing.exerciseLogId,
-                setNumber = existing.setNumber,
-            )
+        val type = normalizeSetType(set.setType)
+        val updated = set.copy(
+            exerciseLogId = existing.exerciseLogId,
+            setNumber = existing.setNumber,
+            setType = type,
+            isWarmup = type == SET_TYPE_WARMUP,
         )
+        dao.updateSetLog(updated)
+        if (existing.isWarmup != updated.isWarmup) {
+            dao.recalculateCompletedSets(updated.exerciseLogId)
+        }
     }
 
     /**
@@ -540,12 +564,17 @@ open class WorkoutRepository(
         val existing = dao.getSetLog(set.id)
             ?: error("Série não encontrada no aparelho.")
         requireCompletedSessionForHistory(existing.exerciseLogId)
-        dao.updateSetLog(
-            set.copy(
-                exerciseLogId = existing.exerciseLogId,
-                setNumber = existing.setNumber,
-            )
+        val type = normalizeSetType(set.setType)
+        val updated = set.copy(
+            exerciseLogId = existing.exerciseLogId,
+            setNumber = existing.setNumber,
+            setType = type,
+            isWarmup = type == SET_TYPE_WARMUP,
         )
+        dao.updateSetLog(updated)
+        if (existing.isWarmup != updated.isWarmup) {
+            dao.recalculateCompletedSets(updated.exerciseLogId)
+        }
     }
 
     /**
@@ -872,6 +901,9 @@ open class WorkoutRepository(
                 "Série ${dto.setNumber} referencia um exercício de sessão que não está no snapshot " +
                     "(exerciseLogId ${dto.sessionExerciseId})."
             }
+            // H4-4: normaliza a dupla setType/isWarmup — DTO antigo sem setType
+            // mas com isWarmup=true vira 'warmup'; nunca ficam divergentes.
+            val setType = resolveSetType(dto.setType, dto.isWarmup)
             SetLogEntity(
                 id = dto.localId,
                 exerciseLogId = exerciseLogId,
@@ -882,7 +914,9 @@ open class WorkoutRepository(
                 durationSeconds = dto.durationSeconds,
                 distanceMeters = dto.distanceMeters,
                 isCompleted = dto.isCompleted,
-                isWarmup = dto.isWarmup,
+                isWarmup = setType == SET_TYPE_WARMUP,
+                setType = setType,
+                rir = dto.rir,
                 restTakenSeconds = dto.restTakenSeconds,
                 completedAt = dto.completedAt,
             )
@@ -1194,6 +1228,8 @@ open class WorkoutRepository(
                             distanceMeters = set.distanceMeters,
                             isCompleted = set.isCompleted,
                             isWarmup = set.isWarmup,
+                            setType = set.setType,
+                            rir = set.rir,
                             restTakenSeconds = set.restTakenSeconds,
                             completedAt = set.completedAt,
                         )

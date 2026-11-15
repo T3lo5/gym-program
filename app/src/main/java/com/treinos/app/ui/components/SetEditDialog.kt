@@ -2,6 +2,8 @@ package com.treinos.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -25,11 +28,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.R
+import com.treinos.app.data.local.SET_TYPE_AMRAP
+import com.treinos.app.data.local.SET_TYPE_DROP
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.ui.HapticEvent
+import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.SetInputErrors
 import com.treinos.app.ui.SetInputValidation
 import com.treinos.app.ui.formatKg
@@ -42,8 +52,10 @@ import com.treinos.app.ui.validateSetInput
  * Diálogo de série (H3-27), extraído para reuso (H3-54): registra uma série
  * nova ou edita uma existente com as mesmas validações (`SetValidation`),
  * sugestão de progressão e botão "Excluir série" opcional. Usado pela tela de
- * treino e pela folha "Editar séries" do Histórico.
+ * treino e pela folha "Editar séries" do Histórico. H4-4: escolhe o tipo
+ * (Normal/Aquecimento/Drop set/AMRAP) e o RIR, entregues no `SetInput`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SetEditDialog(
     key: String,
@@ -56,29 +68,43 @@ fun SetEditDialog(
     confirmLabel: String,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
-    onConfirm: (Int?, Double?, Double?) -> Unit,
-    confirmHaptic: (Int?, Double?, Double?) -> HapticEvent = { _, _, _ -> HapticEvent.SetSaved },
+    onConfirm: (SetInput) -> Unit,
+    confirmHaptic: (SetInput) -> HapticEvent = { _ -> HapticEvent.SetSaved },
+    initialSetType: String = SET_TYPE_NORMAL,
+    initialRir: String = "",
 ) {
     // H3-31: o que foi digitado sobrevive à rotação (e ao teclado que recria
     // a Activity). `key` evita herdar rascunho de outro diálogo na mesma posição.
     var reps by rememberSaveable(key = key) { mutableStateOf(initialReps) }
     var weight by rememberSaveable(key = key) { mutableStateOf(initialWeight) }
     var rpe by rememberSaveable(key = key) { mutableStateOf(initialRpe) }
+    var rir by rememberSaveable(key = key) { mutableStateOf(initialRir) }
+    var setType by rememberSaveable(key = key) { mutableStateOf(initialSetType) }
     var errors by remember { mutableStateOf(SetInputErrors()) }
     val haptics = LocalHapticFeedback.current
     val suggestionText = suggestionLabel(suggestion)
+    val chipSelectedDesc = stringResource(R.string.chip_selected)
+    val chipNotSelectedDesc = stringResource(R.string.chip_not_selected)
 
     // H3-27: valor preenchido e inválido bloqueia o salvamento — nada é
     // gravado com carga/reps/RPE `null` por falha de parse.
     fun submit() {
-        when (val result = validateSetInput(repsText = reps, weightText = weight, rpeText = rpe)) {
+        when (
+            val result = validateSetInput(
+                repsText = reps,
+                weightText = weight,
+                rpeText = rpe,
+                rirText = rir,
+                setType = setType,
+            )
+        ) {
             is SetInputValidation.Invalid -> errors = result.errors
             is SetInputValidation.Valid -> {
                 // H3-46/H4-1: o evento é decidido por quem chama — o PR substitui
                 // o SetSaved na mesma confirmação (nunca dois hápticos).
-                val event = confirmHaptic(result.input.reps, result.input.weightKg, result.input.rpe)
+                val event = confirmHaptic(result.input)
                 haptics.performHapticFeedback(hapticFeedbackForEvent(event))
-                onConfirm(result.input.reps, result.input.weightKg, result.input.rpe)
+                onConfirm(result.input)
             }
         }
     }
@@ -105,6 +131,32 @@ fun SetEditDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                }
+                // H4-4: tipo da série — aquecimento não conta como série de
+                // trabalho; drop set e AMRAP contam.
+                Text(
+                    text = stringResource(R.string.workout_set_dialog_type),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        SET_TYPE_NORMAL to R.string.workout_set_type_normal,
+                        SET_TYPE_WARMUP to R.string.workout_set_type_warmup,
+                        SET_TYPE_DROP to R.string.workout_set_type_drop,
+                        SET_TYPE_AMRAP to R.string.workout_set_type_amrap,
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = setType == value,
+                            onClick = { setType = value },
+                            label = { Text(stringResource(label)) },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .semantics {
+                                    stateDescription =
+                                        if (setType == value) chipSelectedDesc else chipNotSelectedDesc
+                                },
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = reps,
@@ -150,7 +202,20 @@ fun SetEditDialog(
                     supportingText = { Text(errors.rpe ?: stringResource(R.string.workout_set_dialog_support_rpe)) },
                     isError = errors.rpe != null,
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = rir,
+                    onValueChange = { value ->
+                        rir = value.filter(Char::isDigit)
+                        errors = errors.copy(rir = null)
+                    },
+                    label = { Text(stringResource(R.string.workout_set_dialog_rir)) },
+                    supportingText = { Text(errors.rir ?: stringResource(R.string.workout_set_dialog_support_rir)) },
+                    isError = errors.rir != null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     modifier = Modifier.fillMaxWidth(),
                 )

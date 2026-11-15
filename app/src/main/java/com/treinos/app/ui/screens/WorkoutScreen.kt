@@ -67,6 +67,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.treinos.app.data.local.SET_TYPE_AMRAP
+import com.treinos.app.data.local.SET_TYPE_DROP
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
@@ -77,6 +81,7 @@ import com.treinos.app.data.SwapScope
 import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.KeepScreenOnEffect
+import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
@@ -109,7 +114,7 @@ fun WorkoutScreen(
     restRemaining: Int?,
     restTotal: Int?,
     onLeave: () -> Unit,
-    onLogSet: (SessionExerciseWithSets, Int?, Double?, Double?) -> Unit,
+    onLogSet: (SessionExerciseWithSets, SetInput) -> Unit,
     onSkipRest: () -> Unit,
     onFinish: () -> Unit,
     hasInProgressSession: Boolean,
@@ -121,7 +126,7 @@ fun WorkoutScreen(
     progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
     personalRecords: Map<String, PersonalRecord> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
-    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit = { _, _, _, _ -> },
+    onUpdateSet: (SetLogEntity, SetInput) -> Unit = { _, _ -> },
     onDeleteSet: (SetLogEntity) -> Unit = {},
     onAbandon: () -> Unit = {},
     onNextExercise: () -> Unit = {},
@@ -306,7 +311,9 @@ fun WorkoutScreen(
                         media = exerciseMedia[exercise.exercise.exerciseId],
                         onLogSet = { exerciseToLogId = exercise.exercise.id },
                         onRepeatLastSet = { reps, weight, rpe ->
-                            onLogSet(exercise, reps, weight, rpe)
+                            // H4-4: repetir registra série de trabalho (normal) —
+                            // a última série pode ser aquecimento.
+                            onLogSet(exercise, SetInput(reps = reps, weightKg = weight, rpe = rpe))
                         },
                         repeatHaptic = { reps, weight, rpe ->
                             // H4-1: repetir a última série também avalia PR.
@@ -390,14 +397,14 @@ fun WorkoutScreen(
             confirmLabel = stringResource(R.string.workout_set_dialog_save),
             onDelete = null,
             onDismiss = { exerciseToLogId = null },
-            confirmHaptic = { reps, weight, rpe ->
+            confirmHaptic = { input ->
                 // H4-1: PR substitui o SetSaved na mesma confirmação (um háptico).
                 val candidate = RecordSet(
                     sessionId = session?.session?.id ?: 0L,
                     sessionStartedAt = session?.session?.startedAt ?: 0L,
-                    reps = reps,
-                    weightKg = weight,
-                    rpe = rpe,
+                    reps = input.reps,
+                    weightKg = input.weightKg,
+                    rpe = input.rpe,
                 )
                 if (isPersonalRecord(candidate, personalRecords[exercise.exercise.exerciseId])) {
                     prSessionExercises = prSessionExercises + exercise.exercise.exerciseId
@@ -406,18 +413,18 @@ fun WorkoutScreen(
                     HapticEvent.SetSaved
                 }
             },
-            onConfirm = { reps, weight, rpe ->
+            onConfirm = { input ->
                 val nextSetNumber = exercise.sets.size + 1
                 val partes = mutableListOf<String>()
-                reps?.let { partes.add(String.format(repsTemplate, it)) }
-                weight?.let { partes.add(formatKg(it)) }
+                input.reps?.let { partes.add(String.format(repsTemplate, it)) }
+                input.weightKg?.let { partes.add(formatKg(it)) }
                 val detalhe = partes.joinToString(" • ")
                 val candidate = RecordSet(
                     sessionId = session?.session?.id ?: 0L,
                     sessionStartedAt = session?.session?.startedAt ?: 0L,
-                    reps = reps,
-                    weightKg = weight,
-                    rpe = rpe,
+                    reps = input.reps,
+                    weightKg = input.weightKg,
+                    rpe = input.rpe,
                 )
                 val bateuPr = isPersonalRecord(candidate, personalRecords[exercise.exercise.exerciseId])
                 setSavedAnnouncement =
@@ -428,7 +435,7 @@ fun WorkoutScreen(
                         detalhe.isNotBlank() -> String.format(savedDetailTemplate, nextSetNumber, detalhe)
                         else -> String.format(savedTemplate, nextSetNumber)
                     }
-                onLogSet(exercise, reps, weight, rpe)
+                onLogSet(exercise, input)
                 exerciseToLogId = null
             },
         )
@@ -443,11 +450,13 @@ fun WorkoutScreen(
             initialReps = set.reps?.toString().orEmpty(),
             initialWeight = set.weightKg?.let { formatDecimal(it, 1) }.orEmpty(),
             initialRpe = set.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
+            initialSetType = set.setType,
+            initialRir = set.rir?.toString().orEmpty(),
             confirmLabel = stringResource(R.string.workout_set_dialog_save_changes),
             onDelete = { setToDelete = set },
             onDismiss = { editSetId = null },
-            onConfirm = { reps, weight, rpe ->
-                onUpdateSet(set, reps, weight, rpe)
+            onConfirm = { input ->
+                onUpdateSet(set, input)
                 editSetId = null
             },
         )
@@ -1108,17 +1117,30 @@ private fun ExerciseCard(
 
 @Composable
 private fun setDetailText(set: SetLogEntity): String {
+    val typePart = setTypeLabel(set.setType)
     val repsPart = set.reps?.let { stringResource(R.string.workout_reps, it) }
     val weightPart = set.weightKg?.let { formatKg(it) }
     val rpePart = set.rpe?.let { "RPE ${formatDecimal(it, 1)}" }
+    val rirPart = set.rir?.let { "RIR $it" }
     return buildString {
-        repsPart?.let { append(it) }
+        typePart?.let { append(it) }
+        repsPart?.let { if (isNotEmpty()) append(" • "); append(it) }
         weightPart?.let { if (isNotEmpty()) append(" • "); append(it) }
         rpePart?.let { if (isNotEmpty()) append(" • "); append(it) }
-        if (repsPart == null && weightPart == null && rpePart == null) {
+        rirPart?.let { if (isNotEmpty()) append(" • "); append(it) }
+        if (repsPart == null && weightPart == null && rpePart == null && rirPart == null) {
             append(stringResource(R.string.workout_set_recorded))
         }
     }
+}
+
+/** H4-4: rótulo do tipo; `null` para série normal (sem selo). */
+@Composable
+private fun setTypeLabel(setType: String): String? = when (setType) {
+    SET_TYPE_WARMUP -> stringResource(R.string.workout_set_type_warmup)
+    SET_TYPE_DROP -> stringResource(R.string.workout_set_type_drop)
+    SET_TYPE_AMRAP -> stringResource(R.string.workout_set_type_amrap)
+    else -> null
 }
 
 /** Verdadeiro quando as séries planejadas do exercício já foram registradas. */

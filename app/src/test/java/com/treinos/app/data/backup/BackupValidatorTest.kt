@@ -1,7 +1,9 @@
 package com.treinos.app.data.backup
 
+import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -237,6 +239,122 @@ class BackupValidatorTest {
         assertFalse(result.valid)
         val msg = result.message
         assertTrue(msg != null && msg.contains("rpe da série 1 fora da faixa"))
+    }
+
+    // ---------- H4-4: setType / rir ----------
+
+    @Test
+    fun rejeita_set_type_invalido() {
+        val setLogTipoInvalido = BackupSetLog(
+            id = 5000,
+            setNumber = 1,
+            reps = 10,
+            weightKg = 40.0,
+            rpe = null,
+            durationSeconds = null,
+            distanceMeters = null,
+            isCompleted = true,
+            isWarmup = false,
+            setType = "gigante",
+            restTakenSeconds = 90,
+            completedAt = 1000L,
+            exerciseLogId = 500,
+        )
+        val exercicioSessao = BackupSessionExercise(
+            id = 500,
+            exerciseId = "EX",
+            exerciseName = "Ex",
+            exerciseOrder = 0,
+            plannedSets = 3,
+            completedSets = 1,
+            restSeconds = 90,
+            startedAt = 1000L,
+            endedAt = null,
+            sessionId = 50,
+            sets = listOf(setLogTipoInvalido),
+        )
+        val sessao = validSession(id = 50, planId = 1, exercises = listOf(exercicioSessao))
+        val result = BackupValidator.validate(validFile(sessions = listOf(sessao)))
+
+        assertFalse(result.valid)
+        val msg = result.message
+        assertTrue(msg != null && msg.contains("setType da série 1 inválido"))
+    }
+
+    @Test
+    fun rejeita_rir_fora_da_faixa() {
+        val setLogRirInvalido = BackupSetLog(
+            id = 5000,
+            setNumber = 1,
+            reps = 10,
+            weightKg = 40.0,
+            rpe = null,
+            durationSeconds = null,
+            distanceMeters = null,
+            isCompleted = true,
+            isWarmup = false,
+            rir = 11,
+            restTakenSeconds = 90,
+            completedAt = 1000L,
+            exerciseLogId = 500,
+        )
+        val exercicioSessao = BackupSessionExercise(
+            id = 500,
+            exerciseId = "EX",
+            exerciseName = "Ex",
+            exerciseOrder = 0,
+            plannedSets = 3,
+            completedSets = 1,
+            restSeconds = 90,
+            startedAt = 1000L,
+            endedAt = null,
+            sessionId = 50,
+            sets = listOf(setLogRirInvalido),
+        )
+        val sessao = validSession(id = 50, planId = 1, exercises = listOf(exercicioSessao))
+        val result = BackupValidator.validate(validFile(sessions = listOf(sessao)))
+
+        assertFalse(result.valid)
+        val msg = result.message
+        assertTrue(msg != null && msg.contains("rir da série 1 fora da faixa"))
+    }
+
+    @Test
+    fun backup_antigo_sem_set_type_e_valido() {
+        // Backup antigo: sem setType/rir no JSON — os defaults do DTO cobrem.
+        val json = """
+            {
+              "schemaVersion": 3,
+              "exportedAt": "2026-11-03T18:00:00Z",
+              "app": {"packageName": "com.treinos.app", "versionName": "1.0.0", "versionCode": 1},
+              "deviceId": "device-1",
+              "plans": [],
+              "sessions": [{
+                "id": 50, "planId": 0, "dayId": 0, "planName": "", "dayName": "A",
+                "status": "completed", "startedAt": 1, "endedAt": 10,
+                "totalDurationSeconds": 9, "notes": "",
+                "exercises": [{
+                  "id": 500, "exerciseId": "EX", "exerciseName": "Ex", "exerciseOrder": 0,
+                  "plannedSets": 3, "completedSets": 1, "restSeconds": 90,
+                  "startedAt": 1000, "endedAt": null, "sessionId": 50,
+                  "sets": [{
+                    "id": 5000, "setNumber": 1, "reps": 10, "weightKg": 40.0, "rpe": null,
+                    "durationSeconds": null, "distanceMeters": null, "isCompleted": true,
+                    "isWarmup": false, "restTakenSeconds": 90, "completedAt": 1000,
+                    "exerciseLogId": 500
+                  }]
+                }]
+              }]
+            }
+        """.trimIndent()
+        val file = backupImportDecoder.decodeFromString(BackupFile.serializer(), json)
+
+        val result = BackupValidator.validate(file)
+
+        assertTrue(result.valid)
+        val setLog = file.sessions.single().exercises.single().sets.single()
+        assertEquals("normal", setLog.setType)
+        assertNull(setLog.rir)
     }
 
     @Test

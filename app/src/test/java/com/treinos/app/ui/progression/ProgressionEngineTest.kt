@@ -1,5 +1,12 @@
 package com.treinos.app.ui.progression
 
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
+import com.treinos.app.data.local.SessionExerciseEntity
+import com.treinos.app.data.local.SessionExerciseWithSets
+import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.data.local.WorkoutSessionEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -54,6 +61,51 @@ class ProgressionEngineTest {
         targetReps: String = "8-12",
     ): ProgressionSuggestion =
         suggestProgression(context(equipment = equipment, targetReps = targetReps), history, nowMillis)
+
+    /** H4-4: sessão com séries gravadas para exercer `progressionHistory`. */
+    private fun sessao(sets: List<SetLogEntity>): SessionWithExercises = SessionWithExercises(
+        session = WorkoutSessionEntity(
+            id = 1,
+            planId = 1,
+            dayId = 10,
+            planName = "P",
+            dayName = "A",
+            status = "completed",
+            startedAt = nowMillis - dayMillis,
+        ),
+        exercises = listOf(
+            SessionExerciseWithSets(
+                exercise = SessionExerciseEntity(
+                    id = 100,
+                    sessionId = 1,
+                    exerciseId = "barbell_bench_press",
+                    exerciseName = "Supino",
+                    exerciseOrder = 0,
+                    plannedSets = 3,
+                ),
+                sets = sets,
+            ),
+        ),
+    )
+
+    private fun setLog(
+        reps: Int = 10,
+        weightKg: Double = 40.0,
+        rpe: Double? = null,
+        rir: Int? = null,
+        setType: String = SET_TYPE_NORMAL,
+        isWarmup: Boolean = false,
+    ) = SetLogEntity(
+        id = 1,
+        exerciseLogId = 100,
+        setNumber = 1,
+        reps = reps,
+        weightKg = weightKg,
+        rpe = rpe,
+        setType = setType,
+        rir = rir,
+        isWarmup = isWarmup,
+    )
 
     @Test
     fun historico_insuficiente_retorna_none() {
@@ -242,5 +294,47 @@ class ProgressionEngineTest {
         assertEquals(40.0, roundToIncrement(41.0), 0.001)
         assertEquals(42.5, roundToIncrement(43.0), 0.001)
         assertEquals(42.5, roundToIncrement(42.5), 0.001)
+    }
+
+    // ---------- H4-4: RIR ----------
+
+    @Test
+    fun rir_vira_rpe_na_historia() {
+        // RIR 2 sem RPE: a progressão trata o esforço como RPE 8 (10 - RIR).
+        val history = progressionHistory(
+            listOf(sessao(listOf(setLog(rir = 2)))),
+            "barbell_bench_press",
+        )
+
+        assertEquals(1, history.size)
+        assertEquals(8.0, history.single().rpe!!, 0.0001)
+    }
+
+    @Test
+    fun rpe_presente_vence_rir() {
+        // Com os dois preenchidos, RPE é a fonte da verdade.
+        val history = progressionHistory(
+            listOf(sessao(listOf(setLog(rpe = 7.0, rir = 0)))),
+            "barbell_bench_press",
+        )
+
+        assertEquals(7.0, history.single().rpe!!, 0.0001)
+    }
+
+    @Test
+    fun warmup_com_rir_continua_ignorado() {
+        // Aquecimento com RIR não entra na progressão: histórico insuficiente.
+        val history = progressionHistory(
+            listOf(sessao(listOf(setLog(setType = SET_TYPE_WARMUP, isWarmup = true, rir = 0)))),
+            "barbell_bench_press",
+        )
+        assertEquals(1, history.size)
+
+        val suggestion = suggestProgression(
+            context(equipment = "barbell"),
+            history,
+            nowMillis,
+        )
+        assertEquals(ProgressionAction.NONE, suggestion.action)
     }
 }

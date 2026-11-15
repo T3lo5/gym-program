@@ -607,6 +607,10 @@ class SyncSetLog(BaseModel):
     distanceMeters: Optional[float] = None
     isCompleted: bool = False
     isWarmup: bool = False
+    # H4-4: tipo da série ('normal' | 'warmup' | 'drop' | 'amrap') e RIR.
+    # App antigo não envia os campos — defaults mantêm o contrato compatível.
+    setType: str = "normal"
+    rir: Optional[int] = None
     restTakenSeconds: Optional[int] = None
     completedAt: Optional[int] = None
 

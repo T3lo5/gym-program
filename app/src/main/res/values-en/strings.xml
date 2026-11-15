@@ -151,6 +151,13 @@
     <string name="workout_set_dialog_support_reps">Integer from 1 to 100</string>
     <string name="workout_set_dialog_support_weight">Optional. Use comma or period.</string>
     <string name="workout_set_dialog_support_rpe">Optional, from 1 to 10.</string>
+    <string name="workout_set_dialog_type">Set type</string>
+    <string name="workout_set_type_normal">Normal</string>
+    <string name="workout_set_type_warmup">Warm-up</string>
+    <string name="workout_set_type_drop">Drop set</string>
+    <string name="workout_set_type_amrap">AMRAP</string>
+    <string name="workout_set_dialog_rir">RIR (optional)</string>
+    <string name="workout_set_dialog_support_rir">Optional, from 0 to 10.</string>
     <string name="workout_suggestion">Suggestion: %1$s — %2$s</string>
     <string name="workout_rest_finished">Rest completed. On to the next set.</string>
     <string name="workout_rest_paused">Rest paused: %1$s</string>

@@ -58,6 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
+import com.treinos.app.data.local.SET_TYPE_AMRAP
+import com.treinos.app.data.local.SET_TYPE_DROP
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
@@ -76,6 +79,7 @@ import com.treinos.app.ui.components.ProgressLineChart
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.components.SetEditDialog
+import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDateShort
@@ -127,7 +131,7 @@ fun HistoryScreen(
     onDeleteActivity: (Long) -> Unit = {},
     muscleByExerciseId: Map<String, String> = emptyMap(),
     onGenerate: () -> Unit = {},
-    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit = { _, _, _, _ -> },
+    onUpdateSet: (SetLogEntity, SetInput) -> Unit = { _, _ -> },
     onDeleteSet: (SetLogEntity) -> Unit = {},
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
@@ -495,7 +499,7 @@ private fun HistorySessionRow(
     onOpenExerciseHistory: (String) -> Unit,
     onEditActivity: (Long) -> Unit,
     onDeleteActivity: (Long) -> Unit,
-    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
+    onUpdateSet: (SetLogEntity, SetInput) -> Unit,
     onDeleteSet: (SetLogEntity) -> Unit,
 ) {
     if (session.session.source == MANUAL_SESSION_SOURCE) {
@@ -811,7 +815,7 @@ private fun SessionCard(
     exerciseMedia: Map<String, ExerciseMedia>,
     onOpenExerciseDetail: (String) -> Unit,
     onOpenExerciseHistory: (String) -> Unit,
-    onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
+    onUpdateSet: (SetLogEntity, SetInput) -> Unit,
     onDeleteSet: (SetLogEntity) -> Unit,
 ) {
     var expanded by remember(session.session.id) { mutableStateOf(false) }
@@ -992,14 +996,16 @@ private fun SessionCard(
             initialReps = set.reps?.toString().orEmpty(),
             initialWeight = set.weightKg?.let { formatDecimal(it, 1) }.orEmpty(),
             initialRpe = set.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
+            initialSetType = set.setType,
+            initialRir = set.rir?.toString().orEmpty(),
             confirmLabel = stringResource(R.string.workout_set_dialog_save_changes),
             onDelete = {
                 editSetId = null
                 deleteSetId = set.id
             },
             onDismiss = { editSetId = null },
-            onConfirm = { reps, weight, rpe ->
-                onUpdateSet(set, reps, weight, rpe)
+            onConfirm = { input ->
+                onUpdateSet(set, input)
                 editSetId = null
             },
         )
@@ -1108,7 +1114,18 @@ private fun SessionSetsEditSheet(
 @Composable
 private fun historySetLabel(set: SetLogEntity): String = buildString {
     append(stringResource(R.string.workout_set, set.setNumber))
+    setTypeLabel(set.setType)?.let { append(" • $it") }
     set.reps?.let { append(" • ${stringResource(R.string.history_metric_sets_reps, it)}") }
     set.weightKg?.let { append(" • ${formatKg(it)}") }
     set.rpe?.let { append(" • RPE ${formatDecimal(it, 1)}") }
+    set.rir?.let { append(" • RIR $it") }
+}
+
+/** H4-4: rótulo do tipo; `null` para série normal (sem selo). */
+@Composable
+private fun setTypeLabel(setType: String): String? = when (setType) {
+    SET_TYPE_WARMUP -> stringResource(R.string.workout_set_type_warmup)
+    SET_TYPE_DROP -> stringResource(R.string.workout_set_type_drop)
+    SET_TYPE_AMRAP -> stringResource(R.string.workout_set_type_amrap)
+    else -> null
 }

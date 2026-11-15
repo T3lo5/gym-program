@@ -135,6 +135,10 @@ data class BackupSetLog(
     val distanceMeters: Double?,
     val isCompleted: Boolean,
     val isWarmup: Boolean,
+    /** H4-4: tipo da série; default cobre backup antigo sem o campo. */
+    val setType: String = "normal",
+    /** H4-4: repetições em reserva (0..10); default cobre backup antigo. */
+    val rir: Int? = null,
     val restTakenSeconds: Int?,
     val completedAt: Long?,
     val exerciseLogId: Long,

@@ -152,6 +152,13 @@
     <string name="workout_set_dialog_support_reps">Número inteiro, de 1 a 100</string>
     <string name="workout_set_dialog_support_weight">Opcional. Use vírgula ou ponto.</string>
     <string name="workout_set_dialog_support_rpe">Opcional, de 1 a 10.</string>
+    <string name="workout_set_dialog_type">Tipo de série</string>
+    <string name="workout_set_type_normal">Normal</string>
+    <string name="workout_set_type_warmup">Aquecimento</string>
+    <string name="workout_set_type_drop">Drop set</string>
+    <string name="workout_set_type_amrap">AMRAP</string>
+    <string name="workout_set_dialog_rir">RIR (opcional)</string>
+    <string name="workout_set_dialog_support_rir">Opcional, de 0 a 10.</string>
     <string name="workout_suggestion">Sugestão: %1$s — %2$s</string>
     <string name="workout_rest_finished">Descanso concluído. Bora para a próxima série.</string>
     <string name="workout_rest_paused">Descanso pausado: %1$s</string>

@@ -178,7 +178,7 @@ class A11yTest {
                 restRemaining = 90,
                 restTotal = 90,
                 onLeave = {},
-                onLogSet = { _, _, _, _ -> },
+                onLogSet = { _, _ -> },
                 onSkipRest = {},
                 onFinish = {},
                 hasInProgressSession = true,

@@ -152,6 +152,8 @@ CREATE TABLE IF NOT EXISTS synced_set_logs (
     distance_meters REAL,
     is_completed INTEGER NOT NULL DEFAULT 0,
     is_warmup INTEGER NOT NULL DEFAULT 0,
+    set_type TEXT NOT NULL DEFAULT 'normal',
+    rir INTEGER,
     rest_taken_seconds INTEGER,
     completed_at INTEGER,
     UNIQUE(session_exercise_id, local_id)
@@ -248,6 +250,15 @@ def init_db() -> None:
                 "pool_length_meters": "INTEGER",
                 "stroke": "TEXT",
                 "session_rpe": "REAL",
+            },
+        )
+        # H4-4: tipo da série e RIR; colunas aditivas, backend antigo atualiza.
+        _ensure_columns(
+            conn,
+            "synced_set_logs",
+            {
+                "set_type": "TEXT NOT NULL DEFAULT 'normal'",
+                "rir": "INTEGER",
             },
         )
 
@@ -569,8 +580,8 @@ def _upsert_session(conn: sqlite3.Connection, device_id: str, session: Dict[str,
                 INSERT INTO synced_set_logs (
                     session_exercise_id, local_id, set_number, reps, weight_kg,
                     rpe, duration_seconds, distance_meters, is_completed,
-                    is_warmup, rest_taken_seconds, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_warmup, set_type, rir, rest_taken_seconds, completed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     exercise_id,
@@ -583,6 +594,8 @@ def _upsert_session(conn: sqlite3.Connection, device_id: str, session: Dict[str,
                     set_log.get("distanceMeters"),
                     1 if set_log.get("isCompleted") else 0,
                     1 if set_log.get("isWarmup") else 0,
+                    set_log.get("setType", "normal"),
+                    set_log.get("rir"),
                     set_log.get("restTakenSeconds"),
                     set_log.get("completedAt"),
                 ),
@@ -760,7 +773,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
                 f"""
                 SELECT id, session_exercise_id, local_id, set_number, reps, weight_kg,
                        rpe, duration_seconds, distance_meters, is_completed,
-                       is_warmup, rest_taken_seconds, completed_at
+                       is_warmup, set_type, rir, rest_taken_seconds, completed_at
                 FROM synced_set_logs
                 WHERE session_exercise_id IN ({placeholders})
                 ORDER BY session_exercise_id, local_id
@@ -888,6 +901,8 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
                 "distanceMeters": row["distance_meters"],
                 "isCompleted": _bool(row["is_completed"]),
                 "isWarmup": _bool(row["is_warmup"]),
+                "setType": row["set_type"],
+                "rir": row["rir"],
                 "restTakenSeconds": row["rest_taken_seconds"],
                 "completedAt": row["completed_at"],
             }

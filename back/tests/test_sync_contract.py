@@ -589,3 +589,155 @@ def test_snapshot_sem_kind_vira_main():
     d = client.get("/v1/sync/download", params={"deviceId": "d-sem-kind"})
     assert d.status_code == 200
     assert d.json()["plans"][0]["kind"] == "main"
+
+
+def test_sync_preserva_set_type_e_rir():
+    """H4-4: tipo da série e RIR sobrevivem ao sync e voltam no download."""
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = {
+        "deviceId": "d-h44",
+        "syncedAt": "2026-11-15T00:00:00Z",
+        "plans": [],
+        "sessions": [
+            {
+                "localId": 50,
+                "planLocalId": 0,
+                "dayLocalId": 0,
+                "planName": "",
+                "dayName": "",
+                "status": "completed",
+                "startedAt": 1,
+                "endedAt": 60,
+                "totalDurationSeconds": 59,
+                "notes": "",
+                "exercises": [
+                    {
+                        "localId": 500,
+                        "exerciseId": "e1",
+                        "exerciseName": "Ex",
+                        "exerciseOrder": 0,
+                        "plannedSets": 3,
+                        "completedSets": 3,
+                        "startedAt": 1,
+                        "endedAt": 60,
+                        "sets": [
+                            {
+                                "localId": 5000,
+                                "setNumber": 1,
+                                "reps": 10,
+                                "weightKg": 40.0,
+                                "rpe": None,
+                                "isCompleted": True,
+                                "isWarmup": True,
+                                "setType": "warmup",
+                                "rir": None,
+                                "restTakenSeconds": None,
+                                "completedAt": 2,
+                            },
+                            {
+                                "localId": 5001,
+                                "setNumber": 2,
+                                "reps": 12,
+                                "weightKg": 60.0,
+                                "rpe": None,
+                                "isCompleted": True,
+                                "isWarmup": False,
+                                "setType": "drop",
+                                "rir": 2,
+                                "restTakenSeconds": 90,
+                                "completedAt": 3,
+                            },
+                            {
+                                "localId": 5002,
+                                "setNumber": 3,
+                                "reps": 15,
+                                "weightKg": 40.0,
+                                "rpe": None,
+                                "isCompleted": True,
+                                "isWarmup": False,
+                                "setType": "amrap",
+                                "rir": 1,
+                                "restTakenSeconds": 120,
+                                "completedAt": 4,
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-h44"})
+    assert d.status_code == 200
+    sets = d.json()["setLogs"]
+    assert len(sets) == 3
+    por_local = {s["localId"]: s for s in sets}
+    assert por_local[5000]["setType"] == "warmup"
+    assert por_local[5000]["rir"] is None
+    assert por_local[5000]["isWarmup"] is True
+    assert por_local[5001]["setType"] == "drop"
+    assert por_local[5001]["rir"] == 2
+    assert por_local[5002]["setType"] == "amrap"
+    assert por_local[5002]["rir"] == 1
+
+
+def test_sync_sem_set_type_aplica_default():
+    """H4-4: app antigo sem os campos novos grava 'normal' e RIR nulo."""
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = {
+        "deviceId": "d-h44-antigo",
+        "syncedAt": "2026-11-15T00:00:00Z",
+        "plans": [],
+        "sessions": [
+            {
+                "localId": 51,
+                "planLocalId": 0,
+                "dayLocalId": 0,
+                "planName": "",
+                "dayName": "",
+                "status": "completed",
+                "startedAt": 1,
+                "endedAt": 60,
+                "totalDurationSeconds": 59,
+                "notes": "",
+                "exercises": [
+                    {
+                        "localId": 501,
+                        "exerciseId": "e1",
+                        "exerciseName": "Ex",
+                        "exerciseOrder": 0,
+                        "plannedSets": 1,
+                        "completedSets": 1,
+                        "startedAt": 1,
+                        "endedAt": 60,
+                        "sets": [
+                            {
+                                "localId": 5010,
+                                "setNumber": 1,
+                                "reps": 10,
+                                "weightKg": 40.0,
+                                "rpe": None,
+                                "isCompleted": True,
+                                "isWarmup": False,
+                                "restTakenSeconds": 90,
+                                "completedAt": 2,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-h44-antigo"})
+    assert d.status_code == 200
+    sets = d.json()["setLogs"]
+    assert len(sets) == 1
+    assert sets[0]["setType"] == "normal"
+    assert sets[0]["rir"] is None

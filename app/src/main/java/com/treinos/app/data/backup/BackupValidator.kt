@@ -1,5 +1,7 @@
 package com.treinos.app.data.backup
 
+import com.treinos.app.data.local.VALID_SET_TYPES
+
 data class BackupValidationResult(
     val valid: Boolean,
     val message: String?,
@@ -289,6 +291,22 @@ object BackupValidator {
                         return BackupValidationResult(
                             valid = false,
                             message = "rpe da série ${setLog.setNumber} fora da faixa no exercício '${sessionExercise.exerciseName}'.",
+                            preview = null,
+                        )
+                    }
+                    // H4-4: tipo fora da whitelist e RIR fora de 0..10 rejeitam
+                    // o backup — diferente do formulário, aqui não há default.
+                    if (setLog.setType !in VALID_SET_TYPES) {
+                        return BackupValidationResult(
+                            valid = false,
+                            message = "setType da série ${setLog.setNumber} inválido no exercício '${sessionExercise.exerciseName}'.",
+                            preview = null,
+                        )
+                    }
+                    if (setLog.rir != null && (setLog.rir < 0 || setLog.rir > 10)) {
+                        return BackupValidationResult(
+                            valid = false,
+                            message = "rir da série ${setLog.setNumber} fora da faixa no exercício '${sessionExercise.exerciseName}'.",
                             preview = null,
                         )
                     }

@@ -1,11 +1,13 @@
 package com.treinos.app.data.backup
 
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.local.resolveSetType
 
 object BackupMapper {
 
@@ -118,6 +120,8 @@ object BackupMapper {
             distanceMeters = setLog.distanceMeters,
             isCompleted = setLog.isCompleted,
             isWarmup = setLog.isWarmup,
+            setType = setLog.setType,
+            rir = setLog.rir,
             restTakenSeconds = setLog.restTakenSeconds,
             completedAt = setLog.completedAt,
             exerciseLogId = exerciseLogId,
@@ -213,8 +217,11 @@ object BackupMapper {
             endedAt = dto.endedAt,
         )
 
-    fun toEntity(dto: BackupSetLog, exerciseLogId: Long): SetLogEntity =
-        SetLogEntity(
+    fun toEntity(dto: BackupSetLog, exerciseLogId: Long): SetLogEntity {
+        // H4-4: normaliza a dupla setType/isWarmup — backup antigo sem setType
+        // mas com isWarmup=true vira 'warmup'; nunca ficam divergentes.
+        val setType = resolveSetType(dto.setType, dto.isWarmup)
+        return SetLogEntity(
             id = dto.id,
             exerciseLogId = exerciseLogId,
             setNumber = dto.setNumber,
@@ -224,8 +231,11 @@ object BackupMapper {
             durationSeconds = dto.durationSeconds,
             distanceMeters = dto.distanceMeters,
             isCompleted = dto.isCompleted,
-            isWarmup = dto.isWarmup,
+            isWarmup = setType == SET_TYPE_WARMUP,
+            setType = setType,
+            rir = dto.rir,
             restTakenSeconds = dto.restTakenSeconds,
             completedAt = dto.completedAt,
         )
+    }
 }

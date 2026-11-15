@@ -691,9 +691,13 @@ class AppViewModel(
                     val ultimoSet = exercicio.sets.lastOrNull()
                     logSet(
                         exercise = exercicio.exercise,
-                        reps = command.reps ?: ultimoSet?.reps,
-                        weightKg = command.weightKg ?: ultimoSet?.weightKg,
-                        rpe = command.rpe,
+                        // H4-4: pulso do relógio continua registrando série normal,
+                        // sem tipo nem RIR (fora de escopo na spec).
+                        input = SetInput(
+                            reps = command.reps ?: ultimoSet?.reps,
+                            weightKg = command.weightKg ?: ultimoSet?.weightKg,
+                            rpe = command.rpe,
+                        ),
                     )
                 }
             }
@@ -1382,17 +1386,17 @@ class AppViewModel(
 
     fun logSet(
         exercise: SessionExerciseEntity,
-        reps: Int?,
-        weightKg: Double?,
-        rpe: Double?,
+        input: SetInput,
     ) {
         viewModelScope.launch {
             try {
                 repository.logSet(
                     exerciseLogId = exercise.id,
-                    reps = reps,
-                    weightKg = weightKg,
-                    rpe = rpe,
+                    reps = input.reps,
+                    weightKg = input.weightKg,
+                    rpe = input.rpe,
+                    setType = input.setType,
+                    rir = input.rir,
                 )
                 startRest(exercise.restSeconds)
                 syncWearState()
@@ -1404,17 +1408,17 @@ class AppViewModel(
 
     fun logSet(
         exercise: ExerciseSessionData,
-        reps: Int?,
-        weightKg: Double?,
-        rpe: Double?,
+        input: SetInput,
     ) {
         viewModelScope.launch {
             try {
                 repository.logSet(
                     exerciseLogId = exercise.sessionExerciseId,
-                    reps = reps,
-                    weightKg = weightKg,
-                    rpe = rpe,
+                    reps = input.reps,
+                    weightKg = input.weightKg,
+                    rpe = input.rpe,
+                    setType = input.setType,
+                    rir = input.rir,
                 )
                 startRest(exercise.restSeconds)
                 syncWearState()
@@ -1454,12 +1458,20 @@ class AppViewModel(
 
     /**
      * Edita uma série já registrada (H3-27): o mesmo `id` é atualizado com
-     * reps/carga/RPE novos e o estado do relógio é reenviado.
+     * reps/carga/RPE/tipo/RIR novos (H4-4) e o estado do relógio é reenviado.
      */
-    fun updateSet(set: SetLogEntity, reps: Int?, weightKg: Double?, rpe: Double?) {
+    fun updateSet(set: SetLogEntity, input: SetInput) {
         viewModelScope.launch {
             try {
-                repository.updateSet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
+                repository.updateSet(
+                    set.copy(
+                        reps = input.reps,
+                        weightKg = input.weightKg,
+                        rpe = input.rpe,
+                        setType = input.setType,
+                        rir = input.rir,
+                    )
+                )
                 syncWearState()
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_update_set_error)
@@ -1487,10 +1499,18 @@ class AppViewModel(
      * repositório recusa sessão em andamento; o relógio não é reenviado
      * porque ele espelha a sessão em andamento, que não mudou.
      */
-    fun updateHistorySet(set: SetLogEntity, reps: Int?, weightKg: Double?, rpe: Double?) {
+    fun updateHistorySet(set: SetLogEntity, input: SetInput) {
         viewModelScope.launch {
             try {
-                repository.updateHistorySet(set.copy(reps = reps, weightKg = weightKg, rpe = rpe))
+                repository.updateHistorySet(
+                    set.copy(
+                        reps = input.reps,
+                        weightKg = input.weightKg,
+                        rpe = input.rpe,
+                        setType = input.setType,
+                        rir = input.rir,
+                    )
+                )
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_update_set_error)
             }

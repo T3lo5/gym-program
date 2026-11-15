@@ -14,6 +14,9 @@ import androidx.compose.ui.test.performTextReplacement
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.data.local.SET_TYPE_DROP
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.SwapScope
@@ -48,7 +51,12 @@ class WorkoutScreenTest {
     }
 
     /** Sessão de força com um exercício e uma série 60 kg × 10 registrada. */
-    private fun sessao(comSets: Boolean = true, weightKg: Double = 60.0): SessionWithExercises {
+    private fun sessao(
+        comSets: Boolean = true,
+        weightKg: Double = 60.0,
+        setType: String = SET_TYPE_NORMAL,
+        rir: Int? = null,
+    ): SessionWithExercises {
         val sets = if (comSets) {
             listOf(
                 SetLogEntity(
@@ -58,6 +66,8 @@ class WorkoutScreenTest {
                     reps = 10,
                     weightKg = weightKg,
                     rpe = null,
+                    setType = setType,
+                    rir = rir,
                 ),
             )
         } else {
@@ -110,12 +120,12 @@ class WorkoutScreenTest {
                 restRemaining = restRemaining,
                 restTotal = restTotal,
                 onLeave = { },
-                onLogSet = { _, reps, weight, rpe -> onLoggedSet(reps, weight, rpe) },
+                onLogSet = { _, input -> onLoggedSet(input.reps, input.weightKg, input.rpe) },
                 onSkipRest = { },
                 onFinish = onFinished,
                 hasInProgressSession = false,
                 restPaused = restPaused,
-                onUpdateSet = { _, reps, weight, rpe -> onUpdatedSet(reps, weight, rpe) },
+                onUpdateSet = { _, input -> onUpdatedSet(input.reps, input.weightKg, input.rpe) },
                 exerciseMedia = exerciseMedia,
                 availableEquipment = availableEquipment,
                 personalRecords = personalRecords,
@@ -426,5 +436,39 @@ class WorkoutScreenTest {
             .onNode(hasScrollAction())
             .performScrollToNode(hasText("Recorde pessoal!"))
         composeRule.onNodeWithText("Recorde pessoal!").assertIsDisplayed()
+    }
+
+    // ---------- H4-4: tipos de série ----------
+
+    @Test
+    fun serie_warmup_mostra_rotulo() {
+        // A série de aquecimento aparece rotulada na linha do card do treino.
+        setContent(session = sessao(setType = SET_TYPE_WARMUP))
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Aquecimento", substring = true))
+        composeRule.onNodeWithText("Aquecimento", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun serie_drop_mostra_rotulo() {
+        // Drop set também é rotulado na linha da série.
+        setContent(session = sessao(setType = SET_TYPE_DROP))
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Drop set", substring = true))
+        composeRule.onNodeWithText("Drop set", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun serie_normal_nao_mostra_rotulo_de_tipo() {
+        // Série normal não ganha selo de tipo — só reps/carga.
+        setContent(session = sessao(setType = SET_TYPE_NORMAL))
+
+        composeRule.onNodeWithText("Drop set", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Aquecimento", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("AMRAP", substring = true).assertDoesNotExist()
     }
 }

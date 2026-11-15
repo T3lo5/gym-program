@@ -181,7 +181,8 @@ fun progressionHistory(
                     isWarmup = set.isWarmup,
                     reps = set.reps,
                     weightKg = set.weightKg,
-                    rpe = set.rpe,
+                    // H4-4: RIR é a outra face do RPE — sem RPE, deriva 10 - RIR.
+                    rpe = set.rpe ?: set.rir?.let { 10.0 - it },
                 )
             }
         }

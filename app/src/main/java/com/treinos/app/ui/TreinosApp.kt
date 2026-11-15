@@ -351,8 +351,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                     restRemaining = restRemaining,
                     restTotal = restTotal,
                     onLeave = viewModel::leaveWorkout,
-                    onLogSet = { exercise, reps, weight, rpe ->
-                        viewModel.logSet(exercise.exercise, reps, weight, rpe)
+                    onLogSet = { exercise, input ->
+                        viewModel.logSet(exercise.exercise, input)
                     },
                     onSkipRest = viewModel::skipRest,
                     onFinish = viewModel::finishWorkout,
@@ -414,7 +414,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     muscleByExerciseId = historyMuscleByExerciseId,
                     onGenerate = viewModel::openGenerate,
                     // H3-54: corrigir séries de sessão concluída direto do Histórico.
-                    onUpdateSet = viewModel::updateHistorySet,
+                    onUpdateSet = { set, input -> viewModel.updateHistorySet(set, input) },
                     onDeleteSet = viewModel::deleteHistorySet,
                 )
 

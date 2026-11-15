@@ -1,17 +1,24 @@
 package com.treinos.app.ui
 
+import com.treinos.app.data.local.SET_TYPE_NORMAL
+import com.treinos.app.data.local.normalizeSetType
+
 /**
  * Regras puras de validação do formulário de série (H3-27).
  *
  * Fim do `null` silencioso: valor preenchido e inválido **bloqueia** o
  * salvamento com mensagem no diálogo — nada é gravado com carga/reps/RPE
  * `null` por falha de parse. Campo vazio continua sendo escolha explícita
- * (`null`) para carga, reps e RPE.
+ * (`null`) para carga, reps, RPE e RIR (H4-4).
  */
 data class SetInput(
     val reps: Int? = null,
     val weightKg: Double? = null,
     val rpe: Double? = null,
+    /** H4-4: tipo da série já normalizado (`normal`/`warmup`/`drop`/`amrap`). */
+    val setType: String = SET_TYPE_NORMAL,
+    /** H4-4: repetições em reserva; `null` = não informado (nunca `0`). */
+    val rir: Int? = null,
 )
 
 /** Erro por campo; campo sem erro fica `null`. */
@@ -19,9 +26,10 @@ data class SetInputErrors(
     val reps: String? = null,
     val weight: String? = null,
     val rpe: String? = null,
+    val rir: String? = null,
 ) {
     val hasErrors: Boolean
-        get() = reps != null || weight != null || rpe != null
+        get() = reps != null || weight != null || rpe != null || rir != null
 }
 
 sealed interface SetInputValidation {
@@ -40,20 +48,33 @@ const val MAX_SET_REPS = 100
 const val MIN_SET_RPE = 1.0
 const val MAX_SET_RPE = 10.0
 
+/** RIR aceito (H4-4): inteiro em 0..10; vazio = `null`. */
+const val MIN_SET_RIR = 0
+const val MAX_SET_RIR = 10
+
 /**
- * Valida o texto bruto dos três campos do diálogo de série.
+ * Valida o texto bruto dos campos do diálogo de série.
  *
  * - Carga: não vazia deve parsear (vírgula ou ponto) e satisfazer
  *   `0 < peso <= 500`.
  * - Reps: não vazia deve ser inteiro em `1..100`.
  * - RPE: vazio = `null`; preenchido deve estar em `1..10` com no máximo
  *   uma casa decimal.
+ * - RIR (H4-4): vazio = `null`; preenchido deve ser inteiro em `0..10`.
+ * - Tipo: valor desconhecido é normalizado para `normal`.
  */
-fun validateSetInput(repsText: String, weightText: String, rpeText: String): SetInputValidation {
+fun validateSetInput(
+    repsText: String,
+    weightText: String,
+    rpeText: String,
+    rirText: String = "",
+    setType: String = SET_TYPE_NORMAL,
+): SetInputValidation {
     val errors = SetInputErrors(
         reps = validateRepsText(repsText),
         weight = validateWeightText(weightText),
         rpe = validateRpeText(rpeText),
+        rir = validateRirText(rirText),
     )
     return if (errors.hasErrors) {
         SetInputValidation.Invalid(errors)
@@ -63,6 +84,8 @@ fun validateSetInput(repsText: String, weightText: String, rpeText: String): Set
                 reps = repsText.trim().toIntOrNull(),
                 weightKg = parseDecimalInput(weightText),
                 rpe = parseDecimalInput(rpeText),
+                setType = normalizeSetType(setType),
+                rir = rirText.trim().toIntOrNull(),
             )
         )
     }
@@ -101,6 +124,18 @@ private fun validateRpeText(rpeText: String): String? {
         rpe < MIN_SET_RPE || rpe > MAX_SET_RPE -> "RPE deve ser 1–10."
         hasMoreThanOneDecimal(rpeText) -> "RPE aceita até uma casa decimal."
         else -> null
+    }
+}
+
+/** H4-4: RIR vazio = `null` (nunca `0`); preenchido deve ser inteiro em 0..10. */
+private fun validateRirText(rirText: String): String? {
+    if (rirText.isBlank()) return null
+    val rir = rirText.trim().toIntOrNull()
+        ?: return "Informe o RIR como número inteiro."
+    return if (rir in MIN_SET_RIR..MAX_SET_RIR) {
+        null
+    } else {
+        "RIR deve estar entre $MIN_SET_RIR e $MAX_SET_RIR."
     }
 }
 

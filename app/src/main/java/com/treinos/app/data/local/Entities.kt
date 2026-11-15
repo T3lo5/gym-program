@@ -145,6 +145,30 @@ data class SessionExerciseEntity(
     val endedAt: Long? = null,
 )
 
+/** Tipos de série (H4-4): a intenção é por série, não por exercício. */
+const val SET_TYPE_NORMAL = "normal"
+const val SET_TYPE_WARMUP = "warmup"
+const val SET_TYPE_DROP = "drop"
+const val SET_TYPE_AMRAP = "amrap"
+
+/** Whitelist de tipos aceitos no formulário, no backup e no sync. */
+val VALID_SET_TYPES = setOf(SET_TYPE_NORMAL, SET_TYPE_WARMUP, SET_TYPE_DROP, SET_TYPE_AMRAP)
+
+/** Tipo desconhecido vira "normal" (H4-4): formulário e sync nunca gravam lixo. */
+fun normalizeSetType(value: String): String =
+    if (value in VALID_SET_TYPES) value else SET_TYPE_NORMAL
+
+/**
+ * Resolve a dupla legada (H4-4): `setType` vence; sem `setType` útil,
+ * `isWarmup` marca aquecimento. Nunca deixa os dois divergentes no banco.
+ */
+fun resolveSetType(setType: String, isWarmup: Boolean): String =
+    when {
+        setType != SET_TYPE_NORMAL -> normalizeSetType(setType)
+        isWarmup -> SET_TYPE_WARMUP
+        else -> SET_TYPE_NORMAL
+    }
+
 @Entity(
     tableName = "set_logs",
     foreignKeys = [
@@ -168,6 +192,11 @@ data class SetLogEntity(
     val distanceMeters: Double? = null,
     val isCompleted: Boolean = true,
     val isWarmup: Boolean = false,
+    /** H4-4: intenção da série; `isWarmup` é derivado na escrita. */
+    @ColumnInfo(defaultValue = "normal")
+    val setType: String = SET_TYPE_NORMAL,
+    /** H4-4: repetições em reserva (0..10); `null` = esforço não informado. */
+    val rir: Int? = null,
     val restTakenSeconds: Int? = null,
     val completedAt: Long? = System.currentTimeMillis(),
 )

@@ -213,6 +213,10 @@ data class SyncSetLogDto(
     val distanceMeters: Double? = null,
     val isCompleted: Boolean = true,
     val isWarmup: Boolean = false,
+    /** H4-4: tipo da série; backend antigo ignora o campo extra. */
+    val setType: String = "normal",
+    /** H4-4: repetições em reserva (0..10); `null` = não informado. */
+    val rir: Int? = null,
     val restTakenSeconds: Int? = null,
     val completedAt: Long? = null,
 )
@@ -342,6 +346,10 @@ data class SyncDownloadSetLogDto(
     val distanceMeters: Double? = null,
     val isCompleted: Boolean = false,
     val isWarmup: Boolean = false,
+    /** H4-4: tipo da série; backend antigo não envia — default "normal". */
+    val setType: String = "normal",
+    /** H4-4: repetições em reserva (0..10); `null` = não informado. */
+    val rir: Int? = null,
     val restTakenSeconds: Int? = null,
     val completedAt: Long? = null,
 )

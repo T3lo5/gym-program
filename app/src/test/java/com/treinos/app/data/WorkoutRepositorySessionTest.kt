@@ -332,6 +332,89 @@ class WorkoutRepositorySessionTest {
         assertNotNull(dao.getSession(sessionId))
     }
 
+    // ---------- H4-4: tipos de série ----------
+
+    /** Sessão de força em andamento com um exercício planejado; devolve o logId. */
+    private suspend fun sessaoEmAndamento(): Pair<Long, Long> {
+        val planId = dao.insertPlan(
+            WorkoutPlanEntity(id = 1, name = "Plano", goal = "hypertrophy", daysPerWeek = 3, isActive = true)
+        )
+        val dayId = dao.insertDay(
+            WorkoutDayEntity(id = 10, planId = planId, name = "Treino A", dayOrder = 0, weekday = 1, modality = "strength")
+        )
+        dao.insertPlanExercises(
+            listOf(WorkoutPlanExerciseEntity(id = 100, dayId = dayId, exerciseId = "ex1", exerciseName = "Ex 1", sets = 3))
+        )
+        val sessionId = repository.startSession(planId, dayId)
+        val exerciseLogId = dao.getAllSessionExercises().single { it.sessionId == sessionId }.id
+        return sessionId to exerciseLogId
+    }
+
+    @Test
+    fun logSet_warmup_nao_incrementa_completed_sets() = runTest {
+        val (_, exerciseLogId) = sessaoEmAndamento()
+
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 40.0, rpe = null, setType = "warmup")
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 60.0, rpe = null)
+
+        val sets = dao.getAllSetLogs().filter { it.exerciseLogId == exerciseLogId }
+        assertEquals(2, sets.size)
+        // Aquecimento: isWarmup derivado na escrita e não conta no progresso.
+        assertEquals("warmup", sets.first { it.setType == "warmup" }.setType)
+        assertEquals(true, sets.first { it.setType == "warmup" }.isWarmup)
+        // Série de trabalho incrementa o contador.
+        assertEquals(1, dao.getSessionExercise(exerciseLogId)?.completedSets)
+    }
+
+    @Test
+    fun logSet_drop_e_amrap_contam() = runTest {
+        val (_, exerciseLogId) = sessaoEmAndamento()
+
+        repository.logSet(exerciseLogId, reps = 12, weightKg = 60.0, rpe = null, setType = "drop")
+        repository.logSet(exerciseLogId, reps = 15, weightKg = 40.0, rpe = null, setType = "amrap", rir = 1)
+
+        val sets = dao.getAllSetLogs().filter { it.exerciseLogId == exerciseLogId }.sortedBy { it.setNumber }
+        assertEquals(listOf("drop", "amrap"), sets.map { it.setType })
+        // Ambas contam como série de trabalho.
+        assertEquals(false, sets.any { it.isWarmup })
+        assertEquals(2, dao.getSessionExercise(exerciseLogId)?.completedSets)
+        assertEquals(1, sets[1].rir)
+    }
+
+    @Test
+    fun updateSet_para_warmup_recalcula_completed_sets() = runTest {
+        val (_, exerciseLogId) = sessaoEmAndamento()
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 60.0, rpe = null)
+        val primeira = dao.getAllSetLogs().first { it.exerciseLogId == exerciseLogId }
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 60.0, rpe = null)
+        assertEquals(2, dao.getSessionExercise(exerciseLogId)?.completedSets)
+
+        // Virar warm-up tira a série do progresso.
+        repository.updateSet(primeira.copy(setType = "warmup"))
+        assertEquals(1, dao.getSessionExercise(exerciseLogId)?.completedSets)
+        assertEquals(true, dao.getSetLog(primeira.id)?.isWarmup)
+
+        // Voltar a ser de trabalho devolve a série ao progresso.
+        repository.updateSet(dao.getSetLog(primeira.id)!!.copy(setType = "normal"))
+        assertEquals(2, dao.getSessionExercise(exerciseLogId)?.completedSets)
+        assertEquals(false, dao.getSetLog(primeira.id)?.isWarmup)
+    }
+
+    @Test
+    fun delete_warmup_nao_altera_completed_sets() = runTest {
+        val (_, exerciseLogId) = sessaoEmAndamento()
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 60.0, rpe = null)
+        repository.logSet(exerciseLogId, reps = 10, weightKg = 40.0, rpe = null, setType = "warmup")
+        assertEquals(1, dao.getSessionExercise(exerciseLogId)?.completedSets)
+        val warmup = dao.getAllSetLogs().first { it.setType == "warmup" }
+
+        repository.deleteSet(warmup.id)
+
+        // Excluir aquecimento não muda o contador de séries de trabalho.
+        assertEquals(1, dao.getSessionExercise(exerciseLogId)?.completedSets)
+        assertEquals(1, dao.getAllSetLogs().count { it.exerciseLogId == exerciseLogId })
+    }
+
     private fun generatedResponse(name: String) = GeneratePlanResponse(
         workout = com.treinos.app.data.remote.WorkoutPlanDto(
             name = name,

@@ -287,6 +287,86 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migracao_6_7_preserva_linhas_e_marca_warmup() {
+        // H4-4: banco v6 com um aquecimento (isWarmup=1) e uma série de trabalho.
+        helper.createDatabase(testDb, 6).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source, kind) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local','main')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_days (id, planId, name, dayOrder, notes, isRestDay, modality, weekday) " +
+                    "VALUES (10,1,'A',0,'',0,'strength',1)"
+            )
+            db.execSQL(
+                "INSERT INTO workout_plan_exercises (id, dayId, exerciseId, exerciseName, " +
+                    "primaryMuscles, equipment, exerciseOrder, sets, targetReps, targetRpe, " +
+                    "restSeconds, notes, isSupersetWithPrevious, metricType, instructions, images) " +
+                    "VALUES (100,10,'Barbell_Bench_Press','Supino','peito','barra',0,3,'8-12',NULL,90,'',0,'reps_weight','','')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.execSQL(
+                "INSERT INTO session_exercises (id, sessionId, exerciseId, exerciseName, " +
+                    "exerciseOrder, plannedSets, completedSets, restSeconds, startedAt, endedAt, targetReps) " +
+                    "VALUES (500,50,'Barbell_Bench_Press','Supino',0,3,2,90,1,NULL,'')"
+            )
+            db.execSQL(
+                "INSERT INTO set_logs (id, exerciseLogId, setNumber, reps, weightKg, rpe, " +
+                    "durationSeconds, distanceMeters, isCompleted, isWarmup, restTakenSeconds, completedAt) " +
+                    "VALUES (5000,500,1,10,40.0,8.0,NULL,NULL,1,1,90,2)"
+            )
+            db.execSQL(
+                "INSERT INTO set_logs (id, exerciseLogId, setNumber, reps, weightKg, rpe, " +
+                    "durationSeconds, distanceMeters, isCompleted, isWarmup, restTakenSeconds, completedAt) " +
+                    "VALUES (5001,500,2,8,42.5,NULL,NULL,NULL,1,0,NULL,3)"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 7, true, AppDatabase.MIGRATION_6_7)
+
+        // Nada se perde na migração aditiva.
+        assertEquals(1, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_days"))
+        assertEquals(1, migrated.rowCount("workout_plan_exercises"))
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        assertEquals(1, migrated.rowCount("session_exercises"))
+        assertEquals(2, migrated.rowCount("set_logs"))
+
+        // Aquecimento vira setType='warmup'; trabalho vira 'normal'; RIR nasce NULL.
+        migrated.query(
+            "SELECT id, setType, rir, isWarmup FROM set_logs ORDER BY id"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(5000, cursor.getInt(0))
+            assertEquals("warmup", cursor.getString(1))
+            assertTrue(cursor.isNull(2))
+            assertEquals(1, cursor.getInt(3))
+            assertTrue(cursor.moveToNext())
+            assertEquals(5001, cursor.getInt(0))
+            assertEquals("normal", cursor.getString(1))
+            assertTrue(cursor.isNull(2))
+            assertEquals(0, cursor.getInt(3))
+        }
+        // Os campos antigos continuam intactos.
+        migrated.query(
+            "SELECT reps, weightKg, rpe FROM set_logs WHERE id = 5001"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(8, cursor.getInt(0))
+            assertEquals(42.5, cursor.getDouble(1), 0.0001)
+            assertTrue(cursor.isNull(2))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

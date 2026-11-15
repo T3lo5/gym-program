@@ -186,10 +186,11 @@ interface WorkoutDao {
     /**
      * Realinha `completedSets` ao número real de séries gravadas (H3-27):
      * após excluir uma série, o contador persistido volta a ser derivado.
+     * H4-4: aquecimento não conta como série de trabalho.
      */
     @Query(
         "UPDATE session_exercises SET completedSets = " +
-            "(SELECT COUNT(*) FROM set_logs WHERE exerciseLogId = :exerciseLogId) " +
+            "(SELECT COUNT(*) FROM set_logs WHERE exerciseLogId = :exerciseLogId AND isWarmup = 0) " +
             "WHERE id = :exerciseLogId"
     )
     suspend fun recalculateCompletedSets(exerciseLogId: Long)

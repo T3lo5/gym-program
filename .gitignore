@@ -114,6 +114,7 @@ scripts/*.log
 dist/
 .gradle-docker/
 .docker-config/
+.docker-ci/
 back/.pytest_cache/
 back/tests/__pycache__/
 
