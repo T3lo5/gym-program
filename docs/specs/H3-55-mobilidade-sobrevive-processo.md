@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-55` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-13) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` (base parcial `7990c2d` corrigida: encadeamento wall-clock de vencidos, transição reconstruída do deadline) |
 
 **Origem:** fora de escopo declarado da H3-31 ("mobilidade sobrevive a morte
 do processo") + varredura de polimento de 2026-11-13. O

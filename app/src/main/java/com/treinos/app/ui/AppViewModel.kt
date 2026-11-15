@@ -1956,7 +1956,11 @@ class AppViewModel(
         val movementIndex = preferences.mobilityMovementIndex
         val deadline = preferences.mobilityMovementDeadlineAtMillis
         val startedAt = preferences.mobilityStartedAtMillis
-        if (deadline <= 0L || startedAt <= 0L) return
+        if (deadline <= 0L || startedAt <= 0L) {
+            // Resíduo sem deadline (sessão já encerrada): nada para retomar.
+            clearPersistedMobility()
+            return
+        }
 
         val routine = MobilityRoutineTemplates.getRoutine(routineId) ?: run {
             // Rotina removida do catálogo: descarta estado salvo.
@@ -1990,6 +1994,10 @@ class AppViewModel(
 
     /** Persiste o estado atual da mobilidade (H3-55). */
     private fun persistMobilityState(routine: MobilityRoutine, session: MobilitySessionState) {
+        // Na transição (H3-31) nenhum movimento começou: o estado persistido
+        // continua sendo o do movimento que acabou de terminar — é o deadline
+        // wall-clock dele que reconstrói a transição ao restaurar (H3-55).
+        if (session.inTransition) return
         val now = System.currentTimeMillis()
         // Calcula o deadline do movimento atual: now + secondsRemaining
         val deadline = if (session.running && session.secondsRemaining > 0) {
