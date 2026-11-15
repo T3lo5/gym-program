@@ -69,7 +69,10 @@ import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.KeyValueRow
 import com.treinos.app.ui.components.LoadingState
+import com.treinos.app.ui.components.MAX_DRAWN_POINTS
 import com.treinos.app.ui.components.MetricCard
+import com.treinos.app.ui.components.ProgressBarChart
+import com.treinos.app.ui.components.ProgressLineChart
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.components.SetEditDialog
@@ -85,14 +88,18 @@ import com.treinos.app.ui.formatPacePer100m
 import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatRunDistanceKm
 import com.treinos.app.ui.formatVolumeKg
+import com.treinos.app.ui.history.ExerciseChartMetric
 import com.treinos.app.ui.history.HistoryMetrics
 import com.treinos.app.ui.history.STATUS_COMPLETED
 import com.treinos.app.ui.history.STATUS_IN_PROGRESS
 import com.treinos.app.ui.history.buildHistoryMetrics
 import com.treinos.app.ui.history.buildMonthGrid
+import com.treinos.app.ui.history.exerciseProgressSeries
+import com.treinos.app.ui.history.exercisesWithHistory
 import com.treinos.app.ui.history.firstDayOfMonth
 import com.treinos.app.ui.history.isBeforeCurrentMonth
 import com.treinos.app.ui.history.lastDayOfMonth
+import com.treinos.app.ui.history.muscleVolumeBars
 import com.treinos.app.ui.history.sessionDates
 import com.treinos.app.ui.history.sessionDay
 import com.treinos.app.ui.history.weekDayLabels
@@ -100,8 +107,10 @@ import com.treinos.app.ui.UiState
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 import java.time.LocalDate
+import java.time.DayOfWeek
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -141,6 +150,9 @@ fun HistoryScreen(
     val lastDay = lastDayOfMonth(month.year, month.monthValue)
     val monthSessions = modalitySessions.filter { sessionDay(it) in firstDay..lastDay }
     val metrics = buildHistoryMetrics(modalitySessions, muscleByExerciseId, firstDay, lastDay)
+    // H4-2: semana corrente (segunda a domingo de hoje) para as barras de volume.
+    val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val weekEnd = weekStart.plusDays(6)
     val completedDates = sessionDates(monthSessions.filter { it.session.status == STATUS_COMPLETED })
     val inProgressDates = sessionDates(monthSessions.filter { it.session.status == STATUS_IN_PROGRESS })
     val visible = selectedDate?.let { day -> monthSessions.filter { sessionDay(it) == day } } ?: monthSessions
@@ -236,6 +248,23 @@ fun HistoryScreen(
                     if (metrics.volumeByMuscle.isNotEmpty()) {
                         item { VolumeByMuscle(metrics) }
                     }
+                    // H4-2: gráficos de progresso — só na visão do mês inteiro;
+                    // com um dia selecionado o foco é a lista daquele dia.
+                    item {
+                        ExerciseEvolutionSection(
+                            monthSessions = monthSessions,
+                            firstDay = firstDay,
+                            lastDay = lastDay,
+                        )
+                    }
+                    item {
+                        WeeklyMuscleVolumeSection(
+                            sessions = modalitySessions,
+                            muscleByExerciseId = muscleByExerciseId,
+                            weekStart = weekStart,
+                            weekEnd = weekEnd,
+                        )
+                    }
                 }
 
                 if (visible.isEmpty()) {
@@ -295,6 +324,163 @@ private fun VolumeByMuscle(metrics: HistoryMetrics) {
             .forEach { (muscle, volume) ->
                 KeyValueRow(label = muscle, value = formatVolumeKg(volume))
             }
+    }
+}
+
+/**
+ * H4-2: evolução do exercício no mês selecionado — seletor por chips, métrica
+ * (melhor série ou volume) e gráfico de linha. Sem exercício de musculação no
+ * mês, a seção não aparece.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExerciseEvolutionSection(
+    monthSessions: List<SessionWithExercises>,
+    firstDay: LocalDate,
+    lastDay: LocalDate,
+) {
+    val options = remember(monthSessions, firstDay, lastDay) {
+        exercisesWithHistory(monthSessions, firstDay, lastDay)
+    }
+    if (options.isEmpty()) return
+
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var metric by rememberSaveable { mutableStateOf(ExerciseChartMetric.BEST_SET_KG) }
+    val selected = options.firstOrNull { it.exerciseId == selectedId } ?: options.first()
+    val series = remember(monthSessions, selected.exerciseId, metric, firstDay, lastDay) {
+        exerciseProgressSeries(monthSessions, selected.exerciseId, metric, firstDay, lastDay)
+    }
+    val metricLabel = if (metric == ExerciseChartMetric.BEST_SET_KG) {
+        stringResource(R.string.chart_metric_best)
+    } else {
+        stringResource(R.string.history_metric_volume)
+    }
+    // A formatação do valor fica no chamador: o gráfico não formata sozinho.
+    val valueLabel: (Double) -> String = if (metric == ExerciseChartMetric.BEST_SET_KG) {
+        { value -> formatKg(value) }
+    } else {
+        { value -> formatVolumeKg(value) }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SectionTitle(stringResource(R.string.chart_exercise_title))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { option ->
+                FilterChip(
+                    selected = option.exerciseId == selected.exerciseId,
+                    onClick = { selectedId = option.exerciseId },
+                    label = { Text(option.name) },
+                )
+            }
+        }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ExerciseChartMetric.entries.forEach { candidate ->
+                FilterChip(
+                    selected = candidate == metric,
+                    onClick = { metric = candidate },
+                    label = {
+                        Text(
+                            if (candidate == ExerciseChartMetric.BEST_SET_KG) {
+                                stringResource(R.string.chart_metric_best)
+                            } else {
+                                stringResource(R.string.history_metric_volume)
+                            },
+                        )
+                    },
+                )
+            }
+        }
+        if (series.points.size < 2) {
+            // Um ponto isolado não é tendência (H4-2, regra 6).
+            Text(
+                text = stringResource(R.string.chart_few_data),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            // Mesma janela desenhada pelo gráfico (últimos MAX_DRAWN_POINTS).
+            val drawn = series.points.takeLast(MAX_DRAWN_POINTS)
+            val description = stringResource(
+                R.string.chart_line_a11y,
+                selected.name,
+                metricLabel,
+                drawn.size,
+                valueLabel(drawn.first().value),
+                drawn.first().label,
+                valueLabel(drawn.last().value),
+                drawn.last().label,
+            )
+            ProgressLineChart(
+                points = series.points,
+                valueLabel = valueLabel,
+                contentDescription = description,
+            )
+        }
+    }
+}
+
+/**
+ * H4-2: volume por músculo na semana corrente (segunda a domingo) — barras em
+ * `Canvas` com o ranking textual logo abaixo (o gráfico nunca é o único
+ * canal). Sem treinos de musculação na semana, mostra o estado vazio.
+ */
+@Composable
+private fun WeeklyMuscleVolumeSection(
+    sessions: List<SessionWithExercises>,
+    muscleByExerciseId: Map<String, String>,
+    weekStart: LocalDate,
+    weekEnd: LocalDate,
+) {
+    val bars = remember(sessions, muscleByExerciseId, weekStart, weekEnd) {
+        muscleVolumeBars(sessions, muscleByExerciseId, weekStart, weekEnd)
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SectionTitle(stringResource(R.string.chart_weekly_title))
+        if (bars.isEmpty()) {
+            Text(
+                text = stringResource(R.string.chart_week_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            // Descrição por músculo para o TalkBack (regra 14 da spec).
+            val parts = ArrayList<String>(bars.size)
+            bars.forEach { bar ->
+                parts.add(
+                    stringResource(
+                        R.string.chart_bar_a11y,
+                        bar.muscle,
+                        formatVolumeKg(bar.volumeKg),
+                        bar.sets,
+                    ),
+                )
+            }
+            val description = stringResource(R.string.chart_bars_a11y, parts.joinToString("; "))
+            ProgressBarChart(
+                bars = bars,
+                valueLabel = { volume -> formatVolumeKg(volume) },
+                contentDescription = description,
+            )
+            bars.forEach { bar ->
+                KeyValueRow(
+                    label = bar.muscle,
+                    value = formatVolumeKg(bar.volumeKg) +
+                        " • " + stringResource(R.string.history_series_count, bar.sets),
+                )
+            }
+        }
     }
 }
 

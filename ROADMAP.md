@@ -54,7 +54,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Testes de UI/Room/contrato | ✅ | Compose no Robolectric dentro do gate (`HistoryScreenTest`, `BackupFlowUiTest`), Room em memória (`WorkoutDaoTest`), contrato `contracts/generate_response.json` nos dois lados, `assembleDebugAndroidTest` no gate e cobertura com `COVERAGE=1` (H3-1) |
 | Periodização e progressão de carga | ✅ | `ProgressionEngine` sugere carga/reps pelo melhor série das sessões dos últimos 42 dias (incremento por equipamento + RPE), `ReviewSchedule` adia `nextReviewAt` sem antecipar, card de revisão atrasada e aviso de deload na Home, sugestão pré-preenche o diálogo de série; testes `ProgressionEngineTest`/`ReviewScheduleTest` (H3-5) |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
-| Progresso visual (gráficos e PR) | 🟡 | PR e 1RM entregues (H4-1): `PersonalRecords.kt` puro (Epley/Brzycki, PR por 1RM estrito), selo "Recorde pessoal!" no treino e "Melhor de todos os tempos" no detalhe; gráficos de tendência continuam ❌ (H4-2) |
+| Progresso visual (gráficos e PR) | ✅ | PR e 1RM entregues (H4-1) e gráficos de progresso entregues (H4-2): linha de carga/volume por exercício no mês e barras de volume por músculo na semana em Compose `Canvas` (sem dependência nova), com ranking textual e resumo para TalkBack; drill-down por exercício continua ❌ (H4-3) |
 | Health Connect | ❌ | Nenhuma permissão de saúde no manifest; app isolado do ecossistema Android (H4-9) |
 | Peso/medidas ao longo do tempo | ❌ | Peso é valor estático do perfil (só para o prompt da IA); sem entidade de medida (H4-8) |
 | Supersets | ❌ | `isSupersetWithPrevious` existe no schema/backup, mas nenhuma tela usa (H4-6) |
@@ -145,6 +145,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-54 | Correção de séries em sessões concluídas (Histórico) | Diálogo de série da H3-27 extraído para `ui/components/SetEditDialog.kt` (`SetEditDialog` público, `WorkoutScreen` sem mudança de comportamento); `WorkoutRepository.updateHistorySet`/`deleteHistorySet` com guarda `requireCompletedSessionForHistory` (só sessão `completed`; em andamento recusa com erro) e `WorkoutDao.deleteSessionExercise` remove a entrada do exercício que ficou sem séries; `AppViewModel.updateHistorySet`/`deleteHistorySet` sem `syncWearState` (relógio espelha a sessão em andamento, que não mudou); `HistoryScreen` ganha "Editar séries" no card de sessão concluída → `SessionSetsEditSheet` com exercícios/séries do Room, cada série abre o diálogo com as validações da H3-27 e exclusão com `ConfirmationDialog`; ids em `rememberSaveable` rederivados da sessão (padrão H3-31); métricas do Histórico recalculam pelo Room; testes `WorkoutRepositorySessionTest` (+4: edição persiste sem tocar data/hora, exclusão realinha `completedSets`, caminho do Histórico rejeita sessão em andamento, última série esvazia o exercício); [spec](docs/specs/H3-54-correcao-series-historico.md) |
 | H3-57 | Predictive back (Android 14) na pilha de navegação | `enableOnBackInvokedCallback="true"` no manifest do celular (opt-in do gesto preditivo); `BackHandler` da pilha em `TreinosApp` trocado por `PredictiveBackHandler` (API 33+) que coleta o fluxo de `BackEventCompat` e só navega (`voltar`/`leaveWorkout`) quando o gesto é confirmado — cancelar lança `CancellationException` e não navega; fallback `BackHandler` clássico para API < 33 (no activity-compose 1.8.2 o fluxo só completa com eventos preditivos); `MainActivity` sem `onBackPressed`/callback custom (sem conflito com a flag); `NavigationBackTest` segue verde; [spec](docs/specs/H3-57-predictive-back.md) |
 | H4-1 | Recordes pessoais (PR) e 1RM estimado | `PersonalRecords.kt` puro (`RecordSet`, `PersonalRecord`, `estimateOneRepMax` Epley/Brzycki com `reps = 1` devolvendo a própria carga, `personalRecord`, `recordSetsFor`, `isPersonalRecord` por 1RM estrito; peso corporal por reps; warm-up/incompletas fora); `HapticEvent.PersonalRecord` + parâmetro `confirmHaptic` no `SetEditDialog` (PR substitui `SetSaved` na mesma confirmação — um háptico só); selo "Recorde pessoal!" por sessão no `WorkoutScreen` (confirmação e "Repetir última série") e seção "Melhor de todos os tempos" no `ExerciseDetailSheet`; sem migration e sem contrato novo; testes `PersonalRecordsTest` (18), `HapticFeedbackTest` (+1), `WorkoutScreenTest` (+3) e `ExerciseDetailSheetTest` (2); [spec](docs/specs/H4-1-recordes-pessoais-1rm.md) |
+| H4-2 | Gráficos de progresso (exercício e volume por músculo) | `ProgressCharts.kt` puro (`ExerciseChartMetric`, `ProgressPoint`, `ExerciseProgressSeries`, `MuscleBar`, `ExerciseOption`, `exerciseProgressSeries`, `muscleVolumeBars`, `exercisesWithHistory` — só sessão de força concluída, séries válidas fora de warm-up, valores finitos, período inclusivo); `ProgressChart.kt` com `ProgressLineChart`/`ProgressBarChart` em Compose `Canvas` (sem dependência nova), eixo Y em 0, cap de 30 pontos e `contentDescription` de resumo; `muscleKeysFor` vira `internal` para as barras reusarem a divisão de volume entre músculos; `HistoryScreen` com "Evolução do exercício" (chips de exercício + métrica melhor série/volume + linha no mês selecionado) e "Volume por músculo na semana" (barras segunda–domingo + ranking textual); strings PT/EN com paridade; testes `ProgressChartsTest` (18), `ProgressChartTest` (3, Robolectric) e `HistoryScreenTest` (+2); [spec](docs/specs/H4-2-graficos-progresso.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -475,8 +476,9 @@ cumprido), H3-9 (backup automático) e as funções futuras do relógio
 **Horizon 4 — paridade de mercado (levantamento 2026-11-14):** a fila nova
 prioriza o que usa dado existente e ativa campo morto. **Must:** **H4-1**
 (PR/1RM) está **concluída** (2026-11-15, gate verde) e listada em §4.1;
-**H4-2** (gráficos de progresso) e **H4-3** (histórico por exercício) são os
-próximos, com 1–2 dias cada. **Should:** H4-4 (tipos de série),
+**H4-2** (gráficos de progresso) está **concluída** (2026-11-15, gate verde) e
+listada em §4.1; **H4-3** (histórico por exercício) é o próximo, com 0,5–1 dia,
+e reusa os componentes de gráfico da H4-2. **Should:** H4-4 (tipos de série),
 H4-5 (anilhas/aquecimento), H4-6 (supersets), H4-7 (export/import CSV),
 H4-8 (peso/medidas), H4-9 (Health Connect) e H4-10 (programas prontos offline).
 **Could:** H4-11..H4-16 (notas, aplicar progressão, streak/relatório, widget/tile,
@@ -573,7 +575,7 @@ confirme antes de implementar.
 aguardando aprovação do dono.
 
 - [H4-1 — Recordes pessoais (PR) e 1RM estimado](docs/specs/H4-1-recordes-pessoais-1rm.md) — concluída (2026-11-15)
-- [H4-2 — Gráficos de progresso (exercício e volume por músculo)](docs/specs/H4-2-graficos-progresso.md) — proposta
+- [H4-2 — Gráficos de progresso (exercício e volume por músculo)](docs/specs/H4-2-graficos-progresso.md) — concluída (2026-11-15) (`ProgressCharts.kt` puro + `ProgressLineChart`/`ProgressBarChart` em `Canvas`, seções no Histórico com ranking textual e resumo de acessibilidade; sem dependência nova e sem mudança de Room/backend)
 - [H4-3 — Histórico por exercício (drill-down)](docs/specs/H4-3-historico-por-exercicio.md) — proposta
 - [H4-4 — Tipos de série: aquecimento, drop set, AMRAP e RIR](docs/specs/H4-4-tipos-de-serie.md) — proposta
 - [H4-5 — Calculadora de anilhas e rampa de aquecimento](docs/specs/H4-5-calculadora-anilhas-aquecimento.md) — proposta

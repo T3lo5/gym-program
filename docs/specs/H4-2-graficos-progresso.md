@@ -7,13 +7,25 @@
 | Item do roadmap | `H4-2` |
 | MoSCoW | `M` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` |
+| Implementação | `concluída em 2026-11-15` |
 | Depende de | H3-5 (melhor série por sessão), H3-28 (Histórico), H3-3/H3-34 (acessibilidade) |
 
 **Origem:** levantamento de mercado de 2026-11-14 (Horizon 4, Tier 1). O app
 tem `HistoryMetrics` (agregação) e `ProgressionEngine` (melhor série por
 sessão), mas nenhuma tendência visível; não há um único `Canvas` no código.
+
+**Implementação (2026-11-15):** gate verde. Notas do que ficou diferente do
+texto original: (1) as barras semanais vêm acompanhadas do ranking textual por
+músculo logo abaixo do gráfico (volume + séries por linha) — o rótulo do
+músculo não é desenhado no canvas, então o gráfico nunca é o único canal;
+(2) `MAX_DRAWN_POINTS = 30` limita os pontos desenhados na linha e o resumo de
+acessibilidade descreve exatamente a janela desenhada; (3) testes existentes
+do `HistoryScreenTest` foram ajustados onde a UI nova acrescenta nós (o nome
+do exercício no chip do seletor e "Outros"/"Volume" repetidos) — a intenção de
+cada teste está preservada e comentada; (4) a seção "Evolução do exercício"
+não aparece em meses sem musculação e o dia selecionado mantém o foco na lista
+daquele dia (gráficos só na visão do mês inteiro).
 
 **Relacionado:** [H4-1](H4-1-recordes-pessoais-1rm.md) fornece o 1RM estimado
 (usado como métrica opcional); [H4-3](H4-3-historico-por-exercicio.md) reusa os

@@ -155,8 +155,10 @@ class HistoryScreenTest {
         cardSessao().assertExists()
         composeRule.onNodeWithText("Concluído", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Plano Teste", useUnmergedTree = true).assertExists()
-        // Recolhido: o detalhe das séries ainda não está na tela.
-        composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertDoesNotExist()
+        // Recolhido: o detalhe das séries ainda não está na tela. (H4-2: o
+        // nome do exercício também aparece no seletor do gráfico, então o que
+        // distingue o card recolhido é a ausência das séries.)
+        composeRule.onNodeWithText("Série 1", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -166,13 +168,14 @@ class HistoryScreenTest {
         }
 
         alternarCardSessao()
-        composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertExists()
+        // H4-2: "Supino reto" aparece no card e no chip do seletor do gráfico.
+        composeRule.onAllNodesWithText("Supino reto", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithText("Série 1", substring = true, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("10 reps • 40,0 kg • RPE 8,0", substring = true, useUnmergedTree = true)
             .assertExists()
 
         alternarCardSessao()
-        composeRule.onNodeWithText("Supino reto", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Série 1", substring = true, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -184,13 +187,16 @@ class HistoryScreenTest {
         composeRule.onNodeWithText(formatMonthYear(today.year, today.monthValue)).assertExists()
         composeRule.onNodeWithText("Treinos", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Séries", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("Volume", useUnmergedTree = true).assertExists()
+        // H4-2: o rótulo "Volume" existe no card de métricas e no chip do gráfico.
+        composeRule.onAllNodesWithText("Volume", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithText("Duração", useUnmergedTree = true).assertExists()
         // 1 sessão concluída, 1 série de 10 reps com 40 kg = 400 kg, 1h de duração.
         composeRule.onNodeWithText("10 reps", useUnmergedTree = true).assertExists()
-        // O mesmo "400 kg" aparece duas vezes na tela: no card "Volume" e na linha
-        // "Outros" do ranking por músculo (a sessão falsa não tem músculo mapeado).
-        composeRule.onNodeWithText("Outros", useUnmergedTree = true).assertExists()
+        // H4-2: "Outros" aparece no ranking do mês e na linha semanal do
+        // gráfico de barras (a sessão falsa não tem músculo mapeado).
+        composeRule.onAllNodesWithText("Outros", useUnmergedTree = true).assertCountEquals(2)
+        // O mesmo "400 kg" em duas linhas: card "Volume" e ranking do mês (a
+        // linha semanal junta volume e séries no mesmo texto).
         composeRule.onAllNodesWithText("400 kg", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithText("1h 00min", useUnmergedTree = true).assertExists()
     }
@@ -305,5 +311,37 @@ class HistoryScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Excluir o registro?").assertDoesNotExist()
         assertEquals(2L, excluido)
+    }
+
+    @Test
+    fun historico_mostra_seletor_de_exercicio() {
+        // H4-2: a seção "Evolução do exercício" lista o exercício do mês como
+        // chip; com uma única sessão, mostra o estado de poucos dados.
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })
+        }
+
+        composeRule.onNodeWithText("Evolução do exercício").assertExists()
+        composeRule.onAllNodesWithText("Supino reto", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNodeWithText("Melhor série", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Poucos dados para um gráfico").assertExists()
+    }
+
+    @Test
+    fun historico_mostra_barras_por_musculo() {
+        // H4-2: com o músculo mapeado, a semana corrente mostra a barra "Peito"
+        // e o ranking textual logo abaixo do gráfico.
+        composeRule.setContent {
+            HistoryScreen(
+                sessions = listOf(sessaoConcluida),
+                onBack = { },
+                muscleByExerciseId = mapOf("Barbell_Bench_Press" to "chest"),
+            )
+        }
+
+        composeRule.onNodeWithText("Volume por músculo na semana").assertExists()
+        // "Peito" aparece no ranking do mês e na linha semanal do gráfico.
+        composeRule.onAllNodesWithText("Peito", useUnmergedTree = true).assertCountEquals(2)
+        composeRule.onNodeWithText("400 kg • 1 série(s)", useUnmergedTree = true).assertExists()
     }
 }

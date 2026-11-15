@@ -349,6 +349,15 @@
     <string name="history_edit_sets">Edit sets</string>
     <string name="history_edit_sets_title">Edit sets</string>
     <string name="history_edit_sets_helper">Tap a set to edit weight, reps or RPE.</string>
+    <!-- H4-2: progress charts -->
+    <string name="chart_exercise_title">Exercise progress</string>
+    <string name="chart_weekly_title">Weekly volume by muscle</string>
+    <string name="chart_metric_best">Best set</string>
+    <string name="chart_few_data">Not enough data for a chart</string>
+    <string name="chart_week_empty">No strength workouts this week</string>
+    <string name="chart_line_a11y">%1$s — %2$s (%3$d workouts): %4$s on %5$s to %6$s on %7$s</string>
+    <string name="chart_bars_a11y">Weekly volume by muscle: %1$s</string>
+    <string name="chart_bar_a11y">%1$s: %2$s • %3$d set(s)</string>
 
     <!-- Log Activity -->
     <string name="screen_log_activity">Record activity</string>

@@ -350,6 +350,15 @@
     <string name="history_edit_sets">Editar séries</string>
     <string name="history_edit_sets_title">Editar séries</string>
     <string name="history_edit_sets_helper">Toque em uma série para editar carga, repetições ou RPE.</string>
+    <!-- H4-2: gráficos de progresso -->
+    <string name="chart_exercise_title">Evolução do exercício</string>
+    <string name="chart_weekly_title">Volume por músculo na semana</string>
+    <string name="chart_metric_best">Melhor série</string>
+    <string name="chart_few_data">Poucos dados para um gráfico</string>
+    <string name="chart_week_empty">Sem treinos de musculação na semana</string>
+    <string name="chart_line_a11y">%1$s — %2$s (%3$d treinos): %4$s em %5$s até %6$s em %7$s</string>
+    <string name="chart_bars_a11y">Volume por músculo na semana: %1$s</string>
+    <string name="chart_bar_a11y">%1$s: %2$s • %3$d série(s)</string>
 
     <!-- Registro de Atividade -->
     <string name="screen_log_activity">Registrar atividade</string>

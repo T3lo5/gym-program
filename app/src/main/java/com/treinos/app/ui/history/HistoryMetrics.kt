@@ -121,8 +121,11 @@ fun sessionDay(session: SessionWithExercises): LocalDate =
 /**
  * [muscleByExerciseId] guarda a lista de músculos do exercício separada por vírgula;
  * o volume é dividido igualmente entre eles para não contar a mesma série duas vezes.
+ *
+ * H4-2: `internal` para as barras de volume por músculo (`ProgressCharts.kt`)
+ * usarem a mesma regra de divisão — sem mudança de comportamento.
  */
-private fun muscleKeysFor(exerciseId: String, muscleByExerciseId: Map<String, String>): List<String> {
+internal fun muscleKeysFor(exerciseId: String, muscleByExerciseId: Map<String, String>): List<String> {
     val labels = muscleByExerciseId[exerciseId]
         ?.split(',')
         ?.map { it.trim() }
