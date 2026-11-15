@@ -18,6 +18,7 @@ import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.progression.PersonalRecord
 import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
@@ -99,6 +100,7 @@ class WorkoutScreenTest {
         onUpdatedSet: (Int?, Double?, Double?) -> Unit = { _, _, _ -> },
         exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
         availableEquipment: List<String> = emptyList(),
+        personalRecords: Map<String, PersonalRecord> = emptyMap(),
         onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
         onLoadCatalog: () -> Unit = {},
     ) {
@@ -116,6 +118,7 @@ class WorkoutScreenTest {
                 onUpdateSet = { _, reps, weight, rpe -> onUpdatedSet(reps, weight, rpe) },
                 exerciseMedia = exerciseMedia,
                 availableEquipment = availableEquipment,
+                personalRecords = personalRecords,
                 onSwapExercise = onSwapExercise,
                 onLoadCatalog = onLoadCatalog,
             )
@@ -330,5 +333,98 @@ class WorkoutScreenTest {
             Triple(100L, "Dumbbell_Bench_Press", SwapScope.ALL_FUTURE),
             troca,
         )
+    }
+
+    /** Recorde atual de 60 kg × 10 (1RM Epley 80,0) para o exercício da sessão. */
+    private fun recordeAtual(): Map<String, PersonalRecord> = mapOf(
+        "Barbell_Bench_Press" to PersonalRecord(
+            exerciseId = "Barbell_Bench_Press",
+            weightKg = 60.0,
+            reps = 10,
+            estimated1RmKg = 80.0,
+            achievedAtMillis = 1_000L,
+        ),
+    )
+
+    @Test
+    fun bater_pr_mostra_selo() {
+        // H4-1: 65 kg × 12 (1RM 91,0) supera 60 × 10 (80,0) → selo no card e
+        // a série é gravada do mesmo jeito.
+        var gravada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(),
+            onLoggedSet = { reps, weight, rpe -> gravada = Triple(reps, weight, rpe) },
+            personalRecords = recordeAtual(),
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Registrar série 2").performClick()
+        campoDeTexto("10").performTextReplacement("12")
+        campoDeTexto("60,0").performTextReplacement("65")
+        composeRule.onNodeWithText("Salvar série").performClick()
+
+        assertEquals(Triple(12, 65.0, null), gravada)
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Recorde pessoal!"))
+        composeRule.onNodeWithText("Recorde pessoal!").assertIsDisplayed()
+    }
+
+    @Test
+    fun serie_sem_pr_nao_mostra_selo() {
+        // H4-1: repetir o próprio recorde (60 × 10 = 1RM 80,0) é empate —
+        // empate não é PR novo; a série é gravada e nenhum selo aparece.
+        var gravada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(),
+            onLoggedSet = { reps, weight, rpe -> gravada = Triple(reps, weight, rpe) },
+            personalRecords = recordeAtual(),
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Registrar série 2").performClick()
+        campoDeTexto("60,0").performTextReplacement("60")
+        composeRule.onNodeWithText("Salvar série").performClick()
+
+        assertEquals(Triple(10, 60.0, null), gravada)
+        composeRule.onNodeWithText("Recorde pessoal!").assertDoesNotExist()
+    }
+
+    @Test
+    fun repetir_ultima_serie_com_pr_mostra_selo() {
+        // H4-1: "Repetir última série" também avalia PR — com recorde anterior
+        // mais fraco (50 × 8), repetir 60 × 10 supera e mostra o selo.
+        var gravada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(),
+            onLoggedSet = { reps, weight, rpe -> gravada = Triple(reps, weight, rpe) },
+            personalRecords = mapOf(
+                "Barbell_Bench_Press" to PersonalRecord(
+                    exerciseId = "Barbell_Bench_Press",
+                    weightKg = 50.0,
+                    reps = 8,
+                    estimated1RmKg = 56.67,
+                    achievedAtMillis = 1_000L,
+                ),
+            ),
+        )
+
+        // Rolar até "Registrar série 2" (padrão dos demais testes desta classe)
+        // deixa o botão "Repetir última série" — logo acima — visível e
+        // clicável na janela estreita do Robolectric.
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Repetir última série", substring = true).performClick()
+
+        assertEquals(Triple(10, 60.0, null), gravada)
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Recorde pessoal!"))
+        composeRule.onNodeWithText("Recorde pessoal!").assertIsDisplayed()
     }
 }

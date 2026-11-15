@@ -108,6 +108,7 @@ fun TreinosApp(viewModel: AppViewModel) {
     val catalogMessage by viewModel.catalogMessage.collectAsStateWithLifecycle()
     val activityPrefill by viewModel.activityPrefill.collectAsStateWithLifecycle()
     val progressionSuggestions by viewModel.progressionSuggestions.collectAsStateWithLifecycle()
+    val personalRecords by viewModel.personalRecords.collectAsStateWithLifecycle()
     val planCycle by viewModel.planCycle.collectAsStateWithLifecycle()
     val activityEditingId by viewModel.activityEditingId.collectAsStateWithLifecycle()
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
@@ -361,6 +362,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onExtendRest = { viewModel.extendRest() },
                     exerciseMedia = exerciseMedia,
                     progressionSuggestions = progressionSuggestions,
+                    personalRecords = personalRecords,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                     onUpdateSet = viewModel::updateSet,
                     onDeleteSet = viewModel::deleteSet,
@@ -513,9 +515,12 @@ fun TreinosApp(viewModel: AppViewModel) {
     // H3-24: mídia resolvida no ViewModel — catálogo primeiro, mídia do plano
     // (persistida no Room) como fallback quando o catálogo não tem o ID.
     val selectedMedia by viewModel.selectedMedia.collectAsStateWithLifecycle()
+    // H4-1: recorde do exercício aberto no detalhe.
+    val selectedExerciseRecord by viewModel.selectedExerciseRecord.collectAsStateWithLifecycle()
     if (selectedExerciseId != null) {
         ExerciseDetailSheet(
             media = selectedMedia,
+            record = selectedExerciseRecord,
             onDismiss = { viewModel.closeExerciseDetail() },
         )
     }

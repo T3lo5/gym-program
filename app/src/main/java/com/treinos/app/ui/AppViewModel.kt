@@ -58,6 +58,8 @@ import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.nextIncompleteExercise
 import com.treinos.app.ui.progression.ProgressionContext
 import com.treinos.app.ui.progression.ProgressionSuggestion
+import com.treinos.app.ui.progression.PersonalRecord
+import com.treinos.app.ui.progression.personalRecord
 import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.progression.completedSessionsSincePlan
 import com.treinos.app.ui.progression.cycleWeek
@@ -491,6 +493,28 @@ class AppViewModel(
             planInstructions = planExercise?.instructions.orEmpty(),
             planImages = planExercise?.images.orEmpty(),
         )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * H4-1: recorde pessoal por exercício, derivado das séries registradas.
+     * Só leitura — nada é gravado ao calcular; modo avião não muda o resultado.
+     */
+    val personalRecords: StateFlow<Map<String, PersonalRecord>> = sessions.map { list ->
+        val ids = linkedSetOf<String>()
+        list.forEach { session ->
+            session.exercises.forEach { exercise ->
+                ids.add(exercise.exercise.exerciseId)
+            }
+        }
+        ids.mapNotNull { id -> personalRecord(list, id)?.let { id to it } }.toMap()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** H4-1: recorde do exercício aberto no `ExerciseDetailSheet`. */
+    val selectedExerciseRecord: StateFlow<PersonalRecord?> = combine(
+        sessions,
+        _selectedExerciseId,
+    ) { list, exerciseId ->
+        exerciseId?.let { personalRecord(list, it) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _isUpdatingCatalog = MutableStateFlow(false)

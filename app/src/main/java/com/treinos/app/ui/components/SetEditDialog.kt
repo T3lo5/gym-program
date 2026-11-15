@@ -57,6 +57,7 @@ fun SetEditDialog(
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
     onConfirm: (Int?, Double?, Double?) -> Unit,
+    confirmHaptic: (Int?, Double?, Double?) -> HapticEvent = { _, _, _ -> HapticEvent.SetSaved },
 ) {
     // H3-31: o que foi digitado sobrevive à rotação (e ao teclado que recria
     // a Activity). `key` evita herdar rascunho de outro diálogo na mesma posição.
@@ -73,8 +74,10 @@ fun SetEditDialog(
         when (val result = validateSetInput(repsText = reps, weightText = weight, rpeText = rpe)) {
             is SetInputValidation.Invalid -> errors = result.errors
             is SetInputValidation.Valid -> {
-                // Háptico curto ao confirmar o salvamento (H3-46).
-                haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.SetSaved))
+                // H3-46/H4-1: o evento é decidido por quem chama — o PR substitui
+                // o SetSaved na mesma confirmação (nunca dois hápticos).
+                val event = confirmHaptic(result.input.reps, result.input.weightKg, result.input.rpe)
+                haptics.performHapticFeedback(hapticFeedbackForEvent(event))
                 onConfirm(result.input.reps, result.input.weightKg, result.input.rpe)
             }
         }

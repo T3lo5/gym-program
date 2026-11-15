@@ -91,8 +91,11 @@ import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.hapticFeedbackForEvent
 import com.treinos.app.ui.muscleLabel
+import com.treinos.app.ui.progression.PersonalRecord
 import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
+import com.treinos.app.ui.progression.RecordSet
+import com.treinos.app.ui.progression.isPersonalRecord
 import com.treinos.app.ui.progressStateDescription
 import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
@@ -116,6 +119,7 @@ fun WorkoutScreen(
     onExtendRest: () -> Unit = {},
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
+    personalRecords: Map<String, PersonalRecord> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
     onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit = { _, _, _, _ -> },
     onDeleteSet: (SetLogEntity) -> Unit = {},
@@ -129,6 +133,9 @@ fun WorkoutScreen(
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
     var exerciseToLogId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editSetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // H4-1: o selo de PR é por sessão — uma vez batido, fica no card do
+    // exercício até o fim da sessão, mesmo que a série seguinte não seja PR.
+    var prSessionExercises by remember(session?.session?.id) { mutableStateOf(emptySet<String>()) }
     val exerciseToLog = session?.exercises?.firstOrNull { it.exercise.id == exerciseToLogId }
     val editTarget = editSetId?.let { setId ->
         session?.exercises
@@ -301,6 +308,23 @@ fun WorkoutScreen(
                         onRepeatLastSet = { reps, weight, rpe ->
                             onLogSet(exercise, reps, weight, rpe)
                         },
+                        repeatHaptic = { reps, weight, rpe ->
+                            // H4-1: repetir a última série também avalia PR.
+                            val candidate = RecordSet(
+                                sessionId = session?.session?.id ?: 0L,
+                                sessionStartedAt = session?.session?.startedAt ?: 0L,
+                                reps = reps,
+                                weightKg = weight,
+                                rpe = rpe,
+                            )
+                            if (isPersonalRecord(candidate, personalRecords[exercise.exercise.exerciseId])) {
+                                prSessionExercises = prSessionExercises + exercise.exercise.exerciseId
+                                HapticEvent.PersonalRecord
+                            } else {
+                                HapticEvent.RepeatLastSet
+                            }
+                        },
+                        showPrSeal = exercise.exercise.exerciseId in prSessionExercises,
                         onOpenDetail = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
                         onEditSet = { set -> editSetId = set.id },
                         onNextExercise = {
@@ -340,6 +364,8 @@ fun WorkoutScreen(
         // callback roda fora dela e não pode chamar `stringResource`.
         val savedDetailTemplate = stringResource(R.string.workout_set_saved_detail)
         val savedTemplate = stringResource(R.string.workout_set_saved)
+        val prSavedTemplate = stringResource(R.string.workout_set_saved_pr)
+        val prSavedDetailTemplate = stringResource(R.string.workout_set_saved_pr_detail)
         val repsTemplate = stringResource(R.string.common_reps_short)
         SetEditDialog(
             // H3-31: chave por diálogo — reabrir para outra série não herda o
@@ -364,17 +390,43 @@ fun WorkoutScreen(
             confirmLabel = stringResource(R.string.workout_set_dialog_save),
             onDelete = null,
             onDismiss = { exerciseToLogId = null },
+            confirmHaptic = { reps, weight, rpe ->
+                // H4-1: PR substitui o SetSaved na mesma confirmação (um háptico).
+                val candidate = RecordSet(
+                    sessionId = session?.session?.id ?: 0L,
+                    sessionStartedAt = session?.session?.startedAt ?: 0L,
+                    reps = reps,
+                    weightKg = weight,
+                    rpe = rpe,
+                )
+                if (isPersonalRecord(candidate, personalRecords[exercise.exercise.exerciseId])) {
+                    prSessionExercises = prSessionExercises + exercise.exercise.exerciseId
+                    HapticEvent.PersonalRecord
+                } else {
+                    HapticEvent.SetSaved
+                }
+            },
             onConfirm = { reps, weight, rpe ->
                 val nextSetNumber = exercise.sets.size + 1
                 val partes = mutableListOf<String>()
                 reps?.let { partes.add(String.format(repsTemplate, it)) }
                 weight?.let { partes.add(formatKg(it)) }
                 val detalhe = partes.joinToString(" • ")
+                val candidate = RecordSet(
+                    sessionId = session?.session?.id ?: 0L,
+                    sessionStartedAt = session?.session?.startedAt ?: 0L,
+                    reps = reps,
+                    weightKg = weight,
+                    rpe = rpe,
+                )
+                val bateuPr = isPersonalRecord(candidate, personalRecords[exercise.exercise.exerciseId])
                 setSavedAnnouncement =
-                    if (detalhe.isNotBlank()) {
-                        String.format(savedDetailTemplate, nextSetNumber, detalhe)
-                    } else {
-                        String.format(savedTemplate, nextSetNumber)
+                    when {
+                        bateuPr && detalhe.isNotBlank() ->
+                            String.format(prSavedDetailTemplate, nextSetNumber, detalhe)
+                        bateuPr -> String.format(prSavedTemplate, nextSetNumber)
+                        detalhe.isNotBlank() -> String.format(savedDetailTemplate, nextSetNumber, detalhe)
+                        else -> String.format(savedTemplate, nextSetNumber)
                     }
                 onLogSet(exercise, reps, weight, rpe)
                 exerciseToLogId = null
@@ -880,6 +932,8 @@ private fun ExerciseCard(
     media: ExerciseMedia?,
     onLogSet: () -> Unit,
     onRepeatLastSet: (Int?, Double?, Double?) -> Unit,
+    repeatHaptic: (Int?, Double?, Double?) -> HapticEvent = { _, _, _ -> HapticEvent.RepeatLastSet },
+    showPrSeal: Boolean = false,
     onOpenDetail: () -> Unit,
     onEditSet: (SetLogEntity) -> Unit,
     onNextExercise: () -> Unit,
@@ -931,6 +985,15 @@ private fun ExerciseCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (showPrSeal) {
+                            // H4-1: selo do recorde batido nesta sessão.
+                            Text(
+                                text = stringResource(R.string.workout_pr_seal),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 }
 
@@ -988,7 +1051,10 @@ private fun ExerciseCard(
                 if (lastSet != null) {
                     OutlinedButton(
                         onClick = {
-                            haptics.performHapticFeedback(hapticFeedbackForEvent(HapticEvent.RepeatLastSet))
+                            // H4-1: o evento é decidido antes de gravar — PR
+                            // substitui o RepeatLastSet na mesma confirmação.
+                            val event = repeatHaptic(lastSet.reps, lastSet.weightKg, lastSet.rpe)
+                            haptics.performHapticFeedback(hapticFeedbackForEvent(event))
                             onRepeatLastSet(lastSet.reps, lastSet.weightKg, lastSet.rpe)
                         },
                         modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),

@@ -456,6 +456,9 @@
     <string name="workout_set_delete_title">Delete set?</string>
     <string name="workout_set_saved">Set %1$d saved</string>
     <string name="workout_set_saved_detail">Set %1$d saved — %2$s</string>
+    <string name="workout_set_saved_pr">Set %1$d saved — personal record!</string>
+    <string name="workout_set_saved_pr_detail">Set %1$d saved — personal record! %2$s</string>
+    <string name="workout_pr_seal">Personal record!</string>
     <string name="workout_rest_started_announcement">Rest of %1$s s started</string>
     <string name="workout_swap_replace_label">Replace «%1$s»</string>
     <string name="workout_swap_catalog_offline">Offline catalog unavailable.</string>
@@ -613,4 +616,9 @@
     <string name="exercise_detail_equipment">Equipment: %1$s</string>
     <string name="exercise_detail_instructions">Instructions</string>
     <string name="exercise_detail_no_instructions">No instructions available.</string>
+    <string name="exercise_detail_record_title">All-time best</string>
+    <string name="exercise_detail_record_empty">No record yet.</string>
+    <string name="exercise_detail_record_set_loaded">%1$s × %2$d reps</string>
+    <string name="exercise_detail_record_set_bodyweight">%1$d reps</string>
+    <string name="exercise_detail_record_1rm">Est. 1RM: %1$s</string>
 </resources>

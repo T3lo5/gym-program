@@ -87,6 +87,7 @@ class RestFeedbackPlayer(context: Context) {
  */
 sealed interface HapticEvent {
     data object SetSaved : HapticEvent
+    data object PersonalRecord : HapticEvent
     data object SetEdited : HapticEvent
     data object SetDeleted : HapticEvent
     data object RepeatLastSet : HapticEvent
@@ -114,6 +115,7 @@ sealed interface HapticEvent {
  */
 fun hapticFeedbackForEvent(event: HapticEvent): HapticFeedbackType = when (event) {
     is HapticEvent.SetSaved -> HapticFeedbackType.LongPress
+    is HapticEvent.PersonalRecord -> HapticFeedbackType.LongPress
     is HapticEvent.SetEdited -> HapticFeedbackType.LongPress
     is HapticEvent.SetDeleted -> HapticFeedbackType.LongPress
     is HapticEvent.RepeatLastSet -> HapticFeedbackType.LongPress

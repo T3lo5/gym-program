@@ -14,6 +14,12 @@ class HapticFeedbackTest {
     }
 
     @Test
+    fun `evento_personal_record_mapeia_confirmacao`() {
+        // H4-1: o PR substitui o SetSaved na mesma confirmação (um háptico só).
+        assertEquals(HapticFeedbackType.LongPress, hapticFeedbackForEvent(HapticEvent.PersonalRecord))
+    }
+
+    @Test
     fun `evento_controle_descanso_mapeia_toque_leve`() {
         assertEquals(HapticFeedbackType.TextHandleMove, hapticFeedbackForEvent(HapticEvent.RestAdjusted))
     }
@@ -44,6 +50,7 @@ class HapticFeedbackTest {
         // Garante que todos os eventos do sealed interface têm mapeamento explícito
         val allEvents = listOf(
             HapticEvent.SetSaved,
+            HapticEvent.PersonalRecord,
             HapticEvent.SetEdited,
             HapticEvent.SetDeleted,
             HapticEvent.RepeatLastSet,

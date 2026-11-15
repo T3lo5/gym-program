@@ -34,13 +34,17 @@ import coil.request.ImageRequest
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.R
 import com.treinos.app.ui.equipmentLabel
+import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.muscleLabel
+import com.treinos.app.ui.progression.PersonalRecord
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseDetailSheet(
     media: ExerciseMedia?,
     onDismiss: () -> Unit,
+    record: PersonalRecord? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val fallbackName = stringResource(R.string.exercise_detail_fallback_name)
@@ -117,6 +121,41 @@ fun ExerciseDetailSheet(
                     text = stringResource(R.string.exercise_detail_equipment, equipmentLabel(media.equipment)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+
+            // H4-1: melhor de todos os tempos — PR derivado das séries; o 1RM
+            // é sempre rotulado como estimativa, nunca como carga real.
+            Text(
+                text = stringResource(R.string.exercise_detail_record_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (record == null) {
+                Text(
+                    text = stringResource(R.string.exercise_detail_record_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                val setLabel = if (record.weightKg != null) {
+                    stringResource(
+                        R.string.exercise_detail_record_set_loaded,
+                        formatKg(record.weightKg),
+                        record.reps ?: 0,
+                    )
+                } else {
+                    stringResource(R.string.exercise_detail_record_set_bodyweight, record.reps ?: 0)
+                }
+                Text(
+                    text = setLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                record.estimated1RmKg?.let { estimated ->
+                    Text(
+                        text = stringResource(R.string.exercise_detail_record_1rm, formatKg(estimated)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Text(

@@ -25,7 +25,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 
 ---
 
-## 2. Onde estamos hoje (atualizado em 2026-11-11)
+## 2. Onde estamos hoje (atualizado em 2026-11-14)
 
 | Área | Status | Evidência |
 |------|--------|-----------|
@@ -54,6 +54,10 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Testes de UI/Room/contrato | ✅ | Compose no Robolectric dentro do gate (`HistoryScreenTest`, `BackupFlowUiTest`), Room em memória (`WorkoutDaoTest`), contrato `contracts/generate_response.json` nos dois lados, `assembleDebugAndroidTest` no gate e cobertura com `COVERAGE=1` (H3-1) |
 | Periodização e progressão de carga | ✅ | `ProgressionEngine` sugere carga/reps pelo melhor série das sessões dos últimos 42 dias (incremento por equipamento + RPE), `ReviewSchedule` adia `nextReviewAt` sem antecipar, card de revisão atrasada e aviso de deload na Home, sugestão pré-preenche o diálogo de série; testes `ProgressionEngineTest`/`ReviewScheduleTest` (H3-5) |
 | Autenticação / login | ❌ | `deviceId` **não** é autenticação; é identificador de restore |
+| Progresso visual (gráficos e PR) | 🟡 | PR e 1RM entregues (H4-1): `PersonalRecords.kt` puro (Epley/Brzycki, PR por 1RM estrito), selo "Recorde pessoal!" no treino e "Melhor de todos os tempos" no detalhe; gráficos de tendência continuam ❌ (H4-2) |
+| Health Connect | ❌ | Nenhuma permissão de saúde no manifest; app isolado do ecossistema Android (H4-9) |
+| Peso/medidas ao longo do tempo | ❌ | Peso é valor estático do perfil (só para o prompt da IA); sem entidade de medida (H4-8) |
+| Supersets | ❌ | `isSupersetWithPrevious` existe no schema/backup, mas nenhuma tela usa (H4-6) |
 
 > A tabela envelhece rápido. Ao entregar um item, mova-o para §4.1 e atualize esta
 > tabela no mesmo commit.
@@ -139,6 +143,7 @@ Priorização MoSCoW: **M** = Must, **S** = Should, **C** = Could, **W** = Won't
 | H3-48 | Assinatura estável e versionamento dos APKs (celular e relógio) | `app/build.gradle.kts` resolve `file("debug.keystore")` (keystore versionada relativa ao módulo — antes procurava `app/app/debug.keystore` inexistente e assinava com a keystore efêmera do ambiente); `wear/build.gradle.kts` com `signingConfigs` apontando para a mesma keystore (`../app/debug.keystore`) e `versionCode`/`versionName` via `-PversionCode`/`-PversionName` (default `1`/`1.0.0`); `ci-android.sh` deriva o `versionCode` local de `git rev-list --count HEAD` (CI continua com `run_number`) e reprova o build se o fingerprint SHA-256 do certificado dos dois APKs não for o esperado (`71:a5:a2:ac:…:74:6f`); `verify.sh` repassa `VERSION_CODE`/`VERSION_NAME` ao Docker só quando definidos; workflow sem o cache de keystore (evicção não muda mais a assinatura); [spec](docs/specs/H3-48-assinatura-estavel-versionamento.md) |
 | H3-54 | Correção de séries em sessões concluídas (Histórico) | Diálogo de série da H3-27 extraído para `ui/components/SetEditDialog.kt` (`SetEditDialog` público, `WorkoutScreen` sem mudança de comportamento); `WorkoutRepository.updateHistorySet`/`deleteHistorySet` com guarda `requireCompletedSessionForHistory` (só sessão `completed`; em andamento recusa com erro) e `WorkoutDao.deleteSessionExercise` remove a entrada do exercício que ficou sem séries; `AppViewModel.updateHistorySet`/`deleteHistorySet` sem `syncWearState` (relógio espelha a sessão em andamento, que não mudou); `HistoryScreen` ganha "Editar séries" no card de sessão concluída → `SessionSetsEditSheet` com exercícios/séries do Room, cada série abre o diálogo com as validações da H3-27 e exclusão com `ConfirmationDialog`; ids em `rememberSaveable` rederivados da sessão (padrão H3-31); métricas do Histórico recalculam pelo Room; testes `WorkoutRepositorySessionTest` (+4: edição persiste sem tocar data/hora, exclusão realinha `completedSets`, caminho do Histórico rejeita sessão em andamento, última série esvazia o exercício); [spec](docs/specs/H3-54-correcao-series-historico.md) |
 | H3-57 | Predictive back (Android 14) na pilha de navegação | `enableOnBackInvokedCallback="true"` no manifest do celular (opt-in do gesto preditivo); `BackHandler` da pilha em `TreinosApp` trocado por `PredictiveBackHandler` (API 33+) que coleta o fluxo de `BackEventCompat` e só navega (`voltar`/`leaveWorkout`) quando o gesto é confirmado — cancelar lança `CancellationException` e não navega; fallback `BackHandler` clássico para API < 33 (no activity-compose 1.8.2 o fluxo só completa com eventos preditivos); `MainActivity` sem `onBackPressed`/callback custom (sem conflito com a flag); `NavigationBackTest` segue verde; [spec](docs/specs/H3-57-predictive-back.md) |
+| H4-1 | Recordes pessoais (PR) e 1RM estimado | `PersonalRecords.kt` puro (`RecordSet`, `PersonalRecord`, `estimateOneRepMax` Epley/Brzycki com `reps = 1` devolvendo a própria carga, `personalRecord`, `recordSetsFor`, `isPersonalRecord` por 1RM estrito; peso corporal por reps; warm-up/incompletas fora); `HapticEvent.PersonalRecord` + parâmetro `confirmHaptic` no `SetEditDialog` (PR substitui `SetSaved` na mesma confirmação — um háptico só); selo "Recorde pessoal!" por sessão no `WorkoutScreen` (confirmação e "Repetir última série") e seção "Melhor de todos os tempos" no `ExerciseDetailSheet`; sem migration e sem contrato novo; testes `PersonalRecordsTest` (18), `HapticFeedbackTest` (+1), `WorkoutScreenTest` (+3) e `ExerciseDetailSheetTest` (2); [spec](docs/specs/H4-1-recordes-pessoais-1rm.md) |
 
 ### Horizon 1 — Agora (próximas 2-4 semanas): proteger dados e fechar o core
 
@@ -268,6 +273,55 @@ inteira); editar carga/reps no relógio; métricas de corrida no pulso
 pede); notificações e watchface. São as melhorias detalhadas que o MVP não
 precisa para ser útil amanhã.
 
+### Horizon 4 — Paridade de mercado (levantamento 2026-11-14)
+
+Itens levantados na análise de mercado de 2026-11-14 (referência: página pública
+de features do Hevy, líder da categoria, cruzada com o código deste repositório).
+A ordem da tabela é a **ordem de execução por ganho/custo**: primeiro o que usa
+dado que já existe e ativa um campo morto, depois paridade de utilidade diária e,
+por último, o que exige arquitetura nova.
+
+Os três tiers do levantamento mapeiam para o MoSCoW: **Tier 1 → Must**,
+**Tier 2 → Should**, **Tier 3 → Could/Won't now**.
+
+**Versão alvo: 1.5.0.** O Horizon 4 inteiro (H4-1..H4-17) é a release **1.5.0**.
+Ao entrar no CI/CD, definir `versionName = 1.5.0` com o `versionCode` derivado do
+git (H3-48); não misturar itens do H4 em releases 1.3.x/1.4.x. Cada spec do H4
+carrega a linha `Versão alvo | 1.5.0` na tabela de Status.
+
+**Migrations Room (ordem da fila):** o banco está em 6. H4-4 → `MIGRATION_6_7`
+(v7, coluna `setType`); H4-7 → `MIGRATION_7_8` (v8, `importRef` + índice); H4-8 →
+`MIGRATION_8_9` (v9, tabela `body_measurements`); H4-12 → `MIGRATION_9_10`
+(v10, `targetWeightKg`). Cada spec mantém a nota de que o número acompanha o
+`version` real do `AppDatabase.kt` no merge.
+
+**Backup JSON:** H4-8 sobe `schemaVersion` para 4 (bloco `measurements` aditivo,
+v1–v3 continuam aceitos); H4-12 permanece em 3 (`targetWeightKg` aditivo,
+precedente H3-7/H3-45).
+
+| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
+|----|------|--------|----------|------------------|---------|------------|------|
+| H4-1 | Recordes pessoais (PR) e 1RM estimado | **M** | Não existe PR nem 1RM; o mercado (Hevy/Strong) trata como básico. As séries já estão em `SetLogEntity`. | Funções puras de PR por exercício e 1RM (Epley/Brzycki); selo + háptico da H3-46 ao bater PR na sessão e "melhor de todos os tempos" no detalhe do exercício. | 1 dia | H3-46 | [H4-1](docs/specs/H4-1-recordes-pessoais-1rm.md) |
+| H4-2 | Gráficos de progresso (exercício e volume por músculo) | **M** | Zero `Canvas` no app; `HistoryMetrics` só agrega e o `ProgressionEngine` já calcula a melhor série por sessão, mas não há tendência visível. | Gráfico em Compose Canvas (sem dependência nova): linha de carga/volume por exercício e barras de volume/séries por músculo na semana, no Histórico. | 1–2 dias | H3-5 | [H4-2](docs/specs/H4-2-graficos-progresso.md) |
+| H4-3 | Histórico por exercício (drill-down) | **M** | O Histórico só agrega por período; não há como ver a evolução de um exercício específico. | Folha/tela por exercício com todas as sessões, melhor série, PR (H4-1) e o gráfico (H4-2); abre a partir do Histórico e do `ExerciseDetailSheet`. | 0,5–1 dia | H4-1, H4-2 | [H4-3](docs/specs/H4-3-historico-por-exercicio.md) |
+| H4-4 | Tipos de série: aquecimento, drop set, AMRAP e RIR | **S** | `isWarmup` existe no banco mas não há como marcar na UI (só é lido em métricas); o app só tem RPE, sem RIR. | Marcar série como aquecimento/drop set/AMRAP e registrar RIR; métricas e progressão já ignoram warm-up. A H4-4 corrigiu a premissa do roadmap: exige `MIGRATION_6_7` aditiva (coluna `setType` + backfill de `isWarmup`). | 1 dia | H4-1 | [H4-4](docs/specs/H4-4-tipos-de-serie.md) |
+| H4-5 | Calculadora de anilhas e rampa de aquecimento | **S** | Não há plate math nem sugestão de aquecimento; Strong/Hevy têm e é uso diário entre séries. | Funções puras: anilhas por lado a partir da carga-alvo e das anilhas disponíveis; rampa de aquecimento por % da série de trabalho; atalho no diálogo de série. | 0,5–1 dia | — | [H4-5](docs/specs/H4-5-calculadora-anilhas-aquecimento.md) |
+| H4-6 | Supersets (bi/tri-set) | **S** | `isSupersetWithPrevious` existe em `Entities.kt`, backup e DTOs, mas nenhuma tela usa — campo morto. | Ativar o campo: agrupar exercícios na UI, alternar na execução e ajustar o descanso entre eles; sem migration. | 1–2 dias | — | [H4-6](docs/specs/H4-6-supersets.md) |
+| H4-7 | Exportar CSV e importar de Strong/Hevy | **S** | "Won't now" no roadmap; um app local-first sem porta de saída contraria a promessa de não-lock-in. | Export CSV de treinos/séries (mapper do backup da H1-4) e import de CSV de concorrentes, com pré-visualização e confirmação. | 1 dia | H1-4 | [H4-7](docs/specs/H4-7-export-import-csv.md) |
+| H4-8 | Peso corporal e medidas ao longo do tempo | **S** | Peso é valor estático do perfil (só para o prompt da IA); não há entidade de medida nem tendência. | Entidade Room aditiva de medida + gráfico de tendência; fotos de progresso locais (nunca na nuvem) como diferencial de privacidade. | 1–2 dias | H4-2 | [H4-8](docs/specs/H4-8-peso-medidas.md) |
+| H4-9 | Health Connect (escrever treino, ler peso/passos) | **S** | O manifest não tem nenhuma permissão de saúde; o app fica isolado do ecossistema Android. | Dependência `androidx.health.connect`: escrever sessões concluídas e ler peso/passos; tudo on-device, sem conta e sem backend. | 1–2 dias | — | [H4-9](docs/specs/H4-9-health-connect.md) |
+| H4-10 | Biblioteca de programas prontos offline | **S** | O app depende de IA/backend para começar; o Boostcamp ganha com programas comprovados. | Templates determinísticos offline (PPL, 5/3/1, GZCLP, PHUL) com progressão embutida, no modelo de plano existente (H3-15). | 2–3 dias | H3-15 | [H4-10](docs/specs/H4-10-programas-prontos-offline.md) |
+| H4-11 | Notas por exercício durante o treino | **C** | O campo `notes` existe em plano/dia/sessão e aparece no Histórico, mas não há edição no `WorkoutScreen`. | Editar nota por exercício/sessão durante o treino; sem migration. | 0,5 dia | — | [H4-11](docs/specs/H4-11-notas-exercicio-treino.md) |
+| H4-12 | Aplicar sugestão de progressão ao plano (opt-in) | **C** | O `ProgressionEngine` sugere carga/reps mas nunca aplica; o usuário redigita a cada série. | Botão "aplicar ao plano" com 1 toque, opt-in e explícito; nunca altera o plano sozinho. | 0,5–1 dia | H3-5 | [H4-12](docs/specs/H4-12-aplicar-progressao-plano.md) |
+| H4-13 | Streak/consistência e resumo mensal/anual | **C** | O Histórico tem calendário e métricas, mas nenhum recorte periódico; Hevy tem consistency, monthly report e year in review. | Funções puras de streak e relatório mensal/anual (treinos, volume, PRs) com card na Home/Histórico. | 1 dia | H4-2 | [H4-13](docs/specs/H4-13-streak-resumo-periodico.md) |
+| H4-14 | Widget de tela inicial e tile do relógio | **C** | "Won't now"; o acesso rápido é o que o mercado mais usa. O app já tem o shortcut de retomada (H3-35). | Glance widget "Iniciar treino de hoje"/retomar e tile no relógio, reusando o shortcut existente. | 1–2 dias | H3-35 | [H4-14](docs/specs/H4-14-widget-tile-relogio.md) |
+| H4-15 | Wear: editar carga/reps no pulso | **C** | "Won't now"; hoje o relógio só conclui série, pula descanso e finaliza. | Edição de carga/reps no relógio com envio ao celular pela fila da H3-20. | 1–2 dias | H3-20 | [H4-15](docs/specs/H4-15-wear-editar-carga-reps.md) |
+| H4-16 | Modo standalone do relógio | **C** | O relógio depende do celular; sair sem o telefone significa não treinar. Apple Watch/Garmin fazem standalone. | Sessão inteira offline no relógio (Room próprio no `:wear`) com sincronização posterior; maior lift arquitetural do horizonte. | 4–6 dias | H3-20, H4-15 | [H4-16](docs/specs/H4-16-wear-standalone.md) |
+| H4-17 | Corrida com GPS, FC e intervalados | **W** | A corrida é registro manual (distância/duração); Strava/Nike/Garmin fazem GPS, ritmo, zonas de FC e cues de áudio. | Decisão de produto explícita: exige permissões de localização/sensor que a H2-2 recusou; fica fora até priorização do dono. | 3–5 dias | — | [H4-17](docs/specs/H4-17-corrida-gps-fc.md) |
+
+> A H4-17 é a única **Won't now** do horizonte: contraria a decisão de não pedir
+> sensores. As demais entram em execução só com spec aprovada, na ordem da tabela.
+
 ---
 
 ## 5. Priorização consolidada (MoSCoW)
@@ -287,6 +341,14 @@ precisa para ser útil amanhã.
 | Múltiplos planos (H3-15) ✅ | Geração complementar (H3-16) ✅ | | |
 | Fechar o MVP do relógio (H3-17–H3-20) | | | |
 | Geração assíncrona (H3-40) — implementado (2026-11-10) | | | |
+| **Horizon 4 — paridade de mercado (2026-11-14): Tier 1 (Must)** | **Tier 2 (Should)** | **Tier 3 (Could)** | **Won't now** |
+| PR e 1RM (H4-1) | Tipos de série (H4-4) | Notas no treino (H4-11) | Corrida GPS/FC (H4-17) |
+| Gráficos de progresso (H4-2) | Anilhas/aquecimento (H4-5) | Aplicar progressão (H4-12) | |
+| Drill-down por exercício (H4-3) | Supersets (H4-6) | Streak/relatório (H4-13) | |
+| | Export CSV/import (H4-7) | Widget/tile (H4-14) | |
+| | Peso/medidas (H4-8) | Wear: editar carga (H4-15) | |
+| | Health Connect (H4-9) | Standalone relógio (H4-16) | |
+| | Programas prontos (H4-10) | | |
 
 ---
 
@@ -310,6 +372,10 @@ Depois:     H3-8 (nuvem via SAF)
             e H3-25 (seleção por nome na geração) continuam Could, sem
             prioridade agora
 Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar)
+Mercado:    H4-1 (PR/1RM) → H4-2 (gráficos) → H4-3 (drill-down) →
+            H4-4..H4-10 (tipos de série, anilhas/aquecimento, supersets,
+            export/import, peso/medidas, Health Connect, programas prontos) →
+            H4-11..H4-16 (conveniência e relógio) — H4-17 Won't now
 ```
 
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅ → **H3-21 ✅ → H3-22 ✅ → H3-23 ✅ → H3-24 ✅**.
@@ -356,6 +422,8 @@ os testes instrumentados compilam no gate e rodam fora dele com
 | Arquivo de backup passa a conter dados pessoais (peso/altura/sexo) | Média | Médio | Texto de Ajustes que avisa antes de exportar/compartilhar (H3-6), `MANUAL.md` §7 com os três campos que saem do aparelho (H3-7) e H3-10, que mantém o auto-backup do Android fora do caminho até haver policy explícita |
 | Sexo vira regra determinística ou prescrição médica | Baixa | Alto | H3-7: campo opcional só no prompt; `profile_adjustments`/`suggest_initial_load` não recebem `sex` e `test_sexo_ignorado_no_plano_local` quebra se alguém ligar os dois |
 | Backup automático do Android sem política | Alta | Médio | **Mitigado em H3-10:** rules referenciadas no manifest, nomes conferidos por teste (`BackupRulesTest`) contra as constantes de `AppDatabase`/`AppPreferences` e política explícita antes de a H3-4 existir |
+| Health Connect exige permissões novas e revisão do Play | Média | Médio | H4-9: escopo restrito a ler peso/passos e escrever treino, tudo on-device; sem conta e sem backend |
+| GPS/FC na corrida quebra a promessa de "sem sensores" | Média | Alto | H4-17 fica **Won't now**; se priorizada, pedir permissão só no fluxo da corrida e documentar em `MANUAL.md` §7 |
 
 ---
 
@@ -397,6 +465,19 @@ dependem da H3-48.
 **Won't now:** H3-4 (backend na nuvem com token — pré-requisito H3-10 já
 cumprido), H3-9 (backup automático) e as funções futuras do relógio
 (tiles/complicação, standalone, edição no pulso, métricas de corrida).
+
+**Horizon 4 — paridade de mercado (levantamento 2026-11-14):** a fila nova
+prioriza o que usa dado existente e ativa campo morto. **Must:** **H4-1**
+(PR/1RM) está **concluída** (2026-11-15, gate verde) e listada em §4.1;
+**H4-2** (gráficos de progresso) e **H4-3** (histórico por exercício) são os
+próximos, com 1–2 dias cada. **Should:** H4-4 (tipos de série),
+H4-5 (anilhas/aquecimento), H4-6 (supersets), H4-7 (export/import CSV),
+H4-8 (peso/medidas), H4-9 (Health Connect) e H4-10 (programas prontos offline).
+**Could:** H4-11..H4-16 (notas, aplicar progressão, streak/relatório, widget/tile,
+editar carga no pulso e standalone do relógio). **Won't now:** **H4-17** (corrida
+com GPS/FC) por contrariar a decisão de não pedir sensores. Nenhum item entra em
+execução sem spec aprovada — as specs do Horizon 4 ainda serão criadas a partir do
+template.
 
 Nenhuma das specs acima listadas como propostas está aprovada para execução. Para
 iniciar qualquer item, leia a spec em [docs/specs/](docs/specs/); se estiver
@@ -481,6 +562,27 @@ confirme antes de implementar.
 - [H3-57 — Predictive back (Android 14) na pilha de navegação](docs/specs/H3-57-predictive-back.md) — concluída (2026-11-14) (`enableOnBackInvokedCallback` no manifest + `PredictiveBackHandler` na pilha com fallback clássico < API 33; gesto cancelado não navega)
 - [H3-58 — Notificação do fim do descanso em segundo plano](docs/specs/H3-58-notificacao-descanso-background.md) — concluída (2026-11-14) (`RestNotifier` com canal `rest_timer` e política pura testada; `POST_NOTIFICATIONS` pedida quando um descanso começa; notificação posta ao ir para background, vira "concluído" ao zerar e cancela ao voltar/pular/pausar; ação "Pular descanso" reusa o fluxo da tela)
 - [H3-59 — Wear: i18n completa e TalkBack](docs/specs/H3-59-wear-i18n-talkback.md) — concluída (2026-11-14) (`values-en` no relógio com paridade PT/EN coberta por `WearStringParityTest`; literais de `WorkoutWearActivity` movidos para recursos com placeholders posicionais; `contentDescription` nos botões e nos estados de conexão e descanso)
+
+**Horizon 4 — versão 1.5.0 (H4-1..H4-17):** specs criadas em 2026-11-14,
+aguardando aprovação do dono.
+
+- [H4-1 — Recordes pessoais (PR) e 1RM estimado](docs/specs/H4-1-recordes-pessoais-1rm.md) — concluída (2026-11-15)
+- [H4-2 — Gráficos de progresso (exercício e volume por músculo)](docs/specs/H4-2-graficos-progresso.md) — proposta
+- [H4-3 — Histórico por exercício (drill-down)](docs/specs/H4-3-historico-por-exercicio.md) — proposta
+- [H4-4 — Tipos de série: aquecimento, drop set, AMRAP e RIR](docs/specs/H4-4-tipos-de-serie.md) — proposta
+- [H4-5 — Calculadora de anilhas e rampa de aquecimento](docs/specs/H4-5-calculadora-anilhas-aquecimento.md) — proposta
+- [H4-6 — Supersets (bi/tri-set)](docs/specs/H4-6-supersets.md) — proposta
+- [H4-7 — Exportar CSV e importar de Strong/Hevy](docs/specs/H4-7-export-import-csv.md) — proposta
+- [H4-8 — Peso corporal e medidas ao longo do tempo](docs/specs/H4-8-peso-medidas.md) — proposta
+- [H4-9 — Health Connect (escrever treino, ler peso/passos)](docs/specs/H4-9-health-connect.md) — proposta
+- [H4-10 — Biblioteca de programas prontos offline](docs/specs/H4-10-programas-prontos-offline.md) — proposta
+- [H4-11 — Notas por exercício durante o treino](docs/specs/H4-11-notas-exercicio-treino.md) — proposta
+- [H4-12 — Aplicar sugestão de progressão ao plano (opt-in)](docs/specs/H4-12-aplicar-progressao-plano.md) — proposta
+- [H4-13 — Streak/consistência e resumo mensal/anual](docs/specs/H4-13-streak-resumo-periodico.md) — proposta
+- [H4-14 — Widget de tela inicial e tile do relógio](docs/specs/H4-14-widget-tile-relogio.md) — proposta
+- [H4-15 — Wear: editar carga/reps no pulso](docs/specs/H4-15-wear-editar-carga-reps.md) — proposta
+- [H4-16 — Modo standalone do relógio](docs/specs/H4-16-wear-standalone.md) — proposta
+- [H4-17 — Corrida com GPS, FC e intervalados](docs/specs/H4-17-corrida-gps-fc.md) — proposta (**Won't now** na 1.5.0)
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
