@@ -16,18 +16,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# versionCode local cresce a cada commit (H3-48), então `adb install -r` de um
-# build local mais novo nunca é rejeitado por versão. O CI passa VERSION_CODE
-# (run_number) explicitamente; sem ele, deriva do histórico git — fallback 1
-# quando git não está disponível (comportamento antigo, com aviso).
-if [[ -z "${VERSION_CODE:-}" ]]; then
-  VERSION_CODE="$(git rev-list --count HEAD 2>/dev/null || true)"
-  if [[ -z "$VERSION_CODE" ]]; then
-    echo "AVISO: git indisponível; usando versionCode=1." >&2
-    VERSION_CODE=1
-  fi
-fi
-VERSION_NAME="${VERSION_NAME:-0.0.0-local}"
+# versionCode/versionName vêm da FONTE ÚNICA (scripts/version.sh, opção B de
+# 2026-11-15): o CI e o build local usam a MESMA numeração, então o updater
+# in-app (H3-51) e o `adb install -r` nunca esbarram em downgrade. O env
+# continua tendo precedência (build manual pontual).
+VERSION_CODE="${VERSION_CODE:-$("$ROOT/scripts/version.sh" code)}"
+VERSION_NAME="${VERSION_NAME:-$("$ROOT/scripts/version.sh" name)}"
 APP_APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
 WEAR_APK="$ROOT/wear/build/outputs/apk/debug/wear-debug.apk"
 DIST="$ROOT/dist"

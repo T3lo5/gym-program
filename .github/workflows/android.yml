@@ -48,11 +48,16 @@ jobs:
       - name: Compute version
         id: version
         run: |
-          CODE="${{ github.run_number }}"
-          NAME="1.0.${CODE}"
+          # FONTE ÚNICA (scripts/version.sh): o release e o build local usam a
+          # MESMA numeração. NUNCA voltar a usar github.run_number aqui — ele
+          # divergia do build local (release 166 × local 228), o updater in-app
+          # (H3-51) dizia "já atualizado" e instalar o release falhava com
+          # INSTALL_FAILED_VERSION_DOWNGRADE.
+          CODE="$(./scripts/version.sh code)"
+          NAME="$(./scripts/version.sh name)"
 
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            NAME="0.0.${CODE}-pr${{ github.event.pull_request.number }}"
+            NAME="${NAME}-pr${{ github.event.pull_request.number }}"
           fi
 
           echo "code=${CODE}" >> "$GITHUB_OUTPUT"
@@ -141,6 +146,11 @@ jobs:
           DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/treinos.apk"
           WEAR_DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wear.apk"
 
+          # ATENÇÃO: o corpo do release é CONTRATO do updater in-app (H3-51).
+          # app/src/main/java/com/treinos/app/updater/ReleaseChecker.kt faz
+          # parse de "**Versão:** `X`" e "versionCode N" neste template; mudar
+          # o formato sem atualizar o parser desliga a detecção de atualização
+          # em silêncio (o app nunca mais vê versão nova).
           cat > release-notes.md <<EOF
           Build automático do commit \`${{ needs.build.outputs.short-sha }}\`.
 

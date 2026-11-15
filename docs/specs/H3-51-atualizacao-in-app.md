@@ -9,6 +9,13 @@
 | Spec aprovada em | `2026-11-13` |
 | Implementação | `concluída` |
 
+> **Atualização 2026-11-15.** A numeração passou a ser única (`scripts/version.sh`;
+> ver H3-48) e os testes previstos nesta spec foram criados. Correção de bug: o
+> parser exigia crases em volta da versão, mas o template do release publica
+> `- **Versão:** X (versionCode N)` sem crases — o `versionName` vinha `null` e o
+> card mostrava o `tagName`. A regex agora aceita as duas formas
+> (`parse_versao_sem_crases_do_template_real`).
+
 ## Objetivo
 
 O próprio app avisa que existe versão nova no GitHub Releases e instala a
@@ -38,9 +45,15 @@ atualização sem sair para um app externo.
 
 ```text
 GET https://api.github.com/repos/<owner>/<repo>/releases/latest
-→ { "tag_name": "...", "assets": [
-     { "name": "treinos.apk", "browser_download_url": "..." },
-     { "name": "dist.sha256", "browser_download_url": "..." } ] }
+→ { "tag_name": "...",
+    "body": "- **Versão:** 1.5.0 (versionCode 3615279)",
+    "assets": [
+      { "name": "treinos.apk", "browser_download_url": "..." },
+      { "name": "treinos.apk.sha256", "browser_download_url": "..." } ] }
+
+O corpo do release é CONTRATO: o parser lê `**Versão:** X` (com ou sem crases) e
+`versionCode N`. Mudar o template do workflow sem atualizar o parser desliga a
+detecção de atualização em silêncio.
 
 Sem autenticação (rate limit 60/h por IP — suficiente para uso pessoal).
 Checagem: ao abrir Ajustes + botão manual; nunca polling em loop.
@@ -75,7 +88,7 @@ Checagem: ao abrir Ajustes + botão manual; nunca polling em loop.
 
 | Arquivo | Testes |
 |---|---|
-| `app/src/test/java/com/treinos/app/updater/ReleaseParserTest.kt` | `parse_extrai_apk_e_sha256`, `parse_sem_asset_apk_retorna_vazio`, `parse_resposta_malformada_nao_lanca` |
+| `app/src/test/java/com/treinos/app/updater/ReleaseParserTest.kt` | `parse_extrai_apk_e_sha256`, `parse_versao_sem_crases_do_template_real`, `parse_sem_asset_apk_retorna_vazio`, `parse_resposta_malformada_nao_lanca` |
 | `app/src/test/java/com/treinos/app/updater/VersionCompareTest.kt` | `remoto_maior_mostra_card`, `igual_nao_mostra`, `remoto_menor_nao_mostra`, `local_invalido_tratado_como_zero` |
 
 ## Verificação manual

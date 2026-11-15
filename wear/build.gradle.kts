@@ -11,12 +11,24 @@ val debugKeystorePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: "treinos
 val debugKeyAlias = System.getenv("DEBUG_KEY_ALIAS") ?: "treinos-debug"
 val debugKeyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: "treinos123"
 
+// Fonte única do versionName quando o build não recebe `-PversionName` (ex.:
+// Android Studio). O gate e o CI passam `-PversionName` vindo de
+// scripts/version.sh, que lê este mesmo arquivo.
+val rootVersionName: String = rootProject.file("version.properties")
+    .takeIf { it.exists() }
+    ?.readLines()
+    ?.firstOrNull { it.startsWith("versionName=") }
+    ?.removePrefix("versionName=")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "1.0.0"
+
 android {
     namespace = "com.treinos.wear"
     compileSdk = 34
 
     val wearVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-    val wearVersionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
+    val wearVersionName = (project.findProperty("versionName") as String?) ?: rootVersionName
 
     defaultConfig {
         applicationId = "com.treinos.wear"

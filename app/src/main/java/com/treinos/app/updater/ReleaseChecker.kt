@@ -35,7 +35,14 @@ data class ReleaseInfo(
 object ReleaseParser {
     private val json = Json { ignoreUnknownKeys = true }
     private val versionCodeRegex = Regex("""versionCode\s+(\d+)""")
-    private val versionNameRegex = Regex("""\*\*Versão:\*\*\s*`([^`]+)`""")
+
+    /**
+     * Aceita as duas formas do corpo do release: `- **Versão:** 1.5.0
+     * (versionCode 42)` (template atual do workflow) e a variante com crases
+     * `- **Versão:** `1.5.0` (versionCode 42)`. O token para no espaço ou no
+     * parêntese, então `(versionCode …)` não entra no nome.
+     */
+    private val versionNameRegex = Regex("""\*\*Versão:\*\*\s*`?([^`\s(]+)`?""")
 
     /**
      * Interpreta o JSON de `releases/latest`. Retorna null quando a resposta é

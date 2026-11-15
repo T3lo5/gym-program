@@ -9,6 +9,14 @@
 | Spec aprovada em | `2026-11-13` |
 | Implementação | `concluída` |
 
+> **Atualização 2026-11-15 — numeração única.** O `versionCode` deixou de ser
+> `git rev-list --count HEAD` (local) / `run_number` (CI) e passou a ser
+> **minutos desde 2020-01-01T00:00:00Z**, calculado por `scripts/version.sh` —
+> a mesma fonte no CI e no build local. O `versionName` passou a vir de
+> `version.properties` (hoje `1.5.0`). Motivo: as duas sequências divergiam
+> (release 166 × local 228), o updater in-app (H3-51) dizia "já atualizado" e
+> instalar o release falhava com `INSTALL_FAILED_VERSION_DOWNGRADE`.
+
 ## Objetivo
 
 Toda atualização do app (celular e relógio) instala por cima da anterior, sem
@@ -52,7 +60,10 @@ A keystore versionada abre com as credenciais do build (`treinos123`, alias
 |---|---|
 | `app/build.gradle.kts` | `debugKeystoreFile = file("debug.keystore")` (caminho correto relativo ao módulo) |
 | `wear/build.gradle.kts` | `signingConfigs` com a mesma keystore versionada (`file("../app/debug.keystore")`) aplicada ao `buildType` debug; `versionCode`/`versionName` lendo `-PversionCode`/`-PversionName` com default `1`/`"1.0.0"` |
-| `scripts/ci-android.sh` | `VERSION_CODE` local derivado de `git rev-list --count HEAD` (em vez de `1` fixo na linha 19); `VERSION_NAME` local mantém sufixo `-local`; verificação do fingerprint do certificado esperado nos dois APKs |
+| `scripts/ci-android.sh` | `VERSION_CODE`/`VERSION_NAME` derivados de `scripts/version.sh` (fonte única; ver nota de numeração única); verificação do fingerprint do certificado esperado nos dois APKs |
+| `scripts/version.sh` (novo) | fonte única de `versionCode` (minutos desde 2020-01-01) e `versionName` (lê `version.properties`) |
+| `version.properties` (novo) | fonte única do `versionName` (hoje `1.5.0`) |
+| `.github/workflows/android.yml` | "Compute version" chama `scripts/version.sh` (fim do `run_number`); comentário de que o corpo do release é contrato do updater (H3-51) |
 | `scripts/verify.sh` | repassa `VERSION_CODE`/`VERSION_NAME` ao container só quando definidos — forçar `1` anularia a derivação local do `ci-android.sh` |
 | `.github/workflows/android.yml` | remover o passo "Cache debug signing key" (redundante com a keystore versionada) |
 
@@ -66,9 +77,10 @@ Nenhum. Sem mudança em `:protocol`, Room ou backend.
   porque vem do arquivo versionado, não do ambiente.
 - `DEBUG_KEYSTORE_PASSWORD`/`DEBUG_KEY_ALIAS`/`DEBUG_KEY_PASSWORD` continuam
   sobrescrevíveis por ambiente (comportamento atual preservado).
-- `versionCode` local cresce a cada commit (`git rev-list --count HEAD`), então
-  `adb install -r` de um build local mais novo nunca é rejeitado por versão; o
-  CI continua com `run_number`.
+- `versionCode` é monotônico no tempo (`scripts/version.sh`), igual no CI e no
+  build local, então `adb install -r` de um build mais novo nunca é rejeitado
+  por versão. (Superado em 2026-11-15: antes o local usava o contador de commits
+  e o CI o `run_number`, sequências que divergiam e quebravam a atualização.)
 - Se `app/debug.keystore` não existir (checkout parcial), o comportamento atual
   se mantém (assinatura do ambiente), e o gate falha na verificação do
   certificado esperado — o erro deixa de ser silencioso.

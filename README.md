@@ -169,12 +169,17 @@ Na aba **Actions** do GitHub, abra o workflow **Android APK** e clique em
 PRs compilam o APK para validar o código, mas **não** publicam release.
 O APK fica disponível como artifact da execução.
 
-### Assinatura
+### Assinatura e atualização
 
-O CI usa a chave de debug do Android, que é mantida em cache entre as
-execuções. Isso permite instalar uma versão nova por cima da anterior sem
-desinstalar o app. Se o cache expirar, pode ser necessário desinstalar a
-versão antiga antes de instalar a nova.
+A assinatura vem da keystore versionada `app/debug.keystore` (a mesma no celular
+e no relógio, no CI e no build local), então uma versão nova instala por cima da
+anterior sem desinstalar e sem perder os dados. O gate reprova o build se o
+certificado dos APKs não for o esperado.
+
+A numeração é única para o CI e o build local (`scripts/version.sh`): o
+`versionCode` é o tempo (minutos desde 2020-01-01) e o `versionName` vem de
+`version.properties`. Assim o updater in-app e o Obtainium enxergam a versão
+nova e o `adb install -r` nunca é recusado por downgrade.
 
 Para builds assinados com chave própria, configure os secrets
 `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`
