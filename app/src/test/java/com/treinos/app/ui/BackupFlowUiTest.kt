@@ -256,4 +256,63 @@ class BackupFlowUiTest {
             .performScrollTo()
             .assertExists()
     }
+
+    /**
+     * H3-8: o texto de ajuda do card cita a nuvem do usuário (Drive, OneDrive,
+     * Dropbox) como lugar onde o arquivo pode ser salvo pelo seletor do sistema.
+     */
+    @Test
+    fun texto_ajuda_menciona_nuvem() {
+        render(mutableStateOf<BackupImportState>(BackupImportState.Idle))
+
+        composeRule.onNodeWithText("Google Drive, OneDrive, Dropbox", substring = true)
+            .performScrollTo()
+            .assertExists()
+        composeRule.onNodeWithText("nuvem", substring = true).assertExists()
+    }
+
+    /**
+     * H3-8: enquanto um provedor remoto baixa o arquivo, o estado Reading é
+     * renderizado (a tela não parece travada) e nada de pré-visualização
+     * aparece; o resultado só chega depois, quando o estado vira Ready.
+     */
+    @Test
+    fun estado_lendo_aparece_antes_do_resultado() {
+        val state = mutableStateOf<BackupImportState>(BackupImportState.Reading)
+
+        render(state)
+
+        composeRule.onNodeWithText("Lendo o arquivo…").assertExists()
+        // Nada de resultado enquanto lê: sem pré-visualização e sem confirmar.
+        composeRule.onNodeWithText("Substituir tudo").assertDoesNotExist()
+
+        val payload = arquivo()
+        val preview = requireNotNull(BackupValidator.validate(payload).preview)
+        state.value = BackupImportState.Ready(preview, payload)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(textoPreview).assertExists()
+        composeRule.onNodeWithText("Lendo o arquivo…").assertDoesNotExist()
+    }
+
+    /**
+     * H3-8: a escrita do export falhar no meio (provedor que recusa gravação)
+     * mostra a mensagem de erro já existente e NÃO apaga o estado anterior —
+     * a pré-visualização pendente continua na tela, com o payload intacto.
+     */
+    @Test
+    fun erro_de_escrita_mantem_estado() {
+        val payload = arquivo()
+        val preview = requireNotNull(BackupValidator.validate(payload).preview)
+        val state = mutableStateOf<BackupImportState>(BackupImportState.Ready(preview, payload))
+
+        render(state, message = "Não foi possível exportar o backup.")
+
+        composeRule.onNodeWithText("Não foi possível exportar o backup.")
+            .performScrollTo()
+            .assertExists()
+        // O estado anterior sobrevive: preview e botão de confirmar seguem lá.
+        composeRule.onNodeWithText(textoPreview).assertExists()
+        composeRule.onNodeWithText("Substituir tudo").assertExists()
+    }
 }

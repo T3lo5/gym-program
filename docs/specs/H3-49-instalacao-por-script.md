@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-49` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída` (scripts e seções do MANUAL já entregues no `501fd9d`; commit da fila corrige 2 bugs do `install-wear.sh` achados na validação com adb falso: caminho do APK em `--bt` e erro cru do adb sem celular) |
 
 ## Objetivo
 

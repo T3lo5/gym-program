@@ -430,12 +430,13 @@
     <string name="settings_btn_restoring_device">Restoring…</string>
     <string name="settings_section_backup">Backup</string>
     <string name="settings_backup_title">Backup and restore (JSON)</string>
-    <string name="settings_backup_desc">Export your plans, workouts, sets and profile (weight, height, sex) to a JSON file. Restore later, even after uninstalling the app. Anyone with the file can read this data — include weight, height and sex.</string>
+    <string name="settings_backup_desc">Export your plans, workouts, sets and profile (weight, height, sex) to a JSON file. Restore later, even after uninstalling the app. You can save the file to a folder in your own cloud (Google Drive, OneDrive, Dropbox) via the system file picker — the app never asks for an account or password. The file contains your full history; anyone with the file can read this data — third-party cloud is not the app.</string>
     <string name="settings_btn_export">Export backup</string>
     <string name="settings_btn_exporting">Exporting…</string>
     <string name="settings_btn_import">Import backup</string>
     <string name="settings_btn_importing">Importing…</string>
     <string name="settings_backup_preview">Preview: %1$d plan(s), %2$d day(s), %3$d plan exercise(s), %4$d session(s), %5$d session exercise(s), %6$d set(s).</string>
+    <string name="settings_backup_reading">Reading file…</string>
     <string name="settings_dialog_replace_title">Replace local data?</string>
     <string name="settings_dialog_replace_body">Restoring from the server erases the plans, workouts and sets of this device and writes this deviceId\'s snapshot in their place. Export a JSON backup first if you want to be able to go back.</string>
     <string name="settings_dialog_restore_title">Take over this device?</string>

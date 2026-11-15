@@ -602,6 +602,17 @@ fun SettingsScreen(
                                     Text(stringResource(R.string.settings_btn_dismiss))
                                 }
                             }
+                            // H3-8: importar de um provedor remoto (Drive,
+                            // OneDrive, Dropbox) baixa o arquivo durante a
+                            // leitura — mostrar o estado em vez de parecer
+                            // travada, antes da pré-visualização existir.
+                            is BackupImportState.Reading -> {
+                                Text(
+                                    text = stringResource(R.string.settings_backup_reading),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             else -> { }
                         }
 

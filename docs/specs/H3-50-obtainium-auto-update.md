@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-50` |
 | MoSCoW | `S` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída` (seção 3.4.1 do MANUAL já entregue completa no `501fd9d`; auditoria item a item contra a spec não achou lacunas — sem commit próprio) |
 
 ## Objetivo
 

@@ -2164,6 +2164,28 @@ class AppViewModel(
     suspend fun exportBackupJson(appVersionName: String, appVersionCode: Long): String =
         repository.exportBackup(appVersionName, appVersionCode)
 
+    /**
+     * H3-8: liga [BackupImportState.Reading] ANTES de o seletor abrir o stream.
+     * Um provedor remoto (Drive/OneDrive/Dropbox) baixa o arquivo durante
+     * openInputStream e isso pode demorar — sem isso a tela parece travada até
+     * a validação começar. Nenhum estado novo: só a transição que já existia.
+     */
+    fun beginBackupReading() {
+        if (_backupImportState.value is BackupImportState.Importing) return
+        _backupImportState.value = BackupImportState.Reading
+    }
+
+    /**
+     * H3-8: a leitura do stream falhou antes de chegar à validação (provedor
+     * offline, permissão revogada etc.). Só recua se o estado ainda é Reading —
+     * nunca apaga Ready/Error/Importing nem o pendingBackupPayload.
+     */
+    fun abortBackupReading() {
+        if (_backupImportState.value is BackupImportState.Reading) {
+            _backupImportState.value = BackupImportState.Idle
+        }
+    }
+
     fun prepareImport(json: String) {
         if (_backupImportState.value is BackupImportState.Importing) return
         _backupMessage.value = null

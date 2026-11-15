@@ -431,12 +431,13 @@
     <string name="settings_btn_restoring_device">Restaurando…</string>
     <string name="settings_section_backup">Backup</string>
     <string name="settings_backup_title">Backup e restauração (JSON)</string>
-    <string name="settings_backup_desc">Exporte seus planos, treinos, séries e o perfil (peso, altura e sexo) para um arquivo JSON. Restaure depois, mesmo após desinstalar o app. Quem tiver o arquivo lê esses dados — inclua peso, altura e sexo.</string>
+    <string name="settings_backup_desc">Exporte seus planos, treinos, séries e o perfil (peso, altura e sexo) para um arquivo JSON. Restaure depois, mesmo após desinstalar o app. Dá para salvar o arquivo numa pasta da sua nuvem (Google Drive, OneDrive, Dropbox) pelo seletor de arquivos do sistema — o app não pede conta nem senha. O arquivo contém o histórico completo; quem tiver o arquivo lê esses dados — a nuvem de terceiros não é o app.</string>
     <string name="settings_btn_export">Exportar backup</string>
     <string name="settings_btn_exporting">Exportando…</string>
     <string name="settings_btn_import">Importar backup</string>
     <string name="settings_btn_importing">Importando…</string>
     <string name="settings_backup_preview">Pré-visualização: %1$d plano(s), %2$d dia(s), %3$d exercício(s) de plano, %4$d sessão(ões), %5$d exercício(s) de sessão, %6$d série(s).</string>
+    <string name="settings_backup_reading">Lendo o arquivo…</string>
     <string name="settings_dialog_replace_title">Substituir os dados locais?</string>
     <string name="settings_dialog_replace_body">Restaurar do servidor apaga os planos, treinos e séries deste aparelho e grava no lugar o snapshot deste deviceId. Exporte um backup JSON antes, se quiser voltar atrás.</string>
     <string name="settings_dialog_restore_title">Assumir este aparelho?</string>

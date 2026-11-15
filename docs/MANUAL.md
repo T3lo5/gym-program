@@ -1410,6 +1410,17 @@ docker compose up -d --build
     tamanho. Isso vale também para backup importado direto do Google Drive,
     OneDrive ou Dropbox — o app abre esses provedores pela mesma tela de arquivos
     do sistema, sem conta nem SDK de nuvem.
+  - **Salvar na sua nuvem (Drive, OneDrive, Dropbox):** no seletor de
+    **Exportar/Importar backup**, escolha uma pasta da sua conta no provedor —
+    ele aparece lá como uma pasta comum. O app só grava/lê o arquivo; quem faz o
+    upload e o download é o próprio provedor, e nenhuma credencial de nuvem
+    entra no app. Importar de um arquivo remoto pode demorar: o card mostra
+    **"Lendo o arquivo…"** até a pré-visualização aparecer. Se o provedor falhar
+    (sem internet, por exemplo), aparece a mensagem de erro e **nada muda** nos
+    dados locais — tente de novo com internet. Se a escrita falhar no meio, o
+    arquivo no provedor pode ficar parcial: exporte de novo (o nome sugerido
+    inclui data e hora, então não sobrescreve o anterior sem querer) e confira
+    no site do provedor se o JSON chegou íntegro antes de apagar a cópia local.
   - Backups antigos (`schemaVersion` 1 ou 2) continuam importando. Como eles não
     falam de perfil, o peso, a altura e o sexo **que já estão no aparelho são
     mantidos** — restaurar um backup velho não apaga seu perfil. Um `profile` de

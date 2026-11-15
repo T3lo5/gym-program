@@ -42,7 +42,9 @@ Uso: ./scripts/install-wear.sh <ip-do-relógio> [caminho/wear.apk]
      ./scripts/install-wear.sh --bt [caminho/wear.apk]"
       ;;
     *)
-      if [[ -z "$HOST" ]]; then
+      if [[ "$MODE" == "bt" ]]; then
+        APK="$1"           # rota Bluetooth não usa IP: o argumento é o APK
+      elif [[ -z "$HOST" ]]; then
         HOST="$1"          # Wi-Fi: primeiro argumento é o IP do relógio
       else
         APK="$1"           # segundo argumento é o APK
@@ -78,7 +80,9 @@ if [[ "$MODE" == "bt" ]]; then
   # 'Depuração por Bluetooth' ativa também no celular.
   HOST="localhost:4444"
   echo "==> Rota Bluetooth: encaminhando tcp:4444 → adb-hub do relógio"
-  adb forward tcp:4444 localabstract:/adb-hub
+  # Sem celular conectado o forward falha: segue o fluxo para a espera e a
+  # mensagem de orientação, em vez de morrer com o erro cru do adb (set -e).
+  adb forward tcp:4444 localabstract:/adb-hub || true
   adb connect localhost:4444 >/dev/null 2>&1 || true
 else
   [[ -n "$HOST" ]] || fail "Informe o IP do relógio (mostrado na tela em

@@ -6,8 +6,8 @@
 |---|---|
 | Item do roadmap | `H3-8` |
 | MoSCoW | `C` |
-| Spec aprovada em | `pendente` (proposta de 2026-11-05) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` (feedback `Reading` antes do `openInputStream`, abort com try/catch na leitura do provedor, ajuda de nuvem no card e MANUAL §6.4; validação com provedores reais segue manual) |
 | Depende de | H1-4/H1-7 (fluxo de arquivo), H3-6 (conteúdo do backup) |
 
 ## Objetivo

@@ -169,17 +169,33 @@ fun TreinosApp(viewModel: AppViewModel) {
                     return@launch
                 }
             }
-            val input = context.contentResolver.openInputStream(uri)
-            if (input == null) {
-                viewModel.setBackupMessage(context.getString(com.treinos.app.R.string.backup_file_read_error))
-                return@launch
+            // H3-8: o estado de leitura liga ANTES de abrir o stream — um
+            // provedor remoto (Drive/OneDrive/Dropbox) baixa o arquivo durante
+            // openInputStream e a leitura pode demorar; sem isso a tela parece
+            // travada até a validação começar.
+            viewModel.beginBackupReading()
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                if (input == null) {
+                    viewModel.abortBackupReading()
+                    viewModel.setBackupMessage(context.getString(com.treinos.app.R.string.backup_file_read_error))
+                    return@launch
+                }
+                val json = input.use { BackupSizeGuard.readLimited(it) }
+                if (json == null) {
+                    viewModel.abortBackupReading()
+                    viewModel.setBackupMessage(BackupSizeGuard.tooLargeMessage)
+                    return@launch
+                }
+                viewModel.prepareImport(json)
+            } catch (error: Exception) {
+                // Provedor remoto falhando no meio da leitura (modo avião,
+                // permissão revogada): mensagem de erro e nada muda nos dados.
+                viewModel.abortBackupReading()
+                viewModel.setBackupMessage(
+                    uiErrorMessage(error, context, com.treinos.app.R.string.backup_file_read_error),
+                )
             }
-            val json = input.use { BackupSizeGuard.readLimited(it) }
-            if (json == null) {
-                viewModel.setBackupMessage(BackupSizeGuard.tooLargeMessage)
-                return@launch
-            }
-            viewModel.prepareImport(json)
         }
     }
 
