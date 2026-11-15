@@ -121,6 +121,8 @@ fun HistoryScreen(
     onBack: () -> Unit,
     exerciseMedia: Map<String, ExerciseMedia> = emptyMap(),
     onOpenExerciseDetail: (String) -> Unit = {},
+    // H4-3: abre o drill-down do histórico do exercício.
+    onOpenExerciseHistory: (String) -> Unit = {},
     onEditActivity: (Long) -> Unit = {},
     onDeleteActivity: (Long) -> Unit = {},
     muscleByExerciseId: Map<String, String> = emptyMap(),
@@ -289,6 +291,7 @@ fun HistoryScreen(
                         session = session,
                         exerciseMedia = exerciseMedia,
                         onOpenExerciseDetail = onOpenExerciseDetail,
+                        onOpenExerciseHistory = onOpenExerciseHistory,
                         onEditActivity = onEditActivity,
                         onDeleteActivity = onDeleteActivity,
                         onUpdateSet = onUpdateSet,
@@ -489,6 +492,7 @@ private fun HistorySessionRow(
     session: SessionWithExercises,
     exerciseMedia: Map<String, ExerciseMedia>,
     onOpenExerciseDetail: (String) -> Unit,
+    onOpenExerciseHistory: (String) -> Unit,
     onEditActivity: (Long) -> Unit,
     onDeleteActivity: (Long) -> Unit,
     onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
@@ -505,6 +509,7 @@ private fun HistorySessionRow(
             session = session,
             exerciseMedia = exerciseMedia,
             onOpenExerciseDetail = onOpenExerciseDetail,
+            onOpenExerciseHistory = onOpenExerciseHistory,
             onUpdateSet = onUpdateSet,
             onDeleteSet = onDeleteSet,
         )
@@ -805,6 +810,7 @@ private fun SessionCard(
     session: SessionWithExercises,
     exerciseMedia: Map<String, ExerciseMedia>,
     onOpenExerciseDetail: (String) -> Unit,
+    onOpenExerciseHistory: (String) -> Unit,
     onUpdateSet: (SetLogEntity, Int?, Double?, Double?) -> Unit,
     onDeleteSet: (SetLogEntity) -> Unit,
 ) {
@@ -931,6 +937,17 @@ private fun SessionCard(
                                         )
                                     }
                                 }
+                            }
+                            // H4-3: ação secundária da linha — drill-down do
+                            // exercício. O toque no botão não abre o detalhe.
+                            val openHistoryDesc = stringResource(R.string.a11y_exercise_history_action)
+                            TextButton(
+                                onClick = { onOpenExerciseHistory(exercise.exercise.exerciseId) },
+                                modifier = Modifier.semantics {
+                                    contentDescription = openHistoryDesc
+                                },
+                            ) {
+                                Text(stringResource(R.string.history_exercise_history_action))
                             }
                         }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

@@ -49,6 +49,7 @@ import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
 import com.treinos.app.ui.components.BottomNavigationBar
 import com.treinos.app.ui.components.ExerciseDetailSheet
+import com.treinos.app.ui.components.ExerciseHistorySheet
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -406,6 +407,8 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onBack = viewModel::voltar,
                     exerciseMedia = exerciseMedia,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
+                    // H4-3: drill-down do histórico por exercício.
+                    onOpenExerciseHistory = { viewModel.openExerciseHistory(it) },
                     onEditActivity = viewModel::editLogActivity,
                     onDeleteActivity = viewModel::deleteLogActivity,
                     muscleByExerciseId = historyMuscleByExerciseId,
@@ -522,6 +525,19 @@ fun TreinosApp(viewModel: AppViewModel) {
             media = selectedMedia,
             record = selectedExerciseRecord,
             onDismiss = { viewModel.closeExerciseDetail() },
+            // H4-3: "Ver histórico completo" fecha o detalhe e abre o drill-down.
+            onOpenHistory = { viewModel.openExerciseHistory(it) },
+        )
+    }
+
+    // H4-3: drill-down do histórico por exercício. `openExerciseHistory` fecha
+    // o detalhe antes, então as duas folhas nunca ficam empilhadas.
+    val exerciseHistoryId by viewModel.exerciseHistoryId.collectAsStateWithLifecycle()
+    val exerciseHistory by viewModel.exerciseHistory.collectAsStateWithLifecycle()
+    if (exerciseHistoryId != null) {
+        ExerciseHistorySheet(
+            history = exerciseHistory,
+            onDismiss = { viewModel.closeExerciseHistory() },
         )
     }
 }

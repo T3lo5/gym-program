@@ -630,4 +630,15 @@
     <string name="exercise_detail_record_set_loaded">%1$s × %2$d reps</string>
     <string name="exercise_detail_record_set_bodyweight">%1$d reps</string>
     <string name="exercise_detail_record_1rm">Est. 1RM: %1$s</string>
+
+    <!-- H4-3: exercise history drill-down -->
+    <string name="history_exercise_history_action">View history</string>
+    <string name="a11y_exercise_history_action">View exercise history</string>
+    <string name="exercise_detail_open_history">View full history</string>
+    <string name="exercise_history_sessions_title">Sessions</string>
+    <string name="exercise_history_empty">No sessions logged</string>
+    <string name="exercise_history_pr_badge">Record</string>
+    <string name="exercise_history_row_volume">Volume: %1$s</string>
+    <string name="exercise_history_row_a11y">Workout on %1$s. %2$s. %3$s.</string>
+    <string name="exercise_history_row_a11y_pr">Workout on %1$s. %2$s. %3$s. Personal record.</string>
 </resources>

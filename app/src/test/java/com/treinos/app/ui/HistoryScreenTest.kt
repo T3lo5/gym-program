@@ -179,6 +179,25 @@ class HistoryScreenTest {
     }
 
     @Test
+    fun acao_abre_historico_do_exercicio() {
+        // H4-3: a ação secundária da linha de exercício abre o drill-down.
+        var abertoId: String? = null
+        composeRule.setContent {
+            HistoryScreen(
+                sessions = listOf(sessaoConcluida),
+                onBack = { },
+                onOpenExerciseHistory = { abertoId = it },
+            )
+        }
+
+        alternarCardSessao()
+        composeRule
+            .onNodeWithContentDescription("Ver histórico do exercício", useUnmergedTree = true)
+            .performClick()
+        assertEquals("Barbell_Bench_Press", abertoId)
+    }
+
+    @Test
     fun mostra_metricas_do_mes() {
         composeRule.setContent {
             HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })

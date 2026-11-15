@@ -7,13 +7,30 @@
 | Item do roadmap | `H4-3` |
 | MoSCoW | `M` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` |
+| Implementação | `concluída em 2026-11-15` |
 | Depende de | H4-1 (PR/1RM), H4-2 (gráficos), H3-54 (edição de séries no Histórico) |
 
 **Origem:** levantamento de mercado de 2026-11-14 (Horizon 4, Tier 1). O
 Histórico agrega por período; não há como responder "como este exercício
 evoluiu?" sem percorrer os cards de sessão um a um.
+
+**Implementação (2026-11-15):** gate verde. Notas do que ficou diferente do
+texto original: (1) a ação secundária no Histórico é um `TextButton` "Ver
+histórico" no fim de cada linha de exercício do card expandido, com
+`contentDescription` "Ver histórico do exercício" — sem ícone novo, porque o
+app usa `material-icons-core`, que não tem ícone de histórico; (2) o
+fechamento do `ExerciseDetailSheet` ao abrir o histórico acontece dentro do
+`openExerciseHistory` no ViewModel (regra 16), cobrindo os dois pontos de
+entrada sem lógica extra no `TreinosApp`; (3) o candidato a recorde
+progressivo de cada sessão é a melhor série da regra 4 (maior carga, empate
+por reps), comparado pela regra de `isPersonalRecord` da H4-1, e o
+`allTimeRecord` sai direto de `personalRecord` da H4-1 sobre as sessões
+concluídas de força — empate de 1RM não é PR novo, igual ao detalhe; (4) a
+lista da folha usa `Column` com scroll (padrão de `ExerciseDetailSheet` e
+`SessionSetsEditSheet`) em vez de `LazyColumn` — o histórico típico é curto,
+a agregação é derivada no ViewModel e o gráfico já limita a janela desenhada
+a 30 pontos.
 
 **Relacionado:** [H4-1](H4-1-recordes-pessoais-1rm.md) fornece
 `PersonalRecord`; [H4-2](H4-2-graficos-progresso.md) fornece

@@ -16,6 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -45,6 +46,8 @@ fun ExerciseDetailSheet(
     media: ExerciseMedia?,
     onDismiss: () -> Unit,
     record: PersonalRecord? = null,
+    // H4-3: abre o drill-down do histórico; recebe o id do exercício.
+    onOpenHistory: (String) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val fallbackName = stringResource(R.string.exercise_detail_fallback_name)
@@ -155,6 +158,17 @@ fun ExerciseDetailSheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            // H4-3: atalho para o drill-down do exercício; só existe quando há
+            // exercício (a folha sem mídia não tem id para abrir).
+            if (media != null) {
+                TextButton(
+                    onClick = { onOpenHistory(media.id) },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Text(stringResource(R.string.exercise_detail_open_history))
                 }
             }
 

@@ -66,6 +66,8 @@ import com.treinos.app.ui.progression.cycleWeek
 import com.treinos.app.ui.progression.deloadSuggested
 import com.treinos.app.ui.progression.progressionHistory
 import com.treinos.app.ui.progression.suggestProgression
+import com.treinos.app.ui.history.ExerciseHistory
+import com.treinos.app.ui.history.buildExerciseHistory
 import com.treinos.app.ui.progressText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -516,6 +518,38 @@ class AppViewModel(
     ) { list, exerciseId ->
         exerciseId?.let { personalRecord(list, it) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** H4-3: id do exercício aberto no drill-down do Histórico; `null` = folha fechada. */
+    private val _exerciseHistoryId = MutableStateFlow<String?>(null)
+    val exerciseHistoryId: StateFlow<String?> = _exerciseHistoryId.asStateFlow()
+
+    /**
+     * H4-3: histórico do exercício aberto, derivado das sessões já carregadas
+     * — a agregação acontece aqui, nunca dentro do composable (sem recalcular
+     * por frame). Só leitura: abrir/fechar a folha não grava nada.
+     */
+    val exerciseHistory: StateFlow<ExerciseHistory?> = combine(
+        sessions,
+        _exerciseHistoryId,
+    ) { list, exerciseId ->
+        exerciseId?.let { buildExerciseHistory(list, it) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Abre o drill-down do exercício. Regra 16 da H4-3: o `ExerciseDetailSheet`
+     * fecha antes — abrir o histórico a partir do detalhe nunca empilha duas
+     * folhas.
+     */
+    fun openExerciseHistory(exerciseId: String?) {
+        if (exerciseId.isNullOrBlank()) return
+        _selectedExerciseId.value = null
+        _selectedPlanExercise.value = null
+        _exerciseHistoryId.value = exerciseId
+    }
+
+    fun closeExerciseHistory() {
+        _exerciseHistoryId.value = null
+    }
 
     private val _isUpdatingCatalog = MutableStateFlow(false)
     val isUpdatingCatalog: StateFlow<Boolean> = _isUpdatingCatalog.asStateFlow()
