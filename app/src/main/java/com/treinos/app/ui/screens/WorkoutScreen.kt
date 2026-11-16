@@ -107,6 +107,9 @@ import com.treinos.app.ui.progressStateDescription
 import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
 import com.treinos.app.ui.timerShouldAnnounce
+import com.treinos.app.ui.workoutexecution.SupersetGroup
+import com.treinos.app.ui.workoutexecution.canJoinSuperset
+import com.treinos.app.ui.workoutexecution.supersetGroups
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 
@@ -135,6 +138,9 @@ fun WorkoutScreen(
     availableEquipment: List<String> = emptyList(),
     onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
     onLoadCatalog: () -> Unit = {},
+    // H4-6: agrupamento de superset derivado do plano do dia da sessão.
+    planExercises: List<WorkoutPlanExerciseEntity> = emptyList(),
+    onToggleSuperset: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
@@ -159,6 +165,21 @@ fun WorkoutScreen(
     var showSwapConfirm by remember { mutableStateOf(false) }
     var swapTargetId by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
+
+    // H4-6: agrupamento de superset derivado do plano vivo. O cabeçalho do
+    // grupo é renderizado DENTRO do card do primeiro membro — nenhum item
+    // extra na LazyColumn, então o índice de rolagem do H3-27 se mantém.
+    val sortedPlanExercises = remember(planExercises) { planExercises.sortedBy { it.exerciseOrder } }
+    val groups = remember(sortedPlanExercises) { supersetGroups(sortedPlanExercises) }
+    val supersetMembership = remember(groups) {
+        val membership = mutableMapOf<String, Triple<Int, Int, SupersetGroup>>()
+        groups.forEachIndexed { groupIndex, group ->
+            group.exerciseIds.forEachIndexed { memberIndex, exerciseId ->
+                membership.putIfAbsent(exerciseId, Triple(groupIndex, memberIndex, group))
+            }
+        }
+        membership
+    }
 
     // Sessão ativa mantém a tela acesa (H3-26); ao sair da tela a flag é liberada.
     KeepScreenOnEffect(enabled = session != null)
@@ -308,6 +329,22 @@ fun WorkoutScreen(
                 }
 
                 items(current.exercises.sortedBy { it.exercise.exerciseOrder }, key = { it.exercise.id }) { exercise ->
+                    // H4-6: rótulos derivados do grupo (A, A1, A2…); exercício
+                    // fora do plano (troca só-na-sessão) fica sem rótulo e sem
+                    // botão, e o descanso volta ao normal.
+                    val membership = supersetMembership[exercise.exercise.exerciseId]
+                    val supersetHeader = membership
+                        ?.takeIf { (_, memberIndex, _) -> memberIndex == 0 }
+                        ?.let { (groupIndex, _, _) ->
+                            stringResource(R.string.workout_superset_header, supersetGroupLetter(groupIndex))
+                        }
+                    val supersetLabel = membership
+                        ?.let { (groupIndex, memberIndex, _) ->
+                            stringResource(
+                                R.string.workout_superset_label,
+                                supersetGroupLetter(groupIndex) + (memberIndex + 1),
+                            )
+                        }
                     ExerciseCard(
                         exercise = exercise,
                         media = exerciseMedia[exercise.exercise.exerciseId],
@@ -352,6 +389,11 @@ fun WorkoutScreen(
                             swapTargetId = exercise.exercise.id
                             showSwapConfirm = true
                         },
+                        supersetHeader = supersetHeader,
+                        supersetLabel = supersetLabel,
+                        canToggleSuperset = canJoinSuperset(sortedPlanExercises, exercise.exercise.exerciseId),
+                        isSuperset = membership != null,
+                        onToggleSuperset = { enabled -> onToggleSuperset(exercise.exercise.id, enabled) },
                     )
                 }
 
@@ -966,6 +1008,12 @@ private fun ExerciseCard(
     onEditSet: (SetLogEntity) -> Unit,
     onNextExercise: () -> Unit,
     onSwapExercise: (() -> Unit)? = null,
+    // H4-6: rótulos do superset e botão de alternância com o anterior.
+    supersetHeader: String? = null,
+    supersetLabel: String? = null,
+    canToggleSuperset: Boolean = false,
+    isSuperset: Boolean = false,
+    onToggleSuperset: (Boolean) -> Unit = {},
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
     // H3-27: progresso derivado das séries gravadas — editar/excluir série
@@ -977,6 +1025,15 @@ private fun ExerciseCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // H4-6: cabeçalho do grupo dentro do card do primeiro membro.
+            supersetHeader?.let { header ->
+                Text(
+                    text = header,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             // Exercício com as séries planejadas cumpridas fica atenuado (H3-27);
             // o botão de ação fica fora do bloco, em contraste pleno.
             Column(
@@ -1008,6 +1065,15 @@ private fun ExerciseCard(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
                         )
+                        // H4-6: rótulo do membro na ordem de execução (A1, A2…).
+                        supersetLabel?.let { label ->
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         Text(
                             text = stringResource(R.string.workout_planned_sets, exercise.exercise.plannedSets, exercise.exercise.restSeconds),
                             style = MaterialTheme.typography.bodySmall,
@@ -1130,9 +1196,38 @@ private fun ExerciseCard(
                     Text(stringResource(R.string.workout_swap_exercise))
                 }
             }
+
+            // H4-6: alternar o superset com o exercício anterior. O botão
+            // mostra o estado atual e pede o inverso; gravar o estado já
+            // vigente é no-op. Não aparece no primeiro exercício do dia.
+            if (canToggleSuperset) {
+                OutlinedButton(
+                    onClick = { onToggleSuperset(!isSuperset) },
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            if (isSuperset) {
+                                R.string.workout_superset_toggle_off
+                            } else {
+                                R.string.workout_superset_toggle_on
+                            },
+                        ),
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.workout_superset_toggle_helper),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
+
+/** H4-6: letra do grupo derivada do índice (A, B, …); além de Z usa G+n. */
+private fun supersetGroupLetter(groupIndex: Int): String =
+    if (groupIndex < 26) ('A' + groupIndex).toString() else "G${groupIndex + 1}"
 
 @Composable
 private fun setDetailText(set: SetLogEntity): String {

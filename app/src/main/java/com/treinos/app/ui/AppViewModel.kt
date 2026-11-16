@@ -56,6 +56,7 @@ import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.nextIncompleteExercise
+import com.treinos.app.ui.workoutexecution.restAfterSet
 import com.treinos.app.ui.progression.ProgressionContext
 import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.progression.PersonalRecord
@@ -244,6 +245,27 @@ class AppViewModel(
     val inProgressSession: StateFlow<SessionWithExercises?> = repository.observeSessions()
         .map { list -> list.firstOrNull { it.session.status == "in_progress" } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * H4-6: exercícios do plano do dia da sessão em andamento, na ordem do
+     * dia. O agrupamento de superset é derivado deste plano vivo: plano
+     * regenerado ou excluído no meio da sessão esvazia a lista e a UI degrada
+     * sem rótulos e com o descanso normal.
+     */
+    val activeSessionPlanExercises: StateFlow<List<WorkoutPlanExerciseEntity>> = combine(
+        activePlans,
+        inProgressSession,
+    ) { plans, session ->
+        if (session == null) {
+            emptyList()
+        } else {
+            plans.firstOrNull { it.plan.id == session.session.planId }
+                ?.days
+                ?.firstOrNull { it.day.id == session.session.dayId }
+                ?.exercises
+                .orEmpty()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _activeSessionId = MutableStateFlow<Long?>(null)
 
@@ -1398,7 +1420,9 @@ class AppViewModel(
                     setType = input.setType,
                     rir = input.rir,
                 )
-                startRest(exercise.restSeconds)
+                // H4-6: membro de superset que não é o último do grupo descansa
+                // a transição em vez do descanso cheio do plano.
+                startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
                 syncWearState()
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
@@ -1420,10 +1444,33 @@ class AppViewModel(
                     setType = input.setType,
                     rir = input.rir,
                 )
-                startRest(exercise.restSeconds)
+                // H4-6: mesma regra do caminho da tela — o LOG_SET do relógio
+                // passa por aqui e usa o descanso de transição do superset.
+                startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
                 syncWearState()
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
+            }
+        }
+    }
+
+    /**
+     * H4-6: liga/desliga o superset com o exercício anterior. A flag vive no
+     * plano (`WorkoutPlanExerciseEntity`): vale para a sessão atual e para os
+     * próximos treinos do dia. Alternar para o estado já gravado é no-op.
+     */
+    fun toggleSupersetWithPrevious(sessionExerciseId: Long, enabled: Boolean) {
+        val sessionExercise = inProgressSession.value?.exercises
+            ?.firstOrNull { it.exercise.id == sessionExerciseId }
+            ?.exercise ?: return
+        val planExercise = activeSessionPlanExercises.value
+            .firstOrNull { it.exerciseId == sessionExercise.exerciseId } ?: return
+        if (planExercise.isSupersetWithPrevious == enabled) return
+        viewModelScope.launch {
+            try {
+                repository.setSupersetWithPrevious(planExercise.id, enabled)
+            } catch (error: Exception) {
+                Log.w(TAG, "Falha ao alternar superset", error)
             }
         }
     }

@@ -49,6 +49,10 @@ interface WorkoutDao {
     @Update
     suspend fun updatePlanExercise(exercise: WorkoutPlanExerciseEntity): Int
 
+    /** H4-6: liga/desliga o superset com o exercício anterior no plano. */
+    @Query("UPDATE workout_plan_exercises SET isSupersetWithPrevious = :enabled WHERE id = :id")
+    suspend fun updateSupersetFlag(id: Long, enabled: Boolean)
+
     @Query("UPDATE workout_plans SET isActive = 0 WHERE kind = :kind")
     suspend fun deactivateByKind(kind: String)
 

@@ -351,6 +351,27 @@ class WorkoutRepositorySessionTest {
     }
 
     @Test
+    fun set_superset_with_previous_persiste() = runTest {
+        // H4-6: alternar o superset grava a flag no plano (não só na sessão).
+        val planId = dao.insertPlan(
+            WorkoutPlanEntity(id = 1, name = "Plano", goal = "hypertrophy", daysPerWeek = 3, isActive = true)
+        )
+        val dayId = dao.insertDay(
+            WorkoutDayEntity(id = 10, planId = planId, name = "Treino A", dayOrder = 0, weekday = 1, modality = "strength")
+        )
+        dao.insertPlanExercises(
+            listOf(WorkoutPlanExerciseEntity(id = 100, dayId = dayId, exerciseId = "ex1", exerciseName = "Ex 1", sets = 3))
+        )
+        val planExerciseId = dao.getExercisesForDay(dayId).single().id
+
+        repository.setSupersetWithPrevious(planExerciseId, true)
+        assertEquals(true, dao.getExercisesForDay(dayId).single().isSupersetWithPrevious)
+
+        repository.setSupersetWithPrevious(planExerciseId, false)
+        assertEquals(false, dao.getExercisesForDay(dayId).single().isSupersetWithPrevious)
+    }
+
+    @Test
     fun logSet_warmup_nao_incrementa_completed_sets() = runTest {
         val (_, exerciseLogId) = sessaoEmAndamento()
 

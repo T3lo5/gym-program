@@ -206,6 +206,22 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun update_superset_flag_persiste() = runTest {
+        // H4-6: a flag de superset é gravada no plano e sobrevive à leitura —
+        // vale para a sessão atual e para os próximos treinos do dia.
+        val planId = dao.insertPlan(plano())
+        val dayId = dao.insertDay(dia(planId = planId))
+        dao.insertPlanExercises(listOf(exercicioPlano(dayId = dayId)))
+        val planExerciseId = dao.getExercisesForDay(dayId).single().id
+
+        dao.updateSupersetFlag(planExerciseId, true)
+        assertEquals(true, dao.getExercisesForDay(dayId).single().isSupersetWithPrevious)
+
+        dao.updateSupersetFlag(planExerciseId, false)
+        assertEquals(false, dao.getExercisesForDay(dayId).single().isSupersetWithPrevious)
+    }
+
+    @Test
     fun update_set_log_preserva_sessao() = runTest {
         // H3-27: editar a série atualiza reps/carga/RPE sem romper o vínculo
         // com o exercício da sessão nem mudar o número da série.

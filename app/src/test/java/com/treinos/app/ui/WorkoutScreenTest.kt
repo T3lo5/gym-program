@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
@@ -20,6 +21,7 @@ import com.treinos.app.data.local.SET_TYPE_DROP
 import com.treinos.app.data.local.SET_TYPE_NORMAL
 import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.media.ExerciseMedia
@@ -115,6 +117,8 @@ class WorkoutScreenTest {
         personalRecords: Map<String, PersonalRecord> = emptyMap(),
         onSwapExercise: ((Long, String, SwapScope) -> Unit)? = null,
         onLoadCatalog: () -> Unit = {},
+        planExercises: List<WorkoutPlanExerciseEntity> = emptyList(),
+        onToggleSuperset: (Long, Boolean) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
             WorkoutScreen(
@@ -133,6 +137,8 @@ class WorkoutScreenTest {
                 personalRecords = personalRecords,
                 onSwapExercise = onSwapExercise,
                 onLoadCatalog = onLoadCatalog,
+                planExercises = planExercises,
+                onToggleSuperset = onToggleSuperset,
             )
         }
     }
@@ -542,5 +548,106 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("Registrar série 2").performClick()
 
         composeRule.onNodeWithText("Anilhas e aquecimento").assertDoesNotExist()
+    }
+
+    // ---------- H4-6: supersets (bi/tri-set) ----------
+
+    /** Sessão com dois exercícios na ordem do dia; devolve os ids de sessão 100 e 200. */
+    private fun sessaoSuperset(): SessionWithExercises {
+        fun exercicio(id: Long, exerciseId: String, nome: String, order: Int) =
+            SessionExerciseWithSets(
+                exercise = SessionExerciseEntity(
+                    id = id,
+                    sessionId = 1,
+                    exerciseId = exerciseId,
+                    exerciseName = nome,
+                    exerciseOrder = order,
+                    plannedSets = 3,
+                    completedSets = 0,
+                    restSeconds = 90,
+                ),
+                sets = emptyList(),
+            )
+        return SessionWithExercises(
+            session = WorkoutSessionEntity(
+                id = 1,
+                planId = 1,
+                dayId = 10,
+                planName = "Plano Teste",
+                dayName = "Treino A",
+                status = "in_progress",
+            ),
+            exercises = listOf(
+                exercicio(100, "ex1", "Supino reto", 0),
+                exercicio(200, "ex2", "Remada alta", 1),
+            ),
+        )
+    }
+
+    /** Plano do dia com um exercício por flag informada, na ordem. */
+    private fun planoSuperset(vararg flags: Boolean): List<WorkoutPlanExerciseEntity> =
+        flags.mapIndexed { index, superset ->
+            WorkoutPlanExerciseEntity(
+                id = 1000L + index,
+                dayId = 10,
+                exerciseId = "ex${index + 1}",
+                exerciseName = "Ex ${index + 1}",
+                exerciseOrder = index,
+                restSeconds = 90,
+                isSupersetWithPrevious = superset,
+            )
+        }
+
+    @Test
+    fun superset_mostra_cabecalho_e_rotulos() {
+        // Bi-set: o cabeçalho "Supersérie A" fica DENTRO do card do primeiro
+        // membro (sem item extra na lista) e os membros recebem A1 e A2.
+        setContent(session = sessaoSuperset(), planExercises = planoSuperset(false, true))
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Supersérie A"))
+        composeRule.onNodeWithText("Supersérie A").assertIsDisplayed()
+        composeRule.onNodeWithText("A1").assertIsDisplayed()
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("A2"))
+        composeRule.onNodeWithText("A2").assertIsDisplayed()
+    }
+
+    @Test
+    fun botao_superset_ausente_no_primeiro() {
+        // O primeiro exercício do dia nunca entra em grupo: sem botão nele;
+        // só o segundo card mostra a alternância.
+        setContent(session = sessaoSuperset(), planExercises = planoSuperset(false, false))
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Supersérie com o anterior"))
+        composeRule.onNodeWithText("Supersérie com o anterior").assertIsDisplayed()
+        assertEquals(
+            1,
+            composeRule.onAllNodesWithText("Supersérie com o anterior").fetchSemanticsNodes().size,
+        )
+    }
+
+    @Test
+    fun toggle_superset_dispara_callback() {
+        // Tocar em "Supersérie com o anterior" pede a ligação com o exercício
+        // anterior: o callback recebe o id da sessão e o estado novo (true).
+        var alternado: Pair<Long, Boolean>? = null
+        setContent(
+            session = sessaoSuperset(),
+            planExercises = planoSuperset(false, false),
+            onToggleSuperset = { id, enabled -> alternado = id to enabled },
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Supersérie com o anterior"))
+        composeRule.onNodeWithText("Supersérie com o anterior").performClick()
+
+        assertEquals(200L to true, alternado)
     }
 }

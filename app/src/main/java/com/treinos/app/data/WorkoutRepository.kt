@@ -355,6 +355,17 @@ open class WorkoutRepository(
         }
     }
 
+    // ---------------- Superset (H4-6) ----------------
+
+    /**
+     * Grava a flag de superset do exercício no plano: sem coluna em
+     * `session_exercises`, a alternância vale para a sessão atual e para os
+     * próximos treinos do dia. Backup e sync já carregam o campo.
+     */
+    suspend fun setSupersetWithPrevious(planExerciseId: Long, enabled: Boolean) = withContext(Dispatchers.IO) {
+        dao.updateSupersetFlag(planExerciseId, enabled)
+    }
+
     // ---------------- Uso de exercício para calibrar precisão (H3-42) ----------
 
     /**

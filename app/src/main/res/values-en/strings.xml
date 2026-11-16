@@ -148,6 +148,12 @@
     <string name="workout_repeat_last_with_label">Repeat last set (%1$s)</string>
     <string name="workout_exercise_done">Exercise completed — next</string>
     <string name="workout_swap_exercise">Swap exercise</string>
+    <!-- H4-6: supersets (bi/tri-set) -->
+    <string name="workout_superset_header">Superset %1$s</string>
+    <string name="workout_superset_label">%1$s</string>
+    <string name="workout_superset_toggle_on">Superset with previous</string>
+    <string name="workout_superset_toggle_off">Leave superset</string>
+    <string name="workout_superset_toggle_helper">Applies to this workout and to future ones with this plan.</string>
     <string name="workout_log_set">Log set %1$d</string>
     <string name="workout_finish_title">Finish workout?</string>
     <string name="workout_finish_body">%1$d of %2$d sets recorded. Finishing ends the session and saves the workout to the device.</string>

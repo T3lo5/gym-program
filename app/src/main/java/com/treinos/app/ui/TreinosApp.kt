@@ -110,6 +110,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val activityPrefill by viewModel.activityPrefill.collectAsStateWithLifecycle()
     val progressionSuggestions by viewModel.progressionSuggestions.collectAsStateWithLifecycle()
     val personalRecords by viewModel.personalRecords.collectAsStateWithLifecycle()
+    // H4-6: plano do dia da sessão em andamento para os rótulos de superset.
+    val activeSessionPlanExercises by viewModel.activeSessionPlanExercises.collectAsStateWithLifecycle()
     val planCycle by viewModel.planCycle.collectAsStateWithLifecycle()
     val activityEditingId by viewModel.activityEditingId.collectAsStateWithLifecycle()
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
@@ -397,6 +399,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                         }
                     },
                     onLoadCatalog = { viewModel.loadExerciseMedia(false) },
+                    // H4-6: agrupamento de superset e alternância no plano.
+                    planExercises = activeSessionPlanExercises,
+                    onToggleSuperset = viewModel::toggleSupersetWithPrevious,
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(

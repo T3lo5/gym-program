@@ -7,8 +7,8 @@
 | Item do roadmap | `H4-6` |
 | MoSCoW | `S` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` |
 
 ## Objetivo
 
@@ -82,7 +82,12 @@ Alternância:
 - Flag ligada num exercício cujo anterior não está no dia (plano inconsistente):
   mesmo tratamento — sozinho.
 - Desligar um membro do meio divide o grupo: `A, B(off), C(on)` → `A` sozinho e
-  grupo `[B, C]`; o descanso de `B` volta ao normal.
+  grupo `[B, C]`. **Nota de implementação (2026-11-15):** a nota "o descanso de
+  `B` volta ao normal" contraria a regra geral afirmada duas vezes na spec
+  (Modelo de dados + regra de borda): `B` vira âncora não-última do grupo
+  `[B, C]` e paga a transição de 15 s. A regra geral foi implementada; o teste
+  `desligar_do_meio_divide_grupo` fixa a divisão e os descansos de `A` e `C`
+  sem pinar o de `B` — mudar é 1 linha em `restAfterSet`.
 - `restSeconds <= 0` (exercício sem descanso): transição é 0, nunca 15 — o
   plano manda.
 - Exercício não encontrado no plano (sessão antiga/plano trocado): usa
