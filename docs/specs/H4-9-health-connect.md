@@ -265,10 +265,17 @@ fica na verificação manual.
 
 - **Dependência nova:** `androidx.health.connect:connect-client:1.1.0` (Google
   Maven, versão fixa). É a única forma de falar com o Health Connect; sem ela
-  não há integração. O risco de build é o `compileSdk`: se `1.1.0` exigir 35, o
-  `Dockerfile` precisa instalar `platforms;android-35`/`build-tools;35.0.0` e o
-  `app/build.gradle.kts` precisa subir `compileSdk`. Verificar antes de
-  implementar; o gate falha cedo se faltar.
+  não há integração. **Nota de implementação (2026-11-15):** o AAR 1.1.0 exige
+  `minCompileSdk = 36` e AGP ≥ 8.9.1 (verificado no `aar-metadata`), então a
+  entrega subiu `compileSdk` para 36 no `:app` (targetSdk segue 34), o AGP para
+  8.9.1 e o `Dockerfile` passou a instalar `platforms;android-36` +
+  `build-tools;35.0.0` — gate completo verde com a nova toolchain. Outros
+  desvios de API: `Mass.kilograms` (renome da 1.1.0), `RateLimitExceededException`
+  não existe (quota → mensagem genérica; `SecurityException` capturada no
+  gateway), RPE vai anexado às notas do record, o 3º activity-alias usa a action
+  oficial `android.intent.action.VIEW_PERMISSION_USAGE` + `HEALTH_PERMISSIONS`
+  (a string citada na spec não existe) e swim distingue piscina/água aberta
+  pelo `stroke`.
 - **Revisão do Play:** apps que usam Health Connect precisam de política de
   privacidade e declaração de uso; a permissão `READ_STEPS`/`READ_WEIGHT`/
   `WRITE_EXERCISE` é considerada sensível. Escopo restrito (3 permissões, sem
