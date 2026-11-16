@@ -33,7 +33,9 @@ import android.content.ContextWrapper
 import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
+import com.treinos.app.ui.history.STATUS_COMPLETED
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -452,6 +454,76 @@ class HomeScreenTest {
             }
         }
         composeRule.onNodeWithText("No workouts yet").assertIsDisplayed()
+    }
+
+    @Test
+    fun card_streak_aparece_com_historico() {
+        // H4-13: três treinos em dias consecutivos terminando hoje — o card
+        // mostra sequência atual 3 e melhor 3 (critério 1 da spec).
+        composeRule.setContent {
+            HomeScreen(
+                plan = plan,
+                inProgressSession = null,
+                sessions = listOf(
+                    sessaoConcluida(id = 1, diasAtras = 2),
+                    sessaoConcluida(id = 2, diasAtras = 1),
+                    sessaoConcluida(id = 3, diasAtras = 0),
+                ),
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Sequência de treinos").assertIsDisplayed()
+        composeRule.onNodeWithText("Sequência atual: 3 dias").assertIsDisplayed()
+        composeRule.onNodeWithText("Melhor sequência: 3 dias").assertIsDisplayed()
+    }
+
+    @Test
+    fun card_streak_ausente_sem_treino() {
+        // H4-13 regra 12: sem treino concluído o card não existe — a Home fica
+        // como está (critério 6).
+        composeRule.setContent {
+            HomeScreen(
+                plan = plan,
+                inProgressSession = null,
+                sessions = emptyList(),
+                onGenerate = {},
+                onHistory = {},
+                onSettings = {},
+                onStartDay = {},
+                onResume = {},
+                onLogActivity = {},
+                onOpenMobility = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Sequência de treinos").assertDoesNotExist()
+    }
+
+    /** H4-13: sessão de musculação concluída `diasAtras` dias, às 10h locais. */
+    private fun sessaoConcluida(id: Long, diasAtras: Long): SessionWithExercises {
+        val startedAt = LocalDate.now().minusDays(diasAtras)
+            .atTime(10, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return SessionWithExercises(
+            session = WorkoutSessionEntity(
+                id = id,
+                planName = "Plano Teste",
+                dayName = "Treino A",
+                status = STATUS_COMPLETED,
+                startedAt = startedAt,
+                totalDurationSeconds = 3600,
+            ),
+            exercises = emptyList(),
+        )
     }
 
     /** Plano com sessão de musculação hoje e corrida amanhã, independente da data. */

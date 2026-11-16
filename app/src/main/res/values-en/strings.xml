@@ -122,6 +122,17 @@
         <item quantity="other">%1$d of %2$d exercises</item>
     </plurals>
 
+    <!-- H4-13: workout streak on Home -->
+    <string name="home_streak_title">Workout streak</string>
+    <plurals name="home_streak_current">
+        <item quantity="one">Current streak: %1$d day</item>
+        <item quantity="other">Current streak: %1$d days</item>
+    </plurals>
+    <plurals name="home_streak_best">
+        <item quantity="one">Best streak: %1$d day</item>
+        <item quantity="other">Best streak: %1$d days</item>
+    </plurals>
+
     <!-- Workout -->
     <string name="workout_loading">Loading workout…</string>
     <string name="workout_none_title">No workout in progress</string>
@@ -365,6 +376,16 @@
     <string name="chart_line_a11y">%1$s — %2$s (%3$d workouts): %4$s on %5$s to %6$s on %7$s</string>
     <string name="chart_bars_a11y">Weekly volume by muscle: %1$s</string>
     <string name="chart_bar_a11y">%1$s: %2$s • %3$d set(s)</string>
+
+    <!-- H4-13: period summary in History -->
+    <string name="history_report_title">Period summary</string>
+    <string name="history_report_month">Month</string>
+    <string name="history_report_year">Year</string>
+    <string name="history_report_workouts">Completed workouts</string>
+    <string name="history_report_volume">Total volume</string>
+    <string name="history_report_active_days">Active days</string>
+    <string name="history_report_weekly_average">Weekly average</string>
+    <string name="history_report_new_prs">PRs in period</string>
 
     <!-- Log Activity -->
     <string name="screen_log_activity">Record activity</string>

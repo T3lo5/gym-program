@@ -3,6 +3,7 @@ package com.treinos.app.ui
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
@@ -214,9 +216,10 @@ class HistoryScreenTest {
         // H4-2: "Outros" aparece no ranking do mês e na linha semanal do
         // gráfico de barras (a sessão falsa não tem músculo mapeado).
         composeRule.onAllNodesWithText("Outros", useUnmergedTree = true).assertCountEquals(2)
-        // O mesmo "400 kg" em duas linhas: card "Volume" e ranking do mês (a
-        // linha semanal junta volume e séries no mesmo texto).
-        composeRule.onAllNodesWithText("400 kg", useUnmergedTree = true).assertCountEquals(2)
+        // O mesmo "400 kg" em três linhas: card "Volume", ranking do mês e a
+        // linha "Volume total" do resumo do período (H4-13; a linha semanal
+        // junta volume e séries no mesmo texto).
+        composeRule.onAllNodesWithText("400 kg", useUnmergedTree = true).assertCountEquals(3)
         composeRule.onNodeWithText("1h 00min", useUnmergedTree = true).assertExists()
     }
 
@@ -363,4 +366,80 @@ class HistoryScreenTest {
         composeRule.onAllNodesWithText("Peito", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onNodeWithText("400 kg • 1 série(s)", useUnmergedTree = true).assertExists()
     }
+
+    @Test
+    fun relatorio_mes_mostra_metricas() {
+        // H4-13: o resumo do período mostra treinos concluídos, volume, dias
+        // ativos e PRs do mês exibido (a média por semana depende do tamanho
+        // do mês corrente e é coberta em PeriodReportTest).
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })
+        }
+
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Resumo do período"))
+        composeRule.onNodeWithText("Resumo do período").assertIsDisplayed()
+        // 1 sessão concluída no mês; sem histórico antes dele, o primeiro
+        // registro válido do exercício conta como PR (regra 8 da H4-1).
+        composeRule.onNode(hasText("Treinos concluídos") and hasText("1")).assertExists()
+        composeRule.onNode(hasText("Volume total") and hasText("400 kg")).assertExists()
+        composeRule.onNode(hasText("Dias ativos") and hasText("1")).assertExists()
+        composeRule.onNode(hasText("PRs no período") and hasText("1")).assertExists()
+    }
+
+    @Test
+    fun toggle_ano_agrega_ano() {
+        // H4-13 critério 4: com o calendário em janeiro do ano corrente, o
+        // relatório anual agrega o ano inteiro — inclui a sessão de hoje, que
+        // está em outro mês (quando hoje É janeiro, as duas caem no mês).
+        val sessaoJaneiro = sessaoEm(id = 9, data = LocalDate.of(today.year, 1, 1))
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(sessaoConcluida, sessaoJaneiro), onBack = { })
+        }
+
+        repeat(today.monthValue - 1) {
+            composeRule.onNodeWithContentDescription("Mês anterior").performClick()
+        }
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Resumo do período"))
+
+        // Mês de janeiro: só a sessão de janeiro (hoje entra se hoje for janeiro).
+        val esperadoNoMes = if (today.monthValue == 1) 2 else 1
+        composeRule.onNode(hasText("Treinos concluídos") and hasText(esperadoNoMes.toString()))
+            .assertExists()
+
+        // Toggle Ano: o ano do mês exibido agrega as duas sessões.
+        composeRule.onNodeWithText("Ano").performClick()
+        composeRule.onNode(hasText("Treinos concluídos") and hasText("2")).assertExists()
+    }
+
+    /** H4-13: sessão de musculação concluída em [data], às 10h locais. */
+    private fun sessaoEm(id: Long, data: LocalDate): SessionWithExercises = SessionWithExercises(
+        session = WorkoutSessionEntity(
+            id = id,
+            planName = "Plano Teste",
+            dayName = "Treino B",
+            status = STATUS_COMPLETED,
+            startedAt = millisOf(data),
+            totalDurationSeconds = 1800,
+        ),
+        exercises = listOf(
+            SessionExerciseWithSets(
+                exercise = SessionExerciseEntity(
+                    id = 900,
+                    sessionId = id,
+                    exerciseId = "Barbell_Bench_Press",
+                    exerciseName = "Supino reto",
+                    exerciseOrder = 0,
+                ),
+                sets = listOf(
+                    SetLogEntity(
+                        id = 9000,
+                        exerciseLogId = 900,
+                        setNumber = 1,
+                        reps = 10,
+                        weightKg = 40.0,
+                    ),
+                ),
+            ),
+        ),
+    )
 }

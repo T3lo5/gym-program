@@ -94,10 +94,12 @@ import com.treinos.app.ui.formatRunDistanceKm
 import com.treinos.app.ui.formatVolumeKg
 import com.treinos.app.ui.history.ExerciseChartMetric
 import com.treinos.app.ui.history.HistoryMetrics
+import com.treinos.app.ui.history.ReportPeriod
 import com.treinos.app.ui.history.STATUS_COMPLETED
 import com.treinos.app.ui.history.STATUS_IN_PROGRESS
 import com.treinos.app.ui.history.buildHistoryMetrics
 import com.treinos.app.ui.history.buildMonthGrid
+import com.treinos.app.ui.history.buildPeriodReport
 import com.treinos.app.ui.history.exerciseProgressSeries
 import com.treinos.app.ui.history.exercisesWithHistory
 import com.treinos.app.ui.history.firstDayOfMonth
@@ -303,6 +305,19 @@ fun HistoryScreen(
                     )
                 }
 
+                if (selectedDate == null) {
+                    // H4-13: resumo do período (mês/ano) no fim da lista — as
+                    // sessões continuam escaneáveis no topo (H3-28) e o toggle
+                    // não muda o calendário.
+                    item {
+                        PeriodReportCard(
+                            sessions = modalitySessions,
+                            muscleByExerciseId = muscleByExerciseId,
+                            reference = month.atDay(1),
+                        )
+                    }
+                }
+
                 if (selectedDate != null) {
                     // H3-28: com dia selecionado, a lista daquele dia vem antes
                     // das métricas e do volume.
@@ -485,6 +500,73 @@ private fun WeeklyMuscleVolumeSection(
                     label = bar.muscle,
                     value = formatVolumeKg(bar.volumeKg) +
                         " • " + stringResource(R.string.history_series_count, bar.sets),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * H4-13: resumo do mês ou do ano — treinos concluídos, volume, dias ativos,
+ * média por semana e PRs batidos no período, calculados por
+ * [buildPeriodReport] a partir das sessões já carregadas (offline, nada é
+ * gravado). O toggle Mês/Ano é independente do calendário: navegar o mês
+ * muda a referência do relatório mensal e o anual usa o ano do mês exibido.
+ */
+@Composable
+private fun PeriodReportCard(
+    sessions: List<SessionWithExercises>,
+    muscleByExerciseId: Map<String, String>,
+    reference: LocalDate,
+) {
+    var period by rememberSaveable { mutableStateOf(ReportPeriod.MONTH) }
+    val report = remember(sessions, muscleByExerciseId, period, reference) {
+        buildPeriodReport(sessions, muscleByExerciseId, period, reference)
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SectionTitle(stringResource(R.string.history_report_title))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = period == ReportPeriod.MONTH,
+                onClick = { period = ReportPeriod.MONTH },
+                label = { Text(stringResource(R.string.history_report_month)) },
+            )
+            FilterChip(
+                selected = period == ReportPeriod.YEAR,
+                onClick = { period = ReportPeriod.YEAR },
+                label = { Text(stringResource(R.string.history_report_year)) },
+            )
+        }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                KeyValueRow(
+                    label = stringResource(R.string.history_report_workouts),
+                    value = report.metrics.completedCount.toString(),
+                )
+                KeyValueRow(
+                    label = stringResource(R.string.history_report_volume),
+                    value = formatVolumeKg(report.metrics.totalVolumeKg),
+                )
+                KeyValueRow(
+                    label = stringResource(R.string.history_report_active_days),
+                    value = report.activeDays.toString(),
+                )
+                KeyValueRow(
+                    label = stringResource(R.string.history_report_weekly_average),
+                    value = formatDecimal(report.sessionsPerWeek, 1),
+                )
+                KeyValueRow(
+                    label = stringResource(R.string.history_report_new_prs),
+                    value = report.newPrCount.toString(),
                 )
             }
         }

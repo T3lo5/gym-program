@@ -123,6 +123,19 @@
         <item quantity="other">%1$d de %2$d exercícios</item>
     </plurals>
 
+    <!-- H4-13: sequência de treinos na Home -->
+    <string name="home_streak_title">Sequência de treinos</string>
+    <plurals name="home_streak_current">
+        <item quantity="one">Sequência atual: %1$d dia</item>
+        <item quantity="many">Sequência atual: %1$d dias</item>
+        <item quantity="other">Sequência atual: %1$d dias</item>
+    </plurals>
+    <plurals name="home_streak_best">
+        <item quantity="one">Melhor sequência: %1$d dia</item>
+        <item quantity="many">Melhor sequência: %1$d dias</item>
+        <item quantity="other">Melhor sequência: %1$d dias</item>
+    </plurals>
+
     <!-- Workout -->
     <string name="workout_loading">Carregando treino…</string>
     <string name="workout_none_title">Nenhum treino em andamento</string>
@@ -366,6 +379,16 @@
     <string name="chart_line_a11y">%1$s — %2$s (%3$d treinos): %4$s em %5$s até %6$s em %7$s</string>
     <string name="chart_bars_a11y">Volume por músculo na semana: %1$s</string>
     <string name="chart_bar_a11y">%1$s: %2$s • %3$d série(s)</string>
+
+    <!-- H4-13: resumo do período no Histórico -->
+    <string name="history_report_title">Resumo do período</string>
+    <string name="history_report_month">Mês</string>
+    <string name="history_report_year">Ano</string>
+    <string name="history_report_workouts">Treinos concluídos</string>
+    <string name="history_report_volume">Volume total</string>
+    <string name="history_report_active_days">Dias ativos</string>
+    <string name="history_report_weekly_average">Média por semana</string>
+    <string name="history_report_new_prs">PRs no período</string>
 
     <!-- Registro de Atividade -->
     <string name="screen_log_activity">Registrar atividade</string>

@@ -82,6 +82,10 @@ import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.reviewIsDue
 import com.treinos.app.ui.reviewStateDescription
 import com.treinos.app.ui.todaySessionSelector
+import com.treinos.app.ui.history.StreakSummary
+import com.treinos.app.ui.history.STATUS_COMPLETED
+import com.treinos.app.ui.history.buildStreak
+import com.treinos.app.ui.history.sessionDates
 import com.treinos.app.ui.UiState
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ExerciseImage
@@ -92,6 +96,7 @@ import com.treinos.app.ui.components.StatusText
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
+import java.time.LocalDate
 
 @Composable
 fun HomeScreen(
@@ -157,6 +162,17 @@ fun HomeScreen(
         plan?.let { todaySessionSelector(it.days, todayWeekday) }
     }
 
+    // H4-13: sequência de treinos — dias com sessão concluída (qualquer
+    // modalidade conta igual) alimentam o streak; leitura pura do histórico,
+    // nada é gravado e funciona offline.
+    val today = remember { LocalDate.now() }
+    val streak = remember(sessions, today) {
+        buildStreak(
+            sessionDates(sessions.filter { it.session.status == STATUS_COMPLETED }),
+            today,
+        )
+    }
+
     Scaffold(
         topBar = {
             ScreenTopBar(
@@ -204,6 +220,13 @@ fun HomeScreen(
                         onAbandon = onAbandonWorkout,
                     )
                 }
+            }
+
+            // H4-13: card de consistência logo após o treino em andamento —
+            // só aparece com pelo menos um treino concluído (regra 12); sem
+            // histórico, a Home fica como está.
+            if (streak.bestDays > 0) {
+                item { StreakCard(streak) }
             }
 
             if (plan == null) {
@@ -966,6 +989,45 @@ private fun InProgressCard(
                 }
             },
         )
+    }
+}
+
+/**
+ * H4-13: card de consistência da Home — sequência atual e melhor sequência de
+ * dias com treino concluído, calculadas por [buildStreak] a partir das sessões
+ * já recebidas pela tela. Só é renderizado quando `bestDays > 0` (regra 12).
+ */
+@Composable
+private fun StreakCard(streak: StreakSummary) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.home_streak_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = pluralStringResource(
+                    R.plurals.home_streak_current,
+                    streak.currentDays,
+                    streak.currentDays,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = pluralStringResource(
+                    R.plurals.home_streak_best,
+                    streak.bestDays,
+                    streak.bestDays,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
