@@ -341,6 +341,9 @@ private val SUCCESS_PREFIXES = listOf(
     "Medida registrada",
     "Medida excluída",
     "Perfil atualizado",
+
+    // H4-9: Health Connect
+    "Health Connect sincronizado",
     // values-en
     "Connected",
     "Sent:",
@@ -352,6 +355,9 @@ private val SUCCESS_PREFIXES = listOf(
     "Measurement saved",
     "Measurement deleted",
     "Profile updated",
+
+    // H4-9: Health Connect
+    "Health Connect synced",
 )
 
 /**

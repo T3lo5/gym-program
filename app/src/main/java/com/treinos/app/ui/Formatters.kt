@@ -190,3 +190,9 @@ fun formatDecimal(value: Double, casas: Int): String =
  */
 fun formatKg(value: Double?): String =
     value?.let { "${formatDecimal(it, 1)} kg" } ?: "—"
+
+/**
+ * H4-9: total de passos com agrupamento de milhar em locale fixo pt-BR
+ * (ex.: `formatSteps(12345)` = "12.345").
+ */
+fun formatSteps(total: Long): String = String.format(ptBr, "%,d", total)

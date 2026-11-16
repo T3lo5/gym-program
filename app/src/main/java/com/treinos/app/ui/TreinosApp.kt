@@ -3,6 +3,7 @@ package com.treinos.app.ui
 import android.animation.ValueAnimator
 import android.content.ContentResolver
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageInfo
 import android.net.Uri
 import android.os.Build
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.health.connect.client.HealthConnectClient
 import com.treinos.app.data.backup.BackupSizeGuard
 import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.data.MeasurementPhotoStore
@@ -136,6 +138,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
     val isConnectingBackend by viewModel.isConnectingBackend.collectAsStateWithLifecycle()
     val discoveryMessage by viewModel.discoveryMessage.collectAsStateWithLifecycle()
+    // H4-9: integração com o Health Connect (seção em Ajustes).
+    val healthConnectState by viewModel.healthConnectState.collectAsStateWithLifecycle()
+    val healthConnectMessage by viewModel.healthConnectMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // Dispensar o aviso de deload é só visual: nada aqui muda o plano gravado.
     var isDeloadNoticeDismissed by remember { mutableStateOf(false) }
@@ -663,6 +668,25 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onClearUpdateMessage = viewModel::clearUpdateMessage,
                     // H4-8: card "Peso e medidas" abrindo a tela.
                     onOpenMeasurements = viewModel::openMeasurements,
+                    // H4-9: integração com o Health Connect.
+                    healthConnectState = healthConnectState,
+                    healthConnectMessage = healthConnectMessage,
+                    onRequestHealthPermissions = viewModel::requestHealthPermissions,
+                    onSyncHealth = viewModel::syncHealthData,
+                    onOpenHealthConnectSettings = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS),
+                            )
+                        }
+                    },
+                    onOpenHealthConnectStore = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW).setData(Uri.parse(HEALTH_CONNECT_STORE_URI)),
+                            )
+                        }
+                    },
                 )
 
                 // H4-8: peso corporal e medidas ao longo do tempo — gráfico da
@@ -750,3 +774,11 @@ private fun appVersionInfo(context: Context): Pair<String, Long> {
     val info: PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
     return (info.versionName ?: "desconhecida") to PackageInfoCompat.getLongVersionCode(info)
 }
+
+/**
+ * H4-9: URI da loja para instalar/atualizar o app do Health Connect quando o
+ * SDK reporta `SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED` (regra 1).
+ */
+private const val HEALTH_CONNECT_STORE_URI =
+    "market://details?id=com.google.android.apps.healthdata" +
+        "&url=utm_source%3D%26utm_medium%3Dapp_link"

@@ -1,7 +1,9 @@
 import java.time.Duration
 
 plugins {
-    id("com.android.application") version "8.5.0"
+    // H4-9: 8.9.1 é o mínimo exigido por `androidx.health.connect:connect-client:1.1.0`
+    // (aar-metadata: minCompileSdk=36, minAndroidGradlePluginVersion=8.9.1).
+    id("com.android.application") version "8.9.1"
     id("org.jetbrains.kotlin.android") version "1.9.24"
     id("org.jetbrains.kotlin.kapt") version "1.9.24"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
@@ -69,7 +71,10 @@ val rootVersionName: String = rootProject.file("version.properties")
 
 android {
     namespace = "com.treinos.app"
-    compileSdk = 34
+    // H4-9: 36 é o minCompileSdk declarado por `connect-client:1.1.0`; o
+    // targetSdk continua 34 (o bump é só de compilação). O Dockerfile instala
+    // `platforms;android-36` para este SDK.
+    compileSdk = 36
 
     val appVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
     val appVersionName = (project.findProperty("versionName") as String?) ?: rootVersionName
@@ -201,6 +206,11 @@ dependencies {
     // Wear OS Data Layer (comunicação celular ↔ relógio)
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
     implementation(project(":protocol"))
+
+    // H4-9: Health Connect — escrever treino concluído e ler peso/passos.
+    // 1.1.0 é a última versão estável (a linha 1.2.x está em alpha) e exige
+    // compileSdk 36 + AGP 8.9.1 (aar-metadata do artefato).
+    implementation("androidx.health.connect:connect-client:1.1.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

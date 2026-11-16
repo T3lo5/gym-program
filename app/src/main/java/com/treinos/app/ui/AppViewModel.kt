@@ -35,6 +35,12 @@ import com.treinos.app.data.discovery.dedupeBackends
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.media.resolveExerciseMedia
+import com.treinos.app.data.health.HealthConnectAvailability
+import com.treinos.app.data.health.HealthConnectGateway
+import com.treinos.app.data.health.HealthConnectPermissionState
+import com.treinos.app.data.health.HealthWeightSample
+import com.treinos.app.data.health.healthConnectAvailability
+import com.treinos.app.data.health.healthPermissionState
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.SyncDownloadResult
 import com.treinos.app.data.remote.GenerateJobAck
@@ -184,6 +190,8 @@ class AppViewModel(
     private val wearSyncRepository: WearSyncRepository? = null,
     private val restFeedback: RestFeedbackPlayer? = null,
     private val restNotifier: RestNotifier? = null,
+    /** H4-9: gateway do Health Connect; `null` quando indisponível. */
+    private val healthGateway: HealthConnectGateway? = null,
 ) : ViewModel() {
 
     // H3-35: atalho dinâmico "Retomar treino".
@@ -651,6 +659,26 @@ class AppViewModel(
     private val _notificationPermissionRequests = MutableStateFlow(0)
     val notificationPermissionRequest: StateFlow<Int> = _notificationPermissionRequests.asStateFlow()
 
+    // ---------------- Health Connect (H4-9) ----------------
+
+    /** H4-9: estado da seção de Health Connect em Ajustes. */
+    private val _healthConnectState = MutableStateFlow(HealthConnectUiState())
+    val healthConnectState: StateFlow<HealthConnectUiState> = _healthConnectState.asStateFlow()
+
+    private val _healthConnectMessage = MutableStateFlow<String?>(null)
+    val healthConnectMessage: StateFlow<String?> = _healthConnectMessage.asStateFlow()
+
+    /**
+     * H4-9: contador de pedidos de permissão do Health Connect. Incrementa
+     * quando o usuário toca "Conectar"; a MainActivity observa e executa o
+     * contract do sistema (mesmo padrão do `POST_NOTIFICATIONS` da H3-58).
+     */
+    private val _healthPermissionRequests = MutableStateFlow(0)
+    val healthPermissionRequest: StateFlow<Int> = _healthPermissionRequests.asStateFlow()
+
+    /** H4-9: sessão cuja escrita falhou; o "Tentar de novo" reenvia (regra 8). */
+    private var pendingHealthWriteSessionId: Long? = null
+
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
 
@@ -743,6 +771,9 @@ class AppViewModel(
                 runCatching { TodayWidget.updateAll(context) }
             }
         }
+        // H4-9: estado inicial da seção de Health Connect (nunca crasha —
+        // indisponível vira UNAVAILABLE e a seção nem aparece).
+        refreshHealthConnect()
     }
 
     private fun handleWearCommand(command: WearCommand) {
@@ -1647,6 +1678,18 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 repository.finishSession(sessionId)
+                // H4-9: escrita no Health Connect é best-effort e roda em
+                // coroutine própria — falha nunca bloqueia o fim do treino
+                // (regra 8); a sessão continua salva no Room.
+                viewModelScope.launch {
+                    try {
+                        repository.writeCompletedSessionToHealth(sessionId)
+                    } catch (error: Exception) {
+                        pendingHealthWriteSessionId = sessionId
+                        _healthConnectMessage.value = healthConnectErrorMessage(error)
+                        Log.w(TAG, "Falha ao enviar sessão ao Health Connect", error)
+                    }
+                }
                 skipRest()
                 _activeSessionId.value = null
                 _screen.value = Screen.Home
@@ -2872,6 +2915,96 @@ class AppViewModel(
         }
     }
 
+    // ---------------- Health Connect (H4-9) ----------------
+
+    /**
+     * H4-9: recolhe disponibilidade e permissões atuais do Health Connect.
+     * Nunca crasha: qualquer falha do SDK vira `UNAVAILABLE` (regra 1).
+     */
+    fun refreshHealthConnect() {
+        viewModelScope.launch {
+            val availability = runCatching { healthConnectAvailability(context, healthGateway) }
+                .getOrDefault(HealthConnectAvailability.UNAVAILABLE)
+            val granted = healthGateway?.grantedPermissions() ?: emptySet()
+            _healthConnectState.value = _healthConnectState.value.copy(
+                availability = availability,
+                permissions = healthPermissionState(granted),
+            )
+        }
+    }
+
+    /**
+     * H4-9: pede as permissões de saúde. A permissão em si é executada pela
+     * MainActivity com o contract do Health Connect (contexto de Activity).
+     */
+    fun requestHealthPermissions() {
+        _healthPermissionRequests.value = _healthPermissionRequests.value + 1
+    }
+
+    /**
+     * H4-9: "Sincronizar agora" — reenvia a sessão cuja escrita falhou (regra
+     * 8) e lê peso/passos dos últimos 30 dias. Sem permissão nenhuma, nada é
+     * tentado e a UI mostra "Conecte para sincronizar" (regra 2).
+     */
+    fun syncHealthData() {
+        val state = _healthConnectState.value
+        if (state.availability != HealthConnectAvailability.AVAILABLE) return
+        if (!state.permissions.hasAnyPermission) {
+            _healthConnectMessage.value = context.getString(R.string.settings_health_not_connected)
+            return
+        }
+        if (state.isSyncing) return
+        _healthConnectState.value = state.copy(isSyncing = true)
+        viewModelScope.launch {
+            var lastWeight: HealthWeightSample? = null
+            var stepsTotal: Long? = null
+            var failure: String? = null
+            try {
+                val pending = pendingHealthWriteSessionId
+                if (pending != null) {
+                    try {
+                        repository.writeCompletedSessionToHealth(pending)
+                        pendingHealthWriteSessionId = null
+                    } catch (error: Exception) {
+                        failure = healthConnectErrorMessage(error)
+                    }
+                }
+                val now = System.currentTimeMillis()
+                val from = now - HEALTH_SYNC_WINDOW_MILLIS
+                if (_healthConnectState.value.permissions.canReadWeight) {
+                    try {
+                        lastWeight = repository.syncHealthWeight(from, now)
+                            .maxByOrNull { it.timeMillis }
+                    } catch (error: Exception) {
+                        failure = healthConnectErrorMessage(error)
+                    }
+                }
+                if (_healthConnectState.value.permissions.canReadSteps) {
+                    try {
+                        stepsTotal = repository.syncHealthSteps(from, now)
+                    } catch (error: Exception) {
+                        failure = healthConnectErrorMessage(error)
+                    }
+                }
+            } finally {
+                _healthConnectState.value = _healthConnectState.value.copy(
+                    lastWeight = lastWeight,
+                    stepsTotal = stepsTotal,
+                    writeFailed = pendingHealthWriteSessionId != null,
+                    isSyncing = false,
+                )
+            }
+            _healthConnectMessage.value = failure
+                ?: context.getString(R.string.settings_health_sync_done)
+        }
+    }
+
+    /** H4-9: mensagem de falha do Health Connect, distinguindo permissão. */
+    private fun healthConnectErrorMessage(error: Exception): String = when (error) {
+        is SecurityException -> context.getString(R.string.settings_health_error_permission)
+        else -> context.getString(R.string.settings_health_error_write)
+    }
+
     override fun onCleared() {
         super.onCleared()
         discoveryManager?.stop()
@@ -2886,6 +3019,9 @@ class AppViewModel(
         /** "+15 s" padrão da faixa de descanso (H3-26). */
         const val REST_EXTEND_SECONDS = 15
 
+        /** H4-9: janela padrão de sincronização com o Health Connect (30 dias). */
+        const val HEALTH_SYNC_WINDOW_MILLIS = 30L * 24L * 60L * 60L * 1000L
+
         fun factory(
             context: Context,
             repository: WorkoutRepository,
@@ -2896,6 +3032,7 @@ class AppViewModel(
             wearSyncRepository: WearSyncRepository? = null,
             restFeedback: RestFeedbackPlayer? = null,
             restNotifier: RestNotifier? = null,
+            healthGateway: HealthConnectGateway? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2909,6 +3046,7 @@ class AppViewModel(
                     wearSyncRepository,
                     restFeedback,
                     restNotifier,
+                    healthGateway,
                 ) as T
             }
         }
@@ -2947,6 +3085,22 @@ sealed interface BackupImportState {
     object Importing : BackupImportState
     data class Error(val message: String) : BackupImportState
 }
+
+/**
+ * H4-9: estado da seção "Health Connect" em Ajustes. `stepsTotal == null`
+ * significa "sem dados de passos" no período; `writeFailed` liga o "Tentar de
+ * novo" da regra 8.
+ */
+data class HealthConnectUiState(
+    val availability: HealthConnectAvailability = HealthConnectAvailability.UNAVAILABLE,
+    val permissions: HealthConnectPermissionState = HealthConnectPermissionState(),
+    /** Leitura de peso mais recente dos últimos 30 dias; `null` = nenhuma. */
+    val lastWeight: HealthWeightSample? = null,
+    /** Total de passos do período; `null` = sem dados de passos. */
+    val stepsTotal: Long? = null,
+    val isSyncing: Boolean = false,
+    val writeFailed: Boolean = false,
+)
 
 /** Converte o plano ativo em DTO de revisão para enviar ao backend. */
 private fun WorkoutPlanWithDetails.toReviewPlanDto(): WorkoutPlanDto =

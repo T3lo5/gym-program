@@ -37,6 +37,10 @@ import com.treinos.app.data.csv.CsvImportPlan
 import com.treinos.app.data.csv.CsvImportResult
 import com.treinos.app.data.csv.WorkoutCsvExporter
 import com.treinos.app.data.csv.csvExerciseSlug
+import com.treinos.app.data.health.HEALTH_CONNECT_MEASUREMENT_SOURCE
+import com.treinos.app.data.health.HealthConnectGateway
+import com.treinos.app.data.health.HealthWeightSample
+import com.treinos.app.data.health.toHealthSessionDraft
 import com.treinos.app.data.remote.SyncDayDto
 import com.treinos.app.data.remote.SyncPlanDto
 import com.treinos.app.data.remote.SyncPlanExerciseDto
@@ -89,6 +93,12 @@ open class WorkoutRepository(
      * `null` (testes sem filesystem) mantém o caminho como está.
      */
     private val filesDir: File? = null,
+    /**
+     * H4-9: gateway do Health Connect, opcional — `null` quando o Health
+     * Connect não está disponível no aparelho; todo o resto do app funciona
+     * exatamente como antes.
+     */
+    private val healthGateway: HealthConnectGateway? = null,
 ) : SnapshotDownloader {
 
     fun observeActivePlans(): Flow<List<WorkoutPlanWithDetails>> = combine(
@@ -676,6 +686,64 @@ open class WorkoutRepository(
     suspend fun deleteSession(sessionId: Long) = withContext(Dispatchers.IO) {
         dao.deleteSession(sessionId)
     }
+
+    // ---------------- Health Connect (H4-9) ----------------
+
+    /**
+     * Envia uma sessão concluída ao Health Connect. Best-effort: sem gateway,
+     * sessão inexistente, sessão que não pode ser escrita (em andamento, sem
+     * `endedAt`, duração zero — regras 4 e 5) ou sem permissão (regra 2) o
+     * método simplesmente não escreve; falhas de infraestrutura propagam para
+     * o ViewModel, que nunca bloqueia o fim do treino por causa delas (regra
+     * 8). Reescrever a mesma sessão atualiza o registro em vez de duplicar
+     * (`clientRecordId` estável, regra 7).
+     */
+    suspend fun writeCompletedSessionToHealth(sessionId: Long) = withContext(Dispatchers.IO) {
+        val gateway = healthGateway ?: return@withContext
+        val session = dao.getSession(sessionId) ?: return@withContext
+        val draft = toHealthSessionDraft(session) ?: return@withContext
+        gateway.writeSession(draft)
+    }
+
+    /**
+     * Lê o peso do Health Connect no período `[fromMillis, toMillis]` e grava
+     * em `body_measurements` com `source = "health_connect"` (H4-8). Uma
+     * leitura cujo `measuredAt` já existe neste source é ignorada — sincronizar
+     * duas vezes não duplica (regra 9). Devolve as amostras válidas do período
+     * (ordenadas), para a UI mostrar a mais recente.
+     */
+    suspend fun syncHealthWeight(fromMillis: Long, toMillis: Long): List<HealthWeightSample> =
+        withContext(Dispatchers.IO) {
+            val gateway = healthGateway ?: return@withContext emptyList()
+            val samples = gateway.readWeight(fromMillis, toMillis)
+            val existing = dao.getAllMeasurements()
+                .filter { it.source == HEALTH_CONNECT_MEASUREMENT_SOURCE }
+                .mapTo(mutableSetOf()) { it.measuredAt }
+            for (sample in samples) {
+                if (sample.timeMillis in existing) continue
+                dao.insertMeasurement(
+                    BodyMeasurementEntity(
+                        measuredAt = sample.timeMillis,
+                        weightKg = sample.weightKg,
+                        source = HEALTH_CONNECT_MEASUREMENT_SOURCE,
+                    )
+                )
+                existing.add(sample.timeMillis)
+            }
+            samples
+        }
+
+    /**
+     * Lê o total de passos do Health Connect no período. Não cria entidade no
+     * Room — o valor só é exibido (spec H4-9). `null` = sem dados no período.
+     */
+    suspend fun syncHealthSteps(fromMillis: Long, toMillis: Long): Long? =
+        withContext(Dispatchers.IO) {
+            val gateway = healthGateway ?: return@withContext null
+            gateway.readSteps(fromMillis, toMillis)
+                .sumOf { it.count }
+                .takeIf { it > 0 }
+        }
 
     /**
      * Fecha a sessão de mobilidade planejada que já estava aberta (H3-27):

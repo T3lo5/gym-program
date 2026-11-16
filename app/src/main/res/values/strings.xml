@@ -804,4 +804,30 @@
     <string name="workout_note_clear">Limpar</string>
     <string name="msg_note_error">Não foi possível salvar a nota.</string>
     <string name="history_note_label">Nota: %1$s</string>
+    <!-- H4-9: seção Health Connect em Ajustes. -->
+    <string name="settings_health_title">Health Connect</string>
+    <string name="settings_health_desc">Envie cada treino concluído ao Health Connect e traga o peso e os passos do aparelho para dentro do app. Tudo acontece no aparelho: sem conta, sem nuvem e sem envio ao backend.</string>
+    <string name="settings_health_connected">Conectado</string>
+    <string name="settings_health_not_connected">Conecte para sincronizar</string>
+    <string name="settings_health_btn_connect">Conectar</string>
+    <string name="settings_health_btn_manage">Gerenciar no Health Connect</string>
+    <string name="settings_health_btn_sync">Sincronizar agora</string>
+    <string name="settings_health_syncing">Sincronizando…</string>
+    <string name="settings_health_update_required">Atualize o Health Connect</string>
+    <string name="settings_health_btn_update">Abrir a loja</string>
+    <string name="settings_health_perm_exercise">Treinos (escrita)</string>
+    <string name="settings_health_perm_weight">Peso (leitura)</string>
+    <string name="settings_health_perm_steps">Passos (leitura)</string>
+    <string name="settings_health_perm_item">%1$s: %2$s</string>
+    <string name="settings_health_granted">concedida</string>
+    <string name="settings_health_not_granted">não concedida</string>
+    <string name="settings_health_last_weight">Último peso lido: %1$s (%2$s)</string>
+    <string name="settings_health_no_weight">Nenhum peso lido ainda</string>
+    <string name="settings_health_steps_total">Passos nos últimos 30 dias: %1$s</string>
+    <string name="settings_health_no_steps">Sem dados de passos</string>
+    <string name="settings_health_sync_done">Health Connect sincronizado.</string>
+    <string name="settings_health_error_write">Não foi possível enviar ao Health Connect</string>
+    <string name="settings_health_error_write_hint">O treino continua salvo no app. Toque em Tentar de novo para enviá-lo ao Health Connect.</string>
+    <string name="settings_health_error_permission">Permissão do Health Connect negada. Conecte de novo para sincronizar.</string>
+    <string name="settings_health_privacy">Privacidade: os dados de saúde ficam somente neste aparelho, no app e no Health Connect do Android. Nada é enviado ao backend, à IA ou a terceiros.</string>
 </resources>

@@ -42,7 +42,10 @@ RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
 
 # Aceita licenças e instala plataforma/build-tools
 RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
-RUN $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" >/dev/null 2>&1
+# H4-9: `androidx.health.connect:connect-client:1.1.0` exige compileSdk 36
+# (aar-metadata minCompileSdk=36); o :wear segue em 34. O AGP 8.9.1 usa
+# build-tools 35.0.0 por padrão, então as duas revisões ficam instaladas.
+RUN $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;34.0.0" "build-tools;35.0.0" "platforms;android-34" "platforms;android-36" >/dev/null 2>&1
 
 WORKDIR /app
 

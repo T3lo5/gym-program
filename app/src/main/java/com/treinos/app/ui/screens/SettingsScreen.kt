@@ -54,7 +54,9 @@ import com.treinos.app.R
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.discovery.DiscoveredBackend
+import com.treinos.app.data.health.HealthConnectAvailability
 import com.treinos.app.ui.BackupImportState
+import com.treinos.app.ui.HealthConnectUiState
 import com.treinos.app.ui.UiError
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ConfirmationDialog
@@ -62,7 +64,10 @@ import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.StatusText
 import com.treinos.app.ui.components.statusIsSuccess
+import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatIsoDateTime
+import com.treinos.app.ui.formatKg
+import com.treinos.app.ui.formatSteps
 import com.treinos.app.updater.UpdateState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,6 +133,13 @@ fun SettingsScreen(
     onClearUpdateMessage: () -> Unit = {},
     // H4-8: card "Peso e medidas" abrindo a tela dedicada.
     onOpenMeasurements: () -> Unit = {},
+    // H4-9: integração com o Health Connect (escrever treino, ler peso/passos).
+    healthConnectState: HealthConnectUiState = HealthConnectUiState(),
+    healthConnectMessage: String? = null,
+    onRequestHealthPermissions: () -> Unit = {},
+    onSyncHealth: () -> Unit = {},
+    onOpenHealthConnectSettings: () -> Unit = {},
+    onOpenHealthConnectStore: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
@@ -141,6 +153,8 @@ fun SettingsScreen(
     // H3-51: seção de atualização inicia colapsada; expande sozinha quando a
     // checagem automática encontra uma versão nova.
     var updateExpanded by remember { mutableStateOf(false) }
+    // H4-9: seção Health Connect inicia colapsada.
+    var healthExpanded by remember { mutableStateOf(false) }
 
     // H3-51: checagem sob demanda — uma vez por processo ao abrir Ajustes;
     // nunca polling. O botão manual repete a checagem quando o usuário quiser.
@@ -859,6 +873,142 @@ fun SettingsScreen(
                 }
             }
 
+            // H4-9: seção Health Connect — escondida por inteiro quando o
+            // Health Connect está indisponível no aparelho (regra 1: nunca
+            // crasha, o app funciona normalmente sem ela).
+            if (healthConnectState.availability != HealthConnectAvailability.UNAVAILABLE) {
+                CollapsibleSection(
+                    title = stringResource(R.string.settings_health_title),
+                    expanded = healthExpanded,
+                    onToggle = { healthExpanded = it },
+                ) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_health_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_health_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (healthConnectState.availability ==
+                                HealthConnectAvailability.PROVIDER_UPDATE_REQUIRED
+                            ) {
+                                // Regra 1: o app do Health Connect existe, mas
+                                // precisa ser atualizado antes de conectar.
+                                Text(
+                                    text = stringResource(R.string.settings_health_update_required),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                Button(
+                                    onClick = onOpenHealthConnectStore,
+                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                ) {
+                                    Text(stringResource(R.string.settings_health_btn_update))
+                                }
+                            } else {
+                                val permissions = healthConnectState.permissions
+                                Text(
+                                    text = stringResource(
+                                        if (permissions.hasAnyPermission) {
+                                            R.string.settings_health_connected
+                                        } else {
+                                            R.string.settings_health_not_connected
+                                        }
+                                    ),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (permissions.hasAnyPermission) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                                // Regra 3: mostra o que está concedido e habilita
+                                // só o que dá para fazer.
+                                HealthPermissionRow(
+                                    label = stringResource(R.string.settings_health_perm_exercise),
+                                    granted = permissions.canWriteExercise,
+                                )
+                                HealthPermissionRow(
+                                    label = stringResource(R.string.settings_health_perm_weight),
+                                    granted = permissions.canReadWeight,
+                                )
+                                HealthPermissionRow(
+                                    label = stringResource(R.string.settings_health_perm_steps),
+                                    granted = permissions.canReadSteps,
+                                )
+                                if (!permissions.canWriteExercise ||
+                                    !permissions.canReadWeight ||
+                                    !permissions.canReadSteps
+                                ) {
+                                    Button(
+                                        onClick = onRequestHealthPermissions,
+                                        modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                    ) {
+                                        Text(stringResource(R.string.settings_health_btn_connect))
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = onOpenHealthConnectSettings,
+                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                ) {
+                                    Text(stringResource(R.string.settings_health_btn_manage))
+                                }
+                                BusyButton(
+                                    busy = healthConnectState.isSyncing,
+                                    idleText = stringResource(R.string.settings_health_btn_sync),
+                                    busyText = stringResource(R.string.settings_health_syncing),
+                                    onClick = onSyncHealth,
+                                    enabled = permissions.hasAnyPermission,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Text(
+                                    text = healthConnectState.lastWeight?.let { sample ->
+                                        stringResource(
+                                            R.string.settings_health_last_weight,
+                                            formatKg(sample.weightKg),
+                                            formatDateTime(sample.timeMillis),
+                                        )
+                                    } ?: stringResource(R.string.settings_health_no_weight),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    text = healthConnectState.stepsTotal?.let { total ->
+                                        stringResource(R.string.settings_health_steps_total, formatSteps(total))
+                                    } ?: stringResource(R.string.settings_health_no_steps),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                if (healthConnectState.writeFailed) {
+                                    // Regra 8: falha de escrita não bloqueou o
+                                    // treino; aqui fica o "Tentar de novo".
+                                    ErrorState(
+                                        title = stringResource(R.string.settings_health_error_write),
+                                        message = healthConnectMessage
+                                            ?: stringResource(R.string.settings_health_error_write_hint),
+                                        onRetry = onSyncHealth,
+                                    )
+                                } else {
+                                    healthConnectMessage?.let {
+                                        StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
+                                    }
+                                }
+                                Text(
+                                    text = stringResource(R.string.settings_health_privacy),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // H3-37: seletor de idioma do app (per-app locale).
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -1009,4 +1159,24 @@ private fun LanguageSelector(
             }
         }
     }
+}
+
+/**
+ * H4-9: linha "permissão: concedida/não concedida" da seção Health Connect —
+ * a regra 3 pede que a UI mostre exatamente o que foi concedido.
+ */
+@Composable
+private fun HealthPermissionRow(label: String, granted: Boolean) {
+    Text(
+        text = stringResource(
+            R.string.settings_health_perm_item,
+            label,
+            stringResource(
+                if (granted) R.string.settings_health_granted
+                else R.string.settings_health_not_granted
+            ),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }

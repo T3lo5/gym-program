@@ -7,7 +7,10 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             if (requested.id.id == "com.android.application" || requested.id.id == "com.android.library") {
-                useModule("com.android.tools.build:gradle:8.5.0")
+                // H4-9: 8.9.1 é o mínimo exigido por
+                // `androidx.health.connect:connect-client:1.1.0`
+                // (aar-metadata: minAndroidGradlePluginVersion=8.9.1).
+                useModule("com.android.tools.build:gradle:8.9.1")
             }
             if (requested.id.id == "org.jetbrains.kotlin.android") {
                 useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")

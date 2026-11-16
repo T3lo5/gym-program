@@ -17,6 +17,13 @@
          ao usuário no momento do primeiro update. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- H4-9: Health Connect — escrever treino concluído e ler peso/passos.
+         As permissões são pedidas em runtime pelo contract do SDK
+         (PermissionController.createRequestPermissionResultContract). -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+
     <!-- H3-57: opt-in do gesto preditivo (Android 13+). Com a flag ativa, o
          sistema mostra a prévia animada do back e a pilha de navegação decide
          quando voltar (PredictiveBackHandler em TreinosApp). -->
@@ -100,6 +107,43 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
+
+        <!-- H4-9: rationale das permissões de saúde no Health Connect do
+             Android 14+ (plataforma). Aponta para a MainActivity, que mostra
+             o aviso de privacidade na seção de Health Connect em Ajustes. -->
+        <activity-alias
+            android:name="AndroidxHealthConnectShowPermissionsRationaleActivity"
+            android:exported="true"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="androidx.health.connect.action.SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- H4-9: rationale das permissões de saúde no app Health Connect
+             separado (Android 13−). -->
+        <activity-alias
+            android:name="AndroidxHealthShowPermissionsRationaleActivity"
+            android:exported="true"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- H4-9: tela de uso das permissões de saúde (link "política de
+             privacidade" do Health Connect, Android 14+). A permissão
+             START_VIEW_PERMISSION_USAGE é do sistema, não do usuário. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".ui.MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         </application>
 </manifest>

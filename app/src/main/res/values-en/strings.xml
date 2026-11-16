@@ -799,4 +799,30 @@
     <string name="workout_note_clear">Clear</string>
     <string name="msg_note_error">Could not save the note.</string>
     <string name="history_note_label">Note: %1$s</string>
+    <!-- H4-9: Health Connect section in Settings. -->
+    <string name="settings_health_title">Health Connect</string>
+    <string name="settings_health_desc">Send every completed workout to Health Connect and bring the device\'s weight and steps into the app. Everything happens on the device: no account, no cloud and nothing sent to the backend.</string>
+    <string name="settings_health_connected">Connected</string>
+    <string name="settings_health_not_connected">Connect to sync</string>
+    <string name="settings_health_btn_connect">Connect</string>
+    <string name="settings_health_btn_manage">Manage in Health Connect</string>
+    <string name="settings_health_btn_sync">Sync now</string>
+    <string name="settings_health_syncing">Syncing…</string>
+    <string name="settings_health_update_required">Update Health Connect</string>
+    <string name="settings_health_btn_update">Open the store</string>
+    <string name="settings_health_perm_exercise">Workouts (write)</string>
+    <string name="settings_health_perm_weight">Weight (read)</string>
+    <string name="settings_health_perm_steps">Steps (read)</string>
+    <string name="settings_health_perm_item">%1$s: %2$s</string>
+    <string name="settings_health_granted">granted</string>
+    <string name="settings_health_not_granted">not granted</string>
+    <string name="settings_health_last_weight">Last weight read: %1$s (%2$s)</string>
+    <string name="settings_health_no_weight">No weight read yet</string>
+    <string name="settings_health_steps_total">Steps in the last 30 days: %1$s</string>
+    <string name="settings_health_no_steps">No steps data</string>
+    <string name="settings_health_sync_done">Health Connect synced.</string>
+    <string name="settings_health_error_write">Could not send to Health Connect</string>
+    <string name="settings_health_error_write_hint">The workout is still saved in the app. Tap Try again to send it to Health Connect.</string>
+    <string name="settings_health_error_permission">Health Connect permission denied. Connect again to sync.</string>
+    <string name="settings_health_privacy">Privacy: health data stays on this device only, in the app and in Android\'s Health Connect. Nothing is sent to the backend, to AI or to third parties.</string>
 </resources>

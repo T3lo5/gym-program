@@ -1,5 +1,7 @@
 plugins {
-    id("com.android.application") version "8.5.0"
+    // H4-9: mesmo AGP do :app — 8.9.1 é o mínimo exigido por
+    // `androidx.health.connect:connect-client:1.1.0`, dependência nova do :app.
+    id("com.android.application") version "8.9.1"
     id("org.jetbrains.kotlin.android") version "1.9.24"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
 }

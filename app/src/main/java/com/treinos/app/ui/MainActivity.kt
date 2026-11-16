@@ -15,6 +15,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.treinos.app.TreinosApplication
+import com.treinos.app.data.health.HEALTH_PERMISSIONS
+import com.treinos.app.data.health.HealthConnectAvailability
+import androidx.health.connect.client.PermissionController
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -31,6 +34,21 @@ class MainActivity : AppCompatActivity() {
     /** H3-58: último contador de pedido já tratado; `null` = primeira coleta. */
     private var lastSeenPermissionRequest: Int? = null
 
+    /**
+     * H4-9: contract de permissões do Health Connect. O resultado é ignorado —
+     * `refreshHealthConnect()` recolhe o estado real (o usuário pode conceder
+     * só parte das permissões, regra 3).
+     */
+    private val healthPermissionLauncher =
+        registerForActivityResult(
+            PermissionController.createRequestPermissionResultContract(),
+        ) {
+            viewModel.refreshHealthConnect()
+        }
+
+    /** H4-9: último contador de pedido de saúde já tratado; `null` = primeira coleta. */
+    private var lastSeenHealthPermissionRequest: Int? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as TreinosApplication).container
@@ -45,6 +63,7 @@ class MainActivity : AppCompatActivity() {
                 wearSyncRepository = container.wearSyncRepository,
                 restFeedback = container.restFeedback,
                 restNotifier = container.restNotifier,
+                healthGateway = container.healthGateway,
             )
         )[AppViewModel::class.java]
 
@@ -84,6 +103,22 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // H4-9: o VM sinaliza quando o usuário toca "Conectar"; a Activity
+        // executa o contract de permissões do Health Connect.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.healthPermissionRequest.collect { count ->
+                    val last = lastSeenHealthPermissionRequest
+                    if (last == null) {
+                        lastSeenHealthPermissionRequest = count
+                    } else if (count > last) {
+                        lastSeenHealthPermissionRequest = count
+                        launchHealthPermissionRequestIfNeeded()
+                    }
+                }
+            }
+        }
     }
 
     /** H3-58: ação "Pular descanso" com a Activity já viva (CLEAR_TOP | SINGLE_TOP). */
@@ -118,6 +153,17 @@ class MainActivity : AppCompatActivity() {
             return
         }
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /**
+     * H4-9: só pede as permissões de saúde com o Health Connect disponível —
+     * fora disso o contract não tem para onde abrir (regra 1).
+     */
+    private fun launchHealthPermissionRequestIfNeeded() {
+        if (viewModel.healthConnectState.value.availability != HealthConnectAvailability.AVAILABLE) {
+            return
+        }
+        healthPermissionLauncher.launch(HEALTH_PERMISSIONS)
     }
 
     companion object {

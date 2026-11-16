@@ -6,6 +6,8 @@ import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.local.AppDatabase
 import com.treinos.app.data.media.ExerciseMediaRepository
 import com.treinos.app.data.discovery.BackendDiscoveryManager
+import com.treinos.app.data.health.HealthConnectGateway
+import com.treinos.app.data.health.createHealthConnectGatewayIfAvailable
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendClient
 import com.treinos.app.data.wear.WearCommandListenerService
@@ -29,6 +31,13 @@ class AppContainer(context: Context) {
         baseUrlProvider = { preferences.backendUrl }
     )
 
+    /**
+     * H4-9: gateway do Health Connect, construído só quando o SDK está de fato
+     * disponível (`SDK_AVAILABLE`); fora disso fica `null` e o app funciona
+     * como antes, sem a seção de Health Connect.
+     */
+    val healthGateway: HealthConnectGateway? = createHealthConnectGatewayIfAvailable(context)
+
     val repository: WorkoutRepository = WorkoutRepository(
         dao = database.workoutDao(),
         backendClient = backendClient,
@@ -36,6 +45,7 @@ class AppContainer(context: Context) {
         // H4-8: base para converter o caminho da foto de progresso entre o
         // banco (absoluto) e o backup JSON (relativo a filesDir).
         filesDir = context.filesDir,
+        healthGateway = healthGateway,
     )
 
     val discoveryManager: BackendDiscoveryManager = BackendDiscoveryManager(context)
