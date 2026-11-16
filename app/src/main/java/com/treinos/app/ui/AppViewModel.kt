@@ -797,6 +797,12 @@ class AppViewModel(
                     handleWearCommand(command)
                 }
             }
+            // H4-16: lotes de séries registradas offline no relógio.
+            viewModelScope.launch {
+                wearSyncRepository!!.observeSyncBatches().collect { batch ->
+                    applyWearSyncBatch(batch)
+                }
+            }
             viewModelScope.launch {
                 combine(inProgressSession, _exerciseIndex) { session, index ->
                     session to index
@@ -867,6 +873,60 @@ class AppViewModel(
         }
     }
 
+    /**
+     * H4-16: aplica o lote de séries registradas offline no relógio — aditivo
+     * e idempotente (dedupe por `clientSetId` no repositório). Lote de sessão
+     * diferente da ativa é ignorado e o celular reenvia o estado atual; lote
+     * de sessão já finalizada é rejeitado do mesmo jeito (o estado reenviado
+     * tem status != in_progress e o relógio limpa as pendentes daquela
+     * sessão). Falha de gravação vira mensagem, nunca crash.
+     */
+    private fun applyWearSyncBatch(batch: com.treinos.protocol.WearSyncBatch) {
+        if (batch.protocolVersion != 1) return
+        val activeSession = inProgressSession.value
+        if (activeSession == null || batch.sessionId != activeSession.session.id) {
+            val session = activeSession ?: return
+            publishWearState(session, _exerciseIndex.value)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                for (set in batch.sets) {
+                    val exercicio = activeSession.exercises.firstOrNull {
+                        it.exercise.id == set.sessionExerciseId
+                    } ?: activeSession.exercises.getOrNull(set.exerciseIndex)
+                    ?: continue
+                    repository.logSet(
+                        exerciseLogId = exercicio.exercise.id,
+                        reps = set.reps,
+                        weightKg = set.weightKg,
+                        rpe = set.rpe,
+                        // H4-4: série do relógio é sempre normal, sem RIR.
+                        setType = com.treinos.app.data.local.SET_TYPE_NORMAL,
+                        rir = null,
+                    )
+                }
+                if (batch.finished) {
+                    if (_activeSessionId.value == batch.sessionId) {
+                        // Sessão aberta na UI: caminho completo (mensagem,
+                        // Health Connect best-effort, limpeza do estado do
+                        // relógio).
+                        finishWorkout()
+                    } else {
+                        // App recém-aberto (nenhuma sessão ativa na UI): o
+                        // fim do treino offline ainda precisa ser gravado.
+                        repository.finishSession(batch.sessionId)
+                    }
+                }
+            } catch (e: Exception) {
+                // Falha de gravação do lote: nunca crash — o relógio já
+                // considerou o lote entregue (MessageClient) e o dedupe por
+                // clientSetId impede duplicação em reenvio.
+                android.util.Log.w("AppViewModel", "Falha ao aplicar lote do relógio", e)
+            }
+        }
+    }
+
     private fun publishWearState(session: com.treinos.app.data.local.SessionWithExercises, exerciseIndex: Int) {
         val rest = _restRemaining.value
         _wearState.value = WearSessionMapper.toWearState(session, exerciseIndex, rest)
@@ -877,6 +937,9 @@ class AppViewModel(
         val session = inProgressSession.value
         if (session != null) {
             publishWearState(session, _exerciseIndex.value)
+            // H4-16: snapshot da sessão do dia — o relógio guarda no Room
+            // próprio e treina sem o celular (modo standalone).
+            wearSyncRepository!!.publishSnapshot(com.treinos.app.data.wear.WearSessionMapper.toSnapshot(session))
         } else {
             _wearState.value = null
         }

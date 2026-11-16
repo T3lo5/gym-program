@@ -4,8 +4,8 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class WearProtocolTest {
@@ -126,5 +126,87 @@ class WearProtocolTest {
         assertEquals(9, novamente.reps)
         assertEquals(22.5, novamente.weightKg!!, 0.0)
         assertNull(novamente.rpe)
+    }
+
+    // ---------- H4-16: snapshot e lote de sincronização ----------
+
+    @Test
+    fun round_trip_do_snapshot() {
+        val snapshot = WearSessionSnapshot(
+            sessionId = 42,
+            dayName = "Treino A",
+            modality = "strength",
+            startedAt = 1_700_000_000_000,
+            exercises = listOf(
+                WearSessionExercise(
+                    exerciseIndex = 0,
+                    sessionExerciseId = 100,
+                    exerciseName = "Supino reto",
+                    plannedSets = 3,
+                    targetReps = "8-10",
+                    restSeconds = 90,
+                ),
+                WearSessionExercise(
+                    exerciseIndex = 1,
+                    sessionExerciseId = 200,
+                    exerciseName = "Remada alta",
+                    plannedSets = 3,
+                ),
+            ),
+        )
+        val serializado = json.encodeToString(WearSessionSnapshot.serializer(), snapshot)
+        val novamente = json.decodeFromString(WearSessionSnapshot.serializer(), serializado)
+        assertEquals(snapshot, novamente)
+        assertEquals(1, novamente.protocolVersion)
+        assertEquals(2, novamente.exercises.size)
+    }
+
+    @Test
+    fun round_trip_do_lote() {
+        val lote = WearSyncBatch(
+            sessionId = 42,
+            batchId = "batch-1",
+            finished = false,
+            sets = listOf(
+                WearLoggedSet(
+                    clientSetId = "set-1",
+                    sessionExerciseId = 100,
+                    exerciseIndex = 0,
+                    setNumber = 1,
+                    reps = 10,
+                    weightKg = 60.0,
+                    loggedAt = 1_700_000_000_000,
+                ),
+            ),
+        )
+        val serializado = json.encodeToString(WearSyncBatch.serializer(), lote)
+        val novamente = json.decodeFromString(WearSyncBatch.serializer(), serializado)
+        assertEquals(lote, novamente)
+        assertEquals(1, novamente.protocolVersion)
+        assertFalse(novamente.finished)
+    }
+
+    @Test
+    fun snapshot_sem_campo_novo_decodifica() {
+        // Payload mínimo decodifica: os campos com default (modality e
+        // exercises) podem faltar — o contrato é tolerante a payload antigo.
+        val payload =
+            "{\"protocolVersion\":1,\"sessionId\":7,\"dayName\":\"A\",\"startedAt\":1}"
+        val snapshot = json.decodeFromString(WearSessionSnapshot.serializer(), payload)
+        assertEquals(7, snapshot.sessionId)
+        assertEquals("A", snapshot.dayName)
+        assertEquals("strength", snapshot.modality)
+        assertTrue(snapshot.exercises.isEmpty())
+    }
+
+    @Test
+    fun lote_versao_incompativel_e_detectado() {
+        val lote = WearSyncBatch(
+            protocolVersion = 2,
+            sessionId = 42,
+            batchId = "batch-2",
+        )
+        assertEquals(2, lote.protocolVersion)
+        assertNotEquals(1, lote.protocolVersion)
     }
 }

@@ -24,9 +24,11 @@
         </activity>
 
         <!-- Wear OS companion -->
+        <!-- H4-16: standalone — o app do relógio treina sem o celular usando o
+             snapshot do Room próprio e sincroniza depois. -->
         <meta-data
             android:name="com.google.android.wearable.standalone"
-            android:value="false" />
+            android:value="true" />
 
         <service
             android:name=".data.WearSyncService"

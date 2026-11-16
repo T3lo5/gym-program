@@ -174,4 +174,38 @@ class WearSessionMapperTest {
         assertEquals(0, estado.plannedSets)
         assertEquals("in_progress", estado.status)
     }
+
+    // ---------- H4-16: snapshot da sessão do dia ----------
+
+    @Test
+    fun snapshot_inclui_todos_os_exercicios() {
+        val sessao = session(
+            sessionExercise(id = 100, name = "Supino reto", plannedSets = 3, targetReps = "8-10"),
+            sessionExercise(id = 200, name = "Remada alta", plannedSets = 3),
+        )
+        val snapshot = WearSessionMapper.toSnapshot(sessao)
+
+        assertEquals(10, snapshot.sessionId)
+        assertEquals("Treino A", snapshot.dayName)
+        assertEquals(2, snapshot.exercises.size)
+        assertEquals(1, snapshot.protocolVersion)
+        val primeiro = snapshot.exercises.first()
+        assertEquals(100, primeiro.sessionExerciseId)
+        assertEquals("Supino reto", primeiro.exerciseName)
+        assertEquals(3, primeiro.plannedSets)
+        assertEquals("8-10", primeiro.targetReps)
+        assertEquals(90, primeiro.restSeconds)
+    }
+
+    @Test
+    fun snapshot_de_corrida_sem_exercicios() {
+        val sessao = session(modality = "run")
+        val snapshot = WearSessionMapper.toSnapshot(sessao)
+
+        assertEquals(10, snapshot.sessionId)
+        assertEquals("run", snapshot.modality)
+        // Corrida/mobilidade: snapshot com 0 exercícios — a sessão finaliza
+        // offline no relógio sem séries.
+        assertEquals(0, snapshot.exercises.size)
+    }
 }

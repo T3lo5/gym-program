@@ -4,6 +4,8 @@ plugins {
     id("com.android.application") version "8.9.1"
     id("org.jetbrains.kotlin.android") version "1.9.24"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
+    // H4-16: Room no relógio (modo standalone) — kapt para o compiler.
+    id("org.jetbrains.kotlin.kapt") version "1.9.24"
 }
 
 // Mesma keystore versionada do :app (H3-48): a assinatura do relógio passa a ser
@@ -115,6 +117,13 @@ dependencies {
     // Serialização (estado do Data Layer)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // H4-16: Room no relógio — snapshot da sessão do dia e séries offline
+    // (modo standalone). Versão fixa igual à do :app; schema versionado em
+    // wear/schemas (mesmo padrão de app/schemas).
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
     // Compose BOM (2024.04.01 = Compose 1.6.8, compatible with Kotlin 1.9.24)
     implementation(platform("androidx.compose:compose-bom:2024.04.01"))
     implementation("androidx.compose.ui:ui")
@@ -125,4 +134,12 @@ dependencies {
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.wear.compose:compose-material:1.3.1")
+}
+
+// H4-16: schema exportado do Room do relógio, versionado (mesmo padrão de
+// app/schemas) — fonte única versionada do schema do banco do pulso.
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }

@@ -62,4 +62,27 @@ object WearSessionMapper {
             updatedAt = System.currentTimeMillis(),
         )
     }
+
+    /**
+     * H4-16: snapshot da SESSÃO do dia com a lista completa de exercícios — o
+     * relógio guarda no Room próprio e treina sem o celular. Corrida/mobilidade
+     * geram snapshot com 0 exercícios (a sessão finaliza offline sem séries).
+     */
+    fun toSnapshot(session: SessionWithExercises): com.treinos.protocol.WearSessionSnapshot =
+        com.treinos.protocol.WearSessionSnapshot(
+            sessionId = session.session.id,
+            dayName = session.session.dayName,
+            modality = session.session.modality,
+            startedAt = session.session.startedAt,
+            exercises = session.exercises.map { ses ->
+                com.treinos.protocol.WearSessionExercise(
+                    exerciseIndex = ses.exercise.exerciseOrder,
+                    sessionExerciseId = ses.exercise.id,
+                    exerciseName = ses.exercise.exerciseName.ifEmpty { ses.exercise.exerciseId },
+                    plannedSets = ses.exercise.plannedSets,
+                    targetReps = ses.exercise.targetReps,
+                    restSeconds = ses.exercise.restSeconds,
+                )
+            },
+        )
 }

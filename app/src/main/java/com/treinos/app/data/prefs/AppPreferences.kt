@@ -219,6 +219,24 @@ class AppPreferences private constructor(
         prefs.edit().putStringSet(KEY_WEAR_RECENT_COMMANDS, ids).apply()
     }
 
+    /** H4-16: `clientSetId` já aplicado de um lote do relógio (dedupe persistido). */
+    fun isSyncedSet(clientSetId: String): Boolean {
+        val ids = prefs.getStringSet(KEY_WEAR_SYNCED_SET_IDS, emptySet()) ?: emptySet()
+        return clientSetId in ids
+    }
+
+    fun addSyncedSets(clientSetIds: List<String>) {
+        if (clientSetIds.isEmpty()) return
+        val ids = (prefs.getStringSet(KEY_WEAR_SYNCED_SET_IDS, emptySet()) ?: emptySet()).toMutableSet()
+        ids.addAll(clientSetIds)
+        // Cap: acima do teto, remove os mais antigos (conjunto sem ordem —
+        // remove arbitrário; o dedupe só precisa cobrir a janela de reenvio).
+        while (ids.size > MAX_SYNCED_SET_IDS) {
+            ids.remove(ids.first())
+        }
+        prefs.edit().putStringSet(KEY_WEAR_SYNCED_SET_IDS, ids).apply()
+    }
+
     companion object {
         /** Nome do arquivo de prefs (vira treinos_prefs.xml no disco; rules de backup o citam). */
         const val PREFS_NAME = "treinos_prefs"
@@ -259,6 +277,10 @@ class AppPreferences private constructor(
         private const val KEY_HEIGHT_CM = "height_cm"
         private const val KEY_SEX = "sex"
         private const val KEY_WEAR_RECENT_COMMANDS = "wear_recent_commands"
+
+        /** H4-16: dedupe das séries do lote de sync do relógio. */
+        private const val KEY_WEAR_SYNCED_SET_IDS = "wear_synced_set_ids"
+        private const val MAX_SYNCED_SET_IDS = 500
         private const val KEY_GENERATE_CONFIG_V1 = "generate_config_v1"
         private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"
         private const val KEY_PENDING_GENERATION_V1 = "pending_generation_v1"

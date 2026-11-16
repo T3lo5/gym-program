@@ -37,4 +37,9 @@
     <string name="editor_decrease_weight_desc">Decrease weight</string>
     <string name="editor_increase_reps_desc">Increase reps</string>
     <string name="editor_decrease_reps_desc">Decrease reps</string>
+
+    <!-- H4-16: standalone mode on the watch -->
+    <string name="standalone_no_workout">No workout on the watch</string>
+    <string name="standalone_start_today">Start today\'s workout</string>
+    <string name="standalone_waiting_sync">Syncs when the phone reconnects</string>
 </resources>

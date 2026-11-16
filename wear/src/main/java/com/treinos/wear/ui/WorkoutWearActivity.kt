@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +63,98 @@ class WorkoutWearActivity : ComponentActivity() {
             }
             val connected by connectionWatcher.connected.collectAsState()
 
+            // H4-16: modo standalone — sem o celular, a sessão vem do snapshot
+            // no Room (WearStandaloneStore) e o reducer local registra as
+            // séries; o lote sincroniza no onPeerConnected (WearSyncService).
+            var standalone by remember { mutableStateOf<WearStandaloneState?>(null) }
+            var standaloneStarted by rememberSaveable { mutableStateOf(false) }
+            var agora by remember { mutableStateOf(System.currentTimeMillis()) }
+            LaunchedEffect(connected) {
+                if (connected) {
+                    standalone = null
+                    standaloneStarted = false
+                } else {
+                    standalone = runCatching {
+                        val store = (application as WearApplication).standaloneStore
+                        val snapshot = store.loadSnapshot()
+                        if (snapshot == null) {
+                            WearStandaloneState(pendingCount = store.pendingCount())
+                        } else {
+                            val sets = store.setsOfSession(snapshot.sessionId)
+                            val primeiro = snapshot.exercises.firstOrNull()
+                            WearStandaloneSession.reduce(
+                                WearStandaloneState(),
+                                WearStandaloneAction.Start(
+                                    snapshot = snapshot,
+                                    loggedSets = sets.count {
+                                        it.sessionExerciseId == primeiro?.sessionExerciseId
+                                    },
+                                    pendingCount = store.pendingCount(),
+                                ),
+                            )
+                        }
+                    }.getOrNull()
+                }
+            }
+            // Tick de 1 s: o descanso conta no pulso por wall-clock
+            // (restante = max(0, restEndsAt - now), padrão H3-26).
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(1_000L)
+                    agora = System.currentTimeMillis()
+                }
+            }
+
+            fun registrarSerieStandalone(reps: Int?, weightKg: Double?) {
+                val atual = standalone ?: return
+                val exercicio = atual.exercise ?: return
+                scope.launch {
+                    val store = (application as WearApplication).standaloneStore
+                    val now = System.currentTimeMillis()
+                    runCatching {
+                        store.logSetLocal(
+                            sessionId = atual.sessionId,
+                            sessionExerciseId = exercicio.sessionExerciseId,
+                            exerciseIndex = atual.exerciseIndex,
+                            setNumber = atual.setNumber,
+                            reps = reps,
+                            weightKg = weightKg,
+                            rpe = null,
+                            loggedAt = now,
+                        )
+                        store.saveRestEndsAt(atual.sessionId, now + exercicio.restSeconds * 1000L)
+                    }
+                    standalone = WearStandaloneSession.reduce(
+                        atual,
+                        WearStandaloneAction.LogSet(reps, weightKg, now),
+                    )
+                }
+            }
+
+            fun pularDescansoStandalone() {
+                val atual = standalone ?: return
+                scope.launch {
+                    runCatching {
+                        (application as WearApplication).standaloneStore
+                            .saveRestEndsAt(atual.sessionId, null)
+                    }
+                    standalone = WearStandaloneSession.reduce(atual, WearStandaloneAction.SkipRest(System.currentTimeMillis()))
+                }
+            }
+
+            fun finalizarStandalone() {
+                val atual = standalone ?: return
+                scope.launch {
+                    runCatching {
+                        (application as WearApplication).standaloneStore
+                            .finishSession(atual.sessionId)
+                    }
+                    standalone = WearStandaloneSession.reduce(atual, WearStandaloneAction.Finish(System.currentTimeMillis()))
+                    // H4-14 (regra 13): o tile precisa re-renderizar.
+                    runCatching { WorkoutTileService.requestUpdate(this@WorkoutWearActivity) }
+                }
+            }
+
             WorkoutWearScreen(
                 state = stateStore.state.collectAsState().value,
                 connected = connected,
@@ -82,6 +175,13 @@ class WorkoutWearActivity : ComponentActivity() {
                 onRequestState = {
                     scope.launch { sendRequestState() }
                 },
+                standalone = standalone,
+                standaloneStarted = standaloneStarted,
+                standaloneRestante = WearStandaloneSession.restante(standalone?.restEndsAt, agora),
+                onStandaloneStart = { standaloneStarted = true },
+                onStandaloneLogSet = ::registrarSerieStandalone,
+                onStandaloneSkipRest = ::pularDescansoStandalone,
+                onStandaloneFinish = ::finalizarStandalone,
             )
         }
     }
@@ -150,6 +250,14 @@ fun WorkoutWearScreen(
     onSkipRest: (Long) -> Unit,
     onFinish: (Long) -> Unit,
     onRequestState: () -> Unit,
+    /** H4-16: estado do modo standalone (`null` quando conectado). */
+    standalone: WearStandaloneState? = null,
+    standaloneStarted: Boolean = false,
+    standaloneRestante: Int = 0,
+    onStandaloneStart: () -> Unit = {},
+    onStandaloneLogSet: (Int?, Double?) -> Unit = { _, _ -> },
+    onStandaloneSkipRest: () -> Unit = {},
+    onStandaloneFinish: () -> Unit = {},
 ) {
     var timerState by remember { mutableStateOf(WearTimerState(0, false, false)) }
     val debounce = remember { WearDebounce() }
@@ -176,7 +284,20 @@ fun WorkoutWearScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        if (state == null || state.status == "finished") {
+        // H4-16: modo standalone — sem o celular, a sessão vem do snapshot do
+        // Room e o reducer local registra as séries; nada aqui envia comando.
+        if (!connected) {
+            StandaloneScreen(
+                standalone = standalone,
+                started = standaloneStarted,
+                restante = standaloneRestante,
+                onStart = onStandaloneStart,
+                onLogSet = onStandaloneLogSet,
+                onSkipRest = onStandaloneSkipRest,
+                onFinish = onStandaloneFinish,
+                onRequestState = onRequestState,
+            )
+        } else if (state == null || state.status == "finished") {
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -424,6 +545,203 @@ private fun StepButton(
             .semantics { contentDescription = descricao },
     ) {
         Text(text = label, fontSize = 18.sp)
+    }
+}
+
+/**
+ * H4-16: tela do modo standalone — treina a sessão inteira sem o celular. A
+ * série registrada vai para o Room do relógio (`pending = true`) e o lote
+ * sincroniza quando os dois se reconectarem (dedupe por `clientSetId` no
+ * celular). O editor de carga/reps da H4-15 é reusado: no standalone o default
+ * é a carga 0,0 e o primeiro inteiro do alvo (não há "última série" publicada
+ * pelo celular) — decisão registrada na spec.
+ */
+@Composable
+private fun StandaloneScreen(
+    standalone: WearStandaloneState?,
+    started: Boolean,
+    restante: Int,
+    onStart: () -> Unit,
+    onLogSet: (Int?, Double?) -> Unit,
+    onSkipRest: () -> Unit,
+    onFinish: () -> Unit,
+    onRequestState: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+    ) {
+        when {
+            standalone == null || !standalone.hasSnapshot -> {
+                // Sem snapshot no Room e sem conexão: não quebra — pede estado.
+                val semTreino = stringResource(R.string.standalone_no_workout)
+                Text(
+                    text = semTreino,
+                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { contentDescription = semTreino },
+                )
+                val refreshLabel = stringResource(R.string.refresh)
+                Button(
+                    onClick = onRequestState,
+                    modifier = Modifier.semantics { contentDescription = refreshLabel },
+                ) {
+                    Text(text = refreshLabel)
+                }
+            }
+            standalone.status == "finished" -> {
+                val finishedLabel = stringResource(R.string.workout_finished)
+                Text(
+                    text = finishedLabel,
+                    fontSize = 20.sp,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = stringResource(R.string.standalone_waiting_sync),
+                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            !started -> {
+                Text(
+                    text = standalone.dayName.ifEmpty { stringResource(R.string.tile_workout_fallback) },
+                    fontSize = 20.sp,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                )
+                val iniciarLabel = stringResource(R.string.standalone_start_today)
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier.semantics { contentDescription = iniciarLabel },
+                ) {
+                    Text(text = iniciarLabel)
+                }
+            }
+            WearSessionKind.from(standalone.modality) == WearSessionKind.Strength -> {
+                var editor by remember(standalone.exerciseIndex) {
+                    mutableStateOf(WearSetEditorState(0.0, WearSetEditor.DEFAULT_REPS))
+                }
+                LaunchedEffect(standalone.exerciseIndex) {
+                    editor = WearSetEditor.reduce(
+                        editor,
+                        WearSetEditorAction.Reset(null, null, standalone.exercise?.targetReps ?: ""),
+                    )
+                }
+                Text(
+                    text = standalone.dayName,
+                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                )
+                Text(
+                    text = standalone.exercise?.exerciseName ?: "",
+                    fontSize = 20.sp,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                )
+                Text(
+                    text = stringResource(R.string.set_progress_format, standalone.setNumber, standalone.plannedSets),
+                    fontSize = 16.sp,
+                )
+                val alvo = standalone.exercise?.targetReps ?: ""
+                if (alvo.isNotBlank()) {
+                    Text(
+                        text = stringResource(R.string.target_reps_format, alvo),
+                        fontSize = 16.sp,
+                    )
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(text = stringResource(R.string.editor_weight_label), fontSize = 14.sp)
+                    StepButton(
+                        label = stringResource(R.string.editor_decrease),
+                        descricao = stringResource(R.string.editor_decrease_weight_desc),
+                        onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.DecrementWeight) },
+                    )
+                    Text(text = formatarCarga(editor.weightKg), fontSize = 14.sp)
+                    StepButton(
+                        label = stringResource(R.string.editor_increase),
+                        descricao = stringResource(R.string.editor_increase_weight_desc),
+                        onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.IncrementWeight) },
+                    )
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(text = stringResource(R.string.editor_reps_label), fontSize = 14.sp)
+                    StepButton(
+                        label = stringResource(R.string.editor_decrease),
+                        descricao = stringResource(R.string.editor_decrease_reps_desc),
+                        onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.DecrementReps) },
+                    )
+                    Text(text = "${editor.reps}", fontSize = 14.sp)
+                    StepButton(
+                        label = stringResource(R.string.editor_increase),
+                        descricao = stringResource(R.string.editor_increase_reps_desc),
+                        onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.IncrementReps) },
+                    )
+                }
+                if (restante > 0) {
+                    val restLabel = stringResource(R.string.rest_remaining_format, restante)
+                    Text(
+                        text = restLabel,
+                        fontSize = 18.sp,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.semantics { contentDescription = restLabel },
+                    )
+                }
+                val completeSetLabel = stringResource(R.string.complete_set)
+                Button(
+                    onClick = {
+                        // H4-15: carga 0,0 = sem carga (peso corporal) → null.
+                        onLogSet(editor.reps, editor.weightKg.takeIf { it != 0.0 })
+                    },
+                    modifier = Modifier.semantics { contentDescription = completeSetLabel },
+                ) {
+                    Text(text = completeSetLabel)
+                }
+                val skipRestLabel = stringResource(R.string.skip_rest)
+                Button(
+                    onClick = onSkipRest,
+                    modifier = Modifier.semantics { contentDescription = skipRestLabel },
+                ) {
+                    Text(text = skipRestLabel)
+                }
+                val finishLabel = stringResource(R.string.finish_workout)
+                Button(
+                    onClick = onFinish,
+                    modifier = Modifier.semantics { contentDescription = finishLabel },
+                ) {
+                    Text(text = finishLabel)
+                }
+            }
+            else -> {
+                // Corrida/mobilidade: finaliza offline, sem séries.
+                Text(
+                    text = standalone.dayName,
+                    fontSize = 20.sp,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                )
+                Text(
+                    text = stringResource(R.string.in_progress),
+                    fontSize = 18.sp,
+                )
+                val finishLabel = stringResource(R.string.finish_workout)
+                Button(
+                    onClick = onFinish,
+                    modifier = Modifier.semantics { contentDescription = finishLabel },
+                ) {
+                    Text(text = finishLabel)
+                }
+            }
+        }
     }
 }
 

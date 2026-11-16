@@ -37,4 +37,9 @@
     <string name="editor_decrease_weight_desc">Diminuir carga</string>
     <string name="editor_increase_reps_desc">Aumentar repetições</string>
     <string name="editor_decrease_reps_desc">Diminuir repetições</string>
+
+    <!-- H4-16: modo standalone do relógio -->
+    <string name="standalone_no_workout">Sem treino no relógio</string>
+    <string name="standalone_start_today">Iniciar treino de hoje</string>
+    <string name="standalone_waiting_sync">Sincroniza quando o celular reconectar</string>
 </resources>
