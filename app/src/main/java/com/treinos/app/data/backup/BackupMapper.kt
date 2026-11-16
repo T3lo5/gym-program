@@ -1,6 +1,7 @@
 package com.treinos.app.data.backup
 
 import com.treinos.app.data.local.SET_TYPE_WARMUP
+import com.treinos.app.data.local.BodyMeasurementEntity
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutDayEntity
@@ -125,6 +126,43 @@ object BackupMapper {
             restTakenSeconds = setLog.restTakenSeconds,
             completedAt = setLog.completedAt,
             exerciseLogId = exerciseLogId,
+        )
+
+    /**
+     * H4-8: `photoPath` passa como está — no banco é absoluto e a conversão
+     * para o caminho relativo do JSON é do `WorkoutRepository` (é quem conhece
+     * o `filesDir` do aparelho).
+     */
+    fun toDto(measurement: BodyMeasurementEntity): BackupMeasurement =
+        BackupMeasurement(
+            id = measurement.id,
+            measuredAt = measurement.measuredAt,
+            weightKg = measurement.weightKg,
+            bodyFatPercent = measurement.bodyFatPercent,
+            waistCm = measurement.waistCm,
+            chestCm = measurement.chestCm,
+            armCm = measurement.armCm,
+            thighCm = measurement.thighCm,
+            hipCm = measurement.hipCm,
+            photoPath = measurement.photoPath,
+            notes = measurement.notes,
+            source = measurement.source,
+        )
+
+    fun toEntity(dto: BackupMeasurement): BodyMeasurementEntity =
+        BodyMeasurementEntity(
+            id = dto.id,
+            measuredAt = dto.measuredAt,
+            weightKg = dto.weightKg,
+            bodyFatPercent = dto.bodyFatPercent,
+            waistCm = dto.waistCm,
+            chestCm = dto.chestCm,
+            armCm = dto.armCm,
+            thighCm = dto.thighCm,
+            hipCm = dto.hipCm,
+            photoPath = dto.photoPath,
+            notes = dto.notes,
+            source = dto.source,
         )
 
     fun toEntity(dto: BackupPlan): WorkoutPlanEntity =

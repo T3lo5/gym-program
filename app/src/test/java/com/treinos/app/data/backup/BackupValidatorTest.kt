@@ -379,11 +379,17 @@ class BackupValidatorTest {
         assertTrue(BackupValidator.validate(validFile(schemaVersion = 3)).valid)
     }
 
+    // H4-8: o backup v4 (com medidas corporais) passou a ser suportado.
     @Test
-    fun rejeita_v4() {
-        val result = BackupValidator.validate(validFile(schemaVersion = 4))
+    fun aceita_v4() {
+        assertTrue(BackupValidator.validate(validFile(schemaVersion = 4)).valid)
+    }
+
+    @Test
+    fun rejeita_v5() {
+        val result = BackupValidator.validate(validFile(schemaVersion = 5))
         assertFalse(result.valid)
-        assertTrue(result.message?.contains("4") == true)
+        assertTrue(result.message?.contains("5") == true)
     }
 
     @Test

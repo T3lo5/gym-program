@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.backup.BackupApp
 import com.treinos.app.data.backup.BackupFile
@@ -94,10 +95,13 @@ class SettingsScreenTest {
     fun secoes_colapsaveis() {
         screen()
 
-        // As 3 seções existem.
-        composeRule.onNodeWithText("Treino").assertIsDisplayed()
-        composeRule.onNodeWithText("Sincronização").assertIsDisplayed()
-        composeRule.onNodeWithText("Backup").assertIsDisplayed()
+        // As 3 seções existem. O card "Peso e medidas" (H4-8) entrou na seção
+        // Treino e a tela cresceu: em viewport de teste as seções de baixo
+        // ficam fora da dobra, então a intenção ("as seções existem") é
+        // verificada rolando até cada uma — mesmo padrão dos outros testes.
+        composeRule.onNodeWithText("Treino").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Sincronização").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Backup").performScrollTo().assertIsDisplayed()
     }
 
     @Test

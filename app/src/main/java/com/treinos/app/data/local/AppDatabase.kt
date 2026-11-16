@@ -16,8 +16,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SessionExerciseEntity::class,
         SetLogEntity::class,
         ExerciseUsageEvent::class,
+        BodyMeasurementEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -123,6 +124,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H4-8: medidas corporais ao longo do tempo (peso, gordura,
+        // circunferências, foto de progresso). Tabela e índice aditivos —
+        // nenhuma tabela existente é tocada e nenhum dado é perdido.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS body_measurements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        measuredAt INTEGER NOT NULL,
+                        weightKg REAL, bodyFatPercent REAL,
+                        waistCm REAL, chestCm REAL, armCm REAL, thighCm REAL, hipCm REAL,
+                        photoPath TEXT, notes TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'manual'
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_body_measurements_measuredAt` " +
+                        "ON `body_measurements` (`measuredAt`)"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -138,6 +162,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6,
                         MIGRATION_6_7,
                         MIGRATION_7_8,
+                        MIGRATION_8_9,
                     )
                     .build()
                     .also { instance = it }

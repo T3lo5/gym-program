@@ -14,6 +14,7 @@
     <string name="common_optional">Opcional</string>
     <string name="common_replace_all">Substituir tudo</string>
     <string name="common_got_it">Entendi</string>
+    <string name="common_ok">OK</string>
 
     <!-- Telas -->
     <string name="screen_home">Treinos</string>
@@ -22,6 +23,7 @@
     <string name="screen_workout">Treino</string>
     <string name="screen_run">Corrida</string>
     <string name="screen_mobility">Mobilidade e alongamento</string>
+    <string name="screen_measurements">Peso e medidas</string>
 
     <!-- Ações globais -->
     <string name="action_history">Histórico</string>
@@ -58,6 +60,9 @@
     <string name="home_quick_new_workout">Novo treino</string>
     <string name="home_quick_activity">Atividade</string>
     <string name="home_quick_stretching">Alongamento</string>
+    <!-- H4-8: atalho "Peso e medidas" na Home. -->
+    <string name="home_measurements_last_weight">Último peso: %1$s</string>
+    <string name="home_measurements_subtitle">Acompanhe peso e medidas ao longo do tempo</string>
     <string name="home_footnote_activity">Atividade avulsa (natação, aula, corrida) entra no histórico sem plano.</string>
     <string name="home_footnote_mobility">Rotinas curtas de mobilidade/alongamento para bem-estar e recuperação.</string>
     <string name="home_footnote_privacy">Os treinos e as séries ficam salvos apenas neste aparelho. O backend só recebe dados quando você toca em Sincronizar, em Ajustes.</string>
@@ -738,4 +743,52 @@
     <string name="widget_open_app_label">Abrir Treinos</string>
     <string name="widget_workout_fallback">Treino</string>
     <string name="msg_no_workout_today">Sem treino para hoje.</string>
+    <!-- H4-8: peso corporal e medidas ao longo do tempo -->
+    <string name="settings_measurements_title">Peso e medidas</string>
+    <string name="settings_measurements_desc">Registre peso, gordura e circunferências com fotos de progresso. Tudo fica no aparelho.</string>
+    <string name="settings_measurements_open">Abrir</string>
+    <string name="measurements_form_title">Nova medida</string>
+    <string name="measurements_field_date">Data</string>
+    <string name="measurements_field_weight">Peso (kg)</string>
+    <string name="measurements_field_body_fat">Gordura corporal (%)</string>
+    <string name="measurements_field_waist">Cintura (cm)</string>
+    <string name="measurements_field_chest">Peito (cm)</string>
+    <string name="measurements_field_arm">Braço (cm)</string>
+    <string name="measurements_field_thigh">Coxa (cm)</string>
+    <string name="measurements_field_hip">Quadril (cm)</string>
+    <string name="measurements_field_notes">Observações</string>
+    <string name="measurements_error_invalid_number">Valor inválido.</string>
+    <string name="measurements_error_weight">Peso fora da faixa permitida (30–300 kg).</string>
+    <string name="measurements_error_body_fat">Gordura corporal fora da faixa permitida (0–100%).</string>
+    <string name="measurements_error_circumference">Medida fora da faixa permitida (0–300 cm).</string>
+    <string name="measurements_error_no_value">Informe ao menos um valor.</string>
+    <string name="measurements_error_future_date">Data no futuro.</string>
+    <string name="measurements_empty_title">Nenhuma medida ainda</string>
+    <string name="measurements_empty_body">Registre seu peso e suas medidas para acompanhar a evolução ao longo do tempo.</string>
+    <string name="measurements_empty_cta">Registrar primeira medida</string>
+    <string name="measurements_chart_title">Tendência do peso</string>
+    <string name="measurements_chart_desc">Primeiro %1$s, último %2$s, %3$d medidas.</string>
+    <string name="measurements_delta">Variação no período: %1$s</string>
+    <string name="measurements_copy_profile">Copiar último peso para o perfil</string>
+    <string name="measurements_photo_camera">Tirar foto</string>
+    <string name="measurements_photo_gallery">Escolher da galeria</string>
+    <string name="measurements_photo_remove">Remover foto</string>
+    <string name="measurements_photo_thumbnail">Foto de progresso</string>
+    <string name="measurements_photo_missing">Foto não encontrada neste aparelho</string>
+    <string name="measurements_photo_privacy">As fotos de progresso ficam só neste aparelho: não vão para a nuvem, para o backup nem para o servidor.</string>
+    <string name="measurements_delete_title">Excluir medida?</string>
+    <string name="measurements_delete_body">A medida e a foto associada serão apagadas deste aparelho.</string>
+    <string name="measurements_short_body_fat">Gordura</string>
+    <string name="measurements_short_waist">Cintura</string>
+    <string name="measurements_short_chest">Peito</string>
+    <string name="measurements_short_arm">Braço</string>
+    <string name="measurements_short_thigh">Coxa</string>
+    <string name="measurements_short_hip">Quadril</string>
+    <string name="msg_measurement_saved">Medida registrada.</string>
+    <string name="msg_measurement_deleted">Medida excluída.</string>
+    <string name="msg_measurement_save_error">Não foi possível salvar a medida.</string>
+    <string name="msg_measurement_delete_error">Não foi possível excluir a medida.</string>
+    <string name="msg_measurement_photo_error">Não foi possível salvar a foto.</string>
+    <string name="msg_measurement_copy_done">Perfil atualizado com o último peso (%1$s).</string>
+    <string name="msg_measurement_copy_empty">Nenhuma medida com peso para copiar.</string>
 </resources>

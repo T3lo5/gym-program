@@ -121,4 +121,34 @@ class BackupRulesTest {
             text.contains("""android:dataExtractionRules="@xml/data_extraction_rules""""),
         )
     }
+
+    /**
+     * H4-8 (regra 9): as fotos de progresso ficam só no aparelho — a pasta
+     * `progress-photos/` é excluída do backup de nuvem (Google One) no Android
+     * 11− (backup_rules.xml) e no Android 12+ (cloud-backup).
+     */
+    @Test
+    fun fotos_de_progresso_ficam_fora_da_nuvem() {
+        listOf(
+            null to "backup_rules.xml",
+            "cloud-backup" to "data_extraction_rules.xml",
+        ).forEach { (section, fileName) ->
+            assertTrue(
+                "$fileName ($section) precisa excluir progress-photos/ do backup de nuvem",
+                "file" to "progress-photos/" in rules(section, fileName),
+            )
+        }
+    }
+
+    /**
+     * H4-8 (regra 9): a migração iniciada pelo usuário também não leva as
+     * fotos — privacidade vale mesmo entre aparelhos do mesmo dono.
+     */
+    @Test
+    fun fotos_de_progresso_ficam_fora_do_device_transfer() {
+        assertTrue(
+            "device-transfer precisa excluir progress-photos/",
+            "file" to "progress-photos/" in rules("device-transfer", "data_extraction_rules.xml"),
+        )
+    }
 }

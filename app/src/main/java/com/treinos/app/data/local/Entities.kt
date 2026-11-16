@@ -215,6 +215,38 @@ data class SetLogEntity(
     val completedAt: Long? = System.currentTimeMillis(),
 )
 
+/** Fonte de uma medida corporal: registrada no app (H4-8) ou importada do Health Connect (H4-9). */
+const val MEASUREMENT_SOURCE_MANUAL = "manual"
+const val MEASUREMENT_SOURCE_HEALTH_CONNECT = "health_connect"
+
+/**
+ * H4-8: medida corporal pontual (peso, gordura, circunferências) com foto de
+ * progresso opcional. Tabela aditiva; `measuredAt` é informado pelo usuário
+ * (permite registrar ontem) e é indexado para a tendência cronológica.
+ *
+ * `photoPath` é o caminho **absoluto** do arquivo em `filesDir/progress-photos/`;
+ * o backup JSON grava o caminho **relativo** a `filesDir` (a foto nunca sai do
+ * aparelho — ver `MeasurementPhotoStore` e as rules de backup).
+ */
+@Entity(tableName = "body_measurements", indices = [Index("measuredAt")])
+data class BodyMeasurementEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Epoch millis da medição; informado pelo usuário (permite registrar ontem). */
+    val measuredAt: Long,
+    val weightKg: Double? = null,
+    val bodyFatPercent: Double? = null,
+    val waistCm: Double? = null,
+    val chestCm: Double? = null,
+    val armCm: Double? = null,
+    val thighCm: Double? = null,
+    val hipCm: Double? = null,
+    /** Caminho absoluto do arquivo em filesDir/progress-photos/; null = sem foto. */
+    val photoPath: String? = null,
+    val notes: String = "",
+    /** "manual" (esta spec) | "health_connect" (H4-9). */
+    val source: String = MEASUREMENT_SOURCE_MANUAL,
+)
+
 data class WorkoutPlanWithDetails(
     val plan: WorkoutPlanEntity,
     val days: List<WorkoutDayWithExercises>,

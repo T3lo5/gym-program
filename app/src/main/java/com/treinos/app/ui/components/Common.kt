@@ -337,6 +337,10 @@ private val SUCCESS_PREFIXES = listOf(
     // H4-7: CSV
     "CSV importado",
     "CSV exportado",
+    // H4-8: peso e medidas
+    "Medida registrada",
+    "Medida excluída",
+    "Perfil atualizado",
     // values-en
     "Connected",
     "Sent:",
@@ -345,6 +349,9 @@ private val SUCCESS_PREFIXES = listOf(
     "Catalog updated",
     "CSV imported",
     "CSV exported",
+    "Measurement saved",
+    "Measurement deleted",
+    "Profile updated",
 )
 
 /**

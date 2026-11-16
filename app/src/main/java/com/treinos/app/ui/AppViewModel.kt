@@ -2,6 +2,7 @@ package com.treinos.app.ui
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -11,11 +12,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.glance.appwidget.updateAll
 import com.treinos.app.data.WorkoutRepository
+import com.treinos.app.data.MeasurementPhotoStore
+import com.treinos.app.data.MeasurementValidator
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.swapCandidates
 import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
+import com.treinos.app.data.local.BodyMeasurementEntity
+import com.treinos.app.data.local.MEASUREMENT_SOURCE_MANUAL
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
@@ -75,6 +80,8 @@ import com.treinos.app.ui.progression.progressionHistory
 import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.history.ExerciseHistory
 import com.treinos.app.ui.history.buildExerciseHistory
+import com.treinos.app.ui.measurements.latestMeasurement
+import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.progressText
 import com.treinos.app.ui.programs.buildProgram
 import com.treinos.app.ui.programs.programCatalog
@@ -98,6 +105,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -124,6 +132,7 @@ enum class Screen {
     Settings,
     LogActivity,
     Mobility,
+    Measurements,
 }
 
 /**
@@ -147,6 +156,22 @@ fun fallbackReasonLabelRes(reason: String?): Int? = when (reason) {
     "schema_validation" -> R.string.fallback_schema_validation
     else -> R.string.fallback_unknown
 }
+
+/**
+ * H4-8: rascunho do formulário de medida — textos como digitados (vírgula
+ * decimal aceita). O parse e a validação ficam no [AppViewModel.saveMeasurement].
+ */
+data class MeasurementDraft(
+    val measuredAtMillis: Long,
+    val weightKg: String = "",
+    val bodyFatPercent: String = "",
+    val waistCm: String = "",
+    val chestCm: String = "",
+    val armCm: String = "",
+    val thighCm: String = "",
+    val hipCm: String = "",
+    val notes: String = "",
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(
@@ -939,6 +964,13 @@ class AppViewModel(
     fun openMobility() {
         _backTarget.value = _screen.value
         _screen.value = Screen.Mobility
+    }
+
+    /** H4-8: abrir "Peso e medidas" limpa mensagem antiga — entrar é nova tentativa. */
+    fun openMeasurements() {
+        _measurementMessage.value = null
+        _backTarget.value = _screen.value
+        _screen.value = Screen.Measurements
     }
 
     fun goHome() {
@@ -2477,6 +2509,145 @@ class AppViewModel(
 
     fun setCsvMessage(message: String?) {
         _csvMessage.value = message
+    }
+
+    // ---------------- Peso e medidas (H4-8) ----------------
+
+    val measurements: StateFlow<List<BodyMeasurementEntity>> = repository.observeMeasurements()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _measurementMessage = MutableStateFlow<String?>(null)
+    val measurementMessage: StateFlow<String?> = _measurementMessage.asStateFlow()
+
+    /** Foto já anexada no formulário e ainda não gravada junto com a medida. */
+    private val _pendingMeasurementPhoto = MutableStateFlow<String?>(null)
+    val pendingMeasurementPhoto: StateFlow<String?> = _pendingMeasurementPhoto.asStateFlow()
+
+    fun clearMeasurementMessage() {
+        _measurementMessage.value = null
+    }
+
+    /**
+     * Valida e grava a medida do formulário (regras 1–3). Devolve `true` quando
+     * gravada — a tela limpa o formulário; `false` significa que nada foi
+     * gravado e a mensagem explica o motivo.
+     */
+    suspend fun saveMeasurement(draft: MeasurementDraft): Boolean {
+        val validation = MeasurementValidator.validate(
+            measuredAt = draft.measuredAtMillis,
+            weightKg = MeasurementValidator.parse(draft.weightKg),
+            bodyFatPercent = MeasurementValidator.parse(draft.bodyFatPercent),
+            waistCm = MeasurementValidator.parse(draft.waistCm),
+            chestCm = MeasurementValidator.parse(draft.chestCm),
+            armCm = MeasurementValidator.parse(draft.armCm),
+            thighCm = MeasurementValidator.parse(draft.thighCm),
+            hipCm = MeasurementValidator.parse(draft.hipCm),
+            nowMillis = System.currentTimeMillis(),
+        )
+        if (!validation.valid) {
+            _measurementMessage.value = validation.message
+            return false
+        }
+        return try {
+            repository.addMeasurement(
+                BodyMeasurementEntity(
+                    measuredAt = draft.measuredAtMillis,
+                    weightKg = MeasurementValidator.parse(draft.weightKg),
+                    bodyFatPercent = MeasurementValidator.parse(draft.bodyFatPercent),
+                    waistCm = MeasurementValidator.parse(draft.waistCm),
+                    chestCm = MeasurementValidator.parse(draft.chestCm),
+                    armCm = MeasurementValidator.parse(draft.armCm),
+                    thighCm = MeasurementValidator.parse(draft.thighCm),
+                    hipCm = MeasurementValidator.parse(draft.hipCm),
+                    photoPath = _pendingMeasurementPhoto.value,
+                    notes = draft.notes.trim(),
+                    source = MEASUREMENT_SOURCE_MANUAL,
+                ),
+            )
+            _pendingMeasurementPhoto.value = null
+            _measurementMessage.value = context.getString(R.string.msg_measurement_saved)
+            true
+        } catch (error: Exception) {
+            Log.w(TAG, "Falha ao salvar medida corporal", error)
+            _measurementMessage.value = uiErrorMessage(error, context, R.string.msg_measurement_save_error)
+            false
+        }
+    }
+
+    /**
+     * Exclui a medida e, junto, o arquivo da foto (regra 7) — arquivo ausente
+     * não é erro. Registrar/apagar medida nunca altera o perfil (regra 13).
+     */
+    fun deleteMeasurement(id: Long) {
+        viewModelScope.launch {
+            try {
+                val measurement = measurements.value.firstOrNull { it.id == id } ?: return@launch
+                repository.deleteMeasurement(id)
+                measurement.photoPath?.let { path ->
+                    withContext(Dispatchers.IO) { MeasurementPhotoStore.deletePhoto(context, path) }
+                }
+                _measurementMessage.value = context.getString(R.string.msg_measurement_deleted)
+            } catch (error: Exception) {
+                Log.w(TAG, "Falha ao excluir medida corporal", error)
+                _measurementMessage.value = uiErrorMessage(error, context, R.string.msg_measurement_delete_error)
+            }
+        }
+    }
+
+    /**
+     * Anexa a foto do formulário (regra 8). Da câmera (`file://` gravado pelo
+     * TakePicture direto em `progress-photos/`) adota o arquivo; da galeria
+     * (`content://`) copia os bytes para um arquivo novo na mesma pasta. A foto
+     * nunca sai do aparelho.
+     */
+    fun attachMeasurementPhoto(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val path = withContext(Dispatchers.IO) { adoptOrCopyPhoto(uri) }
+                _pendingMeasurementPhoto.value = path
+            } catch (error: Exception) {
+                Log.w(TAG, "Falha ao anexar foto de progresso", error)
+                _measurementMessage.value = context.getString(R.string.msg_measurement_photo_error)
+            }
+        }
+    }
+
+    /** Descarta a foto anexada que ainda não foi salva (apaga o arquivo). */
+    fun removePendingMeasurementPhoto() {
+        val path = _pendingMeasurementPhoto.value ?: return
+        _pendingMeasurementPhoto.value = null
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { MeasurementPhotoStore.deletePhoto(context, path) }
+        }
+    }
+
+    private fun adoptOrCopyPhoto(uri: Uri): String {
+        if (uri.scheme == "file") {
+            val file = File(uri.path ?: error("URI de foto sem caminho"))
+            if (file.parentFile?.absolutePath == MeasurementPhotoStore.photosDir(context).absolutePath) {
+                return file.absolutePath
+            }
+        }
+        val target = MeasurementPhotoStore.newPhotoFile(context)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        } ?: error("Não foi possível abrir a imagem da foto")
+        return target.absolutePath
+    }
+
+    /**
+     * Regra 13: ação explícita do usuário — grava o último peso registrado no
+     * `bodyWeightKg` do perfil. Registrar medida NÃO altera o perfil sozinho.
+     */
+    fun copyLatestWeightToProfile() {
+        val weight = latestMeasurement(measurements.value)?.weightKg
+        if (weight == null) {
+            _measurementMessage.value = context.getString(R.string.msg_measurement_copy_empty)
+            return
+        }
+        preferences.bodyWeightKg = weight
+        _bodyWeightKg.value = preferences.bodyWeightKg
+        _measurementMessage.value = context.getString(R.string.msg_measurement_copy_done, formatKg(weight))
     }
 
     fun startDiscovery() {

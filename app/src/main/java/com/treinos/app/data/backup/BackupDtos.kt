@@ -11,6 +11,31 @@ data class BackupFile(
     val plans: List<BackupPlan>,
     val sessions: List<BackupSession>,
     val profile: BackupProfile? = null,
+    /**
+     * H4-8: medidas corporais. Opcional (`null` em v1/v2/v3 = "o arquivo não
+     * fala disso" — as medidas locais continuam); `[]` explícito em v4 limpa as
+     * medidas locais. `photoPath` é relativo a `filesDir` e a foto nunca viaja
+     * no backup — só o caminho.
+     */
+    val measurements: List<BackupMeasurement>? = null,
+)
+
+/** Medida corporal pontual (H4-8). Ausente em backups v1–v3. */
+@Serializable
+data class BackupMeasurement(
+    val id: Long,
+    val measuredAt: Long,
+    val weightKg: Double? = null,
+    val bodyFatPercent: Double? = null,
+    val waistCm: Double? = null,
+    val chestCm: Double? = null,
+    val armCm: Double? = null,
+    val thighCm: Double? = null,
+    val hipCm: Double? = null,
+    /** Caminho relativo a `filesDir` (ex.: `progress-photos/2026-11-10-0732.jpg`). */
+    val photoPath: String? = null,
+    val notes: String = "",
+    val source: String = "manual",
 )
 
 /** Perfil local (H1-5). Ausente em backups v1/v2. `sex` entrou no bloco v3 sem novo bump (H3-7). */

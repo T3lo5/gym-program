@@ -33,6 +33,9 @@ class AppContainer(context: Context) {
         dao = database.workoutDao(),
         backendClient = backendClient,
         preferences = preferences,
+        // H4-8: base para converter o caminho da foto de progresso entre o
+        // banco (absoluto) e o backup JSON (relativo a filesDir).
+        filesDir = context.filesDir,
     )
 
     val discoveryManager: BackendDiscoveryManager = BackendDiscoveryManager(context)

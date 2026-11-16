@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -71,6 +72,7 @@ import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatDistanceMeters
 import com.treinos.app.ui.formatDuration
+import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.formatPacePerKm
 import com.treinos.app.ui.formatReviewDate
 import com.treinos.app.ui.formatRunDistanceKm
@@ -133,6 +135,9 @@ fun HomeScreen(
     // H3-53: resumo do treino recém-finalizado, efêmero, dispensável com "Fechar".
     postWorkoutSummary: WorkoutSummary? = null,
     onDismissPostWorkoutSummary: () -> Unit = {},
+    // H4-8: atalho "Peso e medidas" com o último peso registrado, se houver.
+    onOpenMeasurements: () -> Unit = {},
+    latestWeightKg: Double? = null,
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
@@ -227,6 +232,14 @@ fun HomeScreen(
             // histórico, a Home fica como está.
             if (streak.bestDays > 0) {
                 item { StreakCard(streak) }
+            }
+
+            // H4-8: atalho "Peso e medidas" visível com e sem plano.
+            item {
+                MeasurementsShortcutCard(
+                    latestWeightKg = latestWeightKg,
+                    onOpen = onOpenMeasurements,
+                )
             }
 
             if (plan == null) {
@@ -746,6 +759,50 @@ private fun HomeQuickAction(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * H4-8: atalho "Peso e medidas" na Home — abre a tela de medidas; com peso
+ * registrado, o card já mostra o último valor.
+ */
+@Composable
+private fun MeasurementsShortcutCard(
+    latestWeightKg: Double?,
+    onOpen: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.screen_measurements),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = latestWeightKg?.let {
+                        stringResource(R.string.home_measurements_last_weight, formatKg(it))
+                    } ?: stringResource(R.string.home_measurements_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
             )
         }
     }

@@ -7,8 +7,8 @@
 | Item do roadmap | `H4-8` |
 | MoSCoW | `S` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` |
 | Depende de | H4-2 (gráfico `ProgressLineChart`), H1-4 (backup JSON), H3-10 (rules de backup do Android) |
 
 **Origem:** levantamento de mercado de 2026-11-14 (Horizon 4, Tier 2). Hoje o

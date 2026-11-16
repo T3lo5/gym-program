@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- H3-51: escopo mínimo para compartilhar o APK da atualização com o
-     instalador do sistema via FileProvider. -->
+     instalador do sistema via FileProvider.
+
+     H4-8: a câmera grava a foto de progresso direto em
+     filesDir/progress-photos/ pelo FileProvider (TakePicture). -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path
         name="updater"
         path="updater/" />
+    <files-path
+        name="progress_photos"
+        path="progress-photos/" />
 </paths>

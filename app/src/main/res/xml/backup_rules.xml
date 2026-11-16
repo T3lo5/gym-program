@@ -11,10 +11,14 @@
 
   Os nomes devem bater com AppDatabase.DATABASE_NAME ("treinos.db") e
   AppPreferences.PREFS_NAME ("treinos_prefs") — BackupRulesTest confere.
+
+  H4-8: fotos de progresso ficam só no aparelho (regra 9) — excluídas do
+  backup automático em todas as seções.
 -->
 <full-backup-content>
     <exclude domain="database" path="treinos.db" />
     <exclude domain="database" path="treinos.db-wal" />
     <exclude domain="database" path="treinos.db-shm" />
     <exclude domain="sharedpref" path="treinos_prefs.xml" />
+    <exclude domain="file" path="progress-photos/" />
 </full-backup-content>

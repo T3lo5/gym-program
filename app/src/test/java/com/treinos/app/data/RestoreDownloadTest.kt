@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.treinos.app.data.local.AppDatabase
+import com.treinos.app.data.local.BodyMeasurementEntity
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutDao
@@ -325,6 +326,7 @@ class RestoreDownloadTest {
             sessions: List<WorkoutSessionEntity>,
             sessionExercises: List<SessionExerciseEntity>,
             setLogs: List<SetLogEntity>,
+            measurements: List<BodyMeasurementEntity>?,
         ) {
             throw IllegalStateException("falha no meio da substituição")
         }

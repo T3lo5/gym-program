@@ -1,6 +1,7 @@
 package com.treinos.app.data
 
 import com.treinos.app.data.local.ExerciseUsageEvent
+import com.treinos.app.data.local.BodyMeasurementEntity
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SET_TYPE_NORMAL
 import com.treinos.app.data.local.SET_TYPE_WARMUP
@@ -59,6 +60,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 
@@ -80,6 +82,12 @@ open class WorkoutRepository(
     private val dao: WorkoutDao,
     private val backendClient: BackendApi,
     private val preferences: AppPreferences,
+    /**
+     * H4-8: `filesDir` do aparelho, para converter o caminho da foto de
+     * progresso entre o banco (absoluto) e o backup JSON (relativo a `filesDir`).
+     * `null` (testes sem filesystem) mantém o caminho como está.
+     */
+    private val filesDir: File? = null,
 ) : SnapshotDownloader {
 
     fun observeActivePlans(): Flow<List<WorkoutPlanWithDetails>> = combine(
@@ -105,6 +113,20 @@ open class WorkoutRepository(
         observeSessions().map { sessions ->
             sessions.firstOrNull { it.session.id == sessionId }
         }
+
+    // ---------------- Medidas corporais (H4-8) ----------------
+
+    /** Lista por `measuredAt` desc (ordem de exibição); o gráfico reordena asc. */
+    fun observeMeasurements(): Flow<List<BodyMeasurementEntity>> = dao.observeMeasurements()
+
+    /** Grava uma medida já validada ([MeasurementValidator]). */
+    suspend fun addMeasurement(measurement: BodyMeasurementEntity): Long =
+        withContext(Dispatchers.IO) { dao.insertMeasurement(measurement) }
+
+    /** Exclui a medida pelo id; o arquivo da foto é apagado por quem chama. */
+    suspend fun deleteMeasurement(id: Long): Unit = withContext(Dispatchers.IO) {
+        dao.deleteMeasurement(id)
+    }
 
     // ---------------- Geração assíncrona sob demanda (H3-40) ----------------
 
@@ -733,6 +755,9 @@ open class WorkoutRepository(
                 sessions = snapshot.sessions,
                 sessionExercises = snapshot.sessionExercises,
                 setLogs = snapshot.setLogs,
+                // H4-8: o backend não conhece medidas corporais — `null` mantém
+                // as medidas locais intactas na substituição do treino.
+                measurements = null,
             )
             preferences.lastSyncAt = Instant.now().toString()
             SyncDownloadResult.Restored(
@@ -951,6 +976,28 @@ open class WorkoutRepository(
         require(id > 0) { "$subject tem ID de aparelho inválido ($id); exporte um backup antes de restaurar." }
     }
 
+    /**
+     * H4-8: caminho da foto no backup JSON — relativo a `filesDir`
+     * (ex.: `progress-photos/2026-11-10-0732.jpg`). Caminho fora de `filesDir`
+     * ou `filesDir` ausente (testes) passa como está.
+     */
+    private fun photoPathForBackup(photoPath: String?): String? {
+        if (photoPath.isNullOrBlank() || filesDir == null) return photoPath
+        val prefix = filesDir.absolutePath.trimEnd('/') + "/"
+        return if (photoPath.startsWith(prefix)) photoPath.removePrefix(prefix) else photoPath
+    }
+
+    /**
+     * H4-8: remonta o caminho relativo do backup contra o `filesDir` deste
+     * aparelho (regra 12). O arquivo pode não existir aqui — a medida continua
+     * válida e a UI avisa; o import nunca falha por causa da foto.
+     */
+    private fun photoPathFromBackup(photoPath: String?): String? {
+        if (photoPath.isNullOrBlank()) return null
+        val dir = filesDir ?: return photoPath
+        return File(dir, photoPath).absolutePath
+    }
+
     private data class RestoredSnapshot(
         val plans: List<WorkoutPlanEntity>,
         val days: List<WorkoutDayEntity>,
@@ -1006,7 +1053,7 @@ open class WorkoutRepository(
         }
 
         val file = BackupFile(
-            schemaVersion = 3,
+            schemaVersion = 4,
             exportedAt = Instant.now().toString(),
             app = BackupApp(
                 packageName = "com.treinos.app",
@@ -1021,6 +1068,13 @@ open class WorkoutRepository(
                 heightCm = preferences.heightCm,
                 sex = preferences.sex,
             ),
+            // H4-8: medidas corporais — o caminho da foto vai relativo a
+            // `filesDir`; a foto em si nunca entra no backup (regra 8).
+            measurements = dao.getAllMeasurements().map { measurement ->
+                BackupMapper.toDto(measurement).copy(
+                    photoPath = photoPathForBackup(measurement.photoPath),
+                )
+            },
         )
 
         backupExportEncoder.encodeToString(BackupFile.serializer(), file)
@@ -1057,6 +1111,17 @@ open class WorkoutRepository(
                     exercise.sets.map { BackupMapper.toEntity(it, exerciseLogId = exercise.id) }
                 }
             }
+            // H4-8: `measurements` decide o destino das medidas com a semântica
+            // do `profile` — `null` (v1/v2/v3) = o arquivo não fala disso e as
+            // medidas locais continuam (regra 11); lista presente (inclusive
+            // vazia) substitui todas dentro da transação de `replaceAllData`
+            // (regra 10). O caminho da foto é remontado contra o `filesDir`
+            // deste aparelho; arquivo ausente não falha o import (regra 12).
+            val measurements = payload.measurements?.map { dto ->
+                BackupMapper.toEntity(dto).copy(
+                    photoPath = photoPathFromBackup(dto.photoPath),
+                )
+            }
 
             dao.replaceAllData(
                 plans = plans,
@@ -1065,6 +1130,7 @@ open class WorkoutRepository(
                 sessions = sessions,
                 sessionExercises = sessionExercises,
                 setLogs = setLogs,
+                measurements = measurements,
             )
 
             if (payload.deviceId.isNotBlank()) {

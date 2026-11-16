@@ -431,6 +431,72 @@ class MigrationTest {
         migrated.close()
     }
 
+    /**
+     * H4-8: a migration 8→9 cria a tabela `body_measurements` (aditiva) sem
+     * tocar em nada existente. O nome acompanha a migração real desta spec
+     * (MIGRATION_8_9, banco v9) — a tabela da spec cita "7_8" por engano
+     * histórico.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun migracao_8_9_cria_tabela_body_measurements() {
+        // H4-8: banco v8 com uma sessão antiga; nada dela pode se perder.
+        helper.createDatabase(testDb, 8).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 9, true, AppDatabase.MIGRATION_8_9)
+
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        assertEquals(0, migrated.rowCount("body_measurements"))
+
+        // A tabela nova aceita medida com os defaults do contrato: notes '' e
+        // source 'manual'; campos numéricos opcionais nascem NULL.
+        migrated.execSQL(
+            "INSERT INTO body_measurements (measuredAt, weightKg, waistCm) VALUES (1000, 82.4, 84.0)"
+        )
+        migrated.query(
+            "SELECT measuredAt, weightKg, bodyFatPercent, photoPath, notes, source " +
+                "FROM body_measurements"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1000, cursor.getLong(0))
+            assertEquals(82.4, cursor.getDouble(1), 0.0001)
+            assertTrue(cursor.isNull(2))
+            assertTrue(cursor.isNull(3))
+            assertEquals("", cursor.getString(4))
+            assertEquals("manual", cursor.getString(5))
+        }
+        migrated.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migracao_8_9_cria_indice_measured_at() {
+        helper.createDatabase(testDb, 8).close()
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 9, true, AppDatabase.MIGRATION_8_9)
+
+        migrated.query(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' " +
+                "AND name = 'index_body_measurements_measuredAt'"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.getString(0).contains("measuredAt"))
+        }
+
+        // Regra 5: duas medidas no mesmo dia são permitidas — o índice não é UNIQUE.
+        migrated.execSQL("INSERT INTO body_measurements (measuredAt) VALUES (1000)")
+        migrated.execSQL("INSERT INTO body_measurements (measuredAt) VALUES (1000)")
+        assertEquals(2, migrated.rowCount("body_measurements"))
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

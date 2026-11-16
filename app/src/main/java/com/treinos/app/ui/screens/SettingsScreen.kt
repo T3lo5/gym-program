@@ -1,5 +1,6 @@
 package com.treinos.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -125,6 +126,8 @@ fun SettingsScreen(
     onCheckForUpdate: () -> Unit = {},
     onDownloadUpdate: () -> Unit = {},
     onClearUpdateMessage: () -> Unit = {},
+    // H4-8: card "Peso e medidas" abrindo a tela dedicada.
+    onOpenMeasurements: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
@@ -233,6 +236,33 @@ fun SettingsScreen(
                             TextButton(onClick = onClearCatalogMessage, modifier = Modifier.minimumInteractiveComponentSize()) {
                                 Text(stringResource(R.string.settings_btn_clear))
                             }
+                        }
+                    }
+                }
+
+                // H4-8: card "Peso e medidas" abrindo a tela dedicada.
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenMeasurements),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_measurements_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_measurements_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Button(
+                            onClick = onOpenMeasurements,
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Text(stringResource(R.string.settings_measurements_open))
                         }
                     }
                 }

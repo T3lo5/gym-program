@@ -18,7 +18,7 @@ object BackupValidator {
     private const val MAX_WEIGHT_KG = 300.0
     private const val MIN_HEIGHT_CM = 120
     private const val MAX_HEIGHT_CM = 250
-    private val SUPPORTED_VERSIONS = setOf(1, 2, 3)
+    private val SUPPORTED_VERSIONS = setOf(1, 2, 3, 4)
     private val MODALITIES = setOf("strength", "run", "swim", "mobility", "other")
     private val SOURCES = setOf("plan", "manual")
     private val METRIC_TYPES = setOf("reps_weight", "duration", "distance_duration")
@@ -42,7 +42,7 @@ object BackupValidator {
         if (file.schemaVersion !in SUPPORTED_VERSIONS) {
             return BackupValidationResult(
                 valid = false,
-                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada 1, 2 ou 3).",
+                message = "Backup de versão não suportada (encontrada ${file.schemaVersion}; esperada 1, 2, 3 ou 4).",
                 preview = null,
             )
         }
@@ -311,6 +311,57 @@ object BackupValidator {
                         )
                     }
                 }
+            }
+        }
+
+        // H4-8: medidas corporais — faixas, `measuredAt > 0` e IDs únicos.
+        // O campo é opcional (v1/v2/v3 não o têm); quando presente, cada
+        // medida precisa fazer sentido. `NaN`/`Infinity` são sempre inválidos.
+        val measurementIds = mutableSetOf<Long>()
+        for (measurement in file.measurements.orEmpty()) {
+            if (!measurementIds.add(measurement.id)) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "IDs de medida duplicados no backup.",
+                    preview = null,
+                )
+            }
+            if (measurement.measuredAt <= 0) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "measuredAt inválido na medida ${measurement.id}.",
+                    preview = null,
+                )
+            }
+            val weight = measurement.weightKg
+            if (weight != null && (!weight.isFinite() || weight < MIN_WEIGHT_KG || weight > MAX_WEIGHT_KG)) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Peso da medida ${measurement.id} fora da faixa permitida (30–300 kg).",
+                    preview = null,
+                )
+            }
+            val bodyFat = measurement.bodyFatPercent
+            if (bodyFat != null && (!bodyFat.isFinite() || bodyFat < 0.0 || bodyFat > 100.0)) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Gordura corporal da medida ${measurement.id} fora da faixa permitida (0–100%).",
+                    preview = null,
+                )
+            }
+            val circumferences = listOf(
+                measurement.waistCm,
+                measurement.chestCm,
+                measurement.armCm,
+                measurement.thighCm,
+                measurement.hipCm,
+            )
+            if (circumferences.any { it != null && (!it.isFinite() || it < 0.0 || it > 300.0) }) {
+                return BackupValidationResult(
+                    valid = false,
+                    message = "Circunferência da medida ${measurement.id} fora da faixa permitida (0–300 cm).",
+                    preview = null,
+                )
             }
         }
 

@@ -14,6 +14,7 @@
     <string name="common_optional">Optional</string>
     <string name="common_replace_all">Replace all</string>
     <string name="common_got_it">Got it</string>
+    <string name="common_ok">OK</string>
 
     <!-- Screens -->
     <string name="screen_home">Workouts</string>
@@ -22,6 +23,7 @@
     <string name="screen_workout">Workout</string>
     <string name="screen_run">Run</string>
     <string name="screen_mobility">Mobility and stretching</string>
+    <string name="screen_measurements">Weight and measurements</string>
 
     <!-- Global actions -->
     <string name="action_history">History</string>
@@ -58,6 +60,9 @@
     <string name="home_quick_new_workout">New workout</string>
     <string name="home_quick_activity">Activity</string>
     <string name="home_quick_stretching">Stretching</string>
+    <!-- H4-8: "Weight and measurements" shortcut on Home. -->
+    <string name="home_measurements_last_weight">Last weight: %1$s</string>
+    <string name="home_measurements_subtitle">Track weight and measurements over time</string>
     <string name="home_footnote_activity">Unplanned activity (swimming, class, running) goes to history without a plan.</string>
     <string name="home_footnote_mobility">Short mobility/stretching routines for well-being and recovery.</string>
     <string name="home_footnote_privacy">Workouts and sets are saved only on this device. The backend only receives data when you tap Sync, in Settings.</string>
@@ -733,4 +738,52 @@
     <string name="widget_open_app_label">Open Treinos</string>
     <string name="widget_workout_fallback">Workout</string>
     <string name="msg_no_workout_today">No workout for today.</string>
+    <!-- H4-8: body weight and measurements over time -->
+    <string name="settings_measurements_title">Weight and measurements</string>
+    <string name="settings_measurements_desc">Log weight, body fat and circumferences with progress photos. Everything stays on this device.</string>
+    <string name="settings_measurements_open">Open</string>
+    <string name="measurements_form_title">New measurement</string>
+    <string name="measurements_field_date">Date</string>
+    <string name="measurements_field_weight">Weight (kg)</string>
+    <string name="measurements_field_body_fat">Body fat (%)</string>
+    <string name="measurements_field_waist">Waist (cm)</string>
+    <string name="measurements_field_chest">Chest (cm)</string>
+    <string name="measurements_field_arm">Arm (cm)</string>
+    <string name="measurements_field_thigh">Thigh (cm)</string>
+    <string name="measurements_field_hip">Hip (cm)</string>
+    <string name="measurements_field_notes">Notes</string>
+    <string name="measurements_error_invalid_number">Invalid value.</string>
+    <string name="measurements_error_weight">Weight out of the allowed range (30–300 kg).</string>
+    <string name="measurements_error_body_fat">Body fat out of the allowed range (0–100%).</string>
+    <string name="measurements_error_circumference">Measurement out of the allowed range (0–300 cm).</string>
+    <string name="measurements_error_no_value">Enter at least one value.</string>
+    <string name="measurements_error_future_date">Date in the future.</string>
+    <string name="measurements_empty_title">No measurements yet</string>
+    <string name="measurements_empty_body">Log your weight and measurements to track progress over time.</string>
+    <string name="measurements_empty_cta">Record first measurement</string>
+    <string name="measurements_chart_title">Weight trend</string>
+    <string name="measurements_chart_desc">First %1$s, last %2$s, %3$d measurements.</string>
+    <string name="measurements_delta">Change over the period: %1$s</string>
+    <string name="measurements_copy_profile">Copy latest weight to profile</string>
+    <string name="measurements_photo_camera">Take photo</string>
+    <string name="measurements_photo_gallery">Choose from gallery</string>
+    <string name="measurements_photo_remove">Remove photo</string>
+    <string name="measurements_photo_thumbnail">Progress photo</string>
+    <string name="measurements_photo_missing">Photo not found on this device</string>
+    <string name="measurements_photo_privacy">Progress photos stay on this device only: they never go to the cloud, to the backup or to the server.</string>
+    <string name="measurements_delete_title">Delete measurement?</string>
+    <string name="measurements_delete_body">The measurement and its photo will be deleted from this device.</string>
+    <string name="measurements_short_body_fat">Body fat</string>
+    <string name="measurements_short_waist">Waist</string>
+    <string name="measurements_short_chest">Chest</string>
+    <string name="measurements_short_arm">Arm</string>
+    <string name="measurements_short_thigh">Thigh</string>
+    <string name="measurements_short_hip">Hip</string>
+    <string name="msg_measurement_saved">Measurement saved.</string>
+    <string name="msg_measurement_deleted">Measurement deleted.</string>
+    <string name="msg_measurement_save_error">Could not save the measurement.</string>
+    <string name="msg_measurement_delete_error">Could not delete the measurement.</string>
+    <string name="msg_measurement_photo_error">Could not save the photo.</string>
+    <string name="msg_measurement_copy_done">Profile updated with the latest weight (%1$s).</string>
+    <string name="msg_measurement_copy_empty">No weight measurement to copy.</string>
 </resources>

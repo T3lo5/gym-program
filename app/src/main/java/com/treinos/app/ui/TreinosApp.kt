@@ -32,10 +32,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.treinos.app.data.backup.BackupSizeGuard
 import com.treinos.app.data.backup.BackupValidator
+import com.treinos.app.data.MeasurementPhotoStore
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.local.WorkoutPlanWithDetails
@@ -43,10 +45,12 @@ import com.treinos.app.ui.screens.GenerateScreen
 import com.treinos.app.ui.screens.HistoryScreen
 import com.treinos.app.ui.screens.HomeScreen
 import com.treinos.app.ui.screens.LogActivityScreen
+import com.treinos.app.ui.screens.MeasurementsScreen
 import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.RunWorkoutScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
+import com.treinos.app.ui.measurements.latestMeasurement
 import com.treinos.app.ui.components.BottomNavigationBar
 import com.treinos.app.ui.components.ExerciseDetailSheet
 import com.treinos.app.ui.components.ExerciseHistorySheet
@@ -56,6 +60,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import androidx.activity.result.PickVisualMediaRequest
 
 @Composable
 fun TreinosApp(viewModel: AppViewModel) {
@@ -115,6 +120,10 @@ fun TreinosApp(viewModel: AppViewModel) {
     val personalRecords by viewModel.personalRecords.collectAsStateWithLifecycle()
     // H4-6: plano do dia da sessão em andamento para os rótulos de superset.
     val activeSessionPlanExercises by viewModel.activeSessionPlanExercises.collectAsStateWithLifecycle()
+    // H4-8: peso corporal e medidas ao longo do tempo.
+    val measurements by viewModel.measurements.collectAsStateWithLifecycle()
+    val measurementMessage by viewModel.measurementMessage.collectAsStateWithLifecycle()
+    val pendingMeasurementPhoto by viewModel.pendingMeasurementPhoto.collectAsStateWithLifecycle()
     val planCycle by viewModel.planCycle.collectAsStateWithLifecycle()
     val activityEditingId by viewModel.activityEditingId.collectAsStateWithLifecycle()
     val activityErrors by viewModel.activityErrors.collectAsStateWithLifecycle()
@@ -269,6 +278,37 @@ fun TreinosApp(viewModel: AppViewModel) {
         }
     }
 
+    // H4-8: foto de progresso — a câmera grava direto em
+    // filesDir/progress-photos/ via FileProvider (o arquivo é o destino final);
+    // a galeria chega como content:// e o ViewModel copia para a mesma pasta.
+    val measurementGalleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri: Uri? ->
+        uri?.let(viewModel::attachMeasurementPhoto)
+    }
+    var measurementCameraTarget by remember { mutableStateOf<File?>(null) }
+    val measurementCameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { saved: Boolean ->
+        val target = measurementCameraTarget
+        measurementCameraTarget = null
+        if (saved && target != null) {
+            viewModel.attachMeasurementPhoto(Uri.fromFile(target))
+        }
+    }
+    val launchMeasurementCamera = {
+        val file = MeasurementPhotoStore.newPhotoFile(context)
+        measurementCameraTarget = file
+        measurementCameraLauncher.launch(
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file),
+        )
+    }
+    val launchMeasurementGallery = {
+        measurementGalleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
+    }
+
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(text)
@@ -401,6 +441,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     // H3-53: card de conclusão do treino na Home.
                     postWorkoutSummary = postWorkoutSummary,
                     onDismissPostWorkoutSummary = viewModel::dismissPostWorkoutSummary,
+                    // H4-8: atalho "Peso e medidas" com o último peso, se houver.
+                    onOpenMeasurements = viewModel::openMeasurements,
+                    latestWeightKg = latestMeasurement(measurements)?.weightKg,
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -615,6 +658,25 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onCheckForUpdate = { viewModel.checkForUpdate(manual = true) },
                     onDownloadUpdate = viewModel::downloadAndInstallUpdate,
                     onClearUpdateMessage = viewModel::clearUpdateMessage,
+                    // H4-8: card "Peso e medidas" abrindo a tela.
+                    onOpenMeasurements = viewModel::openMeasurements,
+                )
+
+                // H4-8: peso corporal e medidas ao longo do tempo — gráfico da
+                // H4-2, lista, formulário validado e foto que nunca sai do
+                // aparelho.
+                Screen.Measurements -> MeasurementsScreen(
+                    measurements = measurements,
+                    message = measurementMessage,
+                    pendingPhotoPath = pendingMeasurementPhoto,
+                    onBack = viewModel::voltar,
+                    onSave = viewModel::saveMeasurement,
+                    onDelete = viewModel::deleteMeasurement,
+                    onRemovePhoto = viewModel::removePendingMeasurementPhoto,
+                    onCopyLatestToProfile = viewModel::copyLatestWeightToProfile,
+                    onOpenCamera = launchMeasurementCamera,
+                    onOpenGallery = launchMeasurementGallery,
+                    onClearMessage = viewModel::clearMeasurementMessage,
                 )
             }
             }

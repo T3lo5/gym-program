@@ -277,6 +277,13 @@ interface WorkoutDao {
      * preservando os IDs originais (Room grava id = 0 como auto-incremento e
      * id > 0 como valor explícito). Ordem de pai para filho:
      * plans → days → plan_exercises → sessions → session_exercises → set_logs.
+     *
+     * H4-8: `measurements` decide o destino das medidas corporais, com a mesma
+     * semântica do `profile` no backup — `null` significa "o arquivo não fala
+     * disso" (backup v1/v2/v3 e sync do backend): as medidas locais ficam
+     * intactas. Lista não-nula (inclusive vazia) substitui todas: limpa e
+     * reinsere dentro da mesma transação, então uma falha no meio faz rollback
+     * completo de dados e medidas.
      */
     @Transaction
     suspend fun replaceAllData(
@@ -286,6 +293,7 @@ interface WorkoutDao {
         sessions: List<WorkoutSessionEntity>,
         sessionExercises: List<SessionExerciseEntity>,
         setLogs: List<SetLogEntity>,
+        measurements: List<BodyMeasurementEntity>? = null,
     ) {
         deleteAllData()
         if (plans.isNotEmpty()) insertPlans(plans)
@@ -294,7 +302,32 @@ interface WorkoutDao {
         if (sessions.isNotEmpty()) insertSessions(sessions)
         if (sessionExercises.isNotEmpty()) insertSessionExercises(sessionExercises)
         if (setLogs.isNotEmpty()) insertSetLogs(setLogs)
+        if (measurements != null) {
+            deleteAllMeasurements()
+            if (measurements.isNotEmpty()) insertMeasurements(measurements)
+        }
     }
+
+    // ---------- Medidas corporais (H4-8) ----------
+
+    /** Lista exibida por `measuredAt` desc (regra 4); o gráfico reordena asc. */
+    @Query("SELECT * FROM body_measurements ORDER BY measuredAt DESC, id DESC")
+    fun observeMeasurements(): Flow<List<BodyMeasurementEntity>>
+
+    @Query("SELECT * FROM body_measurements ORDER BY measuredAt DESC, id DESC")
+    suspend fun getAllMeasurements(): List<BodyMeasurementEntity>
+
+    @Insert
+    suspend fun insertMeasurement(measurement: BodyMeasurementEntity): Long
+
+    @Insert
+    suspend fun insertMeasurements(measurements: List<BodyMeasurementEntity>)
+
+    @Query("DELETE FROM body_measurements WHERE id = :id")
+    suspend fun deleteMeasurement(id: Long)
+
+    @Query("DELETE FROM body_measurements")
+    suspend fun deleteAllMeasurements()
 
     // ---------- Uso de exercício para calibrar precisão (H3-42) ----------
 

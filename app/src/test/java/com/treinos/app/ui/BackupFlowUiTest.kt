@@ -207,7 +207,9 @@ class BackupFlowUiTest {
 
     @Test
     fun mostra_erro_de_versao() {
-        val invalido = arquivo(schemaVersion = 4)
+        // H4-8: a v4 passou a ser suportada (medidas corporais); a versão não
+        // suportada do teste acompanhou o teto e virou v5.
+        val invalido = arquivo(schemaVersion = 5)
         val resultado = BackupValidator.validate(invalido)
         val mensagem = requireNotNull(resultado.message)
         val state = mutableStateOf<BackupImportState>(BackupImportState.Error(mensagem))
