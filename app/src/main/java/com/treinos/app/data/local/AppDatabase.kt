@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SetLogEntity::class,
         ExerciseUsageEvent::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -109,6 +109,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H4-7: chave de deduplicação de importação de CSV (Strong/Hevy).
+        // Coluna aditiva e índice único — NULLs são distintos no SQLite, então
+        // as sessões criadas no app (todas `null`) não colidem. Nenhuma tabela
+        // é recriada e nenhum dado existente é tocado.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN importRef TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_workout_sessions_importRef` " +
+                        "ON `workout_sessions` (`importRef`)"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -123,6 +137,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
+                        MIGRATION_7_8,
                     )
                     .build()
                     .also { instance = it }

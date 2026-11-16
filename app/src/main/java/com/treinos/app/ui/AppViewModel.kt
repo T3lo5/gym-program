@@ -47,6 +47,11 @@ import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.data.backup.backupImportDecoder
+import com.treinos.app.data.csv.CsvCodec
+import com.treinos.app.data.csv.CsvImportPlan
+import com.treinos.app.data.csv.CsvImportPreview
+import com.treinos.app.data.csv.CsvImportState
+import com.treinos.app.data.csv.StrongHevyCsvParser
 import com.treinos.app.data.wear.WearSessionMapper
 import com.treinos.app.data.wear.WearSyncRepository
 import com.treinos.app.ui.ExerciseSessionData
@@ -2293,6 +2298,105 @@ class AppViewModel(
 
     fun setBackupMessage(message: String?) {
         _backupMessage.value = message
+    }
+
+    // ---------------- CSV (H4-7): exportar e importar Strong/Hevy ----------------
+
+    private val _csvImportState = MutableStateFlow<CsvImportState>(CsvImportState.Idle)
+    val csvImportState: StateFlow<CsvImportState> = _csvImportState.asStateFlow()
+
+    private val _csvMessage = MutableStateFlow<String?>(null)
+    val csvMessage: StateFlow<String?> = _csvMessage.asStateFlow()
+
+    private var pendingCsvPlan: CsvImportPlan? = null
+
+    suspend fun exportSessionsCsv(): String = repository.exportSessionsCsv()
+
+    /**
+     * Lê o texto do arquivo, detecta o formato só pelo cabeçalho e monta a
+     * pré-visualização com contagens — nada é gravado aqui. Formato
+     * desconhecido e arquivo sem nenhuma linha válida viram [CsvImportState.Error];
+     * CSV vazio (só cabeçalho) vira `Ready` com zero sessões e o botão de
+     * confirmar desabilitado.
+     */
+    fun prepareCsvImport(text: String) {
+        if (_csvImportState.value is CsvImportState.Importing) return
+        _csvMessage.value = null
+        viewModelScope.launch {
+            try {
+                val rows = CsvCodec.parseCsv(text)
+                val format = StrongHevyCsvParser.detectFormat(rows.firstOrNull().orEmpty())
+                if (format == null) {
+                    pendingCsvPlan = null
+                    _csvImportState.value =
+                        CsvImportState.Error(context.getString(R.string.csv_error_unknown_format))
+                    return@launch
+                }
+                val plan = StrongHevyCsvParser.parse(rows)
+                if (plan.sessions.isEmpty() && plan.skippedRows > 0) {
+                    pendingCsvPlan = null
+                    _csvImportState.value =
+                        CsvImportState.Error(context.getString(R.string.csv_error_no_valid_rows))
+                    return@launch
+                }
+                val preview = CsvImportPreview(
+                    format = plan.format,
+                    sessions = plan.sessions.size,
+                    exercises = plan.sessions.sumOf { session -> session.exercises.size },
+                    sets = plan.sessions.sumOf { session ->
+                        session.exercises.sumOf { exercise -> exercise.sets.size }
+                    },
+                    duplicates = repository.csvDuplicates(plan),
+                    skippedRows = plan.skippedRows,
+                    warnings = plan.warnings,
+                )
+                pendingCsvPlan = plan
+                _csvImportState.value = CsvImportState.Ready(preview = preview, plan = plan)
+            } catch (error: Exception) {
+                Log.w(TAG, "Falha ao preparar importação de CSV", error)
+                pendingCsvPlan = null
+                _csvImportState.value =
+                    CsvImportState.Error(context.getString(R.string.csv_error_invalid_file))
+            }
+        }
+    }
+
+    /** Grava o plano pendente; a gravação é transacional e aditiva. */
+    fun confirmCsvImport() {
+        val plan = pendingCsvPlan ?: return
+        if (_csvImportState.value is CsvImportState.Importing) return
+        viewModelScope.launch {
+            _csvImportState.value = CsvImportState.Importing
+            try {
+                val result = repository.importSessionsCsv(plan, preferences.deviceId)
+                _csvMessage.value = context.getString(
+                    R.string.msg_csv_imported,
+                    result.sessionsImported,
+                    result.setsImported,
+                )
+                _csvImportState.value = CsvImportState.Idle
+                pendingCsvPlan = null
+            } catch (error: Exception) {
+                Log.w(TAG, "Falha ao importar CSV", error)
+                _csvImportState.value =
+                    CsvImportState.Error(uiErrorMessage(error, context, R.string.csv_error_import))
+            }
+        }
+    }
+
+    /** Cancelar (ou dispensar o erro) não altera nada. */
+    fun cancelCsvImport() {
+        _csvImportState.value = CsvImportState.Idle
+        pendingCsvPlan = null
+        _csvMessage.value = null
+    }
+
+    fun clearCsvMessage() {
+        _csvMessage.value = null
+    }
+
+    fun setCsvMessage(message: String?) {
+        _csvMessage.value = message
     }
 
     fun startDiscovery() {

@@ -94,7 +94,15 @@ data class WorkoutPlanExerciseEntity(
     val images: String = "",
 )
 
-@Entity(tableName = "workout_sessions", indices = [Index("startedAt")])
+@Entity(
+    tableName = "workout_sessions",
+    indices = [
+        Index("startedAt"),
+        // H4-7: chave de deduplicação de importação; UNIQUE com NULLs distintos
+        // (SQLite), então as sessões criadas no app (todas `null`) não colidem.
+        Index(value = ["importRef"], unique = true),
+    ],
+)
 data class WorkoutSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val planId: Long = 0,
@@ -116,6 +124,12 @@ data class WorkoutSessionEntity(
     val poolLengthMeters: Int? = null,
     val stroke: String? = null,
     val sessionRpe: Double? = null,
+    /**
+     * H4-7: `"<formato>:<yyyy-MM-dd>:<título normalizado>"` para sessão vinda
+     * de importação de CSV (Strong/Hevy); `null` para sessão criada no app.
+     * Reimportar o mesmo arquivo não duplica sessão.
+     */
+    val importRef: String? = null,
 )
 
 @Entity(

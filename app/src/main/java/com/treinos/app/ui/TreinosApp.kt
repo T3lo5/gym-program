@@ -100,6 +100,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val downloadError by viewModel.downloadError.collectAsStateWithLifecycle()
     val backupImportState by viewModel.backupImportState.collectAsStateWithLifecycle()
     val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
+    // H4-7: exportar CSV e importar de Strong/Hevy.
+    val csvImportState by viewModel.csvImportState.collectAsStateWithLifecycle()
+    val csvMessage by viewModel.csvMessage.collectAsStateWithLifecycle()
     val bodyWeightKg by viewModel.bodyWeightKg.collectAsStateWithLifecycle()
     val heightCm by viewModel.heightCm.collectAsStateWithLifecycle()
     val sex by viewModel.sex.collectAsStateWithLifecycle()
@@ -198,6 +201,71 @@ fun TreinosApp(viewModel: AppViewModel) {
                     uiErrorMessage(error, context, com.treinos.app.R.string.backup_file_read_error),
                 )
             }
+        }
+    }
+
+    // H4-7: exportação CSV — o texto é gerado antes de tocar no arquivo
+    // escolhido; se a geração falhar, o arquivo do usuário continua intacto.
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val csv = viewModel.exportSessionsCsv()
+                val cacheFile = File(context.cacheDir, "treinos-export.csv")
+                cacheFile.writeText(csv)
+                val output = context.contentResolver.openOutputStream(uri)
+                    ?: error(context.getString(com.treinos.app.R.string.backup_file_open_error))
+                output.use { out -> cacheFile.inputStream().use { it.copyTo(out) } }
+                // H4-7 (regra 13): sem treino com série registrada, o CSV sai
+                // só com o cabeçalho e a mensagem avisa em vez de celebrar.
+                val hasExportableSets = sessions.any { details ->
+                    details.exercises.any { exercise ->
+                        exercise.sets.any { set -> set.isCompleted }
+                    }
+                }
+                viewModel.setCsvMessage(
+                    if (hasExportableSets) {
+                        context.getString(com.treinos.app.R.string.msg_csv_exported)
+                    } else {
+                        context.getString(com.treinos.app.R.string.settings_csv_nothing_to_export)
+                    },
+                )
+            } catch (error: Exception) {
+                viewModel.setCsvMessage(
+                    uiErrorMessage(error, context, com.treinos.app.R.string.csv_error_export),
+                )
+            }
+        }
+    }
+
+    // H4-7: importação CSV (Strong/Hevy) — mesmo padrão do import de backup,
+    // com o mesmo teto de leitura (BackupSizeGuard.readLimited, 25 MB).
+    val csvImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val knownSize = documentSize(context.contentResolver, uri)
+            if (knownSize != null) {
+                val sizeCheck = BackupValidator.validateSize(knownSize)
+                if (!sizeCheck.valid) {
+                    viewModel.setCsvMessage(sizeCheck.message ?: BackupSizeGuard.tooLargeMessage)
+                    return@launch
+                }
+            }
+            val input = context.contentResolver.openInputStream(uri)
+            if (input == null) {
+                viewModel.setCsvMessage(context.getString(com.treinos.app.R.string.backup_file_read_error))
+                return@launch
+            }
+            val text = input.use { BackupSizeGuard.readLimited(it) }
+            if (text == null) {
+                viewModel.setCsvMessage(BackupSizeGuard.tooLargeMessage)
+                return@launch
+            }
+            viewModel.prepareCsvImport(text)
         }
     }
 
@@ -508,6 +576,18 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onConfirmImport = { viewModel.confirmImport() },
                     onCancelImport = { viewModel.cancelImport() },
                     onClearBackupMessage = { viewModel.clearBackupMessage() },
+                    // H4-7: CSV — exportar "Treinos" e importar de Strong/Hevy.
+                    csvImportState = csvImportState,
+                    csvMessage = csvMessage,
+                    onExportCsv = { csvExportLauncher.launch(csvFileName()) },
+                    onImportCsvFileSelected = {
+                        csvImportLauncher.launch(
+                            arrayOf("text/*", "text/comma-separated-values", "application/csv"),
+                        )
+                    },
+                    onConfirmCsvImport = { viewModel.confirmCsvImport() },
+                    onCancelCsvImport = { viewModel.cancelCsvImport() },
+                    onClearCsvMessage = { viewModel.clearCsvMessage() },
                     isUpdatingCatalog = isUpdatingCatalog,
                     catalogMessage = catalogMessage,
                     onUpdateCatalog = viewModel::updateCatalog,
@@ -566,6 +646,12 @@ fun TreinosApp(viewModel: AppViewModel) {
 private fun backupFileName(): String {
     val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
     return "treinos-backup-$stamp.json"
+}
+
+/** H4-7: nome sugerido do CSV de treinos (`treinos-*.csv`). */
+private fun csvFileName(): String {
+    val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.getDefault()).format(Date())
+    return "treinos-$stamp.csv"
 }
 
 /**

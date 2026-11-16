@@ -482,6 +482,25 @@
     <string name="settings_btn_replace_all">Substituir tudo</string>
     <string name="settings_btn_dismiss">Dispensar</string>
 
+    <!-- H4-7: exportar CSV e importar de Strong/Hevy -->
+    <string name="settings_csv_title">CSV (Strong/Hevy)</string>
+    <string name="settings_csv_desc">Exporte seus treinos em um CSV que abre no Excel/Sheets ou importe o CSV exportado pelo Strong ou pelo Hevy. A importação é aditiva: nada do que já existe é apagado.</string>
+    <string name="settings_btn_export_csv">Exportar CSV</string>
+    <string name="settings_btn_exporting_csv">Exportando…</string>
+    <string name="settings_btn_import_csv">Importar CSV (Strong/Hevy)</string>
+    <string name="settings_btn_importing_csv">Importando…</string>
+    <string name="settings_btn_csv_confirm">Importar treinos</string>
+    <string name="settings_csv_preview">Pré-visualização: %1$d treino(s), %2$d exercício(s), %3$d série(s), %4$d já importado(s), %5$d linha(s) ignorada(s).</string>
+    <string name="settings_csv_preview_empty">Nenhum treino encontrado no arquivo</string>
+    <string name="csv_error_unknown_format">Formato não reconhecido. Exporte do Strong ou do Hevy.</string>
+    <string name="csv_error_no_valid_rows">Nenhuma linha válida no arquivo.</string>
+    <string name="csv_error_invalid_file">Não foi possível ler o arquivo CSV.</string>
+    <string name="csv_error_import">Falha ao importar o CSV.</string>
+    <string name="csv_error_export">Falha ao exportar o CSV.</string>
+    <string name="msg_csv_imported">CSV importado: %1$d treino(s) e %2$d série(s).</string>
+    <string name="msg_csv_exported">CSV exportado no arquivo escolhido.</string>
+    <string name="settings_csv_nothing_to_export">Nenhum treino para exportar — o arquivo saiu só com o cabeçalho.</string>
+
     <!-- H3-51: atualização in-app (GitHub Releases) -->
     <string name="settings_update_title">Atualização do app</string>
     <string name="settings_update_idle_hint">Verifique se há uma versão nova publicada no GitHub Releases.</string>

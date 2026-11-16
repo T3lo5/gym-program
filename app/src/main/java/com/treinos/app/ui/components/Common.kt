@@ -334,12 +334,17 @@ private val SUCCESS_PREFIXES = listOf(
     "Restaurado:",
     "Backup importado",
     "Catálogo atualizado",
+    // H4-7: CSV
+    "CSV importado",
+    "CSV exportado",
     // values-en
     "Connected",
     "Sent:",
     "Restored:",
     "Backup imported",
     "Catalog updated",
+    "CSV imported",
+    "CSV exported",
 )
 
 /**

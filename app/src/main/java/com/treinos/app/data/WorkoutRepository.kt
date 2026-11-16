@@ -32,6 +32,10 @@ import com.treinos.app.data.backup.BackupMapper
 import com.treinos.app.data.backup.BackupProfile
 import com.treinos.app.data.backup.BackupValidator
 import com.treinos.app.data.backup.backupExportEncoder
+import com.treinos.app.data.csv.CsvImportPlan
+import com.treinos.app.data.csv.CsvImportResult
+import com.treinos.app.data.csv.WorkoutCsvExporter
+import com.treinos.app.data.csv.csvExerciseSlug
 import com.treinos.app.data.remote.SyncDayDto
 import com.treinos.app.data.remote.SyncPlanDto
 import com.treinos.app.data.remote.SyncPlanExerciseDto
@@ -1074,6 +1078,117 @@ open class WorkoutRepository(
                 profileStore.heightCm = profile.heightCm
                 profileStore.sex = profile.sex
             }
+        }
+
+    // ---------------- CSV (H4-7): exportar "Treinos" e importar Strong/Hevy ----------------
+
+    /**
+     * Exporta todas as sessões com pelo menos uma série registrada no formato
+     * "Treinos" ([WorkoutCsvExporter]); sem sessão, sai só o cabeçalho.
+     */
+    suspend fun exportSessionsCsv(): String = withContext(Dispatchers.IO) {
+        WorkoutCsvExporter.exportSessionsCsv(
+            buildSessionDetails(
+                dao.getAllSessionEntities(),
+                dao.getAllSessionExercises(),
+                dao.getAllSetLogs(),
+            ),
+        )
+    }
+
+    /** Sessões do plano que já existem no banco, para a pré-visualização. */
+    suspend fun csvDuplicates(plan: CsvImportPlan): Int = withContext(Dispatchers.IO) {
+        plan.sessions.count { draft -> dao.getSessionByImportRef(draft.importRef) != null }
+    }
+
+    /**
+     * Importa o plano de forma **aditiva** (nunca chama `deleteAllData()` /
+     * `replaceAllData()`): sessões com `importRef` já presente no banco são
+     * contadas em `duplicates` e não reinseridas; as novas entram em uma única
+     * transação, então uma falha no meio não deixa sessão parcial nem
+     * `importRef` órfão. O índice UNIQUE em `importRef` é a trava final.
+     *
+     * [deviceId] é a identidade do aparelho que fez o import (mesma convenção
+     * do backup); não altera o conteúdo gravado.
+     */
+    suspend fun importSessionsCsv(plan: CsvImportPlan, deviceId: String): CsvImportResult =
+        withContext(Dispatchers.IO) {
+            val pending = plan.sessions.filter { draft ->
+                dao.getSessionByImportRef(draft.importRef) == null
+            }
+            val duplicates = plan.sessions.size - pending.size
+            var exercisesImported = 0
+            var setsImported = 0
+            val sessions = mutableListOf<WorkoutSessionEntity>()
+            val exercisesBySession = mutableListOf<List<SessionExerciseEntity>>()
+            val setsByExercise = mutableListOf<List<List<SetLogEntity>>>()
+
+            pending.forEach { draft ->
+                val endedAt = draft.durationSeconds?.let { duration ->
+                    draft.startedAt + duration * 1000L
+                }
+                sessions += WorkoutSessionEntity(
+                    planId = 0,
+                    dayId = 0,
+                    planName = "",
+                    dayName = "",
+                    status = "completed",
+                    startedAt = draft.startedAt,
+                    endedAt = endedAt,
+                    totalDurationSeconds = draft.durationSeconds ?: 0L,
+                    notes = draft.notes,
+                    modality = "strength",
+                    source = MANUAL_SESSION_SOURCE,
+                    title = draft.title,
+                    importRef = draft.importRef,
+                )
+                val exercises = mutableListOf<SessionExerciseEntity>()
+                val setsOfExercise = mutableListOf<List<SetLogEntity>>()
+                draft.exercises.forEach { exercise ->
+                    // `sessionId` e `exerciseLogId` são remapeados dentro da
+                    // transação (insertImportedCsvSessions).
+                    exercises += SessionExerciseEntity(
+                        sessionId = 0,
+                        exerciseId = "csv_" + csvExerciseSlug(exercise.exerciseName),
+                        exerciseName = exercise.exerciseName,
+                        exerciseOrder = exercise.exerciseOrder,
+                        plannedSets = exercise.sets.size,
+                        completedSets = exercise.sets.count { !it.isWarmup },
+                        startedAt = draft.startedAt,
+                    )
+                    setsOfExercise += exercise.sets.map { set ->
+                        SetLogEntity(
+                            exerciseLogId = 0,
+                            setNumber = set.setNumber,
+                            reps = set.reps,
+                            weightKg = set.weightKg,
+                            rpe = set.rpe,
+                            durationSeconds = set.durationSeconds,
+                            distanceMeters = set.distanceMeters,
+                            isCompleted = true,
+                            isWarmup = set.isWarmup,
+                            setType = resolveSetType(SET_TYPE_NORMAL, set.isWarmup),
+                            completedAt = draft.startedAt,
+                        )
+                    }
+                    exercisesImported++
+                    setsImported += exercise.sets.size
+                }
+                exercisesBySession += exercises
+                setsByExercise += setsOfExercise
+            }
+
+            dao.insertImportedCsvSessions(
+                sessions = sessions,
+                exercisesBySession = exercisesBySession,
+                setsByExercise = setsByExercise,
+            )
+            CsvImportResult(
+                sessionsImported = sessions.size,
+                exercisesImported = exercisesImported,
+                setsImported = setsImported,
+                duplicates = duplicates,
+            )
         }
 
     suspend fun testConnection() = withContext(Dispatchers.IO) {

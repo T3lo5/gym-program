@@ -479,6 +479,25 @@
     <string name="settings_btn_replace_all">Replace everything</string>
     <string name="settings_btn_dismiss">Dismiss</string>
 
+    <!-- H4-7: export CSV and import from Strong/Hevy -->
+    <string name="settings_csv_title">CSV (Strong/Hevy)</string>
+    <string name="settings_csv_desc">Export your workouts to a CSV that opens in Excel/Sheets, or import the CSV exported by Strong or Hevy. Importing is additive: nothing already stored is deleted.</string>
+    <string name="settings_btn_export_csv">Export CSV</string>
+    <string name="settings_btn_exporting_csv">Exporting…</string>
+    <string name="settings_btn_import_csv">Import CSV (Strong/Hevy)</string>
+    <string name="settings_btn_importing_csv">Importing…</string>
+    <string name="settings_btn_csv_confirm">Import workouts</string>
+    <string name="settings_csv_preview">Preview: %1$d workout(s), %2$d exercise(s), %3$d set(s), %4$d already imported, %5$d skipped line(s).</string>
+    <string name="settings_csv_preview_empty">No workouts found in the file</string>
+    <string name="csv_error_unknown_format">Unrecognized format. Export from Strong or Hevy.</string>
+    <string name="csv_error_no_valid_rows">No valid rows in the file.</string>
+    <string name="csv_error_invalid_file">Could not read the CSV file.</string>
+    <string name="csv_error_import">Could not import the CSV.</string>
+    <string name="csv_error_export">Could not export the CSV.</string>
+    <string name="msg_csv_imported">CSV imported: %1$d workout(s) and %2$d set(s).</string>
+    <string name="msg_csv_exported">CSV exported to the chosen file.</string>
+    <string name="settings_csv_nothing_to_export">No workouts to export — the file came out with the header only.</string>
+
     <!-- H3-51: in-app update (GitHub Releases) -->
     <string name="settings_update_title">App update</string>
     <string name="settings_update_idle_hint">Check whether a new version was published on GitHub Releases.</string>

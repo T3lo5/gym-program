@@ -142,6 +142,10 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun getSession(id: Long): WorkoutSessionEntity?
 
+    /** H4-7: chave de deduplicação do import de CSV (`importRef` único). */
+    @Query("SELECT * FROM workout_sessions WHERE importRef = :ref LIMIT 1")
+    suspend fun getSessionByImportRef(ref: String): WorkoutSessionEntity?
+
     @Insert
     suspend fun insertSession(session: WorkoutSessionEntity): Long
 
@@ -175,6 +179,37 @@ interface WorkoutDao {
 
     @Insert
     suspend fun insertSetLogs(setLogs: List<SetLogEntity>): List<Long>
+
+    /**
+     * H4-7: grava as sessões importadas de CSV em uma única transação —
+     * falha no meio (ex.: `importRef` duplicado batendo no índice UNIQUE)
+     * faz rollback completo, sem sessão parcial e sem `importRef` órfão.
+     * Aditivo: nada existente é apagado nem alterado.
+     */
+    @Transaction
+    suspend fun insertImportedCsvSessions(
+        sessions: List<WorkoutSessionEntity>,
+        exercisesBySession: List<List<SessionExerciseEntity>>,
+        setsByExercise: List<List<List<SetLogEntity>>>,
+    ): Int {
+        var importedSessions = 0
+        sessions.forEachIndexed { sessionIndex, session ->
+            val sessionId = insertSession(session)
+            importedSessions++
+            val exercises = exercisesBySession.getOrNull(sessionIndex).orEmpty()
+            val setsOfSession = setsByExercise.getOrNull(sessionIndex).orEmpty()
+            exercises.forEachIndexed { exerciseIndex, exercise ->
+                val exerciseLogId = insertSessionExercises(
+                    listOf(exercise.copy(sessionId = sessionId)),
+                ).single()
+                val sets = setsOfSession.getOrNull(exerciseIndex).orEmpty()
+                if (sets.isNotEmpty()) {
+                    insertSetLogs(sets.map { it.copy(exerciseLogId = exerciseLogId) })
+                }
+            }
+        }
+        return importedSessions
+    }
 
     @Query("SELECT * FROM set_logs WHERE id = :id")
     suspend fun getSetLog(id: Long): SetLogEntity?

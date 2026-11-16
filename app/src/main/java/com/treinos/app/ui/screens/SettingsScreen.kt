@@ -51,6 +51,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.treinos.app.R
 import com.treinos.app.data.backup.BackupPreview
+import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.UiError
@@ -93,6 +94,14 @@ fun SettingsScreen(
     onConfirmImport: () -> Unit,
     onCancelImport: () -> Unit,
     onClearBackupMessage: () -> Unit,
+    // H4-7: exportar CSV e importar de Strong/Hevy.
+    csvImportState: CsvImportState = CsvImportState.Idle,
+    csvMessage: String? = null,
+    onExportCsv: () -> Unit = {},
+    onImportCsvFileSelected: () -> Unit = {},
+    onConfirmCsvImport: () -> Unit = {},
+    onCancelCsvImport: () -> Unit = {},
+    onClearCsvMessage: () -> Unit = {},
     isUpdatingCatalog: Boolean = false,
     catalogMessage: String? = null,
     onUpdateCatalog: () -> Unit = {},
@@ -617,6 +626,105 @@ fun SettingsScreen(
                         }
 
                         backupMessage?.let {
+                            StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
+                        }
+                    }
+                }
+
+                // H4-7: CSV — saída que o Excel/Sheets abre e entrada dos
+                // exportes do Strong e do Hevy, com pré-visualização antes de
+                // gravar. Import aditivo: nada existente é apagado.
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_csv_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_csv_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            BusyButton(
+                                busy = csvImportState is CsvImportState.Importing,
+                                idleText = stringResource(R.string.settings_btn_export_csv),
+                                busyText = stringResource(R.string.settings_btn_exporting_csv),
+                                onClick = onExportCsv,
+                                modifier = Modifier.weight(1f),
+                            )
+                            BusyButton(
+                                busy = csvImportState is CsvImportState.Importing,
+                                idleText = stringResource(R.string.settings_btn_import_csv),
+                                busyText = stringResource(R.string.settings_btn_importing_csv),
+                                onClick = onImportCsvFileSelected,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+
+                        when (val state = csvImportState) {
+                            is CsvImportState.Ready -> {
+                                if (state.preview.sessions == 0) {
+                                    Text(
+                                        text = stringResource(R.string.settings_csv_preview_empty),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.settings_csv_preview,
+                                            state.preview.sessions,
+                                            state.preview.exercises,
+                                            state.preview.sets,
+                                            state.preview.duplicates,
+                                            state.preview.skippedRows,
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Button(
+                                        onClick = onConfirmCsvImport,
+                                        // CSV vazio (só cabeçalho) não tem o que gravar.
+                                        enabled = state.preview.sessions > 0,
+                                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                                    ) {
+                                        Text(stringResource(R.string.settings_btn_csv_confirm))
+                                    }
+                                    OutlinedButton(
+                                        onClick = onCancelCsvImport,
+                                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                                    ) {
+                                        Text(stringResource(R.string.common_cancel))
+                                    }
+                                }
+                            }
+                            is CsvImportState.Error -> {
+                                Text(
+                                    text = state.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                OutlinedButton(
+                                    onClick = onCancelCsvImport,
+                                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                                ) {
+                                    Text(stringResource(R.string.settings_btn_dismiss))
+                                }
+                            }
+                            else -> { }
+                        }
+
+                        csvMessage?.let {
                             StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                         }
                     }

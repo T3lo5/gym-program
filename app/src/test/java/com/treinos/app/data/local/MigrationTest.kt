@@ -5,6 +5,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -364,6 +365,69 @@ class MigrationTest {
             assertEquals(42.5, cursor.getDouble(1), 0.0001)
             assertTrue(cursor.isNull(2))
         }
+        migrated.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migracao_7_8_adiciona_import_ref_e_indice() {
+        // H4-7: banco v7 com uma sessão antiga, ainda sem importRef.
+        helper.createDatabase(testDb, 7).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 8, true, AppDatabase.MIGRATION_7_8)
+
+        // Nada se perde na migração aditiva e a coluna nasce NULL.
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        migrated.query("SELECT id, title, importRef FROM workout_sessions WHERE id = 50").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(50, cursor.getInt(0))
+            assertEquals("A", cursor.getString(1))
+            assertTrue(cursor.isNull(2))
+        }
+
+        // O índice único existe e é realmente UNIQUE.
+        migrated.query(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' " +
+                "AND name = 'index_workout_sessions_importRef'"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.getString(0).contains("UNIQUE"))
+        }
+
+        // NULLs são distintos: duas sessões sem importRef coexistem...
+        migrated.execSQL(
+            "INSERT INTO workout_sessions (planId, dayId, planName, dayName, status, " +
+                "startedAt, totalDurationSeconds, notes, modality, source, title) " +
+                "VALUES (1,10,'P','A','completed',2,0,'','strength','manual','B')"
+        )
+        migrated.execSQL(
+            "INSERT INTO workout_sessions (planId, dayId, planName, dayName, status, " +
+                "startedAt, totalDurationSeconds, notes, modality, source, title) " +
+                "VALUES (1,10,'P','A','completed',3,0,'','strength','manual','C')"
+        )
+        // ...e o mesmo importRef não.
+        migrated.execSQL(
+            "UPDATE workout_sessions SET importRef = 'strong:2026-11-10:treino a' WHERE id = 50"
+        )
+        var failure: Exception? = null
+        try {
+            migrated.execSQL(
+                "INSERT INTO workout_sessions (planId, dayId, planName, dayName, status, " +
+                    "startedAt, totalDurationSeconds, notes, modality, source, title, importRef) " +
+                    "VALUES (1,10,'P','A','completed',4,0,'','strength','manual','D'," +
+                    "'strong:2026-11-10:treino a')"
+            )
+        } catch (error: Exception) {
+            failure = error
+        }
+        assertNotNull(failure)
         migrated.close()
     }
 
