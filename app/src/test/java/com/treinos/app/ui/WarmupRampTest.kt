@@ -8,11 +8,12 @@ import org.junit.Test
 class WarmupRampTest {
 
     @Test
-    fun rampa_60kg_descarta_40_por_cento() {
-        // 40% de 60 = 24 kg carrega 22,5 kg — só micro anilha na barra, na
-        // prática a barra — e é descartado; sobram 60% e 80%.
+    fun rampa_60kg_tres_degraus() {
+        // 40% de 60 = 24 kg carrega 22,5 kg (1,25 kg por lado) — sai da barra
+        // e fica; 60% = 35 kg e 80% = 47,5 kg completam os três degraus.
         assertEquals(
             listOf(
+                WarmupStep(percent = 40, weightKg = 22.5, reps = 8),
                 WarmupStep(percent = 60, weightKg = 35.0, reps = 5),
                 WarmupStep(percent = 80, weightKg = 47.5, reps = 3),
             ),
@@ -40,11 +41,15 @@ class WarmupRampTest {
 
     @Test
     fun rampa_deduplica_pesos_iguais() {
-        // Inventário sintético (barra 2 kg, anilha única de 1,25 kg): 60% e 80%
-        // de 11,7 kg carregam os mesmos 7 kg — mantém o primeiro (60%).
+        // Inventário sintético (barra 2 kg, anilha única de 1,25 kg): 80% de
+        // 11,7 kg carrega os mesmos 7,0 kg do 60% — mantém o primeiro (60%).
+        // O 40% (4,5 kg) sai da barra e fica.
         val inventory = PlateInventory(barKg = 2.0, plateKg = listOf(1.25))
         assertEquals(
-            listOf(WarmupStep(percent = 60, weightKg = 7.0, reps = 5)),
+            listOf(
+                WarmupStep(percent = 40, weightKg = 4.5, reps = 8),
+                WarmupStep(percent = 60, weightKg = 7.0, reps = 5),
+            ),
             warmupRamp(11.7, inventory),
         )
     }
@@ -52,10 +57,12 @@ class WarmupRampTest {
     @Test
     fun rampa_arredonda_para_baixo() {
         val rampa = warmupRamp(61.0)
-        assertEquals(2, rampa.size)
-        // 60% de 61 = 36,6 carrega 35; 80% = 48,8 carrega 47,5 — nunca acima.
-        assertEquals(35.0, rampa[0].weightKg, 1e-9)
-        assertEquals(47.5, rampa[1].weightKg, 1e-9)
+        assertEquals(3, rampa.size)
+        // 40% de 61 = 24,4 carrega 22,5; 60% = 36,6 carrega 35; 80% = 48,8
+        // carrega 47,5 — nunca acima.
+        assertEquals(22.5, rampa[0].weightKg, 1e-9)
+        assertEquals(35.0, rampa[1].weightKg, 1e-9)
+        assertEquals(47.5, rampa[2].weightKg, 1e-9)
         assertTrue(rampa.all { it.weightKg <= 61.0 })
     }
 

@@ -16,13 +16,11 @@ data class WarmupStep(
 /**
  * Degraus fixos: 40% × 8 reps, 60% × 5 reps, 80% × 3 reps.
  *
- * Cada `weightKg` é o `loadedKg` de [plateBreakdown] do degrau. É descartado
- * o degrau que não sai da barra na prática: `loadedKg <= barKg` ou
- * `loadedKg <= barKg + 2 * menor anilha` (ex. da spec: 40% de 60 kg = 24 kg
- * carrega 22,5 kg — só micro anilhas na barra — e é descartado). Também são
- * descartados degraus >= à carga de trabalho e pesos repetidos (mantém a
- * primeira ocorrência). Vazio quando a carga de trabalho não é finita ou
- * `<= barKg`.
+ * Cada `weightKg` é o `loadedKg` de [plateBreakdown] do degrau. Regra única
+ * de descarte: o degrau cuja carga carregável não sai da barra
+ * (`loadedKg <= barKg`). Também são descartados degraus >= à carga de
+ * trabalho e pesos repetidos (mantém a primeira ocorrência). Vazio quando a
+ * carga de trabalho não é finita ou `<= barKg`.
  */
 fun warmupRamp(
     workingWeightKg: Double,
@@ -31,11 +29,6 @@ fun warmupRamp(
     if (!workingWeightKg.isFinite()) return emptyList()
     if (!inventory.barKg.isFinite() || inventory.barKg <= 0.0) return emptyList()
     if (workingWeightKg <= inventory.barKg) return emptyList()
-    val smallestPlate = inventory.plateKg
-        .filter { it.isFinite() && it > 0.0 }
-        .minOrNull()
-        ?: return emptyList()
-    val floorKg = inventory.barKg + 2.0 * smallestPlate
     val steps = listOf(
         Triple(40, 8, 0.40),
         Triple(60, 5, 0.60),
@@ -45,7 +38,7 @@ fun warmupRamp(
     val seen = mutableSetOf<Double>()
     for ((percent, reps, fraction) in steps) {
         val loaded = plateBreakdown(fraction * workingWeightKg, inventory)?.loadedKg ?: continue
-        if (loaded <= inventory.barKg || loaded <= floorKg) continue
+        if (loaded <= inventory.barKg) continue
         if (loaded >= workingWeightKg) continue
         if (!seen.add(loaded)) continue // mantém a primeira ocorrência
         ramp.add(WarmupStep(percent = percent, weightKg = loaded, reps = reps))

@@ -54,6 +54,8 @@ plano sozinho.
 | `app/src/test/java/com/treinos/app/ui/WorkoutScreenTest.kt` | Botão, toque único e pré-preenchimento |
 | `app/src/test/java/com/treinos/app/data/backup/BackupSerializationTest.kt` / `BackupMapperTest.kt` | Round-trip e ausência de `targetWeightKg` |
 | `back/tests/test_sync_contract.py` | Round-trip de `targetWeightKg` no snapshot |
+| `app/src/main/java/com/treinos/app/ui/AppViewModel.kt` | `toReviewPlanDto` passa a enviar `targetWeightKg` (débito fechado em 2026-11-16) |
+| `back/app/main.py` | `ExerciseDTO.targetWeightKg` ecoa a carga-alvo na revisão |
 
 Não edite `shared/` nem `com.treinos.shared/` (legado). Sem dependência nova.
 
@@ -187,6 +189,16 @@ Regras da função pura:
 | `app/src/test/java/com/treinos/app/data/backup/BackupSerializationTest.kt` | `target_weight_round_trip`, `target_weight_ausente_vira_null` |
 | `app/src/test/java/com/treinos/app/data/backup/BackupMapperTest.kt` | `target_weight_mapeado_dto_entity` |
 | `back/tests/test_sync_contract.py` | `test_target_weight_round_trip`, `test_snapshot_sem_target_weight_vira_null` |
+| `app/src/test/java/com/treinos/app/ui/ReviewPlanTargetWeightTest.kt` (novo) | `revisao_preserva_carga_alvo` |
+| `back/tests/test_hybrid_plan.py` | `test_revisao_preserva_target_weight` |
+
+**Nota de implementação (2026-11-16):** o débito de `targetWeightKg` na revisão
+foi fechado — `toReviewPlanDto` envia o campo e `ExerciseDTO` do backend o
+devolve, então aceitar uma revisão preserva os alvos. Ao cobrir o caminho com
+teste apareceu um bug real: `Instant.minus(4, ChronoUnit.WEEKS)` lança
+`UnsupportedTemporalTypeException` (`Instant` não suporta `WEEKS`), o que
+quebrava `reviewPlan()` **sempre**; a janela de 4 semanas virou
+`minus(28, ChronoUnit.DAYS)`.
 
 ## Verificação manual
 

@@ -1460,7 +1460,9 @@ class AppViewModel(
     }
 
     private fun nextReviewAt(reviewAfterWeeks: Int): String =
-        Instant.now().plus(reviewAfterWeeks.toLong(), ChronoUnit.WEEKS).toString()
+        // `Instant` não suporta ChronoUnit.WEEKS (mesmo bug do cutoff da
+        // revisão): converte semanas em dias.
+        Instant.now().plus(reviewAfterWeeks.toLong() * 7L, ChronoUnit.DAYS).toString()
 
     // ---------------- Programas prontos (H4-10) ----------------
 
@@ -1506,7 +1508,9 @@ class AppViewModel(
         viewModelScope.launch {
             _isReviewing.value = true
             try {
-                val cutoff = Instant.now().minus(4L, ChronoUnit.WEEKS).toEpochMilli()
+                // 4 semanas = 28 dias: `Instant` não suporta ChronoUnit.WEEKS
+                // (UnsupportedTemporalTypeException) — a revisão quebrava sempre.
+                val cutoff = Instant.now().minus(28L, ChronoUnit.DAYS).toEpochMilli()
                 val sessionList = sessions.value.filter { it.session.startedAt >= cutoff }
                 val history = ReviewPlanHistory(
                     weeks = 4,
@@ -3286,6 +3290,10 @@ private fun WorkoutPlanWithDetails.toReviewPlanDto(): WorkoutPlanDto =
                             sets = ex.sets,
                             targetReps = ex.targetReps,
                             targetRpe = ex.targetRpe,
+                            // H4-12: a carga-alvo aplicada precisa sobreviver à
+                            // revisão — sem isto, aceitar a revisão regenera o
+                            // plano sem os alvos.
+                            targetWeightKg = ex.targetWeightKg,
                             restSeconds = ex.restSeconds,
                             notes = ex.notes,
                             isSupersetWithPrevious = ex.isSupersetWithPrevious,

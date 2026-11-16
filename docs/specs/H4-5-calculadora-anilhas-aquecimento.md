@@ -83,12 +83,12 @@ warmupRamp(workingWeightKg, inventory): List<WarmupStep>
 - Carga abaixo da barra (15 kg) → `null`; o atalho não mostra nada.
 - Inventário vazio → `perSideKg` vazio e `loadedKg = barKg`.
 - `barKg` inválido (não finito ou <= 0) → `null`.
-- Rampa de 60 kg: 40% = 24 kg arredonda para 20 kg (= barra) e é descartada;
-  sobram 60% = 35 kg × 5 e 80% = 47,5 kg × 3. **Nota de implementação
-  (2026-11-15):** com anilhas de 1,25 kg, `plateBreakdown(24)` carrega 22,5 kg
-  (e não 20) — para reproduzir o exemplo e o critério de aceite 4, o degrau é
-  descartado quando `loadedKg <= barKg + 2 × menor anilha` ("não sai da barra na
-  prática"). A regra vale para qualquer inventário e está coberta por teste.
+- Rampa de 60 kg: 40% = 24 kg carrega 22,5 kg (1,25 kg por lado) e é mantida;
+  60% = 35 kg × 5 e 80% = 47,5 kg × 3. Regra única de descarte: só sai o degrau
+  cuja carga carregável não sai da barra (`loadedKg <= barKg`) — sem exceções.
+  (Correção de 2026-11-16: o exemplo original arredondava 24 kg para 20 kg por
+  engano aritmético e gerava uma segunda regra de descarte; spec e código agora
+  seguem a mesma regra.)
 - Rampa de 20 kg (só a barra) → vazia.
 - Dois degraus que arredondam para o mesmo peso → mantém o primeiro (menor %).
 - Formatação pt-BR com vírgula e sem zeros à direita (`formatDecimal`/`formatKg`
@@ -109,8 +109,8 @@ warmupRamp(workingWeightKg, inventory): List<WarmupStep>
 3. **Dado** carga-alvo 15 kg (abaixo da barra), **quando** o cálculo roda,
    **então** retorna `null` e o atalho não exibe nada.
 4. **Dado** carga de trabalho 60 kg, **quando** `warmupRamp` roda, **então**
-   retorna `[35 kg × 5, 47,5 kg × 3]` (o degrau de 40% cai na barra e é
-   descartado).
+   retorna `[22,5 kg × 8, 35 kg × 5, 47,5 kg × 3]` (40% = 24 kg carrega 22,5 kg
+   e fica; só degrau `<= barKg` é descartado).
 5. **Dado** um exercício de barra, **quando** o usuário abre o diálogo de série
    e digita 100, **então** o atalho mostra "Por lado: 20 + 20 kg" e a rampa
    de aquecimento.
@@ -124,7 +124,7 @@ warmupRamp(workingWeightKg, inventory): List<WarmupStep>
 | Arquivo | Testes |
 |---|---|
 | `app/src/test/java/com/treinos/app/ui/PlateMathTest.kt` | `alvo_100_por_lado_20_20`, `alvo_exato_sem_resto`, `alvo_nao_carregavel_arredonda_para_baixo`, `alvo_menor_que_barra_retorna_null`, `alvo_nao_finito_retorna_null`, `anilhas_vazias_retorna_barra`, `anilhas_invalidas_sao_ignoradas`, `barra_invalida_retorna_null`, `equipamento_de_barra_reconhecido` |
-| `app/src/test/java/com/treinos/app/ui/WarmupRampTest.kt` | `rampa_60kg_descarta_40_por_cento`, `rampa_100kg_tres_degraus`, `rampa_abaixo_da_barra_vazia`, `rampa_deduplica_pesos_iguais`, `rampa_arredonda_para_baixo`, `rampa_nao_finita_vazia` |
+| `app/src/test/java/com/treinos/app/ui/WarmupRampTest.kt` | `rampa_60kg_tres_degraus`, `rampa_100kg_tres_degraus`, `rampa_abaixo_da_barra_vazia`, `rampa_deduplica_pesos_iguais`, `rampa_arredonda_para_baixo`, `rampa_nao_finita_vazia` |
 | `app/src/test/java/com/treinos/app/ui/screens/WorkoutScreenTest.kt` | `atalho_de_anilhas_aparece_para_barra`, `atalho_nao_aparece_para_halteres` |
 
 ## Verificação manual

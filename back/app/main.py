@@ -523,6 +523,9 @@ class ExerciseDTO(BaseModel):
     sets: int = Field(ge=1, le=20)
     targetReps: str
     targetRpe: Optional[float] = Field(default=None, ge=5.0, le=10.0)
+    # H4-12: carga-alvo aplicada pelo usuário — a revisão devolve o plano com
+    # o campo intacto (sem isto, aceitar a revisão perde os alvos).
+    targetWeightKg: Optional[float] = None
     restSeconds: int = Field(ge=0, le=300, default=90)
     notes: str = ""
     isSupersetWithPrevious: bool = False

@@ -157,8 +157,10 @@ class SupersetPlanTest {
         assertEquals(1, grupos.size)
         assertEquals(listOf("ex2", "ex3"), grupos.single().exerciseIds)
         assertEquals(1, grupos.single().startIndex)
-        // A (sozinho) e C (último do grupo) usam o descanso do plano.
+        // A (sozinho) e C (último do grupo) usam o descanso do plano; B vira
+        // âncora não-última do grupo [B, C] e paga a transição fixa de 15 s.
         assertEquals(90, restAfterSet(plano, "ex1", 90))
+        assertEquals(15, restAfterSet(plano, "ex2", 90))
         assertEquals(90, restAfterSet(plano, "ex3", 90))
     }
 

@@ -81,13 +81,12 @@ Alternância:
   como sozinho, sem grupo e sem crash.
 - Flag ligada num exercício cujo anterior não está no dia (plano inconsistente):
   mesmo tratamento — sozinho.
-- Desligar um membro do meio divide o grupo: `A, B(off), C(on)` → `A` sozinho e
-  grupo `[B, C]`. **Nota de implementação (2026-11-15):** a nota "o descanso de
-  `B` volta ao normal" contraria a regra geral afirmada duas vezes na spec
-  (Modelo de dados + regra de borda): `B` vira âncora não-última do grupo
-  `[B, C]` e paga a transição de 15 s. A regra geral foi implementada; o teste
-  `desligar_do_meio_divide_grupo` fixa a divisão e os descansos de `A` e `C`
-  sem pinar o de `B` — mudar é 1 linha em `restAfterSet`.
+- Desligar um membro do meio divide o grupo: `A, B(off), C(on)` → `A` sozinho
+  (descanso do plano) e grupo `[B, C]`, com `B` pagando a transição de 15 s
+  como não-último membro — a mesma regra geral de sempre (Modelo de dados +
+  regra de borda), sem exceção. (Correção de 2026-11-16: a nota original "o
+  descanso de `B` volta ao normal" contrariava a regra geral e foi removida;
+  o teste `desligar_do_meio_divide_grupo` agora fixa também o descanso de `B`.)
 - `restSeconds <= 0` (exercício sem descanso): transição é 0, nunca 15 — o
   plano manda.
 - Exercício não encontrado no plano (sessão antiga/plano trocado): usa
@@ -121,7 +120,9 @@ Alternância:
    `isSupersetWithPrevious = true`, a UI agrupa e o próximo treino do dia já vem
    agrupado.
 4. **Dado** um exercício agrupado, **quando** o usuário desliga, **então** ele
-   sai do grupo, os rótulos somem e o descanso volta ao normal.
+   sai do grupo, os rótulos somem e o descanso segue a regra geral: sozinho
+   (ou último do grupo restante) usa o `restSeconds` do plano; não-último do
+   grupo restante paga a transição de 15 s.
 5. **Dado** o primeiro exercício do dia, **quando** o treino abre, **então** o
    botão de superset não aparece.
 6. **Dado** um tri-set A, B, C, **quando** o usuário loga séries de A e de B,

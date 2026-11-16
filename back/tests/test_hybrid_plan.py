@@ -340,6 +340,46 @@ def test_revisao_reduz_volume_com_adesao_baixa():
     assert ex["sets"] == 3  # 4 * 0.8 = 3.2 → 3
 
 
+def test_revisao_preserva_target_weight():
+    """H4-12: a revisão devolve o plano com a carga-alvo aplicada intacta.
+
+    O endpoint monta `WorkoutPlanDTO(**result["workout"])` — o teste replica a
+    construção para provar que o pydantic não descarta o campo.
+    """
+    from app.main import WorkoutPlanDTO
+
+    plan = {
+        "name": "P",
+        "description": "",
+        "goal": "hipertrofia",
+        "daysPerWeek": 1,
+        "days": [
+            {
+                "name": "Dia",
+                "dayOrder": 0,
+                "isRestDay": False,
+                "weekday": None,
+                "modality": "strength",
+                "exercises": [
+                    {
+                        "exerciseId": "squat",
+                        "exerciseOrder": 0,
+                        "sets": 4,
+                        "targetReps": "8-10",
+                        "restSeconds": 90,
+                        "targetWeightKg": 62.5,
+                    }
+                ],
+            }
+        ],
+    }
+    history = {"weeks": 4, "adherence": 0.4, "sessions": []}
+    result = review_plan(plan, history)
+    dto = WorkoutPlanDTO(**result["workout"])
+    ex = dto.days[0].exercises[0]
+    assert ex.targetWeightKg == 62.5, ex.targetWeightKg
+
+
 def test_revisao_deload_com_rpe_alto():
     plan = {
         "name": "P",
