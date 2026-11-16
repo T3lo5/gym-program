@@ -799,6 +799,11 @@
     <string name="workout_note_clear">Clear</string>
     <string name="msg_note_error">Could not save the note.</string>
     <string name="history_note_label">Note: %1$s</string>
+    <!-- H4-12: apply the progression suggestion to the plan (opt-in). -->
+    <string name="workout_apply_progression">Apply to plan</string>
+    <string name="workout_reps_range_short">%1$s reps</string>
+    <string name="msg_progression_applied">Plan target: %1$s on %2$s</string>
+    <string name="msg_progression_apply_error">Could not apply the suggestion to the plan.</string>
     <!-- H4-9: Health Connect section in Settings. -->
     <string name="settings_health_title">Health Connect</string>
     <string name="settings_health_desc">Send every completed workout to Health Connect and bring the device\'s weight and steps into the app. Everything happens on the device: no account, no cloud and nothing sent to the backend.</string>

@@ -804,6 +804,11 @@
     <string name="workout_note_clear">Limpar</string>
     <string name="msg_note_error">Não foi possível salvar a nota.</string>
     <string name="history_note_label">Nota: %1$s</string>
+    <!-- H4-12: aplicar a sugestão de progressão ao plano (opt-in). -->
+    <string name="workout_apply_progression">Aplicar ao plano</string>
+    <string name="workout_reps_range_short">%1$s reps</string>
+    <string name="msg_progression_applied">Alvo do plano: %1$s em %2$s</string>
+    <string name="msg_progression_apply_error">Não foi possível aplicar a sugestão ao plano.</string>
     <!-- H4-9: seção Health Connect em Ajustes. -->
     <string name="settings_health_title">Health Connect</string>
     <string name="settings_health_desc">Envie cada treino concluído ao Health Connect e traga o peso e os passos do aparelho para dentro do app. Tudo acontece no aparelho: sem conta, sem nuvem e sem envio ao backend.</string>

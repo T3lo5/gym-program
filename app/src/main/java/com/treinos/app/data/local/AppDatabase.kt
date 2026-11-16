@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExerciseUsageEvent::class,
         BodyMeasurementEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -147,6 +147,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H4-12: carga-alvo aplicada pelo usuário ao exercício do plano a
+        // partir da sugestão de progressão. Coluna aditiva e opcional —
+        // `NULL` = sem alvo definido (comportamento atual); nenhuma tabela
+        // é recriada e nenhum dado é perdido.
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_plan_exercises ADD COLUMN targetWeightKg REAL")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -163,6 +173,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_6_7,
                         MIGRATION_7_8,
                         MIGRATION_8_9,
+                        MIGRATION_9_10,
                     )
                     .build()
                     .also { instance = it }

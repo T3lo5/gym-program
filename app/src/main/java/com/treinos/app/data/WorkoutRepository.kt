@@ -57,6 +57,8 @@ import com.treinos.app.data.remote.SyncSessionDto
 import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
 import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
+import com.treinos.app.ui.progression.ProgressionSuggestion
+import com.treinos.app.ui.progression.applyProgressionToPlanExercise as applyProgressionSuggestionToEntity
 import com.treinos.app.ui.progression.postponeReviewDate
 import com.treinos.app.ui.normalizeNote
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +83,16 @@ enum class SwapScope {
     THIS_SESSION,
     /** Afeta o plano salvo, valendo para todos os treinos futuros. */
     ALL_FUTURE,
+}
+
+/** Resultado de aplicar a sugestão de progressão ao plano (H4-12). */
+sealed interface ProgressionApplyResult {
+    /** Alvo gravado no plano (a carga aplicada ou a faixa de reps nova). */
+    data class Applied(val targetWeightKg: Double?, val targetReps: String) : ProgressionApplyResult
+    /** Sugestão sem valor concreto (`NONE` ou ação sem carga/reps). */
+    data object NothingToApply : ProgressionApplyResult
+    /** Dia/ordem/exercício não casam: nada é gravado. */
+    data object ExerciseNotInPlan : ProgressionApplyResult
 }
 
 open class WorkoutRepository(
@@ -218,6 +230,7 @@ open class WorkoutRepository(
                             sets = exercise.sets,
                             targetReps = exercise.targetReps,
                             targetRpe = exercise.targetRpe,
+                            targetWeightKg = exercise.targetWeightKg,
                             restSeconds = exercise.restSeconds,
                             notes = exercise.notes,
                             isSupersetWithPrevious = exercise.isSupersetWithPrevious,
@@ -430,6 +443,36 @@ open class WorkoutRepository(
                 ?: error("Exercício não encontrado no plano do dia.")
             dao.updatePlanExercise(exercise.copy(notes = normalizeNote(notes)))
         }
+
+    // ---------------- Progressão aplicada ao plano (H4-12) ----------------
+
+    /**
+     * Aplica a sugestão do `ProgressionEngine` ao exercício do plano com um
+     * toque. O casamento é por `exerciseOrder` **e** `exerciseId` no dia —
+     * um exercício trocado só nesta sessão (H3-41) não casa e nada é gravado.
+     * Idempotente: a mesma sugestão grava o mesmo valor. Não mexe em `sets`,
+     * `restSeconds`, `targetRpe` nem em `nextReviewAt`.
+     */
+    suspend fun applyProgressionToPlanExercise(
+        dayId: Long,
+        exerciseOrder: Int,
+        exerciseId: String,
+        suggestion: ProgressionSuggestion,
+    ): ProgressionApplyResult = withContext(Dispatchers.IO) {
+        val planExercise = dao.getExercisesForDay(dayId)
+            .firstOrNull { it.exerciseOrder == exerciseOrder }
+            ?: return@withContext ProgressionApplyResult.ExerciseNotInPlan
+        if (planExercise.exerciseId != exerciseId) {
+            return@withContext ProgressionApplyResult.ExerciseNotInPlan
+        }
+        val updated = applyProgressionSuggestionToEntity(planExercise, suggestion)
+            ?: return@withContext ProgressionApplyResult.NothingToApply
+        dao.updatePlanExercise(updated)
+        ProgressionApplyResult.Applied(
+            targetWeightKg = updated.targetWeightKg,
+            targetReps = updated.targetReps,
+        )
+    }
 
     // ---------------- Uso de exercício para calibrar precisão (H3-42) ----------
 
@@ -944,6 +987,7 @@ open class WorkoutRepository(
                 sets = dto.sets,
                 targetReps = dto.targetReps,
                 targetRpe = dto.targetRpe,
+                targetWeightKg = dto.targetWeightKg,
                 restSeconds = dto.restSeconds,
                 notes = dto.notes,
                 isSupersetWithPrevious = dto.isSupersetWithPrevious,
@@ -1458,6 +1502,7 @@ open class WorkoutRepository(
                     sets = exercise.sets,
                     targetReps = exercise.targetReps,
                     targetRpe = exercise.targetRpe,
+                    targetWeightKg = exercise.targetWeightKg,
                     restSeconds = exercise.restSeconds,
                     notes = exercise.notes,
                     isSupersetWithPrevious = exercise.isSupersetWithPrevious,

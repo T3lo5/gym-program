@@ -119,6 +119,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val catalogMessage by viewModel.catalogMessage.collectAsStateWithLifecycle()
     val activityPrefill by viewModel.activityPrefill.collectAsStateWithLifecycle()
     val progressionSuggestions by viewModel.progressionSuggestions.collectAsStateWithLifecycle()
+    // H4-12: sugestão aplicável ao plano e carga-alvo já aplicada.
+    val applicableProgressions by viewModel.applicableProgressions.collectAsStateWithLifecycle()
+    val planTargetWeights by viewModel.planTargetWeights.collectAsStateWithLifecycle()
     val personalRecords by viewModel.personalRecords.collectAsStateWithLifecycle()
     // H4-6: plano do dia da sessão em andamento para os rótulos de superset.
     val activeSessionPlanExercises by viewModel.activeSessionPlanExercises.collectAsStateWithLifecycle()
@@ -502,6 +505,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onExtendRest = { viewModel.extendRest() },
                     exerciseMedia = exerciseMedia,
                     progressionSuggestions = progressionSuggestions,
+                    // H4-12: aplicar a sugestão ao plano com um toque.
+                    applicableProgressions = applicableProgressions,
+                    planTargetWeights = planTargetWeights,
+                    onApplyProgression = viewModel::applyProgression,
                     personalRecords = personalRecords,
                     onOpenExerciseDetail = { viewModel.openExerciseDetail(it) },
                     onUpdateSet = viewModel::updateSet,

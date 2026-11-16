@@ -76,6 +76,12 @@ data class WorkoutPlanExerciseEntity(
     val sets: Int = 3,
     val targetReps: String = "8-12",
     val targetRpe: Double? = null,
+    /**
+     * H4-12: carga-alvo aplicada pelo usuário com um toque a partir da
+     * sugestão do `ProgressionEngine`. `null` = sem alvo definido (o plano
+     * não muda sozinho — aplicar é sempre opt-in e explícito).
+     */
+    val targetWeightKg: Double? = null,
     val restSeconds: Int = 90,
     val notes: String = "",
     val isSupersetWithPrevious: Boolean = false,

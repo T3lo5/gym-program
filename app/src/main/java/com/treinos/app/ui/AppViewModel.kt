@@ -14,11 +14,13 @@ import androidx.glance.appwidget.updateAll
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.MeasurementPhotoStore
 import com.treinos.app.data.MeasurementValidator
+import com.treinos.app.data.ProgressionApplyResult
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.swapCandidates
 import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
+import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.BodyMeasurementEntity
 import com.treinos.app.data.local.MEASUREMENT_SOURCE_MANUAL
 import com.treinos.app.data.local.SessionWithExercises
@@ -75,6 +77,7 @@ import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.nextIncompleteExercise
 import com.treinos.app.ui.workoutexecution.restAfterSet
 import com.treinos.app.ui.progression.ProgressionContext
+import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.progression.PersonalRecord
 import com.treinos.app.ui.progression.personalRecord
@@ -370,6 +373,60 @@ class AppViewModel(
                 progressionHistory(sessionList, exercise.exerciseId),
                 nowMillis,
             )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /**
+     * H4-12: exercícios da sessão em andamento com sugestão aplicável —
+     * sugestão com `action != NONE` **e** par de plano válido no dia (mesmo
+     * `exerciseOrder` e mesmo `exerciseId`; exercício trocado só nesta
+     * sessão fica de fora). O id é o do exercício da SESSÃO.
+     */
+    val applicableProgressions: StateFlow<Set<Long>> = combine(
+        inProgressSession,
+        activeSessionPlanExercises,
+        progressionSuggestions,
+    ) { session, planExercises, suggestions ->
+        if (session == null) {
+            emptySet()
+        } else {
+            session.exercises.mapNotNull { exercise ->
+                val sugestao = suggestions[exercise.exercise.exerciseId]
+                val casado = planExercises.any {
+                    it.exerciseOrder == exercise.exercise.exerciseOrder &&
+                        it.exerciseId == exercise.exercise.exerciseId
+                }
+                if (sugestao != null && sugestao.action != ProgressionAction.NONE && casado) {
+                    exercise.exercise.id
+                } else {
+                    null
+                }
+            }.toSet()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /**
+     * H4-12: id do exercício da SESSÃO → carga-alvo aplicada ao plano. O par
+     * casa por `exerciseOrder` + `exerciseId`, então o alvo do slot do plano
+     * não vaza para o substituto de uma troca THIS_SESSION.
+     */
+    val planTargetWeights: StateFlow<Map<Long, Double>> = combine(
+        inProgressSession,
+        activeSessionPlanExercises,
+    ) { session, planExercises ->
+        if (session == null) {
+            emptyMap()
+        } else {
+            session.exercises.mapNotNull { exercise ->
+                val alvo = planExercises
+                    .firstOrNull {
+                        it.exerciseOrder == exercise.exercise.exerciseOrder &&
+                            it.exerciseId == exercise.exercise.exerciseId
+                    }
+                    ?.targetWeightKg
+                    ?: return@mapNotNull null
+                exercise.exercise.id to alvo
+            }.toMap()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
@@ -1669,6 +1726,50 @@ class AppViewModel(
                 )
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_note_error)
+            }
+        }
+    }
+
+    /**
+     * H4-12: aplica a sugestão do `ProgressionEngine` ao plano com um toque.
+     * Só este caminho grava o alvo — abrir a tela, ver a sugestão ou registrar
+     * série não muda o plano. Exercício trocado nesta sessão ou plano excluído
+     * não gravam (`ExerciseNotInPlan`). Não toca em `nextReviewAt` nem dispara
+     * `syncWearState` — o relógio não mostra o alvo do plano.
+     */
+    fun applyProgression(exercise: SessionExerciseWithSets) {
+        val sessionId = _activeSessionId.value
+            ?: inProgressSession.value?.session?.id
+            ?: run {
+                _message.value = context.getString(R.string.msg_no_workout_in_progress)
+                return
+            }
+        val sugestao = progressionSuggestions.value[exercise.exercise.exerciseId] ?: return
+        viewModelScope.launch {
+            try {
+                val session = repository.observeSession(sessionId).first()?.session
+                    ?: error("Sessão não encontrada no aparelho.")
+                when (val result = repository.applyProgressionToPlanExercise(
+                    dayId = session.dayId,
+                    exerciseOrder = exercise.exercise.exerciseOrder,
+                    exerciseId = exercise.exercise.exerciseId,
+                    suggestion = sugestao,
+                )) {
+                    is ProgressionApplyResult.Applied -> {
+                        val alvo = sugestao.suggestedWeightKg?.let { formatKg(it) }
+                            ?: context.getString(R.string.workout_reps_range_short, result.targetReps)
+                        _message.value = context.getString(
+                            R.string.msg_progression_applied,
+                            alvo,
+                            exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                        )
+                    }
+                    ProgressionApplyResult.NothingToApply,
+                    ProgressionApplyResult.ExerciseNotInPlan,
+                    -> _message.value = context.getString(R.string.msg_progression_apply_error)
+                }
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_progression_apply_error)
             }
         }
     }

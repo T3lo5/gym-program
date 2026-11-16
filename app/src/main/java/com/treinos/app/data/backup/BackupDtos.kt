@@ -101,6 +101,10 @@ data class BackupPlanExercise(
     val sets: Int,
     val targetReps: String,
     val targetRpe: Double?,
+    // H4-12: carga-alvo aplicada pelo usuário. Aditivo SEM bump de
+    // `schemaVersion` (precedente H3-7/H3-45): ausente em backups antigos →
+    // decodifica `null`; backup novo em app antigo é ignorado.
+    val targetWeightKg: Double? = null,
     val restSeconds: Int,
     val notes: String,
     val isSupersetWithPrevious: Boolean,

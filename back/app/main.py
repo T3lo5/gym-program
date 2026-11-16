@@ -654,6 +654,8 @@ class SyncPlanExercise(BaseModel):
     sets: int = 3
     targetReps: str = ""
     targetRpe: Optional[float] = None
+    # H4-12: carga-alvo aplicada pelo usuário; app antigo não envia o campo.
+    targetWeightKg: Optional[float] = None
     restSeconds: int = 90
     notes: str = ""
     isSupersetWithPrevious: bool = False

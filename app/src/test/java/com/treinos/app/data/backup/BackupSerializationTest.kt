@@ -438,4 +438,50 @@ class BackupSerializationTest {
             exercise.images,
         )
     }
+
+    /** H4-12: o exercício do plano do sample com a carga-alvo aplicada. */
+    private fun sampleComTargetWeight(valor: Double?): BackupFile =
+        sampleFile().copy(
+            schemaVersion = 4,
+            plans = sampleFile().plans.map { plan ->
+                plan.copy(
+                    days = plan.days.map { day ->
+                        day.copy(
+                            exercises = day.exercises.map { it.copy(targetWeightKg = valor) },
+                        )
+                    },
+                )
+            },
+        )
+
+    @Test
+    fun target_weight_round_trip() {
+        val encoded = backupExportEncoder.encodeToString(
+            BackupFile.serializer(),
+            sampleComTargetWeight(45.0),
+        )
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), encoded)
+
+        assertTrue(encoded.contains("\"targetWeightKg\":45.0"))
+        assertEquals(
+            45.0,
+            decoded.plans.single().days.single().exercises.single().targetWeightKg!!,
+            0.0,
+        )
+    }
+
+    @Test
+    fun target_weight_ausente_vira_null() {
+        // Backup escrito antes da H4-12: aditivo SEM bump de schemaVersion —
+        // nenhuma chave `targetWeightKg` no arquivo decodifica como `null`.
+        val escritoPeloAppAntigo = backupExportEncoder
+            .encodeToString(BackupFile.serializer(), sampleComTargetWeight(45.0))
+            .replace(",\"targetWeightKg\":45.0", "")
+
+        assertTrue(!escritoPeloAppAntigo.contains("targetWeightKg"))
+
+        val decoded = backupImportDecoder.decodeFromString(BackupFile.serializer(), escritoPeloAppAntigo)
+
+        assertNull(decoded.plans.single().days.single().exercises.single().targetWeightKg)
+    }
 }

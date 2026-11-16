@@ -28,6 +28,8 @@ import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.SwapScope
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.progression.PersonalRecord
+import com.treinos.app.ui.progression.ProgressionAction
+import com.treinos.app.ui.progression.ProgressionSuggestion
 import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
@@ -123,6 +125,11 @@ class WorkoutScreenTest {
         onToggleSuperset: (Long, Boolean) -> Unit = { _, _ -> },
         onEditSessionNote: (String) -> Unit = {},
         onEditExerciseNote: (SessionExerciseEntity, String) -> Unit = { _, _ -> },
+        // H4-12: sugestão aplicável ao plano e carga-alvo já aplicada.
+        progressionSuggestions: Map<String, ProgressionSuggestion> = emptyMap(),
+        applicableProgressions: Set<Long> = emptySet(),
+        planTargetWeights: Map<Long, Double> = emptyMap(),
+        onApplyProgression: (SessionExerciseWithSets) -> Unit = {},
     ) {
         composeRule.setContent {
             WorkoutScreen(
@@ -145,6 +152,10 @@ class WorkoutScreenTest {
                 onToggleSuperset = onToggleSuperset,
                 onEditSessionNote = onEditSessionNote,
                 onEditExerciseNote = onEditExerciseNote,
+                applicableProgressions = applicableProgressions,
+                planTargetWeights = planTargetWeights,
+                onApplyProgression = onApplyProgression,
+                progressionSuggestions = progressionSuggestions,
             )
         }
     }
@@ -776,5 +787,114 @@ class WorkoutScreenTest {
             .performScrollToNode(hasText("Cada série é gravada no SQLite", substring = true))
         composeRule.onNodeWithText("Nota do exercício no plano").assertIsDisplayed()
         composeRule.onNodeWithText("puxar a barra até o peito").assertIsDisplayed()
+    }
+
+    // ---------- H4-12: aplicar a sugestão de progressão ao plano ----------
+
+    private fun sugestaoDeCarga(weightKg: Double) = ProgressionSuggestion(
+        action = ProgressionAction.INCREASE,
+        suggestedWeightKg = weightKg,
+        suggestedReps = null,
+        reason = "Duas sessões no topo da faixa com RPE confortável.",
+    )
+
+    @Test
+    fun botao_aplicar_aparece_com_sugestao_aplicavel() {
+        // Sugestão aplicável + par de plano casando → linha de sugestão e botão.
+        setContent(
+            session = sessao(),
+            progressionSuggestions = mapOf("Barbell_Bench_Press" to sugestaoDeCarga(42.5)),
+            applicableProgressions = setOf(100L),
+        )
+
+        // O botão fica no fim do card: rolar até o rodapé satura o scroll e
+        // deixa o fim do card visível (padrão dos testes de nota/superset).
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Cada série é gravada no SQLite", substring = true))
+        composeRule.onNodeWithText("Aplicar ao plano").assertIsDisplayed()
+        composeRule.onNodeWithText("Sugestão: 42,5 kg", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun sem_sugestao_nao_mostra_botao() {
+        // Sem sugestão (mapa vazio) não há linha nem botão — nada a aplicar.
+        setContent(session = sessao())
+
+        composeRule.onNodeWithText("Aplicar ao plano").assertDoesNotExist()
+    }
+
+    @Test
+    fun exercicio_trocado_nao_mostra_botao() {
+        // H3-41: exercício trocado só nesta sessão não casa com o plano na
+        // mesma ordem — a linha de sugestão existe, mas o botão não aparece.
+        setContent(
+            session = sessao(),
+            progressionSuggestions = mapOf("Barbell_Bench_Press" to sugestaoDeCarga(42.5)),
+            planExercises = listOf(
+                WorkoutPlanExerciseEntity(
+                    id = 500,
+                    dayId = 10,
+                    exerciseId = "Dumbbell_Bench_Press",
+                    exerciseOrder = 0,
+                ),
+            ),
+            applicableProgressions = emptySet(),
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Sugestão: 42,5 kg", substring = true))
+        composeRule.onNodeWithText("Aplicar ao plano").assertDoesNotExist()
+    }
+
+    @Test
+    fun toque_dispara_callback_uma_vez() {
+        // Um toque aplica e grava: o callback chega uma vez, com o exercício.
+        var aplicacoes = 0
+        var exerciseIdRecebido: String? = null
+        setContent(
+            session = sessao(),
+            progressionSuggestions = mapOf("Barbell_Bench_Press" to sugestaoDeCarga(42.5)),
+            applicableProgressions = setOf(100L),
+            onApplyProgression = { exercise ->
+                aplicacoes += 1
+                exerciseIdRecebido = exercise.exercise.exerciseId
+            },
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Cada série é gravada no SQLite", substring = true))
+        composeRule.onNodeWithText("Aplicar ao plano").performClick()
+
+        composeRule.waitForIdle()
+        assertEquals(1, aplicacoes)
+        assertEquals("Barbell_Bench_Press", exerciseIdRecebido)
+    }
+
+    @Test
+    fun dialogo_prefere_target_do_plano_sobre_a_sugestao() {
+        // Ordem de pré-preenchimento: última série → carga-alvo do plano →
+        // sugestão. Sem última série, o alvo do plano (42,5) vence a sugestão
+        // (45,0); salvar sem digitar nada grava o valor pré-preenchido — o
+        // valor digitado pelo usuário sempre prevalece.
+        var registrada: Triple<Int?, Double?, Double?>? = null
+        setContent(
+            session = sessao(comSets = false),
+            progressionSuggestions = mapOf("Barbell_Bench_Press" to sugestaoDeCarga(45.0)),
+            planTargetWeights = mapOf(100L to 42.5),
+            onLoggedSet = { reps, weight, rpe -> registrada = Triple(reps, weight, rpe) },
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 1"))
+        composeRule.onNodeWithText("Registrar série 1").performClick()
+        composeRule.onNodeWithText("Série 1 — Supino reto").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Salvar série").performClick()
+
+        assertEquals(Triple(null, 42.5, null), registrada)
     }
 }

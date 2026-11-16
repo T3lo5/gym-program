@@ -741,3 +741,73 @@ def test_sync_sem_set_type_aplica_default():
     assert len(sets) == 1
     assert sets[0]["setType"] == "normal"
     assert sets[0]["rir"] is None
+
+
+def _plan_payload_com_exercicio(device_id: str, target_weight=None):
+    """Plano com um exercício de força; `targetWeightKg` opcional (H4-12)."""
+    plan = _plan_payload(1, "Principal")
+    plan["days"] = [
+        {
+            "localId": 10,
+            "name": "A",
+            "dayOrder": 0,
+            "notes": "",
+            "isRestDay": False,
+            "exercises": [
+                {
+                    "exerciseId": "e1",
+                    "exerciseOrder": 0,
+                    "sets": 3,
+                    "targetReps": "8-12",
+                    "targetRpe": None,
+                    "restSeconds": 90,
+                    "notes": "",
+                    "isSupersetWithPrevious": False,
+                    "exerciseName": "Ex",
+                    "primaryMuscles": ["peito"],
+                    "equipment": "barra",
+                }
+            ],
+        }
+    ]
+    if target_weight is not None:
+        plan["days"][0]["exercises"][0]["targetWeightKg"] = target_weight
+    return {
+        "deviceId": device_id,
+        "syncedAt": "2026-11-15T00:00:00Z",
+        "plans": [plan],
+        "sessions": [],
+    }
+
+
+def test_target_weight_round_trip():
+    """H4-12: a carga-alvo aplicada ao plano sobrevive ao sync e volta no download."""
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = _plan_payload_com_exercicio("d-h412", target_weight=42.5)
+
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-h412"})
+    assert d.status_code == 200
+    exercises = d.json()["planExercises"]
+    assert len(exercises) == 1
+    assert exercises[0]["targetWeightKg"] == 42.5
+    assert exercises[0]["targetReps"] == "8-12"
+
+
+def test_snapshot_sem_target_weight_vira_null():
+    """H4-12: app antigo sem o campo → o download traz `targetWeightKg` None."""
+    setup_test_db()
+    client = TestClient(main.app)
+    payload = _plan_payload_com_exercicio("d-h412-antigo")
+
+    r = client.post("/v1/sync", json=payload)
+    assert r.status_code == 200
+
+    d = client.get("/v1/sync/download", params={"deviceId": "d-h412-antigo"})
+    assert d.status_code == 200
+    exercises = d.json()["planExercises"]
+    assert len(exercises) == 1
+    assert exercises[0]["targetWeightKg"] is None

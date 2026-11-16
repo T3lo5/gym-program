@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS synced_plan_exercises (
     sets INTEGER NOT NULL DEFAULT 3,
     target_reps TEXT NOT NULL DEFAULT '',
     target_rpe REAL,
+    target_weight REAL,
     rest_seconds INTEGER NOT NULL DEFAULT 90,
     notes TEXT NOT NULL DEFAULT '',
     is_superset_with_previous INTEGER NOT NULL DEFAULT 0,
@@ -237,6 +238,8 @@ def init_db() -> None:
                 "target_distance_meters": "REAL",
                 "target_pace_seconds_per_km": "INTEGER",
                 "target_hr_zone": "TEXT",
+                # H4-12: carga-alvo aplicada pelo usuário no plano.
+                "target_weight": "REAL",
             },
         )
         _ensure_columns(
@@ -463,12 +466,12 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
                 """
                 INSERT INTO synced_plan_exercises (
                     day_id, exercise_id, exercise_order, sets, target_reps,
-                    target_rpe, rest_seconds, notes,
+                    target_rpe, target_weight, rest_seconds, notes,
                     is_superset_with_previous, exercise_name,
                     primary_muscles, equipment, metric_type,
                     target_duration_seconds, target_distance_meters,
                     target_pace_seconds_per_km, target_hr_zone
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     day_id,
@@ -477,6 +480,7 @@ def _upsert_plan(conn: sqlite3.Connection, device_id: str, plan: Dict[str, Any],
                     int(exercise.get("sets", 3)),
                     exercise.get("targetReps", ""),
                     exercise.get("targetRpe"),
+                    exercise.get("targetWeightKg"),
                     int(exercise.get("restSeconds", 90)),
                     exercise.get("notes", ""),
                     1 if exercise.get("isSupersetWithPrevious") else 0,
@@ -723,7 +727,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
             ex_rows = conn.execute(
                 f"""
                 SELECT id, day_id, exercise_id, exercise_order, sets, target_reps,
-                       target_rpe, rest_seconds, notes, is_superset_with_previous,
+                       target_rpe, target_weight, rest_seconds, notes, is_superset_with_previous,
                        exercise_name, primary_muscles, equipment, metric_type,
                        target_duration_seconds, target_distance_meters,
                        target_pace_seconds_per_km, target_hr_zone
@@ -834,6 +838,7 @@ def get_sync_download_data(device_id: str) -> Dict[str, Any]:
                 "sets": row["sets"],
                 "targetReps": row["target_reps"],
                 "targetRpe": row["target_rpe"],
+                "targetWeightKg": row["target_weight"],
                 "restSeconds": row["rest_seconds"],
                 "notes": row["notes"],
                 "isSupersetWithPrevious": _bool(row["is_superset_with_previous"]),

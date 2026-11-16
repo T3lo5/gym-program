@@ -421,4 +421,26 @@ class BackupMapperTest {
         assertEquals("", entity.instructions)
         assertEquals("", entity.images)
     }
+
+    @Test
+    fun target_weight_mapeado_dto_entity() {
+        // H4-12: a carga-alvo aplicada atravessa entidade → DTO → entidade.
+        val exercise = WorkoutPlanExerciseEntity(
+            id = 100,
+            dayId = 10,
+            exerciseId = "Barbell_Bench_Press",
+            exerciseName = "Supino reto",
+            exerciseOrder = 0,
+            sets = 3,
+            targetReps = "8-12",
+            targetWeightKg = 45.0,
+        )
+
+        val dto = BackupMapper.toDto(exercise, dayId = 10)
+        assertEquals(45.0, dto.targetWeightKg!!, 0.0)
+
+        val volta = BackupMapper.toEntity(dto, dayId = 10)
+        assertEquals(45.0, volta.targetWeightKg!!, 0.0)
+        assertEquals(10, volta.dayId)
+    }
 }

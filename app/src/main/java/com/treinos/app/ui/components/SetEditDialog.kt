@@ -317,8 +317,10 @@ fun SetEditDialog(
 }
 
 /** Texto de apoio do motor de progressão; `null` quando não há o que sugerir. */
+// H4-12: `internal` para o ExerciseCard reusar o mesmo texto do diálogo —
+// o rótulo da sugestão não pode divergir entre os dois lugares.
 @Composable
-private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
+internal fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
     if (suggestion == null || suggestion.action == ProgressionAction.NONE) return null
     val weight = suggestion.suggestedWeightKg?.let { formatKg(it) }
     val reps = if (weight == null) suggestion.suggestedReps?.let { stringResource(R.string.workout_reps, it) } else null

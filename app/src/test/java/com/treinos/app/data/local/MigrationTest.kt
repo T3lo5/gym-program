@@ -497,6 +497,63 @@ class MigrationTest {
         migrated.close()
     }
 
+    /**
+     * H4-12: a migration 9→10 adiciona `targetWeightKg` (aditiva) sem tocar
+     * em nada existente. O nome acompanha a migração real desta spec
+     * (MIGRATION_9_10, banco v10) — a fila do Horizon 4 consumiu 6→7 (H4-4),
+     * 7→8 (H4-7) e 8→9 (H4-8) antes.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun migracao_9_10_preserva_linhas_e_target_weight_nulo() {
+        // Banco v9 (H4-8) com um plano, um dia e um exercício de plano.
+        helper.createDatabase(testDb, 9).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source, kind) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local','main')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_days (id, planId, name, dayOrder, notes, isRestDay, modality, weekday) " +
+                    "VALUES (10,1,'A',0,'',0,'strength',1)"
+            )
+            db.execSQL(
+                "INSERT INTO workout_plan_exercises (id, dayId, exerciseId, exerciseName, " +
+                    "primaryMuscles, equipment, exerciseOrder, sets, targetReps, targetRpe, " +
+                    "restSeconds, notes, isSupersetWithPrevious, metricType, instructions, images) " +
+                    "VALUES (100,10,'Barbell_Bench_Press','Supino','peito','barra',0,3,'8-12',NULL,90,'',0,'reps_weight','','')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 10, true, AppDatabase.MIGRATION_9_10)
+
+        // Nada se perde na migração aditiva.
+        assertEquals(1, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_days"))
+        assertEquals(1, migrated.rowCount("workout_plan_exercises"))
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+
+        // A coluna nova nasce e os planos antigos ficam sem alvo definido.
+        migrated.query(
+            "SELECT exerciseId, exerciseName, sets, targetReps, targetWeightKg " +
+                "FROM workout_plan_exercises WHERE id = 100"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Barbell_Bench_Press", cursor.getString(0))
+            assertEquals("Supino", cursor.getString(1))
+            assertEquals(3, cursor.getInt(2))
+            assertEquals("8-12", cursor.getString(3))
+            assertTrue(cursor.isNull(4))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

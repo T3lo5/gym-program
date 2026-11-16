@@ -90,6 +90,7 @@ import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.NoteEditDialog
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SetEditDialog
+import com.treinos.app.ui.components.suggestionLabel
 import com.treinos.app.ui.calculateProgress
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.equipmentLabel
@@ -147,6 +148,11 @@ fun WorkoutScreen(
     // exercício é do PLANO (reaparece nas próximas sessões do dia).
     onEditSessionNote: (String) -> Unit = {},
     onEditExerciseNote: (SessionExerciseEntity, String) -> Unit = { _, _ -> },
+    // H4-12: aplicar a sugestão de progressão ao plano com um toque —
+    // opt-in e explícito; nenhum caminho aplica sem o toque.
+    applicableProgressions: Set<Long> = emptySet(),
+    planTargetWeights: Map<Long, Double> = emptyMap(),
+    onApplyProgression: (SessionExerciseWithSets) -> Unit = {},
 ) {
     // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
@@ -433,6 +439,12 @@ fun WorkoutScreen(
                             .firstOrNull { it.exerciseOrder == exercise.exercise.exerciseOrder }
                             ?.notes.orEmpty(),
                         onEditNote = { exerciseNoteTargetId = exercise.exercise.id },
+                        // H4-12: linha de sugestão com o botão "Aplicar ao plano".
+                        // O botão só existe com sugestão aplicável e par de plano
+                        // casando por `exerciseOrder` + `exerciseId`.
+                        suggestion = progressionSuggestions[exercise.exercise.exerciseId],
+                        canApplyProgression = exercise.exercise.id in applicableProgressions,
+                        onApplyProgression = { onApplyProgression(exercise) },
                     )
                 }
 
@@ -470,12 +482,17 @@ fun WorkoutScreen(
             suggestion = progressionSuggestions[exercise.exercise.exerciseId]
                 ?.takeIf { it.action != ProgressionAction.NONE },
             initialReps = last?.reps?.toString().orEmpty(),
-            initialWeight = last?.weightKg?.let { formatDecimal(it, 1) }
-                ?: progressionSuggestions[exercise.exercise.exerciseId]
-                    ?.takeIf { it.action != ProgressionAction.NONE }
-                    ?.suggestedWeightKg
-                    ?.let { formatDecimal(it, 1) }
-                    .orEmpty(),
+            // H4-12: a carga pré-preenchida segue esta ordem — última série
+            // registrada → carga-alvo aplicada ao plano → sugestão. O valor
+            // digitado pelo usuário sempre prevalece.
+            initialWeight = (
+                last?.weightKg?.let { formatDecimal(it, 1) }
+                    ?: planTargetWeights[exercise.exercise.id]?.let { formatDecimal(it, 1) }
+                    ?: progressionSuggestions[exercise.exercise.exerciseId]
+                        ?.takeIf { it.action != ProgressionAction.NONE }
+                        ?.suggestedWeightKg
+                        ?.let { formatDecimal(it, 1) }
+                ).orEmpty(),
             initialRpe = last?.rpe?.let { formatDecimal(it, 1) }.orEmpty(),
             confirmLabel = stringResource(R.string.workout_set_dialog_save),
             onDelete = null,
@@ -1088,6 +1105,10 @@ private fun ExerciseCard(
     // o diálogo. A nota vive no plano e reaparece nas próximas sessões do dia.
     exerciseNote: String = "",
     onEditNote: () -> Unit = {},
+    // H4-12: sugestão de progressão e botão "Aplicar ao plano" (opt-in).
+    suggestion: ProgressionSuggestion? = null,
+    canApplyProgression: Boolean = false,
+    onApplyProgression: () -> Unit = {},
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
     // H3-27: progresso derivado das séries gravadas — editar/excluir série
@@ -1259,6 +1280,25 @@ private fun ExerciseCard(
                         stringResource(R.string.workout_log_set, exercise.sets.size + 1)
                     }
                 )
+            }
+
+            // H4-12: linha de sugestão com o botão de aplicar ao plano. O
+            // toque no botão é o único caminho que grava o alvo no plano.
+            val suggestionText = suggestionLabel(suggestion)
+            if (suggestionText != null) {
+                Text(
+                    text = suggestionText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (canApplyProgression) {
+                OutlinedButton(
+                    onClick = onApplyProgression,
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
+                ) {
+                    Text(stringResource(R.string.workout_apply_progression))
+                }
             }
 
             // Troca de exercício durante o treino em andamento (H3-41/H3-42).

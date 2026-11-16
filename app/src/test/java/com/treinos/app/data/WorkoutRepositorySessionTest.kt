@@ -10,6 +10,7 @@ import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.ProgressionApplyResult
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
@@ -17,6 +18,8 @@ import com.treinos.app.data.remote.GenerateJobAck
 import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
+import com.treinos.app.ui.progression.ProgressionAction
+import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.programs.buildProgram
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -667,5 +670,90 @@ class WorkoutRepositorySessionTest {
         // A sessão continua com o substituto, na mesma ordem.
         assertEquals("ex_sub", dao.getSessionExercise(substituido.id)?.exerciseId)
         assertEquals(0, dao.getSessionExercise(substituido.id)?.exerciseOrder)
+    }
+
+    // ---------- H4-12: aplicar sugestão de progressão ao plano ----------
+
+    private fun sugestao(
+        action: ProgressionAction,
+        suggestedWeightKg: Double? = null,
+        suggestedReps: Int? = null,
+    ) = ProgressionSuggestion(
+        action = action,
+        suggestedWeightKg = suggestedWeightKg,
+        suggestedReps = suggestedReps,
+        reason = "Duas sessões no topo da faixa com RPE confortável.",
+    )
+
+    @Test
+    fun aplicar_progressao_grava_target_weight_por_ordem() = runTest {
+        val (_, dayId) = planoComDoisExercicios()
+
+        val resultado = repository.applyProgressionToPlanExercise(
+            dayId = dayId,
+            exerciseOrder = 1,
+            exerciseId = "ex2",
+            suggestion = sugestao(ProgressionAction.INCREASE, suggestedWeightKg = 42.5),
+        )
+
+        assertTrue(resultado is ProgressionApplyResult.Applied)
+        val aplicado = resultado as ProgressionApplyResult.Applied
+        assertEquals(42.5, aplicado.targetWeightKg ?: 0.0, 0.001)
+        val exercicios = dao.getExercisesForDay(dayId).sortedBy { it.exerciseOrder }
+        // Casou pelo par ordem+exercício: só o slot 1 recebeu o alvo.
+        assertEquals(42.5, exercicios[1].targetWeightKg ?: 0.0, 0.001)
+        assertNull(exercicios[0].targetWeightKg)
+        // O restante do slot não mudou.
+        assertEquals("ex2", exercicios[1].exerciseId)
+        assertEquals(3, exercicios[1].sets)
+    }
+
+    @Test
+    fun aplicar_progressao_nao_casa_exercicio_trocado() = runTest {
+        // H3-41: a troca THIS_SESSION muda o exercício da sessão, não o plano;
+        // o `exerciseId` da sessão difere do plano na mesma ordem → nada gravado.
+        val (_, dayId) = planoComDoisExercicios()
+
+        val resultado = repository.applyProgressionToPlanExercise(
+            dayId = dayId,
+            exerciseOrder = 0,
+            exerciseId = "ex_sub",
+            suggestion = sugestao(ProgressionAction.INCREASE, suggestedWeightKg = 42.5),
+        )
+
+        assertTrue(resultado is ProgressionApplyResult.ExerciseNotInPlan)
+        assertTrue(dao.getExercisesForDay(dayId).all { it.targetWeightKg == null })
+    }
+
+    @Test
+    fun aplicar_progressao_sem_sugestao_nao_grava() = runTest {
+        val (_, dayId) = planoComDoisExercicios()
+
+        val resultado = repository.applyProgressionToPlanExercise(
+            dayId = dayId,
+            exerciseOrder = 0,
+            exerciseId = "ex1",
+            suggestion = sugestao(ProgressionAction.NONE),
+        )
+
+        assertTrue(resultado is ProgressionApplyResult.NothingToApply)
+        assertTrue(dao.getExercisesForDay(dayId).all { it.targetWeightKg == null })
+    }
+
+    @Test
+    fun aplicar_progressao_sem_dia_falha_sem_gravar() = runTest {
+        // Plano `extra` excluído durante a sessão: o dia some → não casa e
+        // nada é gravado.
+        val (_, dayId) = planoComDoisExercicios()
+
+        val resultado = repository.applyProgressionToPlanExercise(
+            dayId = 999L,
+            exerciseOrder = 0,
+            exerciseId = "ex1",
+            suggestion = sugestao(ProgressionAction.INCREASE, suggestedWeightKg = 42.5),
+        )
+
+        assertTrue(resultado is ProgressionApplyResult.ExerciseNotInPlan)
+        assertTrue(dao.getExercisesForDay(dayId).all { it.targetWeightKg == null })
     }
 }

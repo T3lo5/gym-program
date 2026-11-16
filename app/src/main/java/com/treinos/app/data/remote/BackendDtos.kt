@@ -83,6 +83,8 @@ data class WorkoutExerciseDto(
     val sets: Int = 3,
     val targetReps: String = "8-12",
     val targetRpe: Double? = null,
+    // H4-12: carga-alvo aplicada pelo usuário; plano vindo da geração/revisão.
+    val targetWeightKg: Double? = null,
     val restSeconds: Int = 90,
     val notes: String = "",
     val isSupersetWithPrevious: Boolean = false,
@@ -154,6 +156,8 @@ data class SyncPlanExerciseDto(
     val sets: Int = 0,
     val targetReps: String = "",
     val targetRpe: Double? = null,
+    // H4-12: carga-alvo aplicada pelo usuário; `null` = sem alvo definido.
+    val targetWeightKg: Double? = null,
     val restSeconds: Int = 90,
     val notes: String = "",
     val isSupersetWithPrevious: Boolean = false,
@@ -282,6 +286,8 @@ data class SyncDownloadPlanExerciseDto(
     val sets: Int,
     val targetReps: String = "",
     val targetRpe: Double? = null,
+    // H4-12: carga-alvo aplicada pelo usuário; snapshot antigo vem sem o campo.
+    val targetWeightKg: Double? = null,
     val restSeconds: Int = 90,
     val notes: String = "",
     val isSupersetWithPrevious: Boolean = false,
