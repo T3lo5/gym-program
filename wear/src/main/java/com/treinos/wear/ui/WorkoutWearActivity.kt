@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +39,8 @@ import com.treinos.wear.tile.WorkoutTileService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.UUID
 
 class WorkoutWearActivity : ComponentActivity() {
@@ -62,8 +65,8 @@ class WorkoutWearActivity : ComponentActivity() {
             WorkoutWearScreen(
                 state = stateStore.state.collectAsState().value,
                 connected = connected,
-                onLogSet = { sessionId ->
-                    scope.launch { sendCommand(sessionId, WearCommandKind.LOG_SET) }
+                onLogSet = { sessionId, reps, weightKg ->
+                    scope.launch { sendCommand(sessionId, WearCommandKind.LOG_SET, reps, weightKg) }
                 },
                 onSkipRest = { sessionId ->
                     scope.launch { sendCommand(sessionId, WearCommandKind.SKIP_REST) }
@@ -100,11 +103,20 @@ class WorkoutWearActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun sendCommand(sessionId: Long, kind: WearCommandKind) {
+    private suspend fun sendCommand(
+        sessionId: Long,
+        kind: WearCommandKind,
+        reps: Int? = null,
+        weightKg: Double? = null,
+    ) {
+        // H4-15: o LOG_SET do pulso passa a preencher reps/weightKg (antes
+        // nulos) e o celular deixa de cair no fallback da última série.
         val comando = WearCommand(
             commandId = UUID.randomUUID().toString(),
             sessionId = sessionId,
             kind = kind,
+            reps = reps,
+            weightKg = weightKg,
         )
 
         val fila = stateStore.loadPendingCommands()
@@ -134,7 +146,7 @@ class WorkoutWearActivity : ComponentActivity() {
 fun WorkoutWearScreen(
     state: WearWorkoutState?,
     connected: Boolean,
-    onLogSet: (Long) -> Unit,
+    onLogSet: (Long, Int?, Double?) -> Unit,
     onSkipRest: (Long) -> Unit,
     onFinish: (Long) -> Unit,
     onRequestState: () -> Unit,
@@ -187,6 +199,17 @@ fun WorkoutWearScreen(
                 }
             }
         } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
+                // H4-15: editor de carga/reps da próxima série. Parte do default
+                // ao abrir e reseta ao trocar de exercício (sessionId ou
+                // exerciseIndex novos); a edição não persiste entre aberturas.
+                var editor by remember { mutableStateOf(WearSetEditorState(0.0, WearSetEditor.DEFAULT_REPS)) }
+                LaunchedEffect(state.sessionId, state.exerciseIndex) {
+                    editor = WearSetEditor.reduce(
+                        editor,
+                        WearSetEditorAction.Reset(state.lastWeightKg, state.lastReps, state.targetReps),
+                    )
+                }
+
                 // Sincroniza com o estado publicado pelo celular: descanso novo reinicia,
                 // mesma chave não toca, descanso nulo/0 zera um timer rodando.
                 LaunchedEffect(state) {
@@ -249,6 +272,54 @@ fun WorkoutWearScreen(
                             fontSize = 16.sp,
                         )
                     }
+                    // H4-15: controles +/− de carga e reps (passos de 2,5 kg e
+                    // 1 rep). Sem debounce: editar é local, não envia comando.
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.editor_weight_label),
+                            fontSize = 14.sp,
+                        )
+                        StepButton(
+                            label = stringResource(R.string.editor_decrease),
+                            descricao = stringResource(R.string.editor_decrease_weight_desc),
+                            onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.DecrementWeight) },
+                        )
+                        Text(
+                            text = formatarCarga(editor.weightKg),
+                            fontSize = 14.sp,
+                        )
+                        StepButton(
+                            label = stringResource(R.string.editor_increase),
+                            descricao = stringResource(R.string.editor_increase_weight_desc),
+                            onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.IncrementWeight) },
+                        )
+                    }
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.editor_reps_label),
+                            fontSize = 14.sp,
+                        )
+                        StepButton(
+                            label = stringResource(R.string.editor_decrease),
+                            descricao = stringResource(R.string.editor_decrease_reps_desc),
+                            onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.DecrementReps) },
+                        )
+                        Text(
+                            text = "${editor.reps}",
+                            fontSize = 14.sp,
+                        )
+                        StepButton(
+                            label = stringResource(R.string.editor_increase),
+                            descricao = stringResource(R.string.editor_increase_reps_desc),
+                            onClick = { editor = WearSetEditor.reduce(editor, WearSetEditorAction.IncrementReps) },
+                        )
+                    }
                     if (timerState.remainingSeconds > 0) {
                         val restLabel = stringResource(R.string.rest_remaining_format, timerState.remainingSeconds)
                         Text(
@@ -260,7 +331,14 @@ fun WorkoutWearScreen(
                     }
                     val completeSetLabel = stringResource(R.string.complete_set)
                     Button(
-                        onClick = { dispatch { onLogSet(state.sessionId) } },
+                        onClick = {
+                            dispatch {
+                                // H4-15: carga 0,0 = sem carga (peso corporal) →
+                                // null no comando, mesma regra de
+                                // WearSetEditorState.toLogSetCommand.
+                                onLogSet(state.sessionId, editor.reps, editor.weightKg.takeIf { it != 0.0 })
+                            }
+                        },
                         enabled = buttonsEnabled,
                         modifier = Modifier.semantics { contentDescription = completeSetLabel },
                     ) {
@@ -327,4 +405,30 @@ fun WorkoutWearScreen(
                 }
             }
     }
+}
+
+/**
+ * H4-15: botão de passo (+/−) do editor. Sem o `WearDebounce` dos botões que
+ * enviam comando — editar é local e precisa aceitar toques repetidos.
+ */
+@Composable
+private fun StepButton(
+    label: String,
+    descricao: String,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { contentDescription = descricao },
+    ) {
+        Text(text = label, fontSize = 18.sp)
+    }
+}
+
+/** Carga do editor sempre com 1 casa decimal ("20,0 kg"), como em WearFormat. */
+private fun formatarCarga(weightKg: Double): String {
+    val texto = BigDecimal.valueOf(weightKg).setScale(1, RoundingMode.HALF_UP).toPlainString()
+    return "${texto.replace('.', ',')} kg"
 }

@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,5 +105,26 @@ class WearProtocolTest {
             protocolVersion = 2,
         )
         assertNotEquals(1, estadoV2.protocolVersion)
+    }
+
+    @Test
+    fun round_trip_do_log_set_com_carga_e_reps() {
+        // H4-15: o LOG_SET do pulso passa a carregar reps/weightKg preenchidos.
+        // Sem mudança de schema — protocolVersion continua 1 e os campos já
+        // existiam no contrato.
+        val comando = WearCommand(
+            commandId = "cmd-h4-15",
+            sessionId = 42,
+            kind = WearCommandKind.LOG_SET,
+            reps = 9,
+            weightKg = 22.5,
+        )
+        val serializado = json.encodeToString(WearCommand.serializer(), comando)
+        val novamente = json.decodeFromString(WearCommand.serializer(), serializado)
+        assertEquals(comando, novamente)
+        assertEquals(1, novamente.protocolVersion)
+        assertEquals(9, novamente.reps)
+        assertEquals(22.5, novamente.weightKg!!, 0.0)
+        assertNull(novamente.rpe)
     }
 }
