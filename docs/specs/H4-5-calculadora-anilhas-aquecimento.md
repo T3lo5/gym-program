@@ -7,8 +7,8 @@
 | Item do roadmap | `H4-5` |
 | MoSCoW | `S` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` |
 
 ## Objetivo
 
@@ -84,7 +84,11 @@ warmupRamp(workingWeightKg, inventory): List<WarmupStep>
 - Inventário vazio → `perSideKg` vazio e `loadedKg = barKg`.
 - `barKg` inválido (não finito ou <= 0) → `null`.
 - Rampa de 60 kg: 40% = 24 kg arredonda para 20 kg (= barra) e é descartada;
-  sobram 60% = 35 kg × 5 e 80% = 47,5 kg × 3.
+  sobram 60% = 35 kg × 5 e 80% = 47,5 kg × 3. **Nota de implementação
+  (2026-11-15):** com anilhas de 1,25 kg, `plateBreakdown(24)` carrega 22,5 kg
+  (e não 20) — para reproduzir o exemplo e o critério de aceite 4, o degrau é
+  descartado quando `loadedKg <= barKg + 2 × menor anilha` ("não sai da barra na
+  prática"). A regra vale para qualquer inventário e está coberta por teste.
 - Rampa de 20 kg (só a barra) → vazia.
 - Dois degraus que arredondam para o mesmo peso → mantém o primeiro (menor %).
 - Formatação pt-BR com vírgula e sem zeros à direita (`formatDecimal`/`formatKg`

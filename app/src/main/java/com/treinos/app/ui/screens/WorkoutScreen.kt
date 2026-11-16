@@ -83,6 +83,7 @@ import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.SetRecord
+import com.treinos.app.ui.DEFAULT_PLATE_INVENTORY
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.ScreenTopBar
@@ -95,6 +96,7 @@ import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.hapticFeedbackForEvent
+import com.treinos.app.ui.isPlateLoadedEquipment
 import com.treinos.app.ui.muscleLabel
 import com.treinos.app.ui.progression.PersonalRecord
 import com.treinos.app.ui.progression.ProgressionAction
@@ -438,6 +440,14 @@ fun WorkoutScreen(
                 onLogSet(exercise, input)
                 exerciseToLogId = null
             },
+            // H4-5: atalho de anilhas só para equipamento carregado com anilhas.
+            plateInventory = if (
+                isPlateLoadedEquipment(exerciseMedia[exercise.exercise.exerciseId]?.equipment)
+            ) {
+                DEFAULT_PLATE_INVENTORY
+            } else {
+                null
+            },
         )
     }
 
@@ -458,6 +468,15 @@ fun WorkoutScreen(
             onConfirm = { input ->
                 onUpdateSet(set, input)
                 editSetId = null
+            },
+            // H4-5: o diálogo é o mesmo no treino e no Histórico; o atalho
+            // aparece sempre que o inventário é passado, sem mudar o salvamento.
+            plateInventory = if (
+                isPlateLoadedEquipment(exerciseMedia[exercise.exercise.exerciseId]?.equipment)
+            ) {
+                DEFAULT_PLATE_INVENTORY
+            } else {
+                null
             },
         )
     }

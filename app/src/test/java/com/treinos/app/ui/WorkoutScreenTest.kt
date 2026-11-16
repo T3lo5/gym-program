@@ -2,11 +2,13 @@ package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -470,5 +472,75 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("Drop set", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Aquecimento", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("AMRAP", substring = true).assertDoesNotExist()
+    }
+
+    // ---------- H4-5: anilhas e aquecimento ----------
+
+    @Test
+    fun atalho_de_anilhas_aparece_para_barra() {
+        // Exercício de barra: o atalho mostra a quebra por lado e a rampa da
+        // carga digitada (100 kg → 20 + 20 por lado, 60% = 35 kg × 5).
+        setContent(
+            session = sessao(),
+            exerciseMedia = mapOf(
+                "Barbell_Bench_Press" to ExerciseMedia(
+                    id = "Barbell_Bench_Press",
+                    name = "Supino reto",
+                    primaryMuscles = listOf("chest"),
+                    equipment = "barbell",
+                    instructions = emptyList(),
+                    imageUrl = null,
+                ),
+            ),
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Registrar série 2").performClick()
+
+        campoDeTexto("60,0").performTextReplacement("100")
+        // O botão do atalho nasce abaixo da dobra do diálogo na janela do
+        // Robolectric (320×470): rola a Column do diálogo até ele antes de
+        // clicar — clique fora da janela visível se perde.
+        composeRule
+            .onAllNodes(
+                hasScrollAction() and hasAnyDescendant(hasText("Anilhas e aquecimento")),
+            )[0]
+            .performScrollToNode(hasText("Anilhas e aquecimento"))
+        composeRule.onNodeWithText("Anilhas e aquecimento").performClick()
+
+        // A asserção é de existência na composição: o conteúdo da expansão
+        // também fica abaixo da dobra da Column rolável do diálogo.
+        composeRule.onNodeWithText("Por lado: 20 + 20 kg").assertExists()
+        composeRule.onNodeWithText("Total: 100 kg").assertExists()
+        composeRule.onNodeWithText("40%: 40 kg × 8").assertExists()
+        composeRule.onNodeWithText("60%: 60 kg × 5").assertExists()
+        composeRule.onNodeWithText("80%: 80 kg × 3").assertExists()
+    }
+
+    @Test
+    fun atalho_nao_aparece_para_halteres() {
+        // Halteres não carrega anilha: o atalho nem aparece no diálogo.
+        setContent(
+            session = sessao(),
+            exerciseMedia = mapOf(
+                "Barbell_Bench_Press" to ExerciseMedia(
+                    id = "Barbell_Bench_Press",
+                    name = "Supino reto",
+                    primaryMuscles = listOf("chest"),
+                    equipment = "dumbbell",
+                    instructions = emptyList(),
+                    imageUrl = null,
+                ),
+            ),
+        )
+
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Registrar série 2"))
+        composeRule.onNodeWithText("Registrar série 2").performClick()
+
+        composeRule.onNodeWithText("Anilhas e aquecimento").assertDoesNotExist()
     }
 }

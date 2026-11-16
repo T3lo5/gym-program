@@ -39,14 +39,19 @@ import com.treinos.app.data.local.SET_TYPE_DROP
 import com.treinos.app.data.local.SET_TYPE_NORMAL
 import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.ui.HapticEvent
+import com.treinos.app.ui.PlateInventory
 import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.SetInputErrors
 import com.treinos.app.ui.SetInputValidation
+import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.hapticFeedbackForEvent
+import com.treinos.app.ui.parseDecimalInput
+import com.treinos.app.ui.plateBreakdown
 import com.treinos.app.ui.progression.ProgressionAction
 import com.treinos.app.ui.progression.ProgressionSuggestion
 import com.treinos.app.ui.validateSetInput
+import com.treinos.app.ui.warmupRamp
 
 /**
  * Diálogo de série (H3-27), extraído para reuso (H3-54): registra uma série
@@ -72,6 +77,8 @@ fun SetEditDialog(
     confirmHaptic: (SetInput) -> HapticEvent = { _ -> HapticEvent.SetSaved },
     initialSetType: String = SET_TYPE_NORMAL,
     initialRir: String = "",
+    /** H4-5: inventário de anilhas; `null` (ou carga não carregável) esconde o atalho. */
+    plateInventory: PlateInventory? = null,
 ) {
     // H3-31: o que foi digitado sobrevive à rotação (e ao teclado que recria
     // a Activity). `key` evita herdar rascunho de outro diálogo na mesma posição.
@@ -205,6 +212,65 @@ fun SetEditDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // H4-5: atalho de anilhas e aquecimento — informativo, não muda
+                // o salvamento. Só aparece com inventário (barra) e carga
+                // carregável; campo vazio/inválido esconde o atalho sem crash.
+                plateInventory?.let { inventory ->
+                    val breakdown = parseDecimalInput(weight)?.let { plateBreakdown(it, inventory) }
+                    if (breakdown != null) {
+                        var platesExpanded by rememberSaveable(key = "$key-plates") { mutableStateOf(false) }
+                        TextButton(
+                            onClick = { platesExpanded = !platesExpanded },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Text(stringResource(R.string.workout_plate_shortcut))
+                        }
+                        if (platesExpanded) {
+                            if (breakdown.perSideKg.isNotEmpty()) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.workout_plate_per_side,
+                                        breakdown.perSideKg.joinToString(" + ") { plateLabel(it) },
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.workout_plate_total, plateLabel(breakdown.loadedKg)),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (breakdown.remainderKg > 0.0) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.workout_plate_remainder,
+                                        plateLabel(breakdown.remainderKg),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            val ramp = warmupRamp(breakdown.targetKg, inventory)
+                            if (ramp.isNotEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.workout_warmup_title),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                ramp.forEach { step ->
+                                    Text(
+                                        text = stringResource(
+                                            R.string.workout_warmup_step,
+                                            step.percent,
+                                            plateLabel(step.weightKg),
+                                            step.reps,
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = rir,
                     onValueChange = { value ->
@@ -259,3 +325,10 @@ private fun suggestionLabel(suggestion: ProgressionSuggestion?): String? {
     val target = weight ?: reps ?: return null
     return stringResource(R.string.workout_suggestion, target, suggestion.reason)
 }
+
+/**
+ * H4-5: anilha/carga sem zeros à direita ("20", "2,5", "1,25") — o formato
+ * que o usuário lê na plaqueta da anilha, sempre com vírgula pt-BR.
+ */
+private fun plateLabel(value: Double): String =
+    formatDecimal(value, 2).trimEnd('0').trimEnd(',')

@@ -172,6 +172,12 @@
     <string name="workout_set_type_amrap">AMRAP</string>
     <string name="workout_set_dialog_rir">RIR (opcional)</string>
     <string name="workout_set_dialog_support_rir">Opcional, de 0 a 10.</string>
+    <string name="workout_plate_shortcut">Anilhas e aquecimento</string>
+    <string name="workout_plate_per_side">Por lado: %1$s kg</string>
+    <string name="workout_plate_total">Total: %1$s kg</string>
+    <string name="workout_plate_remainder">Faltam %1$s kg para a carga exata</string>
+    <string name="workout_warmup_title">Aquecimento</string>
+    <string name="workout_warmup_step">%1$d%%: %2$s kg × %3$d</string>
     <string name="workout_suggestion">Sugestão: %1$s — %2$s</string>
     <string name="workout_rest_finished">Descanso concluído. Bora para a próxima série.</string>
     <string name="workout_rest_paused">Descanso pausado: %1$s</string>

@@ -169,6 +169,12 @@
     <string name="workout_set_type_amrap">AMRAP</string>
     <string name="workout_set_dialog_rir">RIR (optional)</string>
     <string name="workout_set_dialog_support_rir">Optional, from 0 to 10.</string>
+    <string name="workout_plate_shortcut">Plates &amp; warm-up</string>
+    <string name="workout_plate_per_side">Per side: %1$s kg</string>
+    <string name="workout_plate_total">Total: %1$s kg</string>
+    <string name="workout_plate_remainder">%1$s kg short of the exact load</string>
+    <string name="workout_warmup_title">Warm-up</string>
+    <string name="workout_warmup_step">%1$d%%: %2$s kg × %3$d</string>
     <string name="workout_suggestion">Suggestion: %1$s — %2$s</string>
     <string name="workout_rest_finished">Rest completed. On to the next set.</string>
     <string name="workout_rest_paused">Rest paused: %1$s</string>
