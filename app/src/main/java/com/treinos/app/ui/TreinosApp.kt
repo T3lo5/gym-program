@@ -412,6 +412,11 @@ fun TreinosApp(viewModel: AppViewModel) {
                     savedConfig = generateConfig,
                     error = generateError,
                     onRetry = viewModel::retryGenerate,
+                    // H4-10: programas prontos — com main ativo, aplicar pede
+                    // confirmação dizendo qual plano será substituído.
+                    hasMainPlan = plans.any { it.plan.kind == "main" },
+                    mainPlanName = plans.firstOrNull { it.plan.kind == "main" }?.plan?.name,
+                    onApplyProgram = viewModel::applyProgram,
                     onGenerate = { modalities, goal, daysPerWeek, level, equipment, muscles, sessionDuration, reviewWeeks, bodyWeightKgText, heightCmText, sexChoice, environment, kind, config ->
                         viewModel.submitGeneration(
                             modalities = modalities,

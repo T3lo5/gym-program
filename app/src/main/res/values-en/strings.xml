@@ -313,6 +313,28 @@
     <string name="generate_overlay_elapsed">Elapsed time: %1$ds</string>
     <string name="generate_overlay_ai_note">The AI may take up to 90 s.</string>
 
+    <!-- H4-10: ready-made offline programs -->
+    <string name="program_library_section">Ready-made programs</string>
+    <string name="program_library_desc">Proven programs that become a regular app plan — no AI and no internet.</string>
+    <string name="program_ppl_name">Push/Pull/Legs</string>
+    <string name="program_ppl_desc">Classic 6-day split that trains each group twice a week.</string>
+    <string name="program_531_name">5/3/1</string>
+    <string name="program_531_desc">Strength with cycle-based progression on the four main lifts.</string>
+    <string name="program_gzclp_name">GZCLP</string>
+    <string name="program_gzclp_desc">Linear progression in three exercise tiers, great for getting back on track.</string>
+    <string name="program_phul_name">PHUL</string>
+    <string name="program_phul_desc">Four days alternating power and hypertrophy blocks.</string>
+    <string name="program_days_week">%1$d days per week</string>
+    <string name="program_use_action">Use this program</string>
+    <string name="a11y_program_use">Use the %1$s program</string>
+    <string name="program_confirm_title">Apply program?</string>
+    <string name="program_confirm_message">The current main plan “%1$s” will be replaced and deactivated. Complementary plans and history remain.</string>
+    <string name="program_confirm_current_plan">current main plan</string>
+    <string name="program_confirm_apply">Apply</string>
+    <string name="msg_program_applied">Program applied: %1$s</string>
+    <string name="msg_program_unknown">Unknown program.</string>
+    <string name="msg_program_apply_error">Could not apply the program.</string>
+
     <!-- Generate: option labels -->
     <string name="generate_goal_hypertrophy">Hypertrophy</string>
     <string name="generate_goal_strength">Strength</string>

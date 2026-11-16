@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -244,6 +245,73 @@ class GenerateScreenTest {
         composeRule.onNodeWithText("Gerar semana híbrida").performClick()
         composeRule.waitForIdle()
         assertFalse(gerou)
+    }
+
+    // ---------- H4-10: programas prontos ----------
+
+    @Test
+    fun secao_programas_mostra_quatro_cards() {
+        composeRule.setContent {
+            GenerateScreen(isGenerating = false, onBack = {}, onGenerate = ::onGenerateNoop)
+        }
+
+        composeRule.onNodeWithText("Programas prontos").assertIsDisplayed()
+        listOf("Push/Pull/Legs", "5/3/1", "GZCLP", "PHUL").forEach { nome ->
+            composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(nome))
+            composeRule.onNodeWithText(nome).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Usar o programa $nome").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun toque_em_usar_programa_dispara_callback() {
+        var aplicado: String? = null
+        composeRule.setContent {
+            GenerateScreen(
+                isGenerating = false,
+                onBack = {},
+                hasMainPlan = false,
+                onApplyProgram = { aplicado = it },
+                onGenerate = ::onGenerateNoop,
+            )
+        }
+
+        // Sem main ativo não há confirmação: o toque aplica direto.
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasContentDescription("Usar o programa Push/Pull/Legs"))
+        composeRule.onNodeWithContentDescription("Usar o programa Push/Pull/Legs").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("ppl", aplicado)
+    }
+
+    @Test
+    fun cancelar_confirmacao_nao_aplica() {
+        var aplicado: String? = null
+        composeRule.setContent {
+            GenerateScreen(
+                isGenerating = false,
+                onBack = {},
+                hasMainPlan = true,
+                mainPlanName = "Meu treino",
+                onApplyProgram = { aplicado = it },
+                onGenerate = ::onGenerateNoop,
+            )
+        }
+
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasContentDescription("Usar o programa Push/Pull/Legs"))
+        composeRule.onNodeWithContentDescription("Usar o programa Push/Pull/Legs").performClick()
+
+        // O diálogo nomeia o plano que será substituído.
+        composeRule.onNodeWithText("Aplicar programa?").assertIsDisplayed()
+        composeRule.onNode(hasText("Meu treino", substring = true)).assertIsDisplayed()
+
+        composeRule.onNodeWithText("Cancelar").performClick()
+        composeRule.waitForIdle()
+
+        assertNull(aplicado)
+        composeRule.onNodeWithText("Aplicar programa?").assertDoesNotExist()
     }
 
     private fun onGenerateNoop(

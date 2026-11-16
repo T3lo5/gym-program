@@ -7,8 +7,8 @@
 | Item do roadmap | `H4-10` |
 | MoSCoW | `S` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` |
 
 ## Objetivo
 

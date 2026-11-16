@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -60,9 +61,12 @@ import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.parse5k
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ChipGroup
+import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
+import com.treinos.app.ui.programs.ProgramTemplate
+import com.treinos.app.ui.programs.programCatalog
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 import kotlinx.coroutines.delay
@@ -153,6 +157,11 @@ fun GenerateScreen(
     // H3-29: erro persistente na tela de origem, com "Tentar de novo".
     error: UiError? = null,
     onRetry: () -> Unit = {},
+    // H4-10: programas prontos — com um main ativo, aplicar pede confirmação
+    // dizendo qual plano será substituído.
+    hasMainPlan: Boolean = false,
+    mainPlanName: String? = null,
+    onApplyProgram: (String) -> Unit = {},
     onGenerate: (
         modalities: List<ModalityDto>,
         goal: String,
@@ -212,6 +221,8 @@ fun GenerateScreen(
     // H3-30: perfil/sexo/revisão/ambiente ficam em "Mais opções", colapsado por padrão.
     var showMoreOptions by remember { mutableStateOf(false) }
     val isComplementary = planKind == "extra"
+    // H4-10: programa aguardando confirmação para substituir o main ativo.
+    var pendingProgram by remember { mutableStateOf<String?>(null) }
 
     // Um draft por tipo de modalidade, restaurado da última configuração.
     var modalityDrafts by remember {
@@ -387,6 +398,27 @@ fun GenerateScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // H4-10: programas prontos no topo — começar a treinar sem IA
+                // e sem backend, com um toque.
+                item { SectionTitle(stringResource(R.string.program_library_section)) }
+                item {
+                    Text(
+                        text = stringResource(R.string.program_library_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                programCatalog().forEach { template ->
+                    item(key = "program-${template.id}") {
+                        ProgramCard(
+                            template = template,
+                            onRequestApply = { id ->
+                                if (hasMainPlan) pendingProgram = id else onApplyProgram(id)
+                            },
+                        )
+                    }
+                }
+
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -845,5 +877,95 @@ fun GenerateScreen(
                 }
             }
         }
+
+        // H4-10: com um main ativo, aplicar pede confirmação dizendo qual
+        // plano será substituído. Cancelar não cria nem altera plano algum.
+        ConfirmationDialog(
+            visible = pendingProgram != null,
+            onDismiss = { pendingProgram = null },
+            onConfirm = { pendingProgram?.let(onApplyProgram) },
+            title = stringResource(R.string.program_confirm_title),
+            message = stringResource(
+                R.string.program_confirm_message,
+                mainPlanName ?: stringResource(R.string.program_confirm_current_plan),
+            ),
+            confirmLabel = stringResource(R.string.program_confirm_apply),
+            isDestructive = false,
+        )
     }
+}
+
+/** H4-10: card de um programa pronto, com a ação "Usar este programa". */
+@Composable
+private fun ProgramCard(
+    template: ProgramTemplate,
+    onRequestApply: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(programNameRes(template.id)),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(programDescriptionRes(template.id)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = listOf(
+                    stringResource(R.string.program_days_week, template.daysPerWeek),
+                    stringResource(programLevelRes(template.level)),
+                    stringResource(programGoalRes(template.goal)),
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val useLabel = stringResource(R.string.program_use_action)
+            val useA11y = stringResource(
+                R.string.a11y_program_use,
+                stringResource(programNameRes(template.id)),
+            )
+            Button(
+                onClick = { onRequestApply(template.id) },
+                // Rótulo ambíguo repetido 4×: o contentDescription nomeia o
+                // programa (padrão de a11y do app e gancho único para testes).
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = useA11y },
+            ) {
+                Text(useLabel)
+            }
+        }
+    }
+}
+
+/** Rótulos localizados dos 4 programas; o conteúdo do plano fica no ProgramLibrary. */
+private fun programNameRes(id: String): Int = when (id) {
+    "ppl" -> R.string.program_ppl_name
+    "531" -> R.string.program_531_name
+    "gzclp" -> R.string.program_gzclp_name
+    else -> R.string.program_phul_name
+}
+
+private fun programDescriptionRes(id: String): Int = when (id) {
+    "ppl" -> R.string.program_ppl_desc
+    "531" -> R.string.program_531_desc
+    "gzclp" -> R.string.program_gzclp_desc
+    else -> R.string.program_phul_desc
+}
+
+private fun programLevelRes(level: String): Int = when (level) {
+    "beginner" -> R.string.generate_level_beginner
+    "advanced" -> R.string.generate_level_advanced
+    else -> R.string.generate_level_intermediate
+}
+
+private fun programGoalRes(goal: String): Int = when (goal) {
+    "strength" -> R.string.generate_goal_strength
+    else -> R.string.generate_goal_hypertrophy
 }

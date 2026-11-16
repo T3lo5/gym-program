@@ -16,6 +16,7 @@ import com.treinos.app.data.remote.GenerateJobAck
 import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
 import com.treinos.app.data.remote.GeneratePlanResponse
+import com.treinos.app.ui.programs.buildProgram
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -492,5 +493,71 @@ class WorkoutRepositorySessionTest {
 
         assertNull(dao.getPlan(extraId))
         assertEquals("Abdômen", dao.getSession(sessionId)?.planName)
+    }
+
+    // ---------- H4-10: programas prontos ----------
+
+    @Test
+    fun aplicar_programa_salva_como_main_e_desativa_anterior() = runTest {
+        val mainAntigo = repository.saveGeneratedPlan(generatedResponse("Meu treino"), kind = "main")
+
+        val programId = repository.saveGeneratedPlan(
+            requireNotNull(buildProgram("531", "2026-12-13T00:00:00Z")),
+            kind = "main",
+        )
+
+        // O main anterior é desativado, não excluído.
+        assertEquals(false, dao.getPlan(mainAntigo)?.isActive)
+        val plan = dao.getPlan(programId)
+        assertEquals(true, plan?.isActive)
+        assertEquals("main", plan?.kind)
+        assertEquals("local", plan?.source)
+        assertEquals(false, plan?.generatedByAi)
+        assertEquals("5/3/1", plan?.name)
+        assertEquals("2026-12-13T00:00:00Z", plan?.nextReviewAt)
+        assertEquals(4, plan?.reviewAfterWeeks)
+        val days = dao.getAllDayEntities().filter { it.planId == programId }.sortedBy { it.dayOrder }
+        assertEquals(4, days.size)
+        assertEquals(listOf(0, 1, 2, 3), days.map { it.dayOrder })
+        // Conteúdo prescrito: o principal do dia 1 é 3×5 RPE 8 com a nota 5/3/1.
+        val exercicios = dao.getExercisesForDay(days.first().id).sortedBy { it.exerciseOrder }
+        assertEquals("Barbell_Squat", exercicios.first().exerciseId)
+        assertEquals(3, exercicios.first().sets)
+        assertEquals("5", exercicios.first().targetReps)
+        assertEquals(8.0, exercicios.first().targetRpe ?: 0.0, 0.001)
+        assertEquals(180, exercicios.first().restSeconds)
+        assertTrue(exercicios.first().notes.startsWith("Principal 5/3/1"))
+
+        // Aplicar o mesmo programa duas vezes regenera o plano sem duplicar dias.
+        val segunda = repository.saveGeneratedPlan(
+            requireNotNull(buildProgram("531", "2026-12-13T00:00:00Z")),
+            kind = "main",
+        )
+        assertEquals(false, dao.getPlan(programId)?.isActive)
+        assertEquals(
+            4,
+            dao.getAllDayEntities().count { it.planId == segunda },
+        )
+    }
+
+    @Test
+    fun aplicar_programa_preserva_extras_e_historico() = runTest {
+        val mainAntigo = repository.saveGeneratedPlan(generatedResponse("Meu treino"), kind = "main")
+        val extraId = repository.saveGeneratedPlan(generatedResponse("Abdômen"), kind = "extra")
+        val extraDayId = dao.getAllDayEntities().single { it.planId == extraId }.id
+        val sessionId = repository.startSession(extraId, extraDayId)
+        repository.finishSession(sessionId)
+
+        val programId = repository.saveGeneratedPlan(
+            requireNotNull(buildProgram("ppl", "2026-12-13T00:00:00Z")),
+            kind = "main",
+        )
+
+        // O extra continua ativo e o histórico permanece (sessões não têm FK).
+        assertEquals(true, dao.getPlan(extraId)?.isActive)
+        assertEquals(false, dao.getPlan(mainAntigo)?.isActive)
+        assertEquals("Abdômen", dao.getSession(sessionId)?.planName)
+        // PPL: 6 dias no plano novo.
+        assertEquals(6, dao.getAllDayEntities().count { it.planId == programId })
     }
 }

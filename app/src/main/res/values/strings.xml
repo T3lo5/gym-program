@@ -316,6 +316,28 @@
     <string name="generate_overlay_elapsed">Tempo decorrido: %1$ds</string>
     <string name="generate_overlay_ai_note">A IA pode levar até 90 s.</string>
 
+    <!-- H4-10: programas prontos offline -->
+    <string name="program_library_section">Programas prontos</string>
+    <string name="program_library_desc">Programas comprovados que viram um plano normal do app — sem IA e sem internet.</string>
+    <string name="program_ppl_name">Push/Pull/Legs</string>
+    <string name="program_ppl_desc">Divisão clássica de 6 dias que treina cada grupo duas vezes por semana.</string>
+    <string name="program_531_name">5/3/1</string>
+    <string name="program_531_desc">Força com progressão por ciclos nos quatro levantamentos principais.</string>
+    <string name="program_gzclp_name">GZCLP</string>
+    <string name="program_gzclp_desc">Linear progressivo em três camadas de exercício, ideal para voltar a progredir.</string>
+    <string name="program_phul_name">PHUL</string>
+    <string name="program_phul_desc">Quatro dias alternando blocos de potência e de hipertrofia.</string>
+    <string name="program_days_week">%1$d dias por semana</string>
+    <string name="program_use_action">Usar este programa</string>
+    <string name="a11y_program_use">Usar o programa %1$s</string>
+    <string name="program_confirm_title">Aplicar programa?</string>
+    <string name="program_confirm_message">O plano principal “%1$s” será substituído e desativado. Planos complementares e o histórico continuam.</string>
+    <string name="program_confirm_current_plan">plano principal atual</string>
+    <string name="program_confirm_apply">Aplicar</string>
+    <string name="msg_program_applied">Programa aplicado: %1$s</string>
+    <string name="msg_program_unknown">Programa desconhecido.</string>
+    <string name="msg_program_apply_error">Não foi possível aplicar o programa.</string>
+
     <!-- Generate: rótulos de opção -->
     <string name="generate_goal_hypertrophy">Hipertrofia</string>
     <string name="generate_goal_strength">Força</string>

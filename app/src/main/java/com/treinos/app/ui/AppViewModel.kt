@@ -75,6 +75,8 @@ import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.history.ExerciseHistory
 import com.treinos.app.ui.history.buildExerciseHistory
 import com.treinos.app.ui.progressText
+import com.treinos.app.ui.programs.buildProgram
+import com.treinos.app.ui.programs.programCatalog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1257,6 +1259,39 @@ class AppViewModel(
 
     private fun nextReviewAt(reviewAfterWeeks: Int): String =
         Instant.now().plus(reviewAfterWeeks.toLong(), ChronoUnit.WEEKS).toString()
+
+    // ---------------- Programas prontos (H4-10) ----------------
+
+    /**
+     * Aplica um programa pronto do catálogo local — caminho 100% offline:
+     * monta o [GeneratePlanResponse] no aparelho, salva como `main` (o main
+     * anterior é desativado; extras e histórico continuam), seleciona o plano
+     * e emite snackbar. Nunca chama [submitGeneration]: sem backend, sem
+     * envelope pendente e sem mexer em `lastFallbackReason`.
+     */
+    fun applyProgram(templateId: String) {
+        val template = programCatalog().firstOrNull { it.id == templateId }
+        if (template == null) {
+            _message.value = context.getString(R.string.msg_program_unknown)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val response = buildProgram(templateId, nextReviewAt(reviewAfterWeeks = 4))
+                if (response == null) {
+                    _message.value = context.getString(R.string.msg_program_unknown)
+                    return@launch
+                }
+                val planId = repository.saveGeneratedPlan(response, kind = "main")
+                // O programa aplicado é o novo main (H3-45/H3-15).
+                _selectedPlanId.value = planId
+                _screen.value = Screen.Home
+                _message.value = context.getString(R.string.msg_program_applied, template.name)
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_program_apply_error)
+            }
+        }
+    }
 
     // ---------------- Revisão de plano (H2-6) ----------------
 
