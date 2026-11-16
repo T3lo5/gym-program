@@ -1592,6 +1592,56 @@ class AppViewModel(
         }
     }
 
+    /**
+     * H4-11: grava a nota da sessão em andamento (`workout_sessions.notes`).
+     * Sem sessão ativa (`_activeSessionId` nulo e sem `in_progress`) emite
+     * mensagem de erro e não grava. O relógio não mostra notas, então
+     * `syncWearState` não é necessário.
+     */
+    fun updateSessionNotes(notes: String) {
+        val sessionId = _activeSessionId.value
+            ?: inProgressSession.value?.session?.id
+            ?: run {
+                _message.value = context.getString(R.string.msg_no_workout_in_progress)
+                return
+            }
+        viewModelScope.launch {
+            try {
+                repository.updateSessionNotes(sessionId, normalizeNote(notes))
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_note_error)
+            }
+        }
+    }
+
+    /**
+     * H4-11: grava a nota do exercício no slot do PLANO com o mesmo
+     * `exerciseOrder` da sessão — a troca THIS_SESSION (H3-41) mantém a ordem,
+     * então a nota acompanha o slot do plano e reaparece nas próximas sessões
+     * do dia. Dia/exercício não encontrado vira mensagem de erro.
+     */
+    fun updateExerciseNotes(sessionExercise: SessionExerciseEntity, notes: String) {
+        val sessionId = _activeSessionId.value
+            ?: inProgressSession.value?.session?.id
+            ?: run {
+                _message.value = context.getString(R.string.msg_no_workout_in_progress)
+                return
+            }
+        viewModelScope.launch {
+            try {
+                val session = repository.observeSession(sessionId).first()?.session
+                    ?: error("Sessão não encontrada no aparelho.")
+                repository.updatePlanExerciseNotes(
+                    dayId = session.dayId,
+                    exerciseOrder = sessionExercise.exerciseOrder,
+                    notes = normalizeNote(notes),
+                )
+            } catch (error: Exception) {
+                _message.value = uiErrorMessage(error, context, R.string.msg_note_error)
+            }
+        }
+    }
+
     fun finishWorkout() {
         val sessionId = _activeSessionId.value ?: return
         viewModelScope.launch {

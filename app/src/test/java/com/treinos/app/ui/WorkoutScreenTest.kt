@@ -2,6 +2,7 @@ package com.treinos.app.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTextInput
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
@@ -119,6 +121,8 @@ class WorkoutScreenTest {
         onLoadCatalog: () -> Unit = {},
         planExercises: List<WorkoutPlanExerciseEntity> = emptyList(),
         onToggleSuperset: (Long, Boolean) -> Unit = { _, _ -> },
+        onEditSessionNote: (String) -> Unit = {},
+        onEditExerciseNote: (SessionExerciseEntity, String) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
             WorkoutScreen(
@@ -139,6 +143,8 @@ class WorkoutScreenTest {
                 onLoadCatalog = onLoadCatalog,
                 planExercises = planExercises,
                 onToggleSuperset = onToggleSuperset,
+                onEditSessionNote = onEditSessionNote,
+                onEditExerciseNote = onEditExerciseNote,
             )
         }
     }
@@ -177,6 +183,12 @@ class WorkoutScreenTest {
     fun sem_serie_anterior_o_botao_repetir_nao_existe() {
         setContent(session = sessao(comSets = false))
 
+        // H4-11: o bloco de nota no card de resumo empurra o card do
+        // exercício para baixo na janela de teste — rolar até o texto antes
+        // de afirmar que ele está visível (padrão dos demais testes).
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Nenhuma série registrada ainda."))
         composeRule.onNodeWithText("Nenhuma série registrada ainda.").assertIsDisplayed()
         composeRule.onNodeWithText("Repetir última série", substring = true).assertDoesNotExist()
     }
@@ -231,6 +243,11 @@ class WorkoutScreenTest {
             onUpdatedSet = { reps, weight, rpe -> atualizada = Triple(reps, weight, rpe) },
         )
 
+        // H4-11: o bloco de nota no card de resumo empurra a linha de série
+        // para baixo na janela de teste — rolar até ela antes de clicar.
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Série 1"))
         composeRule.onNodeWithText("Série 1").performClick()
         composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
 
@@ -250,6 +267,9 @@ class WorkoutScreenTest {
             onUpdatedSet = { reps, weight, rpe -> atualizada = Triple(reps, weight, rpe) },
         )
 
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Série 1"))
         composeRule.onNodeWithText("Série 1").performClick()
         composeRule.onNodeWithText("Editar série 1 — Supino reto").assertIsDisplayed()
         campoDeTexto("60,0").performTextReplacement("6.0.5")
@@ -649,5 +669,112 @@ class WorkoutScreenTest {
         composeRule.onNodeWithText("Supersérie com o anterior").performClick()
 
         assertEquals(200L to true, alternado)
+    }
+
+    // ---------- H4-11: notas do treino e do exercício ----------
+
+    @Test
+    fun nota_da_sessao_abre_e_salva() {
+        // Card de resumo: "Adicionar nota" abre o diálogo; salvar entrega o
+        // texto ao ViewModel e fecha o diálogo. O bloco da nota fica no fim do
+        // card de resumo, visível na janela padrão do Robolectric.
+        var salva: String? = null
+        setContent(session = sessao(), onEditSessionNote = { salva = it })
+
+        composeRule.onNodeWithText("Adicionar nota").performClick()
+        composeRule.onNodeWithText("Observações do treino").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("note_edit_field").performTextReplacement("ombro esquerdo incomodou")
+        composeRule.onNodeWithText("Salvar").performClick()
+
+        assertEquals("ombro esquerdo incomodou", salva)
+        composeRule.onNodeWithTag("note_edit_field").assertDoesNotExist()
+    }
+
+    @Test
+    fun nota_do_exercicio_abre_e_salva() {
+        // Card do exercício: "Adicionar nota do exercício" abre o diálogo e
+        // salvar entrega o exercício da sessão + o texto ao ViewModel.
+        var salva: Pair<Int, String>? = null
+        setContent(
+            session = sessao(),
+            planExercises = listOf(
+                WorkoutPlanExerciseEntity(
+                    id = 500,
+                    dayId = 10,
+                    exerciseId = "Barbell_Bench_Press",
+                    exerciseOrder = 0,
+                ),
+            ),
+            onEditExerciseNote = { exercise, note -> salva = exercise.exerciseOrder to note },
+        )
+
+        // O rodapé da tela fica abaixo do card: rolar até ele deixa o bloco
+        // da nota — última linha do card — visível e clicável.
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Cada série é gravada no SQLite", substring = true))
+        composeRule.onNodeWithText("Adicionar nota do exercício").performClick()
+        composeRule.onNodeWithText("Observações do treino").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("note_edit_field").performTextInput("puxar a barra até o peito")
+        composeRule.onNodeWithText("Salvar").performClick()
+
+        assertEquals(0 to "puxar a barra até o peito", salva)
+    }
+
+    @Test
+    fun cancelar_nao_grava() {
+        // Cancelar (e fechar por fora) não chama o callback: nada é gravado.
+        var salva: String? = null
+        setContent(session = sessao(), onEditSessionNote = { salva = it })
+
+        composeRule.onNodeWithText("Adicionar nota").performClick()
+        composeRule.onNodeWithTag("note_edit_field").performTextReplacement("rascunho que não vale")
+        composeRule.onNodeWithText("Cancelar").performClick()
+
+        composeRule.onNodeWithTag("note_edit_field").assertDoesNotExist()
+        assertNull(salva)
+    }
+
+    @Test
+    fun contador_bloqueia_acima_do_limite() {
+        // 2001 caracteres: o contador vira aviso de erro e o Salvar fica
+        // desabilitado — nada é gravado.
+        var salva: String? = null
+        setContent(session = sessao(), onEditSessionNote = { salva = it })
+
+        composeRule.onNodeWithText("Adicionar nota").performClick()
+        composeRule.onNodeWithTag("note_edit_field").performTextReplacement("a".repeat(2001))
+
+        composeRule.onNodeWithText("Máximo de 2000 caracteres.").assertIsDisplayed()
+        composeRule.onNodeWithText("Salvar").assertIsNotEnabled()
+        assertNull(salva)
+    }
+
+    @Test
+    fun nota_do_plano_aparece_sob_o_exercicio() {
+        // A nota vem do slot do plano de mesmo `exerciseOrder` e aparece sob
+        // o exercício na tela de treino (reaparece nas próximas sessões).
+        setContent(
+            session = sessao(),
+            planExercises = listOf(
+                WorkoutPlanExerciseEntity(
+                    id = 500,
+                    dayId = 10,
+                    exerciseId = "Barbell_Bench_Press",
+                    exerciseOrder = 0,
+                    notes = "puxar a barra até o peito",
+                ),
+            ),
+        )
+
+        // O rodapé da tela fica abaixo do card: rolar até ele deixa o bloco
+        // da nota — última linha do card — visível (padrão dos demais testes).
+        composeRule
+            .onNode(hasScrollAction())
+            .performScrollToNode(hasText("Cada série é gravada no SQLite", substring = true))
+        composeRule.onNodeWithText("Nota do exercício no plano").assertIsDisplayed()
+        composeRule.onNodeWithText("puxar a barra até o peito").assertIsDisplayed()
     }
 }

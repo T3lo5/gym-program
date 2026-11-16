@@ -786,4 +786,17 @@
     <string name="msg_measurement_photo_error">Could not save the photo.</string>
     <string name="msg_measurement_copy_done">Profile updated with the latest weight (%1$s).</string>
     <string name="msg_measurement_copy_empty">No weight measurement to copy.</string>
+    <!-- H4-11: workout and exercise notes -->
+    <string name="workout_note_session_label">Workout note</string>
+    <string name="workout_note_session_title">Workout note</string>
+    <string name="workout_note_exercise_label">Exercise note on the plan</string>
+    <string name="workout_note_exercise_title">Exercise note on the plan</string>
+    <string name="workout_note_add">Add note</string>
+    <string name="workout_note_exercise_add">Add exercise note</string>
+    <string name="workout_note_field_label">Workout observations</string>
+    <string name="workout_note_counter">%1$d/%2$d characters</string>
+    <string name="workout_note_too_long">Maximum of %1$d characters.</string>
+    <string name="workout_note_clear">Clear</string>
+    <string name="msg_note_error">Could not save the note.</string>
+    <string name="history_note_label">Note: %1$s</string>
 </resources>

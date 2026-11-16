@@ -71,6 +71,7 @@ import com.treinos.app.data.local.SET_TYPE_AMRAP
 import com.treinos.app.data.local.SET_TYPE_DROP
 import com.treinos.app.data.local.SET_TYPE_NORMAL
 import com.treinos.app.data.local.SET_TYPE_WARMUP
+import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
@@ -86,6 +87,7 @@ import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.DEFAULT_PLATE_INVENTORY
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
+import com.treinos.app.ui.components.NoteEditDialog
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SetEditDialog
 import com.treinos.app.ui.calculateProgress
@@ -141,6 +143,10 @@ fun WorkoutScreen(
     // H4-6: agrupamento de superset derivado do plano do dia da sessão.
     planExercises: List<WorkoutPlanExerciseEntity> = emptyList(),
     onToggleSuperset: (Long, Boolean) -> Unit = { _, _ -> },
+    // H4-11: notas da sessão e do exercício durante o treino. A nota do
+    // exercício é do PLANO (reaparece nas próximas sessões do dia).
+    onEditSessionNote: (String) -> Unit = {},
+    onEditExerciseNote: (SessionExerciseEntity, String) -> Unit = { _, _ -> },
 ) {
     // H3-31: o alvo do diálogo sobrevive à rotação — guardamos apenas os ids
     // (Bundle-friendly) e rederivamos os objetos da sessão a cada composição.
@@ -165,6 +171,14 @@ fun WorkoutScreen(
     var showSwapConfirm by remember { mutableStateOf(false) }
     var swapTargetId by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
+
+    // H4-11: alvo do diálogo de nota em rememberSaveable (padrão H3-31) —
+    // guardamos ids (Bundle-friendly) e rederivamos os objetos da sessão a
+    // cada composição; o rascunho do texto usa a key do diálogo.
+    var showSessionNote by rememberSaveable { mutableStateOf(false) }
+    var exerciseNoteTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val exerciseNoteTarget = session?.exercises
+        ?.firstOrNull { it.exercise.id == exerciseNoteTargetId }?.exercise
 
     // H4-6: agrupamento de superset derivado do plano vivo. O cabeçalho do
     // grupo é renderizado DENTRO do card do primeiro membro — nenhum item
@@ -324,6 +338,25 @@ fun WorkoutScreen(
                                 text = progressStateDescription(done, planned),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
+                            // H4-11: nota da sessão — texto atual ou convite
+                            // para adicionar; tocar abre o diálogo de nota.
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = { showSessionNote = true }),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.workout_note_session_label),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                Text(
+                                    text = current.session.notes.ifBlank {
+                                        stringResource(R.string.workout_note_add)
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                         }
                     }
                 }
@@ -394,6 +427,12 @@ fun WorkoutScreen(
                         canToggleSuperset = canJoinSuperset(sortedPlanExercises, exercise.exercise.exerciseId),
                         isSuperset = membership != null,
                         onToggleSuperset = { enabled -> onToggleSuperset(exercise.exercise.id, enabled) },
+                        // H4-11: nota do exercício no plano, casada por
+                        // `exerciseOrder` (a troca THIS_SESSION preserva a ordem).
+                        exerciseNote = sortedPlanExercises
+                            .firstOrNull { it.exerciseOrder == exercise.exercise.exerciseOrder }
+                            ?.notes.orEmpty(),
+                        onEditNote = { exerciseNoteTargetId = exercise.exercise.id },
                     )
                 }
 
@@ -643,6 +682,37 @@ fun WorkoutScreen(
                 onSwapExercise?.invoke(swapTargetId!!, replacementId, scope)
             },
             onRefreshCatalog = onLoadCatalog,
+        )
+    }
+
+    // H4-11: diálogo da nota da sessão. Cancelar/fechar por fora não grava.
+    if (showSessionNote && session != null) {
+        NoteEditDialog(
+            key = "session-note-${session.session.id}",
+            title = stringResource(R.string.workout_note_session_title),
+            initialNote = session.session.notes,
+            onDismiss = { showSessionNote = false },
+            onConfirm = { note ->
+                showSessionNote = false
+                onEditSessionNote(note)
+            },
+        )
+    }
+
+    // H4-11: diálogo da nota do exercício — alvo rederivado por id (H3-31) e
+    // nota inicial lida do slot do plano de mesmo `exerciseOrder`.
+    exerciseNoteTarget?.let { exercise ->
+        NoteEditDialog(
+            key = "exercise-note-${exercise.id}",
+            title = stringResource(R.string.workout_note_exercise_title),
+            initialNote = sortedPlanExercises
+                .firstOrNull { it.exerciseOrder == exercise.exerciseOrder }
+                ?.notes.orEmpty(),
+            onDismiss = { exerciseNoteTargetId = null },
+            onConfirm = { note ->
+                exerciseNoteTargetId = null
+                onEditExerciseNote(exercise, note)
+            },
         )
     }
 }
@@ -1014,6 +1084,10 @@ private fun ExerciseCard(
     canToggleSuperset: Boolean = false,
     isSuperset: Boolean = false,
     onToggleSuperset: (Boolean) -> Unit = {},
+    // H4-11: nota do exercício no plano — texto atual ou convite; tocar abre
+    // o diálogo. A nota vive no plano e reaparece nas próximas sessões do dia.
+    exerciseNote: String = "",
+    onEditNote: () -> Unit = {},
 ) {
     val name = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId }
     // H3-27: progresso derivado das séries gravadas — editar/excluir série
@@ -1219,6 +1293,24 @@ private fun ExerciseCard(
                     text = stringResource(R.string.workout_superset_toggle_helper),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // H4-11: nota do exercício no plano — texto atual ou convite;
+            // tocar abre o diálogo de nota.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onEditNote),
+            ) {
+                Text(
+                    text = stringResource(R.string.workout_note_exercise_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = exerciseNote.ifBlank { stringResource(R.string.workout_note_exercise_add) },
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }

@@ -979,6 +979,16 @@ private fun SessionCard(
                 style = MaterialTheme.typography.bodySmall,
             )
 
+            // H4-11: nota da sessão no histórico — só quando existe; sessões
+            // antigas sem nota não ganham linha vazia.
+            if (session.session.notes.isNotBlank()) {
+                Text(
+                    text = stringResource(R.string.history_note_label, session.session.notes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             if (expanded) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                 session.exercises

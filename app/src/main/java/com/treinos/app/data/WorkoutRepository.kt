@@ -54,6 +54,7 @@ import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
 import com.treinos.app.ui.progression.REVIEW_POSTPONE_WEEKS
 import com.treinos.app.ui.progression.postponeReviewDate
+import com.treinos.app.ui.normalizeNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -391,6 +392,34 @@ open class WorkoutRepository(
     suspend fun setSupersetWithPrevious(planExerciseId: Long, enabled: Boolean) = withContext(Dispatchers.IO) {
         dao.updateSupersetFlag(planExerciseId, enabled)
     }
+
+    // ---------------- Notas do treino (H4-11) ----------------
+
+    /**
+     * Grava a nota da sessão (`workout_sessions.notes`). O chamador envia o
+     * texto já normalizado; o trim aqui é defesa em profundidade — string
+     * vazia limpa a nota.
+     */
+    suspend fun updateSessionNotes(sessionId: Long, notes: String) = withContext(Dispatchers.IO) {
+        val session = dao.getSession(sessionId)
+            ?: error("Sessão não encontrada no aparelho.")
+        dao.updateSession(session.copy(notes = normalizeNote(notes)))
+    }
+
+    /**
+     * Grava a nota do exercício no PLANO do dia (`workout_plan_exercises.notes`),
+     * casado por `exerciseOrder` — o `exerciseOrder` da sessão é copiado do
+     * plano no startSession e não muda na troca de escopo THIS_SESSION (H3-41).
+     * Por ser do plano, a nota reaparece nas próximas sessões do mesmo dia.
+     * Dia/exercício não encontrado ⇒ erro e nada é gravado.
+     */
+    suspend fun updatePlanExerciseNotes(dayId: Long, exerciseOrder: Int, notes: String) =
+        withContext(Dispatchers.IO) {
+            val exercise = dao.getExercisesForDay(dayId)
+                .firstOrNull { it.exerciseOrder == exerciseOrder }
+                ?: error("Exercício não encontrado no plano do dia.")
+            dao.updatePlanExercise(exercise.copy(notes = normalizeNote(notes)))
+        }
 
     // ---------------- Uso de exercício para calibrar precisão (H3-42) ----------
 

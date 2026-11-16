@@ -518,6 +518,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                     // H4-6: agrupamento de superset e alternância no plano.
                     planExercises = activeSessionPlanExercises,
                     onToggleSuperset = viewModel::toggleSupersetWithPrevious,
+                    // H4-11: notas da sessão e do exercício durante o treino.
+                    onEditSessionNote = viewModel::updateSessionNotes,
+                    onEditExerciseNote = viewModel::updateExerciseNotes,
                 )
 
                 Screen.RunWorkout -> RunWorkoutScreen(

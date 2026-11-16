@@ -442,4 +442,32 @@ class HistoryScreenTest {
             ),
         ),
     )
+
+    // ---------- H4-11: nota da sessão no histórico ----------
+
+    @Test
+    fun sessao_com_nota_mostra_a_nota() {
+        // A nota da sessão aparece no card (inclusive antes de finalizar —
+        // aqui a sessão é concluída, o caminho comum do Histórico).
+        val comNota = sessaoConcluida.copy(
+            session = sessaoConcluida.session.copy(notes = "ombro esquerdo incomodou"),
+        )
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(comNota), onBack = { })
+        }
+
+        composeRule.onNodeWithText("Nota: ombro esquerdo incomodou", useUnmergedTree = true)
+            .assertExists()
+    }
+
+    @Test
+    fun sessao_sem_nota_nao_mostra() {
+        // Sessões antigas sem nota não ganham linha de nota no card.
+        composeRule.setContent {
+            HistoryScreen(sessions = listOf(sessaoConcluida), onBack = { })
+        }
+
+        composeRule.onNodeWithText("Nota: ", substring = true, useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
 }

@@ -10,6 +10,7 @@ import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutPlanEntity
 import com.treinos.app.data.local.WorkoutPlanExerciseEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
+import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.GenerateJobAck
@@ -559,5 +560,112 @@ class WorkoutRepositorySessionTest {
         assertEquals("Abdômen", dao.getSession(sessionId)?.planName)
         // PPL: 6 dias no plano novo.
         assertEquals(6, dao.getAllDayEntities().count { it.planId == programId })
+    }
+
+    // ---------- H4-11: notas do treino e do exercício ----------
+
+    /** Plano de força com dois exercícios (ordens 0 e 1); devolve o dayId. */
+    private suspend fun planoComDoisExercicios(): Pair<Long, Long> {
+        val planId = dao.insertPlan(
+            WorkoutPlanEntity(id = 1, name = "Plano", goal = "hypertrophy", daysPerWeek = 3, isActive = true)
+        )
+        val dayId = dao.insertDay(
+            WorkoutDayEntity(id = 10, planId = planId, name = "Treino A", dayOrder = 0, weekday = 1, modality = "strength")
+        )
+        dao.insertPlanExercises(
+            listOf(
+                WorkoutPlanExerciseEntity(id = 100, dayId = dayId, exerciseId = "ex1", exerciseName = "Ex 1", exerciseOrder = 0, sets = 3),
+                WorkoutPlanExerciseEntity(id = 101, dayId = dayId, exerciseId = "ex2", exerciseName = "Ex 2", exerciseOrder = 1, sets = 3),
+            )
+        )
+        return planId to dayId
+    }
+
+    @Test
+    fun update_session_notes_persiste_e_faz_trim() = runTest {
+        val (planId, dayId) = planoComDoisExercicios()
+        val sessionId = repository.startSession(planId, dayId)
+
+        repository.updateSessionNotes(sessionId, "  ombro esquerdo incomodou  ")
+
+        assertEquals("ombro esquerdo incomodou", dao.getSession(sessionId)?.notes)
+    }
+
+    @Test
+    fun update_session_notes_vazia_limpa() = runTest {
+        val (planId, dayId) = planoComDoisExercicios()
+        val sessionId = repository.startSession(planId, dayId)
+        repository.updateSessionNotes(sessionId, "algo anotado")
+
+        // Texto só de espaços normaliza para vazio e limpa a nota.
+        repository.updateSessionNotes(sessionId, "   ")
+
+        assertEquals("", dao.getSession(sessionId)?.notes)
+    }
+
+    @Test
+    fun update_plan_exercise_notes_casa_por_ordem() = runTest {
+        val (_, dayId) = planoComDoisExercicios()
+
+        repository.updatePlanExerciseNotes(dayId, 1, "puxar a barra até o peito")
+
+        val exercicios = dao.getExercisesForDay(dayId).sortedBy { it.exerciseOrder }
+        // Casou pelo `exerciseOrder`: só o slot 1 recebeu a nota.
+        assertEquals("puxar a barra até o peito", exercicios[1].notes)
+        assertEquals("", exercicios[0].notes)
+    }
+
+    @Test
+    fun update_plan_exercise_notes_sem_dia_falha_sem_gravar() = runTest {
+        val (_, dayId) = planoComDoisExercicios()
+
+        val falhou = runCatching {
+            repository.updatePlanExerciseNotes(dayId = 999L, exerciseOrder = 0, notes = "x")
+        }.isFailure
+
+        assertTrue(falhou)
+        // Nada foi gravado: os dois slots continuam sem nota.
+        assertTrue(dao.getExercisesForDay(dayId).all { it.notes.isEmpty() })
+    }
+
+    @Test
+    fun update_plan_exercise_notes_apos_troca_this_session_usa_ordem() = runTest {
+        // H3-41: a troca THIS_SESSION muda o exercício da sessão, não o plano;
+        // a nota vai para o slot do plano de mesmo `exerciseOrder` e vale para
+        // as próximas sessões do dia.
+        val (_, dayId) = planoComDoisExercicios()
+        val sessionId = repository.startSession(1L, dayId)
+        val substituido = dao.getAllSessionExercises().single {
+            it.sessionId == sessionId && it.exerciseOrder == 0
+        }
+        val catalogo = mapOf(
+            "ex1" to ExerciseMedia(
+                id = "ex1", name = "Ex 1", primaryMuscles = listOf("chest"),
+                equipment = "barbell", instructions = emptyList(), imageUrl = null,
+            ),
+            "ex_sub" to ExerciseMedia(
+                id = "ex_sub", name = "Substituto", primaryMuscles = listOf("chest"),
+                equipment = "dumbbell", instructions = emptyList(), imageUrl = null,
+            ),
+        )
+
+        val troca = repository.swapSessionExercise(
+            sessionExerciseId = substituido.id,
+            replacementExerciseId = "ex_sub",
+            scope = SwapScope.THIS_SESSION,
+            catalog = catalogo,
+            availableEquipment = listOf("barbell", "dumbbell"),
+        )
+        assertTrue(troca is SwapResult.Ok)
+        repository.updatePlanExerciseNotes(dayId, 0, "nota do slot do plano")
+
+        val plano = dao.getExercisesForDay(dayId).sortedBy { it.exerciseOrder }
+        // O plano não mudou de exercício; a nota ficou no slot de ordem 0.
+        assertEquals("ex1", plano[0].exerciseId)
+        assertEquals("nota do slot do plano", plano[0].notes)
+        assertEquals("", plano[1].notes)
+        // A sessão continua com o substituto, na mesma ordem.
+        assertEquals("ex_sub", dao.getSessionExercise(substituido.id)?.exerciseId)
+        assertEquals(0, dao.getSessionExercise(substituido.id)?.exerciseOrder)
     }
 }
