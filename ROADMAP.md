@@ -31,7 +31,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 |------|--------|-----------|
 | Banco local (Room) | ✅ | Planos, dias, exercícios, sessões, séries |
 | Execução de treino | ✅ | Timer de descanso, séries, RPE, carga, histórico (H1-2) |
-| Geração via IA | ✅ | Backend + SenseNova + fallback local existe; robustez entregue (H3-22): prompt com o pool completo do request (sem cap de 136 IDs), parse tolerante, salvamento parcial de IDs inválidos, timeout 60 s + retry; diagnóstico no ar (H3-21: `fallbackReason` no contrato, log `[fallback]` e motivo no app); foco do usuário priorizado nas sessões (H3-23); **plano B (dois níveis) ativo em 2026-11-10**: gatilho de 22.000 chars disparou com request amplo (29.067 chars, IA levava 74,5s, fallback `reason=timeout`) e cortou o prompt para ~14.000 chars sem perder nenhum ID elegível (Tier A: 8 detalhados por músculo; Tier B: IDs agrupados por músculo); evolução planejada: seleção por nome (H3-25); geração assíncrona proposta (H3-40) |
+| Geração via IA | ✅ | Backend + SenseNova + fallback local existe; robustez entregue (H3-22): prompt com o pool completo do request (sem cap de 136 IDs), parse tolerante, salvamento parcial de IDs inválidos, timeout 60 s + retry; diagnóstico no ar (H3-21: `fallbackReason` no contrato, log `[fallback]` e motivo no app); foco do usuário priorizado nas sessões (H3-23); **plano B (dois níveis) ativo em 2026-11-10**: gatilho de 22.000 chars disparou com request amplo (29.067 chars, IA levava 74,5s, fallback `reason=timeout`) e cortou o prompt para ~14.000 chars sem perder nenhum ID elegível (Tier A: 8 detalhados por músculo; Tier B: IDs agrupados por músculo); seleção por nome entregue (H3-25, concluída em 2026-11-15); geração assíncrona proposta (H3-40) |
 | Foco muscular no plano principal | ✅ | No principal, foco é **prioridade**: cada sessão de força garante ≥ 1 exercício de cada grupo pedido antes do split do ciclo (`user_target_muscles` em `build_strength_session`/`build_hybrid_plan`), regra explícita no prompt e dica na GenerateScreen; exclusivo só no complementar (H3-16) (H3-23) |
 | Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
 | Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
@@ -499,15 +499,19 @@ prioriza o que usa dado existente e ativa campo morto. **Must:** **H4-1**
 listada em §4.1; **H4-3** (histórico por exercício) está **concluída**
 (2026-11-15, gate verde) e listada em §4.1. **Should:** **H4-4** (tipos de
 série) está **concluída** (2026-11-15, gate verde) e listada em §4.1;
-H4-5 (anilhas/aquecimento), H4-6 (supersets), H4-7 (export/import CSV),
-H4-8 (peso/medidas), H4-9 (Health Connect) e H4-10 (programas prontos offline).
-**Could:** H4-11..H4-16 (notas, aplicar progressão, streak/relatório, widget/tile,
-editar carga no pulso e standalone do relógio). **Won't now:** **H4-17** (corrida
-com GPS/FC) por contrariar a decisão de não pedir sensores. Nenhum item entra em
-execução sem spec aprovada — as specs do Horizon 4 ainda serão criadas a partir do
-template.
+**H4-5** (anilhas/aquecimento), **H4-6** (supersets), **H4-7** (export/import CSV),
+**H4-8** (peso/medidas), **H4-9** (Health Connect) e **H4-10** (programas prontos
+offline) estão **concluídas** (2026-11-15, gate verde) e listadas em §4.1.
+**Could:** **H4-11** (notas), **H4-12** (aplicar progressão), **H4-13**
+(streak/relatório), **H4-14** (widget/tile), **H4-15** (editar carga no pulso) e
+**H4-16** (standalone do relógio) estão **concluídas** (2026-11-15/16, gate
+verde) e listadas em §4.1. **Won't now:** **H4-17** (corrida com GPS/FC) por
+contrariar a decisão de não pedir sensores. Com isso, **toda a fila não-Won't-now
+do Horizon 4 está concluída** — a fila de specs pendentes do projeto zerou em
+2026-11-16.
 
-Nenhuma das specs acima listadas como propostas está aprovada para execução. Para
+Fila encerrada em 2026-11-16: todas as specs não-Won't-now acima foram aprovadas
+pelo dono (2026-11-15) e concluídas com gate verde. Para
 iniciar qualquer item, leia a spec em [docs/specs/](docs/specs/); se estiver
 pendente, ajuste a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md) e
 confirme antes de implementar.
@@ -591,8 +595,9 @@ confirme antes de implementar.
 - [H3-58 — Notificação do fim do descanso em segundo plano](docs/specs/H3-58-notificacao-descanso-background.md) — concluída (2026-11-14) (`RestNotifier` com canal `rest_timer` e política pura testada; `POST_NOTIFICATIONS` pedida quando um descanso começa; notificação posta ao ir para background, vira "concluído" ao zerar e cancela ao voltar/pular/pausar; ação "Pular descanso" reusa o fluxo da tela)
 - [H3-59 — Wear: i18n completa e TalkBack](docs/specs/H3-59-wear-i18n-talkback.md) — concluída (2026-11-14) (`values-en` no relógio com paridade PT/EN coberta por `WearStringParityTest`; literais de `WorkoutWearActivity` movidos para recursos com placeholders posicionais; `contentDescription` nos botões e nos estados de conexão e descanso)
 
-**Horizon 4 — versão 1.5.0 (H4-1..H4-17):** specs criadas em 2026-11-14,
-aguardando aprovação do dono.
+**Horizon 4 — versão 1.5.0 (H4-1..H4-17):** specs criadas em 2026-11-14;
+**H4-1..H4-16 concluídas em 2026-11-15/16** (gate `verify.sh` verde a cada
+commit da fila); **H4-17** segue Won't now.
 
 - [H4-1 — Recordes pessoais (PR) e 1RM estimado](docs/specs/H4-1-recordes-pessoais-1rm.md) — concluída (2026-11-15)
 - [H4-2 — Gráficos de progresso (exercício e volume por músculo)](docs/specs/H4-2-graficos-progresso.md) — concluída (2026-11-15) (`ProgressCharts.kt` puro + `ProgressLineChart`/`ProgressBarChart` em `Canvas`, seções no Histórico com ranking textual e resumo de acessibilidade; sem dependência nova e sem mudança de Room/backend)
