@@ -7,8 +7,8 @@
 | Item do roadmap | `H4-14` |
 | MoSCoW | `C` |
 | Versão alvo | `1.5.0` |
-| Spec aprovada em | `pendente` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-15` (pedido do dono de implementar a fila de specs) |
+| Implementação | `concluída em 2026-11-15` |
 | Depende de | H3-35 (atalho de retomada), H3-20 (fila/estado do relógio) |
 
 **Origem:** levantamento de mercado de 2026-11-14 (Horizon 4, Tier 3). O

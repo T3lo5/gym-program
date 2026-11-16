@@ -728,4 +728,14 @@
     <string name="exercise_history_row_volume">Volume: %1$s</string>
     <string name="exercise_history_row_a11y">Treino de %1$s. %2$s. %3$s.</string>
     <string name="exercise_history_row_a11y_pr">Treino de %1$s. %2$s. %3$s. Recorde pessoal.</string>
+
+    <!-- H4-14: widget de tela inicial -->
+    <string name="widget_name">Treinos</string>
+    <string name="widget_resume_label">Retomar treino</string>
+    <string name="widget_start_today_label">Iniciar treino de hoje</string>
+    <string name="widget_next_label">Próximo: %1$s</string>
+    <string name="widget_rest_label">Hoje é descanso</string>
+    <string name="widget_open_app_label">Abrir Treinos</string>
+    <string name="widget_workout_fallback">Treino</string>
+    <string name="msg_no_workout_today">Sem treino para hoje.</string>
 </resources>

@@ -13,6 +13,7 @@ import com.treinos.protocol.PATH_COMMAND
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
+import com.treinos.wear.tile.WorkoutTileService
 import kotlinx.serialization.json.Json
 
 class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListener {
@@ -64,6 +65,8 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
                 continue
             }
             stateStore?.saveState(estado)
+            // H4-14: estado novo do celular — o tile do pulso precisa re-render.
+            runCatching { WorkoutTileService.requestUpdate(this) }
         }
     }
 

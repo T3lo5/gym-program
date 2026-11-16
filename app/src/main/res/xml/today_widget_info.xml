@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- H4-14: provider do widget "treino de hoje". updatePeriodMillis=0: o
+     conteúdo só muda com o app (AppViewModel) ou quando o launcher pede
+     onUpdate — nada de atualização periódica em segundo plano. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="56dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

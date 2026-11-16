@@ -38,5 +38,20 @@
             </intent-filter>
         </service>
 
+        <!-- H4-14: tile do treino no pulso; o sistema liga o provider com a
+             permissão BIND_TILE_PROVIDER. -->
+        <service
+            android:name=".tile.WorkoutTileService"
+            android:exported="true"
+            android:label="@string/tile_name"
+            android:permission="android.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_launcher" />
+        </service>
+
     </application>
 </manifest>

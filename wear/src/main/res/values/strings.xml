@@ -19,4 +19,12 @@
     <string name="complete_set">Concluir Série</string>
     <string name="finish_workout">Finalizar Treino</string>
     <string name="in_progress">Em andamento</string>
+
+    <!-- H4-14: tile do treino no pulso -->
+    <string name="tile_name">Treinos</string>
+    <string name="tile_open_app">Abrir Treinos</string>
+    <string name="tile_open">Abrir</string>
+    <string name="tile_open_workout">Abrir treino</string>
+    <string name="tile_set_progress">%1$d de %2$d séries</string>
+    <string name="tile_workout_fallback">Treino</string>
 </resources>

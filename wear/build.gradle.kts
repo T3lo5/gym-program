@@ -102,6 +102,11 @@ dependencies {
     // Wear Data Layer
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
 
+    // H4-14: tile do relógio — API oficial de Wear Tiles (estável 2024-05-01,
+    // compatível com minSdk 30) e componentes Material do protolayout.
+    implementation("androidx.wear.tiles:tiles:1.4.0")
+    implementation("androidx.wear.protolayout:protolayout-material:1.2.0")
+
     // Material Components (tema do wear)
     implementation("com.google.android.material:material:1.11.0")
 

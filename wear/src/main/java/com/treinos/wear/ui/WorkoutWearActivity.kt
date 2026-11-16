@@ -34,6 +34,7 @@ import com.treinos.protocol.WearWorkoutState
 import com.treinos.wear.R
 import com.treinos.wear.WearApplication
 import com.treinos.wear.data.WearStateStore
+import com.treinos.wear.tile.WorkoutTileService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -68,7 +69,12 @@ class WorkoutWearActivity : ComponentActivity() {
                     scope.launch { sendCommand(sessionId, WearCommandKind.SKIP_REST) }
                 },
                 onFinish = { sessionId ->
-                    scope.launch { sendCommand(sessionId, WearCommandKind.FINISH_WORKOUT) }
+                    scope.launch {
+                        sendCommand(sessionId, WearCommandKind.FINISH_WORKOUT)
+                        // H4-14 (regra 13): o relógio pediu o fim — o tile precisa
+                        // re-renderizar (vira ocioso quando o estado permitir).
+                        runCatching { WorkoutTileService.requestUpdate(this@WorkoutWearActivity) }
+                    }
                 },
                 onRequestState = {
                     scope.launch { sendRequestState() }

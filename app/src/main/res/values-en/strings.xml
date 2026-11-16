@@ -723,4 +723,14 @@
     <string name="exercise_history_row_volume">Volume: %1$s</string>
     <string name="exercise_history_row_a11y">Workout on %1$s. %2$s. %3$s.</string>
     <string name="exercise_history_row_a11y_pr">Workout on %1$s. %2$s. %3$s. Personal record.</string>
+
+    <!-- H4-14: home screen widget -->
+    <string name="widget_name">Treinos</string>
+    <string name="widget_resume_label">Resume workout</string>
+    <string name="widget_start_today_label">Start today\'s workout</string>
+    <string name="widget_next_label">Next: %1$s</string>
+    <string name="widget_rest_label">Rest day today</string>
+    <string name="widget_open_app_label">Open Treinos</string>
+    <string name="widget_workout_fallback">Workout</string>
+    <string name="msg_no_workout_today">No workout for today.</string>
 </resources>

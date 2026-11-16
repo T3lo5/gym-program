@@ -9,6 +9,7 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.glance.appwidget.updateAll
 import com.treinos.app.data.WorkoutRepository
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
@@ -95,9 +96,12 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoField
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
@@ -109,6 +113,7 @@ import com.treinos.app.updater.VersionCompare
 import com.treinos.app.R
 import com.treinos.app.notify.RestNotifier
 import com.treinos.app.notify.RestNotifierPolicy
+import com.treinos.app.widget.TodayWidget
 
 enum class Screen {
     Home,
@@ -161,7 +166,8 @@ class AppViewModel(
         if (session != null) {
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                putExtra(EXTRA_RESUME_SESSION, true)
+                // H4-14: o widget "Retomar treino" reusa o mesmo extra do atalho.
+                putExtra(MainActivity.EXTRA_RESUME_SESSION, true)
             }
             val shortcut = ShortcutInfoCompat.Builder(context, SHORTCUT_ID_RESUME)
                 .setShortLabel(context.getString(com.treinos.app.R.string.shortcut_resume_short_label))
@@ -697,6 +703,19 @@ class AppViewModel(
         viewModelScope.launch {
             inProgressSession.collect { session ->
                 publishResumeShortcut(session)
+            }
+        }
+        // H4-14: widget da tela inicial acompanha sessão em andamento e planos
+        // (início, fim, abandono, import/geração de plano). Protegido por
+        // runCatching: sem host de widget a chamada não pode derrubar o app.
+        viewModelScope.launch {
+            inProgressSession.collect {
+                runCatching { TodayWidget.updateAll(context) }
+            }
+        }
+        viewModelScope.launch {
+            activePlans.collect {
+                runCatching { TodayWidget.updateAll(context) }
             }
         }
     }
@@ -1431,6 +1450,32 @@ class AppViewModel(
     fun leaveWorkout() {
         _screen.value = Screen.Home
         _message.value = context.getString(R.string.msg_workout_left_open)
+    }
+
+    /**
+     * H4-14: inicia o treino de hoje direto do widget. Espera o plano ativo
+     * convergir com teto de 5 s (cold start do processo); sem plano, dia de
+     * descanso ou dia flexível mostra mensagem em vez de travar. Sessão já em
+     * andamento (rotação reentregando o extra) retoma em vez de iniciar outra.
+     */
+    fun startTodayWorkout() {
+        viewModelScope.launch {
+            inProgressSession.value?.let {
+                resumeWorkout()
+                return@launch
+            }
+            val plan = activePlan.value
+                ?: withTimeoutOrNull(5_000) { activePlan.first { it != null } }
+            if (plan == null) {
+                _message.value = context.getString(R.string.msg_no_workout_today)
+                return@launch
+            }
+            val todayWeekday = LocalDate.now().get(ChronoField.DAY_OF_WEEK)
+            when (val today = todaySessionSelector(plan.days, todayWeekday)) {
+                is TodaySession.Today -> startWorkout(today.day.day.id)
+                else -> _message.value = context.getString(R.string.msg_no_workout_today)
+            }
+        }
     }
 
     fun resumeWorkout() {
@@ -2616,7 +2661,6 @@ class AppViewModel(
 
         // H3-35: atalho dinâmico "Retomar treino".
         private const val SHORTCUT_ID_RESUME = "resume_workout"
-        private const val EXTRA_RESUME_SESSION = "extra_resume_session"
 
         /** "+15 s" padrão da faixa de descanso (H3-26). */
         const val REST_EXTEND_SECONDS = 15

@@ -193,6 +193,11 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // H4-14: widget da tela inicial — API oficial de AppWidgets com Compose
+    // (estável 2024-05-01; compatível com compileSdk 34, minSdk 26, Kotlin
+    // 1.9.24 e o Compose BOM já usado no :app).
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+
     // Wear OS Data Layer (comunicação celular ↔ relógio)
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
     implementation(project(":protocol"))

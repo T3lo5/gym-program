@@ -19,4 +19,12 @@
     <string name="complete_set">Complete Set</string>
     <string name="finish_workout">Finish Workout</string>
     <string name="in_progress">In progress</string>
+
+    <!-- H4-14: workout tile on the watch -->
+    <string name="tile_name">Treinos</string>
+    <string name="tile_open_app">Open Treinos</string>
+    <string name="tile_open">Open</string>
+    <string name="tile_open_workout">Open workout</string>
+    <string name="tile_set_progress">%1$d of %2$d sets</string>
+    <string name="tile_workout_fallback">Workout</string>
 </resources>

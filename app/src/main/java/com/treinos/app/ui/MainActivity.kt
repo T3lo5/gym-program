@@ -53,10 +53,16 @@ class MainActivity : AppCompatActivity() {
             viewModel.skipRest()
         }
 
+        // H4-14: widget "Iniciar treino de hoje" inicia a sessão do dia direto.
+        if (intent.getBooleanExtra(EXTRA_START_TODAY, false)) {
+            viewModel.startTodayWorkout()
+        }
+
         setContent {
             TreinosTheme {
                 // H3-35: atalho "Retomar treino" abre direto a tela de treino.
-                if (intent.getBooleanExtra("extra_resume_session", false)) {
+                // H4-14: o widget "Retomar treino" reusa o mesmo extra.
+                if (intent.getBooleanExtra(EXTRA_RESUME_SESSION, false)) {
                     viewModel.resumeWorkout()
                 }
                 TreinosApp(viewModel)
@@ -86,6 +92,10 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(EXTRA_SKIP_REST, false)) {
             viewModel.skipRest()
         }
+        // H4-14: widget "Iniciar treino de hoje" com a Activity já viva.
+        if (intent.getBooleanExtra(EXTRA_START_TODAY, false)) {
+            viewModel.startTodayWorkout()
+        }
     }
 
     /** H3-40: poll sob demanda ao voltar ao foreground — consulta o job se houver envelope. */
@@ -113,5 +123,11 @@ class MainActivity : AppCompatActivity() {
     companion object {
         /** H3-58: extra do PendingIntent "Pular descanso" da notificação. */
         const val EXTRA_SKIP_REST = "extra_skip_rest"
+
+        /** H3-35/H4-14: extra do atalho e do widget "Retomar treino". */
+        const val EXTRA_RESUME_SESSION = "extra_resume_session"
+
+        /** H4-14: extra do widget "Iniciar treino de hoje". */
+        const val EXTRA_START_TODAY = "extra_start_today"
     }
 }
