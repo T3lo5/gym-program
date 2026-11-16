@@ -309,6 +309,10 @@ Os três tiers do levantamento mapeiam para o MoSCoW: **Tier 1 → Must**,
 Ao entrar no CI/CD, definir `versionName = 1.5.0` com o `versionCode` derivado do
 git (H3-48); não misturar itens do H4 em releases 1.3.x/1.4.x. Cada spec do H4
 carrega a linha `Versão alvo | 1.5.0` na tabela de Status.
+**Patch 1.5.1 (2026-11-16):** `version.properties` sobe para `1.5.1` — fecha a
+fila do Horizon 4 com a correção do débito do H4-12 (carga-alvo preservada na
+revisão) e do bug `Instant` + `ChronoUnit.WEEKS` que quebrava a revisão de plano
+sempre, além de unificar as regras da rampa (H4-5) e do superset (H4-6).
 
 **Migrations Room (ordem da fila):** o banco está em 7 (H4-4 consumiu
 `MIGRATION_6_7`, colunas `setType`/`rir` com backfill de `isWarmup`). H4-7 →
@@ -484,7 +488,7 @@ relógio — com 2 bugs do `install-wear.sh` corrigidos na validação) estão
 **concluídas** e listadas em §4.1.
 **Numeração única (2026-11-15):** `scripts/version.sh` é a fonte única de
 `versionCode` (minutos desde 2020-01-01) e `versionName`
-(`version.properties`, hoje `1.5.0`), usada pelo CI e pelo build local — antes
+(`version.properties`, hoje `1.5.1`), usada pelo CI e pelo build local — antes
 o release usava `run_number` (166) e o local o contador de commits (228), o que
 fazia o updater dizer "já atualizado" e o install do release falhar com
 `INSTALL_FAILED_VERSION_DOWNGRADE`.
