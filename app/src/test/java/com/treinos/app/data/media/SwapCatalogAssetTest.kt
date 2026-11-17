@@ -1,6 +1,8 @@
 package com.treinos.app.data.media
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -91,5 +93,73 @@ class SwapCatalogAssetTest {
         val ids = assetExercises().map { it.jsonObject["id"]!!.jsonPrimitive.content }
 
         assertEquals(ids.sorted(), ids)
+    }
+
+    /**
+     * Bug relatado por usuário: o substituto escolhido na troca abria o detalhe
+     * sem imagem e sem descrição. O asset compacto da H3-44 descartava
+     * `instructions`/`images`/`namePt`, e na troca "Só hoje" não há mídia do
+     * plano para cobrir — o catálogo local é a única fonte. O asset passa a
+     * carregar a mídia completa e este teste impede ele voltar a descartar.
+     */
+    @Test
+    fun asset_carrega_midia_completa_igual_ao_backend() {
+        val backend = Json.parseToJsonElement(backendCatalog().readText()).jsonArray
+        val parsed = ExerciseMediaRepository.parseSwapCatalog(asset().readText())
+        assertTrue("asset não pode ser vazio", parsed.isNotEmpty())
+
+        var comInstrucoes = 0
+        var comImagem = 0
+        backend.forEach { element ->
+            val exercise = element.jsonObject
+            val id = exercise["id"]!!.jsonPrimitive.content
+            val media = parsed[id]
+                ?: error("ID $id do backend ausente no asset parseado")
+
+            val backendInstructions = exercise["instructions"]?.jsonArray
+                ?.map { it.jsonPrimitive.content }
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+            // Passos em branco do dataset são descartados na geração (nunca
+            // renderizam "3. " no detalhe); o resto tem que ser idêntico.
+            assertEquals("instructions divergentes para $id", backendInstructions, media.instructions)
+
+            val backendImages = exercise["images"]?.jsonArray
+                ?.map { it.jsonPrimitive.content }
+                .orEmpty()
+            assertEquals(
+                "imageUrl divergente para $id",
+                ExerciseMediaRepository.imageUrlFor(backendImages),
+                media.imageUrl,
+            )
+
+            val namePtElement = exercise["namePt"]
+            val backendNamePt = if (namePtElement is JsonPrimitive && namePtElement !is JsonNull) {
+                namePtElement.content
+            } else {
+                ""
+            }
+            assertEquals("namePt divergente para $id", backendNamePt, media.namePt.orEmpty())
+
+            if (media.instructions.isNotEmpty()) comInstrucoes++
+            if (media.imageUrl != null) comImagem++
+        }
+        // Cobertura real do dataset: quase tudo tem passos e imagem.
+        assertTrue("asset sem instruções suficientes ($comInstrucoes)", comInstrucoes > 800)
+        assertTrue("asset sem imagens suficientes ($comImagem)", comImagem > 800)
+    }
+
+    @Test
+    fun asset_resolve_conteudo_em_pt() {
+        val parsed = ExerciseMediaRepository.parseSwapCatalog(asset().readText())
+        val media = parsed["Dumbbell_Bench_Press"]
+            ?: error("Dumbbell_Bench_Press ausente no asset")
+
+        val pt = media.resolvedFor("pt")
+        assertTrue("nome em PT esperado", pt.name != media.name || !media.namePt.isNullOrBlank())
+        assertTrue(
+            "instruções em PT esperadas",
+            pt.instructions != media.instructions || !media.instructionsPt.isNullOrEmpty(),
+        )
     }
 }

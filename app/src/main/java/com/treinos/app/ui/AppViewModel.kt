@@ -17,6 +17,7 @@ import com.treinos.app.data.MeasurementValidator
 import com.treinos.app.data.ProgressionApplyResult
 import com.treinos.app.data.SwapResult
 import com.treinos.app.data.SwapScope
+import com.treinos.app.data.availableEquipmentForSwap
 import com.treinos.app.data.swapCandidates
 import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
@@ -533,6 +534,27 @@ class AppViewModel(
         GenerateConfigCodec.decode(preferences.generateConfigJson)
     )
     val generateConfig: StateFlow<GenerateConfig?> = _generateConfig.asStateFlow()
+
+    /**
+     * Equipamento disponível para a troca de exercício (bug relatado por
+     * usuário): união do equipamento dos exercícios dos planos ativos com o da
+     * última configuração de geração. Usar só `generateConfig` travava a lista
+     * de substitutos no equipamento do ÚLTIMO treino gerado (ex.: peso
+     * corporal) mesmo dentro de um treino de academia completa. Vazio = sem
+     * filtro por equipamento.
+     */
+    val swapAvailableEquipment: StateFlow<List<String>> = combine(
+        activePlans,
+        _generateConfig,
+    ) { plans, config ->
+        availableEquipmentForSwap(
+            planEquipment = plans
+                .flatMap { it.days }
+                .flatMap { it.exercises }
+                .map { it.equipment },
+            configuredEquipment = config?.equipment.orEmpty(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _isReviewing = MutableStateFlow(false)
     val isReviewing: StateFlow<Boolean> = _isReviewing.asStateFlow()

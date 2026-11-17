@@ -19,6 +19,7 @@ import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.local.normalizeSetType
 import com.treinos.app.data.local.resolveSetType
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.data.media.rawImagePathFromUrl
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
 import com.treinos.app.data.remote.GenerateJobAck
@@ -398,6 +399,15 @@ open class WorkoutRepository(
                     exerciseName = replacement.name,
                     primaryMuscles = replacement.primaryMuscles.joinToString(", "),
                     equipment = replacement.equipment,
+                    // Mídia do substituto (bug relatado): sem isto, o slot do
+                    // plano continuava com as instruções/imagem do exercício
+                    // ANTIGO e o detalhe do substituto mostrava conteúdo errado.
+                    // O plano guarda passos '\n' e paths crus separados por ','.
+                    instructions = replacement.instructions.joinToString("\n"),
+                    images = rawImagePathFromUrl(replacement.imageUrl).orEmpty(),
+                    // A carga-alvo era do exercício antigo e não é transferível:
+                    // 60 kg de supino não valem para o substituto.
+                    targetWeightKg = null,
                 )
                 dao.updatePlanExercise(updated)
                 SwapResult.Ok(exerciseId = replacement.id, exerciseName = replacement.name)

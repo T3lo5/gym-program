@@ -2,8 +2,12 @@
 """Gera o catálogo compacto de troca de exercício embarcado no app.
 
 H3-44: o app precisa listar substitutos offline, antes de qualquer download.
-O backend é a fonte de verdade; este script deriva um asset pequeno com
-apenas os campos usados pela troca (id, nome, músculos, equipamento).
+O backend é a fonte de verdade; este script deriva um asset com os campos da
+troca (id, nome, músculos, equipamento) e da mídia do detalhe (instruções EN/PT,
+paths de imagem, nome em PT) — bug relatado por usuário: o substituto escolhido
+na troca abria o detalhe sem imagem e sem descrição quando o catálogo do
+backend nunca foi baixado, porque a troca "Só hoje" não tem mídia embutida no
+plano para cobrir.
 
 Uso:
     python3 scripts/gen-swap-catalog.py
@@ -37,8 +41,24 @@ def build(catalog: list[dict]) -> dict:
             {
                 "id": exercise_id,
                 "name": name,
+                "namePt": (raw.get("namePt") or "").strip(),
                 "primaryMuscles": muscles,
                 "equipment": (raw.get("equipment") or "").strip(),
+                "instructions": [
+                    str(step).strip()
+                    for step in (raw.get("instructions") or [])
+                    if str(step).strip()
+                ],
+                "instructionsPt": [
+                    str(step).strip()
+                    for step in (raw.get("instructionsPt") or [])
+                    if str(step).strip()
+                ],
+                "images": [
+                    str(image).strip()
+                    for image in (raw.get("images") or [])
+                    if str(image).strip()
+                ],
             }
         )
     exercises.sort(key=lambda item: item["id"])

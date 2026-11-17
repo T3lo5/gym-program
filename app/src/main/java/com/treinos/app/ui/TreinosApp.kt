@@ -81,6 +81,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     // H3-30: config restaurada na tela de gerar e motivo do fallback no selo.
     val generateConfig by viewModel.generateConfig.collectAsStateWithLifecycle()
+    // Troca de exercício: equipamento do treino em andamento (união plano +
+    // última geração), não o da última geração sozinho.
+    val swapAvailableEquipment by viewModel.swapAvailableEquipment.collectAsStateWithLifecycle()
     val lastFallbackReason by viewModel.lastFallbackReason.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
@@ -515,14 +518,14 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDeleteSet = viewModel::deleteSet,
                     onAbandon = viewModel::abandonWorkout,
                     onNextExercise = viewModel::nextExercise,
-                    availableEquipment = generateConfig?.equipment.orEmpty(),
+                    availableEquipment = swapAvailableEquipment,
                     onSwapExercise = { sessionExerciseId, replacementId, swapScope ->
                         scope.launch {
                             viewModel.swapSessionExercise(
                                 sessionExerciseId = sessionExerciseId,
                                 replacementExerciseId = replacementId,
                                 scope = swapScope,
-                                availableEquipment = generateConfig?.equipment.orEmpty(),
+                                availableEquipment = swapAvailableEquipment,
                             )
                         }
                     },

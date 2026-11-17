@@ -672,6 +672,107 @@ class WorkoutRepositorySessionTest {
         assertEquals(0, dao.getSessionExercise(substituido.id)?.exerciseOrder)
     }
 
+    @Test
+    fun troca_all_future_atualiza_midia_e_limpa_carga_alvo_do_antigo() = runTest {
+        // Bug relatado: trocar com escopo "Todos os treinos" deixava no plano as
+        // instruções/imagem do exercício ANTIGO (o detalhe do substituto mostrava
+        // a mídia errada) e a carga-alvo dele. O slot do plano passa a refletir o
+        // substituto: instruções/imagem do catálogo e carga-alvo zerada.
+        val (_, dayId) = planoComDoisExercicios()
+        val antigo = dao.getExercisesForDay(dayId).first { it.exerciseId == "ex1" }
+        dao.updatePlanExercise(
+            antigo.copy(
+                primaryMuscles = "chest",
+                equipment = "barbell",
+                instructions = "passo antigo 1\npasso antigo 2",
+                images = "Exercicio_Antigo/0.jpg",
+                targetWeightKg = 60.0,
+            )
+        )
+        val sessionId = repository.startSession(1L, dayId)
+        val substituido = dao.getAllSessionExercises().single {
+            it.sessionId == sessionId && it.exerciseOrder == 0
+        }
+        val catalogo = mapOf(
+            "ex1" to ExerciseMedia(
+                id = "ex1", name = "Ex 1", primaryMuscles = listOf("chest"),
+                equipment = "barbell", instructions = emptyList(), imageUrl = null,
+            ),
+            "ex_sub" to ExerciseMedia(
+                id = "ex_sub", name = "Substituto", primaryMuscles = listOf("chest"),
+                equipment = "dumbbell",
+                instructions = listOf("passo novo 1", "passo novo 2"),
+                imageUrl = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Substituto/0.jpg",
+            ),
+        )
+
+        val troca = repository.swapSessionExercise(
+            sessionExerciseId = substituido.id,
+            replacementExerciseId = "ex_sub",
+            scope = SwapScope.ALL_FUTURE,
+            catalog = catalogo,
+            availableEquipment = listOf("barbell", "dumbbell"),
+        )
+
+        assertTrue(troca is SwapResult.Ok)
+        val slot = dao.getExercisesForDay(dayId).first { it.exerciseOrder == 0 }
+        assertEquals("ex_sub", slot.exerciseId)
+        assertEquals("Substituto", slot.exerciseName)
+        assertEquals("passo novo 1\npasso novo 2", slot.instructions)
+        // O plano guarda o path cru (a URL é montada na leitura), nunca a URL.
+        assertEquals("Substituto/0.jpg", slot.images)
+        assertNull("carga-alvo do exercício antigo não vaza para o substituto", slot.targetWeightKg)
+    }
+
+    @Test
+    fun troca_this_session_nao_toca_midia_nem_carga_do_plano() = runTest {
+        // A troca "Só hoje" muda a sessão; o slot do plano continua do exercício
+        // original — o detalhe do substituto resolve a mídia pelo catálogo.
+        val (_, dayId) = planoComDoisExercicios()
+        val antigo = dao.getExercisesForDay(dayId).first { it.exerciseId == "ex1" }
+        dao.updatePlanExercise(
+            antigo.copy(
+                primaryMuscles = "chest",
+                equipment = "barbell",
+                instructions = "passo antigo 1\npasso antigo 2",
+                images = "Exercicio_Antigo/0.jpg",
+                targetWeightKg = 60.0,
+            )
+        )
+        val sessionId = repository.startSession(1L, dayId)
+        val substituido = dao.getAllSessionExercises().single {
+            it.sessionId == sessionId && it.exerciseOrder == 0
+        }
+        val catalogo = mapOf(
+            "ex1" to ExerciseMedia(
+                id = "ex1", name = "Ex 1", primaryMuscles = listOf("chest"),
+                equipment = "barbell", instructions = emptyList(), imageUrl = null,
+            ),
+            "ex_sub" to ExerciseMedia(
+                id = "ex_sub", name = "Substituto", primaryMuscles = listOf("chest"),
+                equipment = "dumbbell",
+                instructions = listOf("passo novo 1", "passo novo 2"),
+                imageUrl = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Substituto/0.jpg",
+            ),
+        )
+
+        val troca = repository.swapSessionExercise(
+            sessionExerciseId = substituido.id,
+            replacementExerciseId = "ex_sub",
+            scope = SwapScope.THIS_SESSION,
+            catalog = catalogo,
+            availableEquipment = listOf("barbell", "dumbbell"),
+        )
+
+        assertTrue(troca is SwapResult.Ok)
+        val slot = dao.getExercisesForDay(dayId).first { it.exerciseOrder == 0 }
+        assertEquals("ex1", slot.exerciseId)
+        assertEquals("passo antigo 1\npasso antigo 2", slot.instructions)
+        assertEquals("Exercicio_Antigo/0.jpg", slot.images)
+        assertEquals(60.0, slot.targetWeightKg!!, 0.0)
+        assertEquals("ex_sub", dao.getSessionExercise(substituido.id)?.exerciseId)
+    }
+
     // ---------- H4-12: aplicar sugestão de progressão ao plano ----------
 
     private fun sugestao(

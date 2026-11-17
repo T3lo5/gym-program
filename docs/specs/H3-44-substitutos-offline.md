@@ -34,9 +34,16 @@ esperar uma chamada de rede.
 - Persistir uma tabela de "substitutos por exercício" no Room. Os candidatos
   são derivados em memória do catálogo local; a fonte de verdade continua
   sendo um único catálogo.
-- Incluir imagens/instruções no catálogo embarcado. O asset é compacto e só
+- ~~Incluir imagens/instruções no catálogo embarcado. O asset é compacto e só
   cobre o necessário para listar e aplicar a troca; a mídia completa continua
-  vindo do cache/H3-24 quando disponível.
+  vindo do cache/H3-24 quando disponível.~~
+  **Revisto em 2026-11-17 (bug relatado por usuário):** na troca `THIS_SESSION`
+  o substituto não tem slot no plano, então a mídia do plano (H3-24) não cobre
+  — sem imagens/instruções no asset, o detalhe do substituto abria sem imagem
+  e sem descrição para quem nunca baixou o catálogo do backend. O asset volta a
+  carregar `instructions`/`instructionsPt`/`images`/`namePt` do catálogo do
+  backend (~1,3 MB, ~290 KB comprimido no APK), gerado pelo mesmo
+  `scripts/gen-swap-catalog.py`; `SwapCatalogAssetTest` impede dessincronia.
 - Corrigir a ausência de filtro por categoria (força vs. alongamento) na
   função de candidatos. É uma questão separada da H3-41; esta spec preserva o
   comportamento atual de filtragem.

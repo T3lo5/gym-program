@@ -82,6 +82,28 @@ fun validateSwap(
 }
 
 /**
+ * Equipamento disponível para a troca de exercício: a união do equipamento dos
+ * exercícios do plano ativo com o da configuração da última geração.
+ *
+ * Bug relatado por usuário: a troca durante o treino usava só o `equipment`
+ * da ÚLTIMA geração (`generateConfig`) — quem gerou um treino de peso corporal
+ * e depois treina um plano de academia completa via a lista de substitutos
+ * travada em "body only". O plano ativo foi gerado com o equipamento do
+ * usuário; a união nunca estreita o filtro (config só soma) e vazios são
+ * ignorados. Lista vazia = sem filtro por equipamento.
+ *
+ * Pura: testável em JVM sem Room nem Android.
+ */
+fun availableEquipmentForSwap(
+    planEquipment: List<String>,
+    configuredEquipment: List<String>,
+): List<String> =
+    (planEquipment.asSequence().map { it.trim() }.filter { it.isNotEmpty() } +
+        configuredEquipment.asSequence().map { it.trim() }.filter { it.isNotEmpty() })
+        .distinct()
+        .toList()
+
+/**
  * Candidatos válidos para trocar o exercício de uma [sessão em andamento]
  * [sessionExercise] no mesmo dia.
  *

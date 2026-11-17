@@ -81,8 +81,16 @@ private data class SwapCatalogDto(
 private data class SwapExerciseDto(
     val id: String = "",
     val name: String = "",
+    // Mídia completa no asset (bug relatado por usuário): sem instruções e
+    // imagem no asset, o substituto da troca "Só hoje" abria o detalhe sem
+    // descrição e sem imagem quando o catálogo do backend nunca foi baixado.
+    // Campos aditivos: um asset antigo sem eles continua parseando (defaults).
+    val namePt: String = "",
     val primaryMuscles: List<String> = emptyList(),
     val equipment: String = "",
+    val instructions: List<String> = emptyList(),
+    val instructionsPt: List<String> = emptyList(),
+    val images: List<String> = emptyList(),
 )
 
 class ExerciseMediaRepository(
@@ -134,12 +142,14 @@ class ExerciseMediaRepository(
                 id to ExerciseMedia(
                     id = id,
                     name = name,
+                    namePt = exercise.namePt.takeIf { it.isNotBlank() },
                     primaryMuscles = exercise.primaryMuscles
                         .map { it.trim() }
                         .filter { it.isNotEmpty() },
                     equipment = exercise.equipment.trim(),
-                    instructions = emptyList(),
-                    imageUrl = null,
+                    instructions = exercise.instructions,
+                    instructionsPt = exercise.instructionsPt.takeIf { it.isNotEmpty() },
+                    imageUrl = imageUrlFor(exercise.images),
                 )
             }.toMap()
         }
@@ -306,22 +316,31 @@ class ExerciseMediaRepository(
         }
     }
 
-    private fun imagesFromUrl(url: String?): List<String> {
-        if (url.isNullOrBlank()) return emptyList()
-        if (!url.startsWith(IMAGE_BASE_URL)) return emptyList()
-        val path = url.removePrefix(IMAGE_BASE_URL)
-        // O cache guarda o path cru: [imageUrlFor] codifica a cada leitura, e
-        // decodificar aqui evita dupla codificação (%20 viraria %2520).
-        val raw = path
-            .split('/')
-            .joinToString("/") { segment -> decodeSegment(segment) }
-        return listOf(raw)
-    }
-
-    private fun decodeSegment(segment: String): String =
-        runCatching { URLDecoder.decode(segment, Charsets.UTF_8.name()) }
-            .getOrDefault(segment)
+    private fun imagesFromUrl(url: String?): List<String> =
+        rawImagePathFromUrl(url)?.let { listOf(it) } ?: emptyList()
 }
+
+/**
+ * Reconstrói o path cru do catálogo a partir da URL absoluta (o inverso de
+ * [imageUrlFor]). O plano guarda paths relativos separados por vírgula
+ * (`WorkoutPlanExerciseEntity.images`) e a URL é remontada na leitura — gravar
+ * a URL inteira quebraria a reconstrução (dupla codificação). null/blank ou
+ * URL de outra origem = sem path. Pura: testável em JVM.
+ */
+internal fun rawImagePathFromUrl(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    if (!url.startsWith(ExerciseMediaRepository.IMAGE_BASE_URL)) return null
+    val path = url.removePrefix(ExerciseMediaRepository.IMAGE_BASE_URL)
+    // O cache guarda o path cru: [imageUrlFor] codifica a cada leitura, e
+    // decodificar aqui evita dupla codificação (%20 viraria %2520).
+    return path
+        .split('/')
+        .joinToString("/") { segment -> decodeSegment(segment) }
+}
+
+private fun decodeSegment(segment: String): String =
+    runCatching { URLDecoder.decode(segment, Charsets.UTF_8.name()) }
+        .getOrDefault(segment)
 
 /**
  * H3-24: resolução determinística da mídia de um exercício.

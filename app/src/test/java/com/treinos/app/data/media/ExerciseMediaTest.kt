@@ -343,8 +343,13 @@ class ExerciseMediaTest {
         assertEquals("Barbell Bench Press", media.name)
         assertEquals(listOf("chest"), media.primaryMuscles)
         assertEquals("barbell", media.equipment)
-        // O asset é só para troca: sem imagens/instruções.
-        assertNull(media.imageUrl)
+        // Revisão de 2026-11-17 (bug relatado por usuário): o asset carrega a
+        // mídia do detalhe — `images` vira URL absoluta na leitura. Campos
+        // desconhecidos (category) continuam ignorados.
+        assertEquals(
+            ExerciseMediaRepository.imageUrlFor(listOf("Barbell_Bench_Press/0.jpg")),
+            media.imageUrl,
+        )
         assertEquals(emptyList<String>(), media.instructions)
     }
 
