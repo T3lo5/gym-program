@@ -313,6 +313,15 @@ carrega a linha `Versão alvo | 1.5.0` na tabela de Status.
 fila do Horizon 4 com a correção do débito do H4-12 (carga-alvo preservada na
 revisão) e do bug `Instant` + `ChronoUnit.WEEKS` que quebrava a revisão de plano
 sempre, além de unificar as regras da rampa (H4-5) e do superset (H4-6).
+**Patch 1.5.2 (2026-11-17):** `version.properties` sobe para `1.5.2` — corrige a
+troca de exercício durante o treino relatada por usuário: a lista de substitutos
+usava o equipamento da ÚLTIMA geração (`generateConfig.equipment`) e ficava
+travada em "peso corporal" dentro de um treino de academia completa — agora é a
+união do equipamento dos planos ativos com a config (`availableEquipmentForSwap`);
+o asset offline volta a carregar instruções/imagem/nome em PT do catálogo do
+backend (revisão da decisão da H3-44 — o substituto da troca "Só hoje" abria o
+detalhe sem imagem e sem descrição); e a troca "Todos os treinos" atualiza a
+mídia do substituto no plano e limpa a carga-alvo do exercício antigo.
 
 **Migrations Room (ordem da fila):** o banco está em 7 (H4-4 consumiu
 `MIGRATION_6_7`, colunas `setType`/`rir` com backfill de `isWarmup`). H4-7 →
