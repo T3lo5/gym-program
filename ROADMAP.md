@@ -368,10 +368,8 @@ precedente H3-7/H3-45).
 | H4-14 | Widget de tela inicial e tile do relógio | **C** | "Won't now"; o acesso rápido é o que o mercado mais usa. O app já tem o shortcut de retomada (H3-35). | Glance widget "Iniciar treino de hoje"/retomar e tile no relógio, reusando o shortcut existente. | 1–2 dias | H3-35 | [H4-14](docs/specs/H4-14-widget-tile-relogio.md) (concluída) |
 | H4-15 | Wear: editar carga/reps no pulso | **C** | "Won't now"; hoje o relógio só conclui série, pula descanso e finaliza. | Edição de carga/reps no relógio com envio ao celular pela fila da H3-20. | 1–2 dias | H3-20 | [H4-15](docs/specs/H4-15-wear-editar-carga-reps.md) (concluída) |
 | H4-16 | Modo standalone do relógio | **C** | O relógio depende do celular; sair sem o telefone significa não treinar. Apple Watch/Garmin fazem standalone. | Sessão inteira offline no relógio (Room próprio no `:wear`) com sincronização posterior; maior lift arquitetural do horizonte. | 4–6 dias | H3-20, H4-15 | [H4-16](docs/specs/H4-16-wear-standalone.md) (concluída) |
-| H4-17 | Corrida com GPS, FC e intervalados | **W** | A corrida é registro manual (distância/duração); Strava/Nike/Garmin fazem GPS, ritmo, zonas de FC e cues de áudio. | Decisão de produto explícita: exige permissões de localização/sensor que a H2-2 recusou; fica fora até priorização do dono. | 3–5 dias | — | [H4-17](docs/specs/H4-17-corrida-gps-fc.md) |
+| H4-17 | Corrida com GPS, FC e intervalados | **S** | A corrida é registro manual (distância/duração); GPS, FC opcional e intervalos por tempo ficam disponíveis sem substituir o fluxo manual. | Tracking opt-in com GPS, FC disponível no Health Connect, rota/FC persistidas aditivamente e resumo no relógio; sem inventar dados sem sensor. | 3–5 dias | H3-19 | [H4-17](docs/specs/H4-17-corrida-gps-fc.md) (concluída) |
 
-> A H4-17 é a única **Won't now** do horizonte: contraria a decisão de não pedir
-> sensores. As demais entram em execução só com spec aprovada, na ordem da tabela.
 
 ---
 
@@ -392,8 +390,8 @@ precedente H3-7/H3-45).
 | Múltiplos planos (H3-15) ✅ | Geração complementar (H3-16) ✅ | | |
 | Fechar o MVP do relógio (H3-17–H3-20) | | | |
 | Geração assíncrona (H3-40) — implementado (2026-11-10) | | | |
-| **Horizon 4 — paridade de mercado (2026-11-14): Tier 1 (Must)** | **Tier 2 (Should)** | **Tier 3 (Could)** | **Won't now** |
-| PR e 1RM (H4-1) | Tipos de série (H4-4) | Notas no treino (H4-11) ✅ | Corrida GPS/FC (H4-17) |
+| **Horizon 4 — paridade de mercado (2026-11-14): Tier 1 (Must)** | **Tier 2 (Should)** | **Tier 3 (Could)** | **Concluído** |
+| PR e 1RM (H4-1) | Tipos de série (H4-4) | Notas no treino (H4-11) ✅ | Corrida GPS/FC (H4-17) ✅ |
 | Gráficos de progresso (H4-2) | Anilhas/aquecimento (H4-5) ✅ | Aplicar progressão (H4-12) ✅ | |
 | Drill-down por exercício (H4-3) | Supersets (H4-6) ✅ | Streak/relatório (H4-13) ✅ | |
 | | Export CSV/import (H4-7) ✅ | Widget/tile (H4-14) ✅ | |
@@ -401,7 +399,7 @@ precedente H3-7/H3-45).
 | | Health Connect (H4-9) ✅ | Standalone relógio (H4-16) ✅ | |
 | | Programas prontos (H4-10) ✅ | | |
 | **Horizon 5 — backend sob demanda confiável** | | | |
-| Backend remoto HTTPS/token (H3-4) | Deploy sob demanda (H5-3) | Sync multi-dispositivo (H5-5) | Corrida GPS/FC (H4-17) |
+| Backend remoto HTTPS/token (H3-4) | Deploy sob demanda (H5-3) | Sync multi-dispositivo (H5-5) | |
 | Sync incremental (H5-1) | Diagnóstico operacional (H5-4) | Wear sync robusto (H5-6) | |
 | Job de geração durável (H5-2) | | | |
 
@@ -429,7 +427,7 @@ Qualidade:  H3-4 nuvem/token e H3-9 backup automático (Won't now até priorizar
 Mercado:    H4-1 (PR/1RM) → H4-2 (gráficos) → H4-3 (drill-down) →
             H4-4..H4-10 (tipos de série, anilhas/aquecimento, supersets,
             export/import, peso/medidas, Health Connect, programas prontos) →
-            H4-11..H4-16 (conveniência e relógio) — H4-17 Won't now
+            H4-11..H4-17 (conveniência, relógio e corrida ao vivo) concluídas
 ```
 
 **Caminho crítico (produto):** H1-6 ✅ → H1-7 ✅ → H2-5 ✅ → H2-1 ✅ → H2-6 ✅ → H2-7 ✅ → H3-5 ✅ → H3-6 ✅ → H3-11 ✅ → H3-12 ✅ → H3-13 ✅ → H3-15 ✅ → H3-16 ✅ → **H3-21 ✅ → H3-22 ✅ → H3-23 ✅ → H3-24 ✅**.
@@ -477,7 +475,7 @@ os testes instrumentados compilam no gate e rodam fora dele com
 | Sexo vira regra determinística ou prescrição médica | Baixa | Alto | H3-7: campo opcional só no prompt; `profile_adjustments`/`suggest_initial_load` não recebem `sex` e `test_sexo_ignorado_no_plano_local` quebra se alguém ligar os dois |
 | Backup automático do Android sem política | Alta | Médio | **Mitigado em H3-10:** rules referenciadas no manifest, nomes conferidos por teste (`BackupRulesTest`) contra as constantes de `AppDatabase`/`AppPreferences` e política explícita antes de a H3-4 existir |
 | Health Connect exige permissões novas e revisão do Play | Média | Médio | H4-9: escopo restrito a ler peso/passos e escrever treino, tudo on-device; sem conta e sem backend |
-| GPS/FC na corrida quebra a promessa de "sem sensores" | Média | Alto | H4-17 fica **Won't now**; se priorizada, pedir permissão só no fluxo da corrida e documentar em `MANUAL.md` §7 |
+| GPS/FC na corrida quebra a promessa de privacidade | Média | Médio | H4-17 pede localização só ao ativar rastreamento; negado mantém o registro manual e `MANUAL.md` §7 documenta |
 
 ---
 
@@ -539,13 +537,11 @@ offline) estão **concluídas** (2026-11-15, gate verde) e listadas em §4.1.
 **Could:** **H4-11** (notas), **H4-12** (aplicar progressão), **H4-13**
 (streak/relatório), **H4-14** (widget/tile), **H4-15** (editar carga no pulso) e
 **H4-16** (standalone do relógio) estão **concluídas** (2026-11-15/16, gate
-verde) e listadas em §4.1. **Won't now:** **H4-17** (corrida com GPS/FC) por
-contrariar a decisão de não pedir sensores. Com isso, **toda a fila não-Won't-now
-do Horizon 4 está concluída** — a fila de specs pendentes do projeto zerou em
-2026-11-16.
+verde) e listadas em §4.1. **H4-17** (corrida com GPS/FC/intervalados) foi
+aprovada e concluída em 2026-11-18. Com isso, toda a fila H4 está concluída.
 
-Fila encerrada em 2026-11-16: todas as specs não-Won't-now acima foram aprovadas
-pelo dono (2026-11-15) e concluídas com gate verde. Para
+Fila H4 encerrada em 2026-11-18: as specs acima foram aprovadas e concluídas
+com gate verde. Para
 iniciar qualquer item, leia a spec em [docs/specs/](docs/specs/); se estiver
 pendente, ajuste a partir de [docs/specs/_TEMPLATE.md](docs/specs/_TEMPLATE.md) e
 confirme antes de implementar.
@@ -630,8 +626,8 @@ confirme antes de implementar.
 - [H3-59 — Wear: i18n completa e TalkBack](docs/specs/H3-59-wear-i18n-talkback.md) — concluída (2026-11-14) (`values-en` no relógio com paridade PT/EN coberta por `WearStringParityTest`; literais de `WorkoutWearActivity` movidos para recursos com placeholders posicionais; `contentDescription` nos botões e nos estados de conexão e descanso)
 
 **Horizon 4 — versão 1.5.0 (H4-1..H4-17):** specs criadas em 2026-11-14;
-**H4-1..H4-16 concluídas em 2026-11-15/16** (gate `verify.sh` verde a cada
-commit da fila); **H4-17** segue Won't now.
+**H4-1..H4-16 concluídas em 2026-11-15/16** e **H4-17 concluída em
+2026-11-18** na versão 1.10.0.
 
 - [H4-1 — Recordes pessoais (PR) e 1RM estimado](docs/specs/H4-1-recordes-pessoais-1rm.md) — concluída (2026-11-15)
 - [H4-2 — Gráficos de progresso (exercício e volume por músculo)](docs/specs/H4-2-graficos-progresso.md) — concluída (2026-11-15) (`ProgressCharts.kt` puro + `ProgressLineChart`/`ProgressBarChart` em `Canvas`, seções no Histórico com ranking textual e resumo de acessibilidade; sem dependência nova e sem mudança de Room/backend)
@@ -649,7 +645,7 @@ commit da fila); **H4-17** segue Won't now.
 - [H4-14 — Widget de tela inicial e tile do relógio](docs/specs/H4-14-widget-tile-relogio.md) — concluída (2026-11-15: Glance `1.1.0` no celular e Tiles `1.4.0`/protolayout `1.2.0` no relógio; intents reusam o shortcut da H3-35; tile nunca inicia treino)
 - [H4-15 — Wear: editar carga/reps no pulso](docs/specs/H4-15-wear-editar-carga-reps.md) — concluída (2026-11-15: `WearSetEditor` puro com passos de 2,5 kg/1 rep e carga 0,0 → `null`; `sendCommand` preenche o `WearCommand` e o celular grava os valores editados; sem mudança em `:protocol`)
 - [H4-16 — Modo standalone do relógio](docs/specs/H4-16-wear-standalone.md) — concluída (2026-11-16: Room próprio no `:wear` v1 com snapshot da sessão; séries offline viram lote `PATH_SYNC_BATCH` deduplicado por `clientSetId`; `standalone = true` no manifest)
-- [H4-17 — Corrida com GPS, FC e intervalados](docs/specs/H4-17-corrida-gps-fc.md) — proposta (**Won't now** na 1.5.0)
+- [H4-17 — Corrida com GPS, FC e intervalados](docs/specs/H4-17-corrida-gps-fc.md) — concluída (2026-11-18; GPS opt-in, FC pelo Health Connect, intervalos por tempo e resumo no relógio)
 - [H4-18 — Iniciar o treino de hoje pelo relógio](docs/specs/H4-18-iniciar-treino-pelo-relogio.md) — concluída (2026-11-18; `START_TODAY` inicia treino, respeita sessão ativa e responde idle em descanso; depende da correção do canal wear entregue em 2026-11-18)
 
 ### Horizon 5 — Backend sob demanda confiável

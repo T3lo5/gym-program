@@ -572,6 +572,9 @@ fun TreinosApp(viewModel: AppViewModel) {
                             // H3-31: o usuário digita km; a sessão grava metros.
                             distanceMeters = input.distanceKm?.let(::runDistanceKmToMeters),
                             rpe = input.rpe,
+                            routePolyline = input.routePolyline,
+                            avgHeartRate = input.avgHeartRate,
+                            maxHeartRate = input.maxHeartRate,
                         )
                     },
                 )

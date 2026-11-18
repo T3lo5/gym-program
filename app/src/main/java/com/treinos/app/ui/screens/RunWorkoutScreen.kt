@@ -52,6 +52,26 @@ import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.treinos.app.ui.run.RunTrackingSample
+import com.treinos.app.ui.run.RunTrackingState
+import com.treinos.app.ui.run.addRunTrackingSample
+import com.treinos.app.ui.run.intervalPhaseAt
+import kotlinx.coroutines.delay
 
 /**
  * Corrida planejada (H3-29): a tela distingue carregando (antes do Room
@@ -129,6 +149,87 @@ private fun RunWorkoutForm(
     var rpeError by rememberSaveable { mutableStateOf<String?>(null) }
     var pace by rememberSaveable { mutableStateOf<String?>(null) }
     var showDiscardConfirm by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    var trackingActive by rememberSaveable { mutableStateOf(false) }
+    var trackingState by remember { mutableStateOf(RunTrackingState()) }
+    var trackingStartMillis by remember { mutableStateOf(0L) }
+    var trackingNowMillis by remember { mutableStateOf(0L) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        if (granted[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            granted[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        ) {
+            trackingStartMillis = System.currentTimeMillis()
+            trackingNowMillis = trackingStartMillis
+            trackingActive = true
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun startTracking() {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (fineGranted || coarseGranted) {
+            trackingStartMillis = System.currentTimeMillis()
+            trackingNowMillis = trackingStartMillis
+            trackingActive = true
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+    }
+
+    DisposableEffect(trackingActive) {
+        val fused = LocationServices.getFusedLocationProviderClient(context)
+        var callback: LocationCallback? = null
+        if (trackingActive) {
+            callback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.locations.forEach { location ->
+                        if (!location.hasAccuracy() || location.accuracy > 35f) return@forEach
+                        trackingState = addRunTrackingSample(
+                            trackingState,
+                            RunTrackingSample(
+                                latitude = location.latitude,
+                                longitude = location.longitude,
+                                elapsedMillis = System.currentTimeMillis() - trackingStartMillis,
+                            ),
+                        )
+                    }
+                }
+            }
+            val request = LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                2_000L,
+            ).setMinUpdateIntervalMillis(1_000L).build()
+            try {
+                fused.requestLocationUpdates(request, callback, null)
+            } catch (_: SecurityException) {
+                trackingActive = false
+            }
+        }
+        onDispose {
+            callback?.let { fused.removeLocationUpdates(it) }
+        }
+    }
+
+    LaunchedEffect(trackingActive) {
+        while (trackingActive) {
+            trackingNowMillis = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
 
     // Sessão de corrida em andamento mantém a tela acesa (H3-26).
     KeepScreenOnEffect(enabled = true)
@@ -247,6 +348,59 @@ private fun RunWorkoutForm(
                 }
             }
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = if (trackingActive) "Rastreando corrida" else "Rastreamento opcional",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (trackingActive) {
+                        val km = trackingState.distanceMeters / 1000.0
+                        Text("Distância GPS: ${"%.2f".format(km)} km")
+                        trackingState.paceSecondsPerKm?.let { paceSeconds ->
+                            val minutes = paceSeconds / 60
+                            val seconds = paceSeconds % 60
+                            Text("Ritmo: ${minutes}:${seconds.toString().padStart(2, '0')} /km")
+                        }
+                        val elapsedSeconds =
+                            ((trackingNowMillis - trackingStartMillis).coerceAtLeast(0L) / 1000L)
+                        val (phase, remaining) = intervalPhaseAt(elapsedSeconds)
+                        val phaseLabel = when (phase) {
+                            "warmup" -> "Aquecimento"
+                            "work" -> "Tiro"
+                            else -> "Recuperação"
+                        }
+                        Text("$phaseLabel — ${remaining}s")
+                        TextButton(
+                            onClick = { trackingActive = false },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Text("Parar rastreamento")
+                        }
+                    } else {
+                        Text(
+                            "Ative o GPS por opt-in. Negar ou desligar mantém duração e distância manual.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(
+                            onClick = { startTracking() },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Text("Iniciar rastreamento")
+                        }
+                    }
+                }
+            }
+
             SectionTitle(stringResource(R.string.run_your_run))
 
             Column(
@@ -314,12 +468,21 @@ private fun RunWorkoutForm(
                     compute()
                     if (durationError == null && distanceError == null && rpeError == null) {
                         val dur = durationMinutes.toIntOrNull() ?: 0
+                        val liveDistanceKm = trackingState.distanceMeters
+                            .takeIf { trackingActive && it > 0.0 }
+                            ?.div(1000.0)
+                        val routePolyline = trackingState.route
+                            .joinToString(";") { "${it.latitude},${it.longitude}" }
+                            .takeIf { it.isNotBlank() }
                         onFinish(
                             session.session.id,
                             RunLogInput(
                                 durationSeconds = dur.toLong() * 60,
-                                distanceKm = parseDistanceKm(distanceKm),
+                                distanceKm = parseDistanceKm(distanceKm) ?: liveDistanceKm,
                                 rpe = parseDraftNumber(rpe),
+                                routePolyline = routePolyline,
+                                avgHeartRate = null,
+                                maxHeartRate = null,
                             ),
                         )
                     }

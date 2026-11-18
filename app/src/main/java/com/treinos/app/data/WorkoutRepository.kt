@@ -717,6 +717,9 @@ open class WorkoutRepository(
         durationSeconds: Long,
         distanceMeters: Double?,
         rpe: Double?,
+        routePolyline: String? = null,
+        avgHeartRate: Int? = null,
+        maxHeartRate: Int? = null,
     ) = withContext(Dispatchers.IO) {
         val session = dao.getSession(sessionId) ?: return@withContext
         val now = System.currentTimeMillis()
@@ -727,6 +730,9 @@ open class WorkoutRepository(
                 totalDurationSeconds = durationSeconds.coerceAtLeast(0L),
                 totalDistanceMeters = distanceMeters?.takeIf { it > 0.0 },
                 sessionRpe = rpe,
+                routePolyline = routePolyline,
+                avgHeartRate = avgHeartRate,
+                maxHeartRate = maxHeartRate,
             )
         )
     }

@@ -205,6 +205,7 @@ dependencies {
 
     // Wear OS Data Layer (comunicação celular ↔ relógio)
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation(project(":protocol"))
 
     // H4-9: Health Connect — escrever treino concluído e ler peso/passos.

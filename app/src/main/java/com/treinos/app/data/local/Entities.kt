@@ -136,6 +136,9 @@ data class WorkoutSessionEntity(
      * Reimportar o mesmo arquivo não duplica sessão.
      */
     val importRef: String? = null,
+    val routePolyline: String? = null,
+    val avgHeartRate: Int? = null,
+    val maxHeartRate: Int? = null,
 )
 
 @Entity(

@@ -617,6 +617,24 @@ fun WorkoutWearScreen(
                         text = stringResource(R.string.in_progress),
                         fontSize = 18.sp,
                     )
+                    state.liveDistanceMeters?.takeIf { it > 0.0 }?.let { meters ->
+                        Text(
+                            text = "${"%.1f".format(meters / 1000.0)} km",
+                            fontSize = 14.sp,
+                        )
+                    }
+                    state.livePaceSecondsPerKm?.let { pace ->
+                        Text(
+                            text = "${pace / 60}:${(pace % 60).toString().padStart(2, '0')} /km",
+                            fontSize = 14.sp,
+                        )
+                    }
+                    state.liveHeartRate?.let { bpm ->
+                        Text(
+                            text = "$bpm bpm",
+                            fontSize = 14.sp,
+                        )
+                    }
                     val finishLabel = stringResource(R.string.finish_workout)
                     val confirmLabel = stringResource(R.string.confirm_finish)
                     ConfirmFinalizeButton(

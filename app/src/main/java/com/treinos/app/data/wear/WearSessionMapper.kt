@@ -60,6 +60,8 @@ object WearSessionMapper {
             },
             status = session.session.status,
             updatedAt = System.currentTimeMillis(),
+            liveDistanceMeters = session.session.totalDistanceMeters,
+            liveHeartRate = null,
         )
     }
 

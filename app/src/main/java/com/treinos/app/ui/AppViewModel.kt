@@ -118,6 +118,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
+import kotlin.math.roundToInt
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -2176,10 +2177,41 @@ class AppViewModel(
     }
 
     /** Finaliza uma sessão de corrida planejada. */
-    fun finishRunWorkout(sessionId: Long, durationSeconds: Long, distanceMeters: Double?, rpe: Double?) {
+    fun finishRunWorkout(
+        sessionId: Long,
+        durationSeconds: Long,
+        distanceMeters: Double?,
+        rpe: Double?,
+        routePolyline: String? = null,
+        avgHeartRate: Int? = null,
+        maxHeartRate: Int? = null,
+    ) {
         viewModelScope.launch {
             try {
-                repository.finishRunSession(sessionId, durationSeconds, distanceMeters, rpe)
+                val nowMillis = System.currentTimeMillis()
+                val startedAt = inProgressSession.value?.session?.startedAt
+                    ?: (nowMillis - durationSeconds * 1_000L)
+                val heartSamples = healthGateway
+                    ?.readHeartRate(startedAt, nowMillis)
+                    .orEmpty()
+                val heartValues = heartSamples.map { it.beatsPerMinute }
+                    .filter { it in 20..300 }
+                val finalAvgHeartRate = avgHeartRate ?: heartValues
+                    .takeIf { it.isNotEmpty() }
+                    ?.average()
+                    ?.roundToInt()
+                val finalMaxHeartRate = maxHeartRate ?: heartValues
+                    .takeIf { it.isNotEmpty() }
+                    ?.maxOrNull()
+                repository.finishRunSession(
+                    sessionId,
+                    durationSeconds,
+                    distanceMeters,
+                    rpe,
+                    routePolyline,
+                    finalAvgHeartRate,
+                    finalMaxHeartRate,
+                )
                 _activeSessionId.value = null
                 _screen.value = Screen.Home
                 _message.value = context.getString(R.string.msg_run_finished)

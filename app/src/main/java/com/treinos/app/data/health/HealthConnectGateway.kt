@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
@@ -24,11 +25,14 @@ val HEALTH_PERMISSION_READ_WEIGHT: String =
     HealthPermission.getReadPermission(WeightRecord::class)
 val HEALTH_PERMISSION_READ_STEPS: String =
     HealthPermission.getReadPermission(StepsRecord::class)
+val HEALTH_PERMISSION_READ_HEART_RATE: String =
+    HealthPermission.getReadPermission(HeartRateRecord::class)
 
 val HEALTH_PERMISSIONS: Set<String> = setOf(
     HEALTH_PERMISSION_READ_WEIGHT,
     HEALTH_PERMISSION_READ_STEPS,
     HEALTH_PERMISSION_WRITE_EXERCISE,
+    HEALTH_PERMISSION_READ_HEART_RATE,
 )
 
 /** Estado de permissões derivado do conjunto concedido (regra 3). */
@@ -37,6 +41,7 @@ fun healthPermissionState(granted: Set<String>): HealthConnectPermissionState =
         canWriteExercise = HEALTH_PERMISSION_WRITE_EXERCISE in granted,
         canReadWeight = HEALTH_PERMISSION_READ_WEIGHT in granted,
         canReadSteps = HEALTH_PERMISSION_READ_STEPS in granted,
+        canReadHeartRate = HEALTH_PERMISSION_READ_HEART_RATE in granted,
     )
 
 /** Mapeia o status do SDK para a disponibilidade da UI (regra 1). */
@@ -79,6 +84,7 @@ interface HealthConnectGateway {
     suspend fun writeSession(draft: HealthSessionDraft)
     suspend fun readWeight(fromMillis: Long, toMillis: Long): List<HealthWeightSample>
     suspend fun readSteps(fromMillis: Long, toMillis: Long): List<HealthStepsSample>
+    suspend fun readHeartRate(fromMillis: Long, toMillis: Long): List<HealthHeartRateSample>
 }
 
 /**
@@ -170,6 +176,36 @@ class HealthConnectClientGateway(
         }
         val total = response[StepsRecord.COUNT_TOTAL] ?: return emptyList()
         return toStepsSamples(listOf(RawSteps(fromMillis, toMillis, total)))
+    }
+
+    override suspend fun readHeartRate(
+        fromMillis: Long,
+        toMillis: Long,
+    ): List<HealthHeartRateSample> {
+        if (HEALTH_PERMISSION_READ_HEART_RATE !in grantedPermissions()) return emptyList()
+        val response = try {
+            client.readRecords(
+                ReadRecordsRequest(
+                    recordType = HeartRateRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(
+                        Instant.ofEpochMilli(fromMillis),
+                        Instant.ofEpochMilli(toMillis),
+                    ),
+                )
+            )
+        } catch (error: SecurityException) {
+            return emptyList()
+        }
+        return response.records.flatMap { record ->
+            record.samples.mapNotNull { sample ->
+                val bpm = sample.beatsPerMinute.toLong()
+                if (bpm in 20..300) {
+                    HealthHeartRateSample(sample.time.toEpochMilli(), bpm.toInt())
+                } else {
+                    null
+                }
+            }
+        }.sortedBy { it.timeMillis }
     }
 
     /** Junta as notas do usuário com o RPE, quando houver (regra 6). */

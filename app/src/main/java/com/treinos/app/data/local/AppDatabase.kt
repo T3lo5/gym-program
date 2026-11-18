@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BodyMeasurementEntity::class,
         SyncOutboxEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -192,6 +192,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H4-17: métricas opcionais da corrida. Colunas aditivas; GPS/FC ausentes
+        // continuam como NULL e nenhuma sessão existente é regravada.
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN routePolyline TEXT")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN avgHeartRate INTEGER")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN maxHeartRate INTEGER")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -211,6 +221,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_10_11,
                         MIGRATION_11_12,
+                        MIGRATION_12_13,
                     )
                     .build()
                     .also { instance = it }

@@ -13,6 +13,9 @@ data class RunLogInput(
     val durationSeconds: Long,
     val distanceKm: Double?,
     val rpe: Double?,
+    val routePolyline: String? = null,
+    val avgHeartRate: Int? = null,
+    val maxHeartRate: Int? = null,
 )
 
 data class RunLogValidation(

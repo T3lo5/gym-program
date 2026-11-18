@@ -336,7 +336,7 @@ O app:
 - não pede login;
 - não pede cadastro;
 - não mostra anúncios;
-- não acessa sua localização;
+- não acessa sua localização por padrão;
 - salva tudo no próprio aparelho.
 
 #### 3.3.1 Gerar um treino (backend sob demanda)
@@ -1479,6 +1479,12 @@ pip install -r requirements.txt
 ---
 
 ## 7. Segurança e privacidade
+
+- **Corrida com GPS e FC é opt-in.** Desde a H4-17, a tela de corrida pode pedir
+  localização ao ativar o rastreamento. A rota e a distância permanecem no
+  aparelho; negar o GPS mantém o registro manual. FC só é usada quando o
+  Health Connect tem uma amostra disponível e a permissão correspondente foi
+  concedida; sem permissão ou sensor, o app não mostra nem inventa valor.
 
 - **O que sai do aparelho ao gerar um treino.** Além dos parâmetros da semana
   (objetivo, dias, equipamentos, foco, nível, duração), o request leva os campos

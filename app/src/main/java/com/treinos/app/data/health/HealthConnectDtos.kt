@@ -42,14 +42,18 @@ data class HealthWeightSample(val timeMillis: Long, val weightKg: Double)
 /** O total de passos de um período, já validado. */
 data class HealthStepsSample(val startMillis: Long, val endMillis: Long, val count: Long)
 
+/** Amostra de frequência cardíaca disponível no Health Connect. */
+data class HealthHeartRateSample(val timeMillis: Long, val beatsPerMinute: Int)
+
 /** O que o usuário concedeu; a UI habilita só o que dá para fazer (regra 3). */
 data class HealthConnectPermissionState(
     val canWriteExercise: Boolean = false,
     val canReadWeight: Boolean = false,
     val canReadSteps: Boolean = false,
+    val canReadHeartRate: Boolean = false,
 ) {
     val hasAnyPermission: Boolean
-        get() = canWriteExercise || canReadWeight || canReadSteps
+        get() = canWriteExercise || canReadWeight || canReadSteps || canReadHeartRate
 }
 
 /**

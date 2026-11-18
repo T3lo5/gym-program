@@ -16,12 +16,16 @@
          não existe para o app e o update falha. O Android pede a permissão
          ao usuário no momento do primeiro update. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- H4-17: GPS solicitado somente ao ativar rastreamento em uma corrida. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- H4-9: Health Connect — escrever treino concluído e ler peso/passos.
          As permissões são pedidas em runtime pelo contract do SDK
          (PermissionController.createRequestPermissionResultContract). -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
 
     <!-- H3-57: opt-in do gesto preditivo (Android 13+). Com a flag ativa, o

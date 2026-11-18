@@ -627,6 +627,36 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migration12To13_preserva_sessoes_e_campos_corrida_nulos() {
+        helper.createDatabase(testDb, 12).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title, " +
+                    "totalDistanceMeters, poolLengthMeters, stroke, sessionRpe) " +
+                    "VALUES (50,1,10,'P','Corrida','completed',1,10,600,'','run','plan','A',5000.0,NULL,NULL,NULL)"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 13, true, AppDatabase.MIGRATION_12_13)
+
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        migrated.query(
+            "SELECT dayName, totalDistanceMeters, routePolyline, avgHeartRate, maxHeartRate " +
+                "FROM workout_sessions WHERE id = 50"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Corrida", cursor.getString(0))
+            assertEquals(5000.0, cursor.getDouble(1), 0.0)
+            assertTrue(cursor.isNull(2))
+            assertTrue(cursor.isNull(3))
+            assertTrue(cursor.isNull(4))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

@@ -37,6 +37,40 @@ class WearProtocolTest {
     }
 
     @Test
+    fun wear_state_corrida_round_trip() {
+        val estado = WearWorkoutState(
+            sessionId = 42,
+            dayName = "Corrida",
+            modality = "run",
+            exerciseIndex = 0,
+            exerciseCount = 0,
+            exerciseName = "",
+            setNumber = 0,
+            plannedSets = 0,
+            targetReps = "",
+            status = "in_progress",
+            updatedAt = 1L,
+            liveDistanceMeters = 5_200.0,
+            livePaceSecondsPerKm = 330,
+            liveHeartRate = 142,
+            intervalPhase = "work",
+            intervalRemainingSeconds = 42,
+        )
+        val serializado = json.encodeToString(WearWorkoutState.serializer(), estado)
+        val novamente = json.decodeFromString(WearWorkoutState.serializer(), serializado)
+        assertEquals(estado, novamente)
+    }
+
+    @Test
+    fun wear_state_corrida_decodifica_campos_antigos() {
+        val antigo = """{"protocolVersion":1,"sessionId":42,"dayName":"Corrida","modality":"run","exerciseIndex":0,"exerciseCount":0,"exerciseName":"","setNumber":0,"plannedSets":0,"targetReps":"","status":"in_progress","updatedAt":1}"""
+        val novamente = json.decodeFromString(WearWorkoutState.serializer(), antigo)
+        assertEquals(null, novamente.liveDistanceMeters)
+        assertEquals(null, novamente.liveHeartRate)
+        assertEquals(null, novamente.intervalPhase)
+    }
+
+    @Test
     fun round_trip_do_comando() {
         val comando = WearCommand(
             commandId = "cmd-123",

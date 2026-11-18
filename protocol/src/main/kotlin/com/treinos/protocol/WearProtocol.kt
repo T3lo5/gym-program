@@ -31,6 +31,11 @@ data class WearWorkoutState(
     @SerialName("nextExerciseName") val nextExerciseName: String? = null,
     @SerialName("status") val status: String,
     @SerialName("updatedAt") val updatedAt: Long,
+    @SerialName("liveDistanceMeters") val liveDistanceMeters: Double? = null,
+    @SerialName("livePaceSecondsPerKm") val livePaceSecondsPerKm: Int? = null,
+    @SerialName("liveHeartRate") val liveHeartRate: Int? = null,
+    @SerialName("intervalPhase") val intervalPhase: String? = null,
+    @SerialName("intervalRemainingSeconds") val intervalRemainingSeconds: Int? = null,
 )
 
 @Serializable
