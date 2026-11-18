@@ -467,6 +467,14 @@
     <string name="settings_remote_token_label">Backend token</string>
     <string name="settings_remote_token_hint">Same API_TOKEN configured on the server</string>
     <string name="settings_remote_save">Save remote</string>
+    <string name="settings_sync_space_title">Sync space</string>
+    <string name="settings_sync_space_desc">Share plans and sessions across devices without an account.</string>
+    <string name="settings_sync_space_create">Create space</string>
+    <string name="settings_sync_space_join">Link device</string>
+    <string name="settings_sync_space_revoke">Revoke space</string>
+    <string name="settings_sync_space_id_label">Space code</string>
+    <string name="settings_sync_space_secret_label">Space secret</string>
+    <string name="settings_sync_space_error">Could not configure the sync space.</string>
     <string name="settings_diagnostics_title">Backend diagnostics</string>
     <string name="settings_diagnostics_desc">Aggregated summary without device IDs, workout data or secrets.</string>
     <string name="settings_diagnostics_refresh">Refresh diagnostics</string>

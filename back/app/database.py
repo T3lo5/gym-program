@@ -10,6 +10,8 @@ docker-compose.yml monta esse diretório em ./back/data.
 
 import json
 import os
+import hashlib
+import secrets
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -201,6 +203,23 @@ CREATE TABLE IF NOT EXISTS sync_device_cursors (
     PRIMARY KEY(device_id)
 );
 
+CREATE TABLE IF NOT EXISTS sync_spaces (
+    sync_space_id TEXT PRIMARY KEY,
+    secret_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sync_space_devices (
+    sync_space_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    PRIMARY KEY(sync_space_id, device_id),
+    FOREIGN KEY(sync_space_id) REFERENCES sync_spaces(sync_space_id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_synced_plans_device
     ON synced_plans(device_id);
 CREATE INDEX IF NOT EXISTS idx_synced_sessions_device
@@ -214,6 +233,76 @@ CREATE INDEX IF NOT EXISTS idx_generation_jobs_device
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def hash_sync_secret(secret: str) -> str:
+    return hashlib.sha256(secret.strip().encode("utf-8")).hexdigest()
+
+
+def create_sync_space(sync_space_id: str, secret_hash: str) -> Dict[str, Any]:
+    now = _now_iso()
+    with _lock, get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO sync_spaces (sync_space_id, secret_hash, created_at, revoked_at)
+            VALUES (?, ?, ?, NULL)
+            ON CONFLICT(sync_space_id) DO UPDATE SET
+                secret_hash = excluded.secret_hash,
+                revoked_at = NULL,
+                created_at = excluded.created_at
+            """,
+            (sync_space_id, secret_hash, now),
+        )
+    return {"syncSpaceId": sync_space_id, "createdAt": now}
+
+
+def sync_space_authorized(sync_space_id: str, secret_hash: str) -> bool:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT secret_hash, revoked_at
+            FROM sync_spaces
+            WHERE sync_space_id = ?
+            """,
+            (sync_space_id,),
+        ).fetchone()
+    if row is None or row["revoked_at"] is not None:
+        return False
+    return secrets.compare_digest(str(row["secret_hash"]), secret_hash)
+
+
+def join_sync_space(sync_space_id: str, secret_hash: str, device_id: str) -> bool:
+    if not sync_space_authorized(sync_space_id, secret_hash):
+        return False
+    now = _now_iso()
+    with _lock, get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO sync_space_devices (
+                sync_space_id, device_id, name, first_seen_at, last_seen_at
+            ) VALUES (?, ?, '', ?, ?)
+            ON CONFLICT(sync_space_id, device_id) DO UPDATE SET
+                last_seen_at = excluded.last_seen_at
+            """,
+            (sync_space_id, device_id, now, now),
+        )
+    return True
+
+
+def revoke_sync_space(sync_space_id: str, secret_hash: str) -> bool:
+    if not sync_space_authorized(sync_space_id, secret_hash):
+        return False
+    now = _now_iso()
+    with _lock, get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE sync_spaces
+            SET revoked_at = ?
+            WHERE sync_space_id = ?
+            """,
+            (now, sync_space_id),
+        )
+    return cursor.rowcount > 0
 
 
 @contextmanager
@@ -867,6 +956,9 @@ def _revision_wins(
 def sync_changes(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Aplica mutations aditivas do app sem substituir todas as entidades."""
     device_id = str(payload.get("deviceId") or "unknown")
+    sync_space_id = str(payload.get("syncSpaceId") or "")
+    if sync_space_id:
+        device_id = f"{sync_space_id}:{device_id}"
     synced_at = str(payload.get("syncedAt") or _now_iso())
     base_cursor = int(payload.get("baseCursor") or 0)
     mutations: List[Dict[str, Any]] = payload.get("mutations", [])
@@ -999,17 +1091,27 @@ def sync_changes(payload: Dict[str, Any]) -> Dict[str, Any]:
             SELECT seq, device_id, mutation_id, entity, entity_id, operation,
                    updated_at, payload_json, synced_at
             FROM sync_mutations
-            WHERE seq > ?
+            WHERE seq > ? AND (
+                device_id = ?
+                OR (? != '' AND device_id LIKE ?)
+            )
             ORDER BY seq ASC
             LIMIT 500
             """,
-            (base_cursor,),
+            (
+                base_cursor,
+                device_id,
+                sync_space_id,
+                f"{sync_space_id}:%",
+            ),
         ).fetchall()
 
     changes = [
         {
             "seq": int(row["seq"]),
-            "deviceId": row["device_id"],
+            "deviceId": str(row["device_id"]).split(":", 1)[1]
+            if sync_space_id and str(row["device_id"]).startswith(sync_space_id + ":")
+            else row["device_id"],
             "mutationId": row["mutation_id"],
             "entity": row["entity"],
             "entityId": row["entity_id"],

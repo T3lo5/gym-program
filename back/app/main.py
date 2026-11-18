@@ -14,7 +14,7 @@ from time import monotonic
 from typing import Any, Dict, List, Literal, Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
@@ -791,6 +791,22 @@ class SyncChangesResponse(BaseModel):
     ignored: List[str]
     cursor: int
     changes: List[SyncChange]
+
+
+class SyncSpaceCreateRequest(BaseModel):
+    syncSpaceId: str
+    syncSecret: str
+
+
+class SyncSpaceJoinRequest(BaseModel):
+    syncSpaceId: str
+    syncSecret: str
+    deviceId: str
+
+
+class SyncSpaceRevokeRequest(BaseModel):
+    syncSpaceId: str
+    syncSecret: str
 
 
 # Routes
@@ -1773,10 +1789,55 @@ async def sync_data(request: SyncRequest):
     return SyncResponse(**result)
 
 
+@app.post("/v1/sync/spaces/create")
+async def create_sync_space(request: SyncSpaceCreateRequest):
+    if len(request.syncSecret.strip()) < 16:
+        raise HTTPException(422, "Sync secret precisa de pelo menos 16 caracteres")
+    return db.create_sync_space(
+        request.syncSpaceId,
+        db.hash_sync_secret(request.syncSecret),
+    )
+
+
+@app.post("/v1/sync/spaces/join")
+async def join_sync_space(request: SyncSpaceJoinRequest):
+    joined = db.join_sync_space(
+        request.syncSpaceId,
+        db.hash_sync_secret(request.syncSecret),
+        request.deviceId,
+    )
+    if not joined:
+        raise HTTPException(401, "Sync secret inválido ou espaço revogado")
+    return {"ok": True, "syncSpaceId": request.syncSpaceId}
+
+
+@app.post("/v1/sync/spaces/revoke")
+async def revoke_sync_space(request: SyncSpaceRevokeRequest):
+    revoked = db.revoke_sync_space(
+        request.syncSpaceId,
+        db.hash_sync_secret(request.syncSecret),
+    )
+    if not revoked:
+        raise HTTPException(401, "Sync secret inválido ou espaço revogado")
+    return {"ok": True, "syncSpaceId": request.syncSpaceId}
+
+
 @app.post("/v1/sync/changes", response_model=SyncChangesResponse)
-async def sync_changes(request: SyncChangesRequest):
+async def sync_changes(
+    request: SyncChangesRequest,
+    x_sync_space: Optional[str] = Header(default=None, alias="X-Sync-Space"),
+    x_sync_secret: Optional[str] = Header(default=None, alias="X-Sync-Secret"),
+):
     """Recebe mutations aditivas e idempotentes sem substituir o snapshot inteiro."""
+    if x_sync_space:
+        if not x_sync_secret:
+            raise HTTPException(401, "Sync secret ausente")
+        secret_hash = db.hash_sync_secret(x_sync_secret)
+        if not db.sync_space_authorized(x_sync_space, secret_hash):
+            raise HTTPException(401, "Sync secret inválido ou espaço revogado")
+        db.join_sync_space(x_sync_space, secret_hash, request.deviceId)
     payload = request.model_dump()
+    payload["syncSpaceId"] = x_sync_space
     return SyncChangesResponse(**db.sync_changes(payload))
 
 

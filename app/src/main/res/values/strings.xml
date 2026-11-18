@@ -470,6 +470,14 @@
     <string name="settings_remote_token_label">Token do backend</string>
     <string name="settings_remote_token_hint">Mesmo API_TOKEN configurado no servidor</string>
     <string name="settings_remote_save">Salvar remoto</string>
+    <string name="settings_sync_space_title">Espaço de sync</string>
+    <string name="settings_sync_space_desc">Compartilhe planos e sessões entre aparelhos sem conta.</string>
+    <string name="settings_sync_space_create">Criar espaço</string>
+    <string name="settings_sync_space_join">Vincular aparelho</string>
+    <string name="settings_sync_space_revoke">Revogar espaço</string>
+    <string name="settings_sync_space_id_label">Código do espaço</string>
+    <string name="settings_sync_space_secret_label">Segredo do espaço</string>
+    <string name="settings_sync_space_error">Não foi possível configurar o espaço de sync.</string>
     <string name="settings_diagnostics_title">Diagnóstico do backend</string>
     <string name="settings_diagnostics_desc">Resumo agregado sem IDs de aparelho, treinos ou segredo.</string>
     <string name="settings_diagnostics_refresh">Atualizar diagnóstico</string>

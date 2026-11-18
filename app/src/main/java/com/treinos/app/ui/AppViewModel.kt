@@ -617,6 +617,18 @@ class AppViewModel(
     private val _diagnosticsMessage = MutableStateFlow<String?>(null)
     val diagnosticsMessage: StateFlow<String?> = _diagnosticsMessage.asStateFlow()
 
+    private val _syncSpaceId = MutableStateFlow(preferences.syncSpaceId)
+    val syncSpaceId: StateFlow<String?> = _syncSpaceId.asStateFlow()
+
+    private val _syncSecret = MutableStateFlow(preferences.syncSecret)
+    val syncSecret: StateFlow<String?> = _syncSecret.asStateFlow()
+
+    private val _syncJoined = MutableStateFlow(preferences.syncJoined)
+    val syncJoined: StateFlow<Boolean> = _syncJoined.asStateFlow()
+
+    private val _syncSpaceMessage = MutableStateFlow<String?>(null)
+    val syncSpaceMessage: StateFlow<String?> = _syncSpaceMessage.asStateFlow()
+
     private val _connectionMessage = MutableStateFlow<String?>(null)
     val connectionMessage: StateFlow<String?> = _connectionMessage.asStateFlow()
 
@@ -2626,6 +2638,48 @@ class AppViewModel(
         _remoteBackendUrl.value = preferences.remoteBackendUrl
         _apiToken.value = preferences.apiToken
         _connectionMessage.value = null
+    }
+
+    fun createSyncSpace() {
+        viewModelScope.launch {
+            try {
+                val (spaceId, secret) = repository.createSyncSpace()
+                _syncSpaceId.value = spaceId
+                _syncSecret.value = secret
+                _syncJoined.value = true
+                _syncSpaceMessage.value = "Espaço criado. Compartilhe o segredo apenas pelo canal seguro."
+            } catch (error: Exception) {
+                _syncSpaceMessage.value = uiErrorMessage(error, context, R.string.settings_sync_space_error)
+            }
+        }
+    }
+
+    fun joinSyncSpace(syncSpaceId: String, syncSecret: String) {
+        viewModelScope.launch {
+            try {
+                repository.joinSyncSpace(syncSpaceId, syncSecret)
+                _syncSpaceId.value = preferences.syncSpaceId
+                _syncSecret.value = preferences.syncSecret
+                _syncJoined.value = true
+                _syncSpaceMessage.value = "Aparelho vinculado ao espaço."
+            } catch (error: Exception) {
+                _syncSpaceMessage.value = uiErrorMessage(error, context, R.string.settings_sync_space_error)
+            }
+        }
+    }
+
+    fun revokeSyncSpace() {
+        viewModelScope.launch {
+            try {
+                repository.revokeSyncSpace()
+                _syncSpaceId.value = null
+                _syncSecret.value = null
+                _syncJoined.value = false
+                _syncSpaceMessage.value = "Espaço revogado. Dados locais foram preservados."
+            } catch (error: Exception) {
+                _syncSpaceMessage.value = uiErrorMessage(error, context, R.string.settings_sync_space_error)
+            }
+        }
     }
 
     fun refreshDiagnostics() {

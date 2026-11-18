@@ -61,6 +61,9 @@ import com.treinos.app.data.remote.SyncChangesRequestDto
 import com.treinos.app.data.remote.SyncChangesResponseDto
 import com.treinos.app.data.remote.SyncMutationDto
 import com.treinos.app.data.remote.BackendDiagnosticsDto
+import com.treinos.app.data.remote.SyncSpaceCreateDto
+import com.treinos.app.data.remote.SyncSpaceJoinDto
+import com.treinos.app.data.remote.SyncSpaceRevokeDto
 import com.treinos.app.data.remote.SyncSessionDto
 import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
@@ -77,6 +80,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.security.SecureRandom
+import java.util.UUID
 import java.time.Instant
 import java.time.LocalDate
 
@@ -1467,6 +1472,57 @@ open class WorkoutRepository(
         withContext(Dispatchers.IO) {
             backendClient.diagnostics()
         }
+
+    suspend fun createSyncSpace(): Pair<String, String> = withContext(Dispatchers.IO) {
+        val spaceId = UUID.randomUUID().toString()
+        val secretBytes = ByteArray(16)
+        SecureRandom().nextBytes(secretBytes)
+        val secret = secretBytes.joinToString("") { "%02x".format(it) }
+        val response = backendClient.createSyncSpace(
+            SyncSpaceCreateDto(syncSpaceId = spaceId, syncSecret = secret),
+        )
+        if (!response.ok) error("Não foi possível criar o espaço de sync.")
+        preferences.syncSpaceId = spaceId
+        preferences.syncSecret = secret
+        preferences.syncJoined = true
+        preferences.lastSyncedPlanIds = emptySet()
+        preferences.lastSyncedSessionIds = emptySet()
+        preferences.syncCursor = 0
+        spaceId to secret
+    }
+
+    suspend fun joinSyncSpace(syncSpaceId: String, syncSecret: String) =
+        withContext(Dispatchers.IO) {
+            val space = syncSpaceId.trim()
+            val secret = syncSecret.trim()
+            require(space.isNotBlank() && secret.length >= 16) {
+                "Informe o código do espaço e um segredo válido."
+            }
+            val response = backendClient.joinSyncSpace(
+                SyncSpaceJoinDto(
+                    syncSpaceId = space,
+                    syncSecret = secret,
+                    deviceId = preferences.deviceId,
+                ),
+            )
+            if (!response.ok) error("Não foi possível entrar no espaço.")
+            preferences.syncSpaceId = space
+            preferences.syncSecret = secret
+            preferences.syncJoined = true
+            preferences.syncCursor = 0
+        }
+
+    suspend fun revokeSyncSpace() = withContext(Dispatchers.IO) {
+        val space = preferences.syncSpaceId ?: error("Nenhum espaço configurado.")
+        val secret = preferences.syncSecret ?: error("Nenhum segredo configurado.")
+        backendClient.revokeSyncSpace(
+            SyncSpaceRevokeDto(syncSpaceId = space, syncSecret = secret),
+        )
+        preferences.syncSpaceId = null
+        preferences.syncSecret = null
+        preferences.syncJoined = false
+        preferences.syncCursor = 0
+    }
 
     private suspend fun enqueueSyncOutbox(payload: SyncRequestDto) {
         val now = System.currentTimeMillis()

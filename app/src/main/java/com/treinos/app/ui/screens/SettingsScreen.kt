@@ -87,6 +87,13 @@ fun SettingsScreen(
     isLoadingDiagnostics: Boolean = false,
     diagnosticsMessage: String? = null,
     onRefreshDiagnostics: () -> Unit = {},
+    syncSpaceId: String? = null,
+    syncSecret: String? = null,
+    syncJoined: Boolean = false,
+    syncSpaceMessage: String? = null,
+    onCreateSyncSpace: () -> Unit = {},
+    onJoinSyncSpace: (String, String) -> Unit = { _, _ -> },
+    onRevokeSyncSpace: () -> Unit = {},
     isTesting: Boolean,
     isSyncing: Boolean,
     isDownloading: Boolean,
@@ -165,6 +172,8 @@ fun SettingsScreen(
     var remoteEnabled by remember(useRemoteBackend) { mutableStateOf(useRemoteBackend) }
     var remoteUrl by remember(remoteBackendUrl) { mutableStateOf(remoteBackendUrl) }
     var remoteToken by remember(apiToken) { mutableStateOf(apiToken) }
+    var joinSpaceId by remember(syncSpaceId) { mutableStateOf(syncSpaceId.orEmpty()) }
+    var joinSecret by remember(syncSecret) { mutableStateOf(syncSecret.orEmpty()) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
     var showRestoreConfirm by remember { mutableStateOf(false) }
     var showReplaceConfirm by remember { mutableStateOf(false) }
@@ -368,6 +377,79 @@ fun SettingsScreen(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_sync_space_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_sync_space_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        syncSpaceMessage?.let {
+                            StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
+                        }
+                        if (syncJoined) {
+                            Text(
+                                text = "Espaço: ${syncSpaceId.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                            Text(
+                                text = "Segredo: ${syncSecret.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = joinSpaceId,
+                            onValueChange = { joinSpaceId = it },
+                            label = { Text(stringResource(R.string.settings_sync_space_id_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = joinSecret,
+                            onValueChange = { joinSecret = it },
+                            label = { Text(stringResource(R.string.settings_sync_space_secret_label)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (!syncJoined) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                OutlinedButton(
+                                    onClick = onCreateSyncSpace,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(stringResource(R.string.settings_sync_space_create))
+                                }
+                                OutlinedButton(
+                                    onClick = { onJoinSyncSpace(joinSpaceId, joinSecret) },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(stringResource(R.string.settings_sync_space_join))
+                                }
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onRevokeSyncSpace,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(R.string.settings_sync_space_revoke))
+                            }
+                        }
                     }
                 }
 

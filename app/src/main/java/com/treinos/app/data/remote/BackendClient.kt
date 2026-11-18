@@ -39,6 +39,8 @@ class BackendResponseException(message: String, cause: Throwable?) : IOException
 class BackendClient(
     private val baseUrlProvider: () -> String,
     private val tokenProvider: () -> String = { "" },
+    private val syncSpaceProvider: () -> String? = { null },
+    private val syncSecretProvider: () -> String? = { null },
     private val client: OkHttpClient = defaultClient(),
 ) : BackendApi {
     private val json = Json {
@@ -61,7 +63,7 @@ class BackendClient(
         post("/v1/sync", json.encodeToString(SyncRequestDto.serializer(), request))
 
     override suspend fun syncChanges(request: SyncChangesRequestDto): SyncChangesResponseDto =
-        post("/v1/sync/changes", json.encodeToString(SyncChangesRequestDto.serializer(), request))
+        postSyncChanges("/v1/sync/changes", json.encodeToString(SyncChangesRequestDto.serializer(), request))
 
     override suspend fun syncDownload(deviceId: String): SyncDownloadDto =
         get("/v1/sync/download?deviceId=$deviceId")
@@ -71,8 +73,35 @@ class BackendClient(
     override suspend fun diagnostics(): BackendDiagnosticsDto =
         get("/v1/diagnostics")
 
+    override suspend fun createSyncSpace(request: SyncSpaceCreateDto): SyncSpaceResponseDto =
+        post("/v1/sync/spaces/create", json.encodeToString(SyncSpaceCreateDto.serializer(), request))
+
+    override suspend fun joinSyncSpace(request: SyncSpaceJoinDto): SyncSpaceResponseDto =
+        post("/v1/sync/spaces/join", json.encodeToString(SyncSpaceJoinDto.serializer(), request))
+
+    override suspend fun revokeSyncSpace(request: SyncSpaceRevokeDto): SyncSpaceResponseDto =
+        post("/v1/sync/spaces/revoke", json.encodeToString(SyncSpaceRevokeDto.serializer(), request))
+
     override suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
         post("/v1/review-plan", json.encodeToString(ReviewPlanRequest.serializer(), request))
+
+    private suspend inline fun <reified T> postSyncChanges(path: String, body: String): T =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(baseUrlProvider() + path)
+                .post(body.toRequestBody(JSON_MEDIA_TYPE))
+                .apply {
+                    authHeader(tokenProvider())?.let { header("Authorization", it) }
+                    syncSpaceProvider()?.takeIf { it.isNotBlank() }?.let { space ->
+                        header("X-Sync-Space", space)
+                        syncSecretProvider()?.takeIf { it.isNotBlank() }?.let { secret ->
+                            header("X-Sync-Secret", secret)
+                        }
+                    }
+                }
+                .build()
+            execute(request)
+        }
 
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder()

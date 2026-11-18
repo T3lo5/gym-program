@@ -297,6 +297,31 @@ data class BackendDiagnosticsDto(
 )
 
 @Serializable
+data class SyncSpaceCreateDto(
+    val syncSpaceId: String,
+    val syncSecret: String,
+)
+
+@Serializable
+data class SyncSpaceJoinDto(
+    val syncSpaceId: String,
+    val syncSecret: String,
+    val deviceId: String,
+)
+
+@Serializable
+data class SyncSpaceRevokeDto(
+    val syncSpaceId: String,
+    val syncSecret: String,
+)
+
+@Serializable
+data class SyncSpaceResponseDto(
+    val ok: Boolean = true,
+    val syncSpaceId: String = "",
+)
+
+@Serializable
 data class SyncDownloadDto(
     val deviceId: String,
     val plans: List<SyncDownloadPlanDto> = emptyList(),

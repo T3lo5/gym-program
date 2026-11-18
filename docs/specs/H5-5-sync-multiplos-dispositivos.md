@@ -7,8 +7,8 @@
 | Item do roadmap | `H5-5` |
 | MoSCoW | `C` |
 | Versão alvo | `Horizon 5` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-18` |
+| Implementação | `concluída em 2026-11-18` |
 | Depende de | H3-4, H5-1 |
 
 ## Objetivo
@@ -53,7 +53,8 @@ Device:
   lastSeenAt: ISO
 
 Cabeçalho:
-  Authorization: Bearer <syncSecret>
+  Authorization: Bearer <API_TOKEN>       (H3-4; backend local sem token aceita vazio)
+  X-Sync-Secret: <syncSecret>
   X-Sync-Space: <syncSpaceId>
 
 Secret:

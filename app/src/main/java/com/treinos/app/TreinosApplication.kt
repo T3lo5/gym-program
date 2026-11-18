@@ -30,6 +30,8 @@ class AppContainer(context: Context) {
     private val backendClient: BackendClient = BackendClient(
         baseUrlProvider = { preferences.effectiveBackendUrl },
         tokenProvider = { preferences.apiToken },
+        syncSpaceProvider = { preferences.syncSpaceId },
+        syncSecretProvider = { preferences.syncSecret },
     )
 
     /**

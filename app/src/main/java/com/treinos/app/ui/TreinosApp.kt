@@ -95,6 +95,10 @@ fun TreinosApp(viewModel: AppViewModel) {
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
     val isLoadingDiagnostics by viewModel.isLoadingDiagnostics.collectAsStateWithLifecycle()
     val diagnosticsMessage by viewModel.diagnosticsMessage.collectAsStateWithLifecycle()
+    val syncSpaceId by viewModel.syncSpaceId.collectAsStateWithLifecycle()
+    val syncSecret by viewModel.syncSecret.collectAsStateWithLifecycle()
+    val syncJoined by viewModel.syncJoined.collectAsStateWithLifecycle()
+    val syncSpaceMessage by viewModel.syncSpaceMessage.collectAsStateWithLifecycle()
     val connectionMessage by viewModel.connectionMessage.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val downloadMessage by viewModel.downloadMessage.collectAsStateWithLifecycle()
@@ -650,6 +654,13 @@ fun TreinosApp(viewModel: AppViewModel) {
                     isLoadingDiagnostics = isLoadingDiagnostics,
                     diagnosticsMessage = diagnosticsMessage,
                     onRefreshDiagnostics = viewModel::refreshDiagnostics,
+                    syncSpaceId = syncSpaceId,
+                    syncSecret = syncSecret,
+                    syncJoined = syncJoined,
+                    syncSpaceMessage = syncSpaceMessage,
+                    onCreateSyncSpace = viewModel::createSyncSpace,
+                    onJoinSyncSpace = viewModel::joinSyncSpace,
+                    onRevokeSyncSpace = viewModel::revokeSyncSpace,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,
                     onDownload = viewModel::downloadNow,

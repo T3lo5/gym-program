@@ -47,6 +47,26 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_API_TOKEN, value.trim()).apply()
         }
 
+    var syncSpaceId: String?
+        get() = prefs.getString(KEY_SYNC_SPACE_ID, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value == null) prefs.edit().remove(KEY_SYNC_SPACE_ID).apply()
+            else prefs.edit().putString(KEY_SYNC_SPACE_ID, value).apply()
+        }
+
+    var syncSecret: String?
+        get() = prefs.getString(KEY_SYNC_SECRET, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value == null) prefs.edit().remove(KEY_SYNC_SECRET).apply()
+            else prefs.edit().putString(KEY_SYNC_SECRET, value.trim()).apply()
+        }
+
+    var syncJoined: Boolean
+        get() = prefs.getBoolean(KEY_SYNC_JOINED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SYNC_JOINED, value).apply()
+        }
+
     val effectiveBackendUrl: String
         get() = if (useRemoteBackend && remoteBackendUrl.isNotBlank()) {
             remoteBackendUrl
@@ -316,6 +336,9 @@ class AppPreferences private constructor(
         private const val KEY_USE_REMOTE_BACKEND = "use_remote_backend"
         private const val KEY_REMOTE_BACKEND_URL = "remote_backend_url"
         private const val KEY_API_TOKEN = "api_token"
+        private const val KEY_SYNC_SPACE_ID = "sync_space_id"
+        private const val KEY_SYNC_SECRET = "sync_secret"
+        private const val KEY_SYNC_JOINED = "sync_joined"
         private const val KEY_SYNC_CURSOR = "sync_cursor"
         private const val KEY_LAST_SYNCED_PLAN_IDS = "last_synced_plan_ids"
         private const val KEY_LAST_SYNCED_SESSION_IDS = "last_synced_session_ids"

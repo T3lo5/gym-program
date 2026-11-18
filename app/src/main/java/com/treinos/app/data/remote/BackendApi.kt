@@ -31,5 +31,14 @@ interface BackendApi {
     suspend fun diagnostics(): BackendDiagnosticsDto =
         BackendDiagnosticsDto(status = "degraded", databaseWritable = false)
 
+    suspend fun createSyncSpace(request: SyncSpaceCreateDto): SyncSpaceResponseDto =
+        SyncSpaceResponseDto()
+
+    suspend fun joinSyncSpace(request: SyncSpaceJoinDto): SyncSpaceResponseDto =
+        SyncSpaceResponseDto()
+
+    suspend fun revokeSyncSpace(request: SyncSpaceRevokeDto): SyncSpaceResponseDto =
+        SyncSpaceResponseDto()
+
     suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse
 }

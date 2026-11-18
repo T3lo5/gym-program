@@ -22,3 +22,6 @@ fun effectiveBackendUrl(
     } else {
         localUrl
     }
+
+fun isSyncSecretValid(secret: String): Boolean =
+    secret.trim().length >= 16
