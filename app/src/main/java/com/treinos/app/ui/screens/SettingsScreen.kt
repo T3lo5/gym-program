@@ -55,6 +55,7 @@ import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.data.health.HealthConnectAvailability
+import com.treinos.app.ui.AppViewModel
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.HealthConnectUiState
 import com.treinos.app.ui.UiError
@@ -140,6 +141,11 @@ fun SettingsScreen(
     onSyncHealth: () -> Unit = {},
     onOpenHealthConnectSettings: () -> Unit = {},
     onOpenHealthConnectStore: () -> Unit = {},
+    // Permissões pedidas em tela (notificações e apps desconhecidos; Health
+    // Connect tem seção própria).
+    permissions: AppViewModel.PermissionsUiState = AppViewModel.PermissionsUiState(),
+    onRequestNotifications: () -> Unit = {},
+    onRequestInstallPackages: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
@@ -155,6 +161,10 @@ fun SettingsScreen(
     var updateExpanded by remember { mutableStateOf(false) }
     // H4-9: seção Health Connect inicia colapsada.
     var healthExpanded by remember { mutableStateOf(false) }
+    // Permissões em tela: seção inicia expandida quando algo falta.
+    var permissionsExpanded by remember(permissions) {
+        mutableStateOf(permissions.notificationsMissing || permissions.installMissing)
+    }
 
     // H3-51: checagem sob demanda — uma vez por processo ao abrir Ajustes;
     // nunca polling. O botão manual repete a checagem quando o usuário quiser.
@@ -873,6 +883,39 @@ fun SettingsScreen(
                 }
             }
 
+            // Permissões em tela: status de cada uma e o botão que pede —
+            // sem o usuário adivinhar onde conceder em Configurações.
+            CollapsibleSection(
+                title = stringResource(R.string.permissions_title),
+                expanded = permissionsExpanded,
+                onToggle = { permissionsExpanded = it },
+            ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        PermissionStatusRow(
+                            label = stringResource(R.string.permissions_notifications),
+                            granted = permissions.notificationsGranted,
+                            actionLabel = stringResource(R.string.permissions_btn_grant),
+                            onAction = onRequestNotifications,
+                        )
+                        PermissionStatusRow(
+                            label = stringResource(R.string.permissions_install),
+                            granted = permissions.canInstallPackages,
+                            actionLabel = stringResource(R.string.permissions_btn_grant),
+                            onAction = onRequestInstallPackages,
+                        )
+                        Text(
+                            text = stringResource(R.string.permissions_install_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
             // H4-9: seção Health Connect — escondida por inteiro quando o
             // Health Connect está indisponível no aparelho (regra 1: nunca
             // crasha, o app funciona normalmente sem ela).
@@ -1036,6 +1079,47 @@ fun SettingsScreen(
 
 
 
+
+/** Linha de status de permissão em Ajustes: o que é, estado e botão de pedido. */
+@Composable
+private fun PermissionStatusRow(
+    label: String,
+    granted: Boolean,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(
+                    if (granted) R.string.permissions_status_granted else R.string.permissions_status_missing
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (granted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+        }
+        if (!granted) {
+            TextButton(
+                onClick = onAction,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(actionLabel)
+            }
+        }
+    }
+}
 
 /**
  * H3-35: seção colapsável com título e ícone de expansão.

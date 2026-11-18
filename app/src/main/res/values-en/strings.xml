@@ -821,6 +821,21 @@
     <string name="settings_health_perm_item">%1$s: %2$s</string>
     <string name="settings_health_granted">granted</string>
     <string name="settings_health_not_granted">not granted</string>
+
+    <!-- Permissions requested in-app (Home card and Settings section): the app
+         explains and asks for each one instead of the user guessing in
+         Settings. -->
+    <string name="permissions_title">Permissions</string>
+    <string name="permissions_body">What the app still needs — tap to grant now:</string>
+    <string name="permissions_notifications">Rest-finish notifications</string>
+    <string name="permissions_health">Health Connect (workouts, weight and steps)</string>
+    <string name="permissions_install">Install app updates</string>
+    <string name="permissions_install_hint">Android asks for confirmation to install the downloaded update</string>
+    <string name="permissions_btn_grant">Allow</string>
+    <string name="permissions_btn_connect">Connect</string>
+    <string name="permissions_status_granted">Granted</string>
+    <string name="permissions_status_missing">Missing</string>
+    <string name="permissions_dismiss">Not now</string>
     <string name="settings_health_last_weight">Last weight read: %1$s (%2$s)</string>
     <string name="settings_health_no_weight">No weight read yet</string>
     <string name="settings_health_steps_total">Steps in the last 30 days: %1$s</string>

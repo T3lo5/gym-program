@@ -3,8 +3,10 @@ package com.treinos.app.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +20,7 @@ import com.treinos.app.TreinosApplication
 import com.treinos.app.data.health.HEALTH_PERMISSIONS
 import com.treinos.app.data.health.HealthConnectAvailability
 import androidx.health.connect.client.PermissionController
+import com.treinos.app.ui.AppViewModel.PermissionRequest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -88,6 +91,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Estado inicial das permissões para o card da Home/seção de Ajustes.
+        viewModel.refreshPermissions()
+
         // H3-58: o VM sinaliza quando um descanso começa; a Activity executa o
         // pedido de permissão (contexto de treino, não no startup).
         lifecycleScope.launch {
@@ -119,6 +125,20 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // Pedidos explícitos do card "Permissões" (Home) e da seção em Ajustes:
+        // diálogo do sistema para notificações; tela de apps desconhecidos
+        // para o instalador de update (não é diálogo runtime).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.permissionRequests.collect { request ->
+                    when (request) {
+                        PermissionRequest.Notifications -> requestNotificationPermissionIfNeeded()
+                        PermissionRequest.InstallPackages -> openUnknownSourcesSettings()
+                    }
+                }
+            }
+        }
     }
 
     /** H3-58: ação "Pular descanso" com a Activity já viva (CLEAR_TOP | SINGLE_TOP). */
@@ -137,6 +157,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.onAppResumed()
+        // Voltou do primeiro plano (ex.: tela de Configurações depois de
+        // conceder algo): recolhe o estado real das permissões.
+        viewModel.refreshPermissions()
+        viewModel.refreshHealthConnect()
     }
 
     /** H3-58: ao sair do primeiro plano, o VM posta a notificação do descanso. */
@@ -153,6 +177,34 @@ class MainActivity : AppCompatActivity() {
             return
         }
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /**
+     * "Instalar atualizações" não tem diálogo runtime: o Android só oferece a
+     * tela de apps desconhecidos. Abre direto na página do app (sem o usuário
+     * adivinhar onde a permissão mora); sem painel específico, cai na página
+     * do app em Configurações.
+     */
+    private fun openUnknownSourcesSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (packageManager.canRequestPackageInstalls()) return
+        val intent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:$packageName"),
+        )
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            // Fabricante sem a tela específica: página do app em Configurações.
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName"),
+                    )
+                )
+            }
+        }
     }
 
     /**

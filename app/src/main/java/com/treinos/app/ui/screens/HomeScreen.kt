@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,8 +59,10 @@ import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayWithExercises
 import com.treinos.app.data.local.WorkoutPlanWithDetails
+import com.treinos.app.data.health.HealthConnectAvailability
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.ui.ActivityModality
+import com.treinos.app.ui.AppViewModel
 import com.treinos.app.ui.ModalityTab
 import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.PendingGeneration
@@ -92,6 +95,8 @@ import com.treinos.app.ui.UiState
 import com.treinos.app.ui.components.BusyButton
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.LoadingState
+import com.treinos.app.ui.components.PermissionRowState
+import com.treinos.app.ui.components.PermissionsCard
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.components.StatusText
@@ -138,6 +143,13 @@ fun HomeScreen(
     // H4-8: atalho "Peso e medidas" com o último peso registrado, se houver.
     onOpenMeasurements: () -> Unit = {},
     latestWeightKg: Double? = null,
+    // Permissões em tela: estado do sistema + Health Connect e ações de pedido.
+    permissions: AppViewModel.PermissionsUiState = AppViewModel.PermissionsUiState(),
+    healthAvailability: HealthConnectAvailability = HealthConnectAvailability.UNAVAILABLE,
+    healthPermissionsGranted: Boolean = false,
+    onRequestNotifications: () -> Unit = {},
+    onRequestHealthPermissions: () -> Unit = {},
+    onRequestInstallPackages: () -> Unit = {},
 ) {
     // H3-29: Loading até o primeiro emit do Room — o empty state ("Nenhum
     // treino ainda") só aparece quando o banco realmente está vazio. Enquanto
@@ -161,6 +173,8 @@ fun HomeScreen(
     }
     var selectedTab by remember(plan) { mutableStateOf<ModalityTab?>(defaultTab) }
     var showDeletePlanDialog by remember { mutableStateOf(false) }
+    // Card de permissões: "Agora não" esconde até o próximo abrir do app.
+    var permissionsDismissed by rememberSaveable { mutableStateOf(false) }
     var showPlanMenu by remember { mutableStateOf(false) }
     // H3-28: o treino de hoje vem de um seletor puro (testável em JVM).
     val todaySession = remember(plan, todayWeekday) {
@@ -297,6 +311,40 @@ fun HomeScreen(
                 // hoje fica acima da dobra, com ação direta.
                 if (todaySession != null) {
                     item { TodayHeroCard(todaySession, onStartDay) }
+            // Permissões em tela: só o que falta, com o botão que pede —
+            // o usuário deixa de adivinhar em Configurações.
+            if (!permissionsDismissed) {
+                item {
+                    PermissionsCard(
+                        rows = listOf(
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_notifications),
+                                granted = permissions.notificationsGranted,
+                                actionLabel = stringResource(R.string.permissions_btn_grant),
+                                onAction = onRequestNotifications,
+                            ),
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_health),
+                                granted = healthAvailability == HealthConnectAvailability.AVAILABLE &&
+                                    healthPermissionsGranted,
+                                actionLabel = if (healthAvailability == HealthConnectAvailability.AVAILABLE) {
+                                    stringResource(R.string.permissions_btn_connect)
+                                } else {
+                                    null
+                                },
+                                onAction = onRequestHealthPermissions,
+                            ),
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_install),
+                                granted = permissions.canInstallPackages,
+                                actionLabel = stringResource(R.string.permissions_btn_grant),
+                                onAction = onRequestInstallPackages,
+                            ),
+                        ),
+                        onDismiss = { permissionsDismissed = true },
+                    )
+                }
+            }
                 }
 
                 item { HomeQuickActions(onGenerate, onLogActivity, onOpenMobility) }

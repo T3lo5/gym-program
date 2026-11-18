@@ -100,7 +100,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -758,6 +760,55 @@ class AppViewModel(
     /** H4-9: sessão cuja escrita falhou; o "Tentar de novo" reenvia (regra 8). */
     private var pendingHealthWriteSessionId: Long? = null
 
+    // ---------------- Permissões pedidas em tela ----------------
+
+    /**
+     * Estado das permissões que o app usa e passa a pedir em tela (card da
+     * Home e seção em Ajustes) — hoje o usuário precisava adivinhar e conceder
+     * tudo em Configurações. Health Connect tem estado próprio
+     * ([healthConnectState]); aqui ficam as permissões do sistema.
+     */
+    data class PermissionsUiState(
+        /** API 33+: `POST_NOTIFICATIONS`. Antes disso é concedida por padrão. */
+        val notificationsGranted: Boolean = true,
+        /** API 26+: apps desconhecidos — necessária para aplicar o update (H3-51). */
+        val canInstallPackages: Boolean = true,
+    ) {
+        val notificationsMissing: Boolean get() = !notificationsGranted
+        val installMissing: Boolean get() = !canInstallPackages
+    }
+
+    /** Pedido explícito vindo da UI; a MainActivity executa o diálogo/link. */
+    sealed interface PermissionRequest {
+        data object Notifications : PermissionRequest
+        data object InstallPackages : PermissionRequest
+    }
+
+    private val _permissionsState = MutableStateFlow(PermissionsUiState())
+    val permissionsState: StateFlow<PermissionsUiState> = _permissionsState.asStateFlow()
+
+    /**
+     * `SharedFlow` sem replay: cada pedido entrega exatamente uma vez para o
+     * colecionador vivo (a Activity) e não refaz o diálogo em rotação de tela.
+     */
+    private val _permissionRequests = MutableSharedFlow<PermissionRequest>(extraBufferCapacity = 1)
+    val permissionRequests: SharedFlow<PermissionRequest> = _permissionRequests
+
+    /** Recolhe o estado real das permissões do sistema (barato, sem I/O pesado). */
+    fun refreshPermissions() {
+        _permissionsState.value = SystemPermissions.snapshot(context)
+    }
+
+    /** Botão "Permitir" do card/seção — a Activity abre o diálogo do sistema. */
+    fun requestNotificationsPermission() {
+        _permissionRequests.tryEmit(PermissionRequest.Notifications)
+    }
+
+    /** Botão "Permitir" do card/seção — a Activity abre os apps desconhecidos. */
+    fun requestInstallPackagesPermission() {
+        _permissionRequests.tryEmit(PermissionRequest.InstallPackages)
+    }
+
     private val _lastSyncAt = MutableStateFlow(preferences.lastSyncAt)
     val lastSyncAt: StateFlow<String?> = _lastSyncAt.asStateFlow()
 
@@ -1397,6 +1448,13 @@ class AppViewModel(
             viewModelScope.launch {
                 refreshPendingGeneration()
             }
+        }
+        // Integração com o relógio: ao voltar ao primeiro plano, republica o
+        // estado/snapshot — cobre updates que o pulso perdeu com o celular
+        // em segundo plano ou fora de alcance (o relógio também pede estado
+        // ao abrir; isto é o empurrão do lado do celular).
+        if (inProgressSession.value != null) {
+            syncWearState()
         }
     }
 

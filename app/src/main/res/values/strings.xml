@@ -823,6 +823,21 @@
     <string name="settings_health_perm_exercise">Treinos (escrita)</string>
     <string name="settings_health_perm_weight">Peso (leitura)</string>
     <string name="settings_health_perm_steps">Passos (leitura)</string>
+
+    <!-- Permissões pedidas em tela (card da Home e seção em Ajustes): o app
+         explica e pede cada uma, em vez de o usuário adivinhar em
+         Configurações. -->
+    <string name="permissions_title">Permissões</string>
+    <string name="permissions_body">O que falta para o app funcionar por completo — toque para conceder agora:</string>
+    <string name="permissions_notifications">Notificações do fim do descanso</string>
+    <string name="permissions_health">Health Connect (treinos, peso e passos)</string>
+    <string name="permissions_install">Instalar atualizações do app</string>
+    <string name="permissions_install_hint">Android pede confirmação para instalar o update baixado</string>
+    <string name="permissions_btn_grant">Permitir</string>
+    <string name="permissions_btn_connect">Conectar</string>
+    <string name="permissions_status_granted">Concedida</string>
+    <string name="permissions_status_missing">Faltando</string>
+    <string name="permissions_dismiss">Agora não</string>
     <string name="settings_health_perm_item">%1$s: %2$s</string>
     <string name="settings_health_granted">concedida</string>
     <string name="settings_health_not_granted">não concedida</string>

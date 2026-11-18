@@ -146,6 +146,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val discoveryMessage by viewModel.discoveryMessage.collectAsStateWithLifecycle()
     // H4-9: integração com o Health Connect (seção em Ajustes).
     val healthConnectState by viewModel.healthConnectState.collectAsStateWithLifecycle()
+    // Permissões em tela (card da Home e seção em Ajustes).
+    val permissionsState by viewModel.permissionsState.collectAsStateWithLifecycle()
     val healthConnectMessage by viewModel.healthConnectMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // Dispensar o aviso de deload é só visual: nada aqui muda o plano gravado.
@@ -455,6 +457,13 @@ fun TreinosApp(viewModel: AppViewModel) {
                     // H4-8: atalho "Peso e medidas" com o último peso, se houver.
                     onOpenMeasurements = viewModel::openMeasurements,
                     latestWeightKg = latestMeasurement(measurements)?.weightKg,
+                    // Permissões em tela: pede na hora, sem adivinhar Configurações.
+                    permissions = permissionsState,
+                    healthAvailability = healthConnectState.availability,
+                    healthPermissionsGranted = healthConnectState.permissions.hasAnyPermission,
+                    onRequestNotifications = viewModel::requestNotificationsPermission,
+                    onRequestHealthPermissions = viewModel::requestHealthPermissions,
+                    onRequestInstallPackages = viewModel::requestInstallPackagesPermission,
                 )
 
                 Screen.Generate -> GenerateScreen(
@@ -680,6 +689,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onOpenMeasurements = viewModel::openMeasurements,
                     // H4-9: integração com o Health Connect.
                     healthConnectState = healthConnectState,
+                    // Permissões em tela: status e pedido direto em Ajustes.
+                    permissions = permissionsState,
+                    onRequestNotifications = viewModel::requestNotificationsPermission,
+                    onRequestInstallPackages = viewModel::requestInstallPackagesPermission,
                     healthConnectMessage = healthConnectMessage,
                     onRequestHealthPermissions = viewModel::requestHealthPermissions,
                     onSyncHealth = viewModel::syncHealthData,
