@@ -951,11 +951,10 @@ class AppViewModel(
         if (command.protocolVersion != 1) return
         val activeSession = inProgressSession.value
         if (activeSession == null) {
-            // Correção do "pedir no relógio e nada acontece": sem sessão em
-            // andamento o pulso ainda merece resposta — estado idle com o
-            // treino de hoje (quando existe plano), nunca silêncio.
-            if (command.kind == WearCommandKind.REQUEST_STATE) {
-                publishIdleWearState()
+            when (command.kind) {
+                WearCommandKind.REQUEST_STATE -> publishIdleWearState()
+                WearCommandKind.START_TODAY -> startTodayFromWear()
+                else -> Unit
             }
             return
         }
@@ -986,6 +985,29 @@ class AppViewModel(
             }
             WearCommandKind.SKIP_REST -> skipRest()
             WearCommandKind.FINISH_WORKOUT -> finishWorkout()
+            WearCommandKind.START_TODAY -> publishWearState(activeSession, _exerciseIndex.value)
+        }
+    }
+
+    /** H4-18: inicia pelo pulso reutilizando o mesmo guarda do widget. */
+    private fun startTodayFromWear() {
+        viewModelScope.launch {
+            inProgressSession.value?.let {
+                publishWearState(it, _exerciseIndex.value)
+                return@launch
+            }
+            val plan = activePlan.value
+                ?: withTimeoutOrNull(5_000) { activePlan.first { it != null } }
+            if (plan == null) {
+                publishIdleWearState()
+                return@launch
+            }
+            val todayWeekday = LocalDate.now().get(ChronoField.DAY_OF_WEEK)
+            when (val today = todaySessionSelector(plan.days, todayWeekday)) {
+                is TodaySession.Today -> startWorkout(today.day.day.id)
+                TodaySession.Rest -> publishIdleWearState()
+                is TodaySession.Next -> publishIdleWearState()
+            }
         }
     }
 

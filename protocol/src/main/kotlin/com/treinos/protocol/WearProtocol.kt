@@ -50,6 +50,7 @@ enum class WearCommandKind {
     SKIP_REST,
     FINISH_WORKOUT,
     REQUEST_STATE,
+    START_TODAY,
 }
 
 /**

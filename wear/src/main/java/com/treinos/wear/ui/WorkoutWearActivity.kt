@@ -193,6 +193,12 @@ class WorkoutWearActivity : ComponentActivity() {
                 onRequestState = {
                     scope.launch { sendRequestState() }
                 },
+                onStartToday = {
+                    scope.launch {
+                        sendCommand(-1, WearCommandKind.START_TODAY)
+                        sendRequestState()
+                    }
+                },
                 standalone = standalone,
                 standaloneStarted = standaloneStarted,
                 standaloneRestante = WearStandaloneSession.restante(standalone?.restEndsAt, agora),
@@ -263,6 +269,7 @@ fun WorkoutWearScreen(
     onSkipRest: (Long) -> Unit,
     onFinish: (Long) -> Unit,
     onRequestState: () -> Unit,
+    onStartToday: () -> Unit = {},
     /** H4-16: estado do modo standalone (`null` quando conectado). */
     standalone: WearStandaloneState? = null,
     standaloneStarted: Boolean = false,
@@ -401,6 +408,15 @@ fun WorkoutWearScreen(
                                 fontSize = 14.sp,
                                 style = MaterialTheme.typography.labelMedium,
                             )
+                            val startLabel = stringResource(R.string.standalone_start_today)
+                            Button(
+                                onClick = {
+                                    dispatch(onStartToday)
+                                },
+                                modifier = Modifier.semantics { contentDescription = startLabel },
+                            ) {
+                                Text(text = startLabel)
+                            }
                         }
                         Text(
                             text = stringResource(R.string.no_workout_hint),

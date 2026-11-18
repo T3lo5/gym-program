@@ -109,7 +109,11 @@ class WearPublishTest {
 
     /** Pré-aquece `activePlan` (valor cacheado), como em StartTodayWorkoutTest. */
     private fun aguardarPlanoAtivo() {
-        runBlocking { viewModel.activePlan.first { it != null } }
+        runBlocking {
+            viewModel.activePlan.first { plan ->
+                plan != null && plan.days.isNotEmpty()
+            }
+        }
     }
 
     /** Espera limitada: a gravação da sessão roda no executor do Room. */
@@ -180,6 +184,82 @@ class WearPublishTest {
         assertTrue("Botão de sync não publicou nada", publicado != null)
         assertEquals("idle", publicado!!.status)
         assertEquals("Dia Teste", publicado.dayName)
+    }
+
+    @Test
+    fun start_today_sem_sessao_inicia_e_publica_in_progress() {
+        runBlocking { semearPlano(todayWeekday()) }
+        aguardarPlanoAtivo()
+
+        fake.comandos.tryEmit(
+            WearCommand(
+                commandId = "start-1",
+                sessionId = -1,
+                kind = WearCommandKind.START_TODAY,
+            ),
+        )
+
+        val publicado = aguardarPublicacao()
+        assertTrue("START_TODAY não publicou o estado iniciado", publicado != null)
+        assertEquals("in_progress", publicado!!.status)
+        assertEquals("Dia Teste", publicado.dayName)
+        val sessoes = runBlocking { repository.observeSessions().first() }
+        assertEquals(1, sessoes.count { it.session.status == "in_progress" })
+    }
+
+    @Test
+    fun start_today_em_dia_de_descanso_responde_idle() {
+        runBlocking {
+            dao.insertPlanWithDays(
+                plan = WorkoutPlanEntity(name = "Principal", kind = "main"),
+                days = listOf(
+                    WorkoutDayEntity(
+                        planId = 0,
+                        name = "Descanso",
+                        weekday = todayWeekday(),
+                        isRestDay = true,
+                    ),
+                ),
+                exercisesByDay = listOf(emptyList()),
+            )
+        }
+        aguardarPlanoAtivo()
+
+        fake.comandos.tryEmit(
+            WearCommand(
+                commandId = "start-rest",
+                sessionId = -1,
+                kind = WearCommandKind.START_TODAY,
+            ),
+        )
+
+        val publicado = aguardarPublicacao()
+        assertTrue("START_TODAY no descanso não respondeu idle", publicado != null)
+        assertEquals("idle", publicado!!.status)
+        val sessoes = runBlocking { repository.observeSessions().first() }
+        assertTrue(sessoes.none { it.session.status == "in_progress" })
+    }
+
+    @Test
+    fun start_today_com_sessao_ativa_nao_duplica() {
+        runBlocking { semearPlano(todayWeekday()) }
+        aguardarPlanoAtivo()
+        viewModel.startTodayWorkout()
+        aguardarPublicacao()
+
+        fake.comandos.tryEmit(
+            WearCommand(
+                commandId = "start-active",
+                sessionId = -1,
+                kind = WearCommandKind.START_TODAY,
+            ),
+        )
+
+        val publicado = aguardarPublicacao()
+        assertTrue("START_TODAY com sessão ativa não respondeu estado", publicado != null)
+        assertEquals("in_progress", publicado!!.status)
+        val sessoes = runBlocking { repository.observeSessions().first() }
+        assertEquals(1, sessoes.count { it.session.status == "in_progress" })
     }
 }
 

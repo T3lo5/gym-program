@@ -52,6 +52,19 @@ class WearProtocolTest {
     }
 
     @Test
+    fun round_trip_do_start_today() {
+        val comando = WearCommand(
+            commandId = "cmd-start-today",
+            sessionId = -1,
+            kind = WearCommandKind.START_TODAY,
+        )
+        val serializado = json.encodeToString(WearCommand.serializer(), comando)
+        val novamente = json.decodeFromString(WearCommand.serializer(), serializado)
+        assertEquals(comando, novamente)
+        assertEquals(1, novamente.protocolVersion)
+    }
+
+    @Test
     fun modality_vai_no_round_trip() {
         val estado = WearWorkoutState(
             sessionId = 42,
