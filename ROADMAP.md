@@ -38,7 +38,7 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 | Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
 | Testes + CI | ✅ | 35 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); Compose no Robolectric, Room em memória e contrato nos dois lados dentro do gate; instrumentados compilam no gate (H3-1) |
 | Descoberta LAN | ✅ | Ajustes → "Buscar backends" (`NsdManager` em `_treinos._tcp.`); "Conectar" sonda `GET /health` e só salva a URL em 200; IP manual continua como fallback (H2-1) |
-| Wear OS | 🟡 | MVP H2-2 entregue (módulo `:wear` no build, Data Layer + tela do relógio, dois APKs no gate), mas com lacunas de uso real: alvo de reps vazio, timer local não ligado, corrida/mobilidade sem tela coerente e fila offline incompleta — ver "Roadmap do relógio" no §4 |
+| Wear OS | 🟡 | MVP fechado (H3-17..H3-20, H4-15, H4-16 em §4.1). Correção 2026-11-18 do "pedir no relógio e nada acontece": `WearSyncRepository.publish()` não tinha chamador desde o H2-2 (o estado só existia num `StateFlow` local) e `REQUEST_STATE` sem sessão era descartado — agora o estado `in_progress` é publicado no Data Layer, sem sessão o pulso recebe `idle` com o treino de hoje e Ajustes ganhou "Sincronizar com o relógio"; regressão travada em `WearPublishTest`/`WearScreenKindTest`. Falta iniciar o treino pelo pulso (H4-18, spec proposta) |
 | Backup/restore do usuário | ✅ | Exportar/importar ligados aos file pickers (SAF), pré-visualização + confirmação e `deviceId` do arquivo aplicado só após importação válida (H1-7) |
 | Perfil no backup JSON | ✅ | `BackupProfile` no `schemaVersion = 3` (peso, altura e sexo viajam no arquivo; v1/v2 continuam aceitos e **não** limpam o perfil local); guarda de 25 MB ligada antes de ler o stream, com leitura limitada quando o provedor não informa o tamanho (H3-6, H3-7) |
 | Sexo opcional no perfil | ✅ | Seletor em "Seu perfil (opcional)" com `Feminino`/`Masculino`/`Outro`/`Prefiro não informar`, salvo em `AppPreferences.sex` e enviado só quando preenchido; aparece no prompt da IA e **não** muda descanso, RPE, séries nem cargas (H3-7) |
@@ -650,6 +650,7 @@ commit da fila); **H4-17** segue Won't now.
 - [H4-15 — Wear: editar carga/reps no pulso](docs/specs/H4-15-wear-editar-carga-reps.md) — concluída (2026-11-15: `WearSetEditor` puro com passos de 2,5 kg/1 rep e carga 0,0 → `null`; `sendCommand` preenche o `WearCommand` e o celular grava os valores editados; sem mudança em `:protocol`)
 - [H4-16 — Modo standalone do relógio](docs/specs/H4-16-wear-standalone.md) — concluída (2026-11-16: Room próprio no `:wear` v1 com snapshot da sessão; séries offline viram lote `PATH_SYNC_BATCH` deduplicado por `clientSetId`; `standalone = true` no manifest)
 - [H4-17 — Corrida com GPS, FC e intervalados](docs/specs/H4-17-corrida-gps-fc.md) — proposta (**Won't now** na 1.5.0)
+- [H4-18 — Iniciar o treino de hoje pelo relógio](docs/specs/H4-18-iniciar-treino-pelo-relogio.md) — proposta (pendente de aprovação; depende da correção do canal wear entregue em 2026-11-18)
 
 ### Horizon 5 — Backend sob demanda confiável
 

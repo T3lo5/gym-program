@@ -69,7 +69,7 @@ import com.treinos.app.data.csv.CsvImportPreview
 import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.csv.StrongHevyCsvParser
 import com.treinos.app.data.wear.WearSessionMapper
-import com.treinos.app.data.wear.WearSyncRepository
+import com.treinos.app.data.wear.WearSyncChannel
 import com.treinos.app.ui.ExerciseSessionData
 import com.treinos.app.ui.PendingGeneration
 import com.treinos.app.ui.PendingGenerationCodec
@@ -194,7 +194,7 @@ class AppViewModel(
     private val exerciseMediaRepository: ExerciseMediaRepository? = null,
     private val discoveryManager: BackendDiscoveryManager? = null,
     private val healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
-    private val wearSyncRepository: WearSyncRepository? = null,
+    private val wearSyncRepository: WearSyncChannel? = null,
     private val restFeedback: RestFeedbackPlayer? = null,
     private val restNotifier: RestNotifier? = null,
     /** H4-9: gateway do Health Connect; `null` quando indisponível. */
@@ -861,6 +861,10 @@ class AppViewModel(
     private val _wearState = MutableStateFlow<WearWorkoutState?>(null)
     val wearState: StateFlow<WearWorkoutState?> = _wearState.asStateFlow()
 
+    /** Mensagem do botão "Sincronizar com o relógio" em Ajustes. */
+    private val _watchSyncMessage = MutableStateFlow<String?>(null)
+    val watchSyncMessage: StateFlow<String?> = _watchSyncMessage.asStateFlow()
+
     private val _activityPrefill = MutableStateFlow<ActivityLogInput?>(null)
     val activityPrefill: StateFlow<ActivityLogInput?> = _activityPrefill.asStateFlow()
 
@@ -946,7 +950,15 @@ class AppViewModel(
     private fun handleWearCommand(command: WearCommand) {
         if (command.protocolVersion != 1) return
         val activeSession = inProgressSession.value
-        if (activeSession == null) return
+        if (activeSession == null) {
+            // Correção do "pedir no relógio e nada acontece": sem sessão em
+            // andamento o pulso ainda merece resposta — estado idle com o
+            // treino de hoje (quando existe plano), nunca silêncio.
+            if (command.kind == WearCommandKind.REQUEST_STATE) {
+                publishIdleWearState()
+            }
+            return
+        }
         if (command.sessionId != activeSession.session.id && command.kind != WearCommandKind.REQUEST_STATE) {
             // Comando de sessão diferente: reenviar estado atual
             publishWearState(activeSession, _exerciseIndex.value)
@@ -1025,7 +1037,43 @@ class AppViewModel(
 
     private fun publishWearState(session: com.treinos.app.data.local.SessionWithExercises, exerciseIndex: Int) {
         val rest = _restRemaining.value
-        _wearState.value = WearSessionMapper.toWearState(session, exerciseIndex, rest)
+        val estado = WearSessionMapper.toWearState(session, exerciseIndex, rest)
+        _wearState.value = estado
+        // O fio que faltava desde o H2-2: o estado só existia no StateFlow
+        // local, que ninguém consumia — o Data Layer nunca o recebia e o
+        // relógio ficava sem treino mesmo com sessão em andamento.
+        wearSyncRepository?.publish(estado)
+    }
+
+    /**
+     * Estado idle publicado ao pulso quando não há sessão em andamento:
+     * `dayName` carrega o treino de hoje do plano ativo (vazio sem plano) e o
+     * status `idle` é tratado pelo relógio como "sem treino em andamento".
+     */
+    private fun publishIdleWearState() {
+        if (wearSyncRepository == null) return
+        val weekday = java.time.LocalDate.now().get(java.time.temporal.ChronoField.DAY_OF_WEEK)
+        val dayName = activePlan.value?.days?.let { dias ->
+            when (val hoje = todaySessionSelector(dias, weekday)) {
+                is TodaySession.Today -> hoje.day.day.name
+                is TodaySession.Next -> hoje.day.day.name
+                TodaySession.Rest -> ""
+            }
+        } ?: ""
+        val idle = WearWorkoutState(
+            sessionId = -1L,
+            dayName = dayName,
+            exerciseIndex = 0,
+            exerciseCount = 0,
+            exerciseName = "",
+            setNumber = 0,
+            plannedSets = 0,
+            targetReps = "",
+            status = "idle",
+            updatedAt = System.currentTimeMillis(),
+        )
+        _wearState.value = idle
+        wearSyncRepository!!.publish(idle)
     }
 
     private fun syncWearState() {
@@ -1039,6 +1087,25 @@ class AppViewModel(
         } else {
             _wearState.value = null
         }
+    }
+
+    /**
+     * Sincronização manual pedida em Ajustes ("Sincronizar com o relógio"):
+     * com sessão em andamento republica estado + snapshot; sem sessão responde
+     * ao pulso com o estado idle (o treino de hoje, quando existe plano).
+     */
+    fun syncWearNow() {
+        if (wearSyncRepository == null) return
+        if (inProgressSession.value != null) {
+            syncWearState()
+        } else {
+            publishIdleWearState()
+        }
+        _watchSyncMessage.value = context.getString(R.string.msg_watch_sync_sent)
+    }
+
+    fun clearWatchSyncMessage() {
+        _watchSyncMessage.value = null
     }
 
     fun loadExerciseMedia(forceRefresh: Boolean) {
@@ -3376,7 +3443,7 @@ class AppViewModel(
             exerciseMediaRepository: ExerciseMediaRepository? = null,
             discoveryManager: BackendDiscoveryManager? = null,
             healthChecker: BackendHealthChecker = HttpBackendHealthChecker(),
-            wearSyncRepository: WearSyncRepository? = null,
+            wearSyncRepository: WearSyncChannel? = null,
             restFeedback: RestFeedbackPlayer? = null,
             restNotifier: RestNotifier? = null,
             healthGateway: HealthConnectGateway? = null,

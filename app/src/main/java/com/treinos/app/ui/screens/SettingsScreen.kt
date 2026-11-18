@@ -166,6 +166,10 @@ fun SettingsScreen(
     permissions: AppViewModel.PermissionsUiState = AppViewModel.PermissionsUiState(),
     onRequestNotifications: () -> Unit = {},
     onRequestInstallPackages: () -> Unit = {},
+    // Correção do canal wear: sincronização manual com o relógio pareado.
+    watchSyncMessage: String? = null,
+    onSyncWatch: () -> Unit = {},
+    onClearWatchSyncMessage: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     val clipboard = LocalClipboardManager.current
@@ -377,6 +381,39 @@ fun SettingsScreen(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        // Correção do "pedir no relógio e nada acontece": o
+                        // celular publica estado/snapshot ao pulso sob demanda.
+                        Text(
+                            text = stringResource(R.string.settings_watch_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_watch_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        watchSyncMessage?.let {
+                            StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                onClearWatchSyncMessage()
+                                onSyncWatch()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .minimumInteractiveComponentSize(),
+                        ) {
+                            Text(stringResource(R.string.settings_btn_sync_watch))
+                        }
                     }
                 }
 

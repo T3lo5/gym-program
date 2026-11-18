@@ -764,6 +764,10 @@
     <string name="widget_rest_label">Rest day today</string>
     <string name="widget_open_app_label">Open Treinos</string>
     <string name="widget_workout_fallback">Workout</string>
+    <string name="msg_watch_sync_sent">State sent to the watch.</string>
+    <string name="settings_watch_title">Watch (Wear OS)</string>
+    <string name="settings_watch_desc">Sends the workout in progress and the current state to the paired watch.</string>
+    <string name="settings_btn_sync_watch">Sync with watch</string>
     <string name="msg_no_workout_today">No workout for today.</string>
     <!-- H4-8: body weight and measurements over time -->
     <string name="settings_measurements_title">Weight and measurements</string>

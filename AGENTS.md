@@ -47,6 +47,18 @@ não substitui o gate.
 
 ## Regras por tipo de mudança
 
+### Versionamento de release
+
+Ao publicar no `main`, atualize `version.properties` com o incremento
+correspondente ao tipo da mudança:
+
+- `feat` -> incrementa o componente menor: `1.8.0` -> `1.9.0`
+- `fix` -> incrementa o componente patch: `1.8.0` -> `1.8.1`
+- breaking change incompatível -> incrementa o componente maior: `1.8.0` -> `2.0.0`
+
+O `versionCode` continua sendo derivado pelo tempo em `scripts/version.sh`;
+apenas o `versionName` vem da linha `versionName=` em `version.properties`.
+
 | Mudança | Obrigatório além do gate |
 |---|---|
 | Lógica pura em `app/src/main` (ex.: cálculo, progresso, parsing) | Teste JVM em `app/src/test/...` cobrindo o caso que motivou a mudança |

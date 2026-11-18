@@ -46,5 +46,6 @@
     <!-- Estado ausente na abertura (não é "treino concluído") e fim em duas etapas -->
     <string name="no_workout_state">Nenhum treino em andamento</string>
     <string name="no_workout_hint">Inicie um treino no celular</string>
+    <string name="idle_today_format">Hoje: %1$s</string>
     <string name="confirm_finish">Confirmar fim?</string>
 </resources>

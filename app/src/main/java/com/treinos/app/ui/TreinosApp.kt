@@ -159,6 +159,7 @@ fun TreinosApp(viewModel: AppViewModel) {
     // Permissões em tela (card da Home e seção em Ajustes).
     val permissionsState by viewModel.permissionsState.collectAsStateWithLifecycle()
     val healthConnectMessage by viewModel.healthConnectMessage.collectAsStateWithLifecycle()
+    val watchSyncMessage by viewModel.watchSyncMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // Dispensar o aviso de deload é só visual: nada aqui muda o plano gravado.
     var isDeloadNoticeDismissed by remember { mutableStateOf(false) }
@@ -718,6 +719,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     permissions = permissionsState,
                     onRequestNotifications = viewModel::requestNotificationsPermission,
                     onRequestInstallPackages = viewModel::requestInstallPackagesPermission,
+                    // Correção do canal wear: sincronização manual com o relógio.
+                    watchSyncMessage = watchSyncMessage,
+                    onSyncWatch = viewModel::syncWearNow,
+                    onClearWatchSyncMessage = viewModel::clearWatchSyncMessage,
                     healthConnectMessage = healthConnectMessage,
                     onRequestHealthPermissions = viewModel::requestHealthPermissions,
                     onSyncHealth = viewModel::syncHealthData,

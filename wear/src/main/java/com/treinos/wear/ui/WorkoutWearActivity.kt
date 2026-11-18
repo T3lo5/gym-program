@@ -350,7 +350,9 @@ fun WorkoutWearScreen(
                         Text(text = refreshLabel)
                     }
                 }
-            } else if (state.status == "finished") {
+            }
+            else when (wearScreenKind(state)) {
+                WearScreenKind.Finished -> {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -373,7 +375,49 @@ fun WorkoutWearScreen(
                         Text(text = refreshLabel)
                     }
                 }
-            } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
+                }
+                WearScreenKind.Idle -> {
+                    // Sem sessão em andamento no celular: o estado idle chegou
+                    // pela correção do canal wear (REQUEST_STATE do pulso ou o
+                    // botão "Sincronizar com o relógio" do celular). Status
+                    // desconhecido (celular mais novo) cai aqui também.
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = padHorizontal, vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    ) {
+                        val semTreino = stringResource(R.string.no_workout_state)
+                        Text(
+                            text = semTreino,
+                            fontSize = 20.sp,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.semantics { contentDescription = semTreino },
+                        )
+                        if (state.dayName.isNotBlank()) {
+                            Text(
+                                text = stringResource(R.string.idle_today_format, state.dayName),
+                                fontSize = 14.sp,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.no_workout_hint),
+                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        val refreshLabel = stringResource(R.string.refresh)
+                        Button(
+                            onClick = onRequestState,
+                            modifier = Modifier.semantics { contentDescription = refreshLabel },
+                        ) {
+                            Text(text = refreshLabel)
+                        }
+                    }
+                }
+                WearScreenKind.Strength -> {
                 // H4-15: editor de carga/reps da próxima série. Parte do default
                 // ao abrir e reseta ao trocar de exercício (sessionId ou
                 // exerciseIndex novos); a edição não persiste entre aberturas.
@@ -538,7 +582,8 @@ fun WorkoutWearScreen(
                         onConfirmed = { dispatch { onFinish(state.sessionId) } },
                     )
                 }
-            } else {
+                }
+                else -> {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -565,6 +610,7 @@ fun WorkoutWearScreen(
                         onConfirmed = { dispatch { onFinish(state.sessionId) } },
                     )
                 }
+            }
             }
         }
     }

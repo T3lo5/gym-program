@@ -46,5 +46,6 @@
     <!-- Missing state on open (not "workout finished") and two-step finish -->
     <string name="no_workout_state">No workout in progress</string>
     <string name="no_workout_hint">Start a workout on your phone</string>
+    <string name="idle_today_format">Today: %1$s</string>
     <string name="confirm_finish">Confirm finish?</string>
 </resources>

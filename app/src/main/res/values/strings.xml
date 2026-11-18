@@ -769,6 +769,10 @@
     <string name="widget_rest_label">Hoje é descanso</string>
     <string name="widget_open_app_label">Abrir Treinos</string>
     <string name="widget_workout_fallback">Treino</string>
+    <string name="msg_watch_sync_sent">Estado enviado ao relógio.</string>
+    <string name="settings_watch_title">Relógio (Wear OS)</string>
+    <string name="settings_watch_desc">Envia o treino em andamento e o estado atual para o relógio pareado.</string>
+    <string name="settings_btn_sync_watch">Sincronizar com o relógio</string>
     <string name="msg_no_workout_today">Sem treino para hoje.</string>
     <!-- H4-8: peso corporal e medidas ao longo do tempo -->
     <string name="settings_measurements_title">Peso e medidas</string>

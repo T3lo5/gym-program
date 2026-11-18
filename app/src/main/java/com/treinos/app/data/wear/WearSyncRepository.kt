@@ -21,21 +21,39 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
+/**
+ * Canal de sync com o relógio consumido pelo `AppViewModel`: comandos do pulso,
+ * lotes standalone (H4-16) e publicação de estado/snapshot no Data Layer.
+ *
+ * Interface para o teste injetar um fake e travar o fio `publish` — o estado
+ * `/treinos/workout-state` ficou sem chamador desde o H2-2 e nunca chegava ao
+ * relógio (o gate JVM não exercita o GMS).
+ */
+interface WearSyncChannel {
+    val commands: Flow<WearCommand>
+
+    fun observeSyncBatches(): Flow<WearSyncBatch>
+
+    fun publish(state: WearWorkoutState)
+
+    fun publishSnapshot(snapshot: WearSessionSnapshot)
+}
+
 class WearSyncRepository(
     private val context: Context,
     private val preferences: AppPreferences,
-) {
+) : WearSyncChannel {
 
     private val job = SupervisorJob()
     private val scope = CoroutineScope(job + Dispatchers.IO)
 
     private val _commands = MutableSharedFlow<WearCommand>(replay = 0, extraBufferCapacity = 50)
-    val commands: kotlinx.coroutines.flow.Flow<WearCommand> = _commands.asSharedFlow()
+    override val commands: Flow<WearCommand> = _commands.asSharedFlow()
 
     /** H4-16: lotes de séries do relógio, já deduplicados por `clientSetId`. */
     private val _syncBatches = MutableSharedFlow<WearSyncBatch>(replay = 0, extraBufferCapacity = 50)
 
-    fun publish(state: WearWorkoutState) {
+    override fun publish(state: WearWorkoutState) {
         scope.launch {
             val payload = Json.encodeToString(WearWorkoutState.serializer(), state).toByteArray()
             val request = PutDataRequest.create(PATH_WORKOUT_STATE).apply {
@@ -54,7 +72,7 @@ class WearSyncRepository(
      * o relógio guarda no Room próprio e treina sem o celular. Falha sem
      * relógio pareado não quebra o app.
      */
-    fun publishSnapshot(snapshot: WearSessionSnapshot) {
+    override fun publishSnapshot(snapshot: WearSessionSnapshot) {
         scope.launch {
             val payload = Json.encodeToString(WearSessionSnapshot.serializer(), snapshot).toByteArray()
             val request = PutDataRequest.create(PATH_SESSION_SNAPSHOT).apply {
@@ -112,7 +130,7 @@ class WearSyncRepository(
         _syncBatches.tryEmit(batch.copy(sets = novas))
     }
 
-    fun observeSyncBatches(): Flow<WearSyncBatch> = _syncBatches.asSharedFlow()
+    override fun observeSyncBatches(): Flow<WearSyncBatch> = _syncBatches.asSharedFlow()
 
     fun close() {
         job.cancel()
