@@ -16,5 +16,9 @@ class WearApplication : Application() {
         super.onCreate()
         WearSyncService.setStateStore(stateStore)
         WearSyncService.setStandaloneStore(standaloneStore)
+        // Hidrata o último estado publicado pelo celular: abrir o app no pulso
+        // mostra o treino em andamento na hora (antes a tela nascia vazia e só
+        // preenchia quando o celular publicasse estado de novo).
+        stateStore.loadState()
     }
 }

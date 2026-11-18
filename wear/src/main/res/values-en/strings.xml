@@ -42,4 +42,9 @@
     <string name="standalone_no_workout">No workout on the watch</string>
     <string name="standalone_start_today">Start today\'s workout</string>
     <string name="standalone_waiting_sync">Syncs when the phone reconnects</string>
+
+    <!-- Missing state on open (not "workout finished") and two-step finish -->
+    <string name="no_workout_state">No workout in progress</string>
+    <string name="no_workout_hint">Start a workout on your phone</string>
+    <string name="confirm_finish">Confirm finish?</string>
 </resources>

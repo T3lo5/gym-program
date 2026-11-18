@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     // H4-9: mesmo AGP do :app — 8.9.1 é o mínimo exigido por
     // `androidx.health.connect:connect-client:1.1.0`, dependência nova do :app.
@@ -6,6 +8,33 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
     // H4-16: Room no relógio (modo standalone) — kapt para o compiler.
     id("org.jetbrains.kotlin.kapt") version "1.9.24"
+}
+
+// Robolectric offline (mesmo padrão do :app): o android-all vem das
+// configurações abaixo, resolvido pelo Gradle e copiado para build/robolectric-
+// deps — o teste nunca baixa dependência em tempo de execução.
+val robolectricAndroidApi31 by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val robolectricAndroidApi34 by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val robolectricDepsDir = layout.buildDirectory.dir("robolectric-deps")
+
+val prepareRobolectricDeps = tasks.register<Copy>("prepareRobolectricDeps") {
+    description = "Copia o android-all do Robolectric do cache do Gradle para uso offline."
+    // `clean` também roda neste build; sem a ordem, ele pode apagar o destino
+    // depois da cópia quando o build paralelo está ligado.
+    mustRunAfter("clean")
+    from(robolectricAndroidApi31)
+    from(robolectricAndroidApi34)
+    into(robolectricDepsDir)
 }
 
 // Mesma keystore versionada do :app (H3-48): a assinatura do relógio passa a ser
@@ -58,6 +87,36 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric baixa o android-all para o Maven local em user.home.
+            // Em containers com uid sem entrada no /etc/passwd, user.home vira
+            // "?" e o teste falha antes de rodar. Usa um diretório gravável.
+            val home = System.getProperty("user.home").orEmpty()
+            val writableHome = home.takeIf { it.isNotBlank() && File(it).canWrite() }
+                ?: System.getenv("ROBOLECTRIC_USER_HOME")
+                ?: System.getProperty("java.io.tmpdir")
+            it.systemProperty("user.home", writableHome)
+
+            // O android-all vem das configurações robolectricAndroidApi31/34
+            // (resolvidas pelo Gradle, cacheadas) copiadas por
+            // prepareRobolectricDeps. offline=true impede qualquer tentativa de
+            // download durante os testes.
+            it.dependsOn(prepareRobolectricDeps)
+            it.systemProperty("robolectric.offline", "true")
+            it.systemProperty(
+                "robolectric.dependency.dir",
+                robolectricDepsDir.get().asFile.absolutePath,
+            )
+
+            // Trava de segurança: se um teste travar, falha em 35 min em vez de
+            // segurar o job até o timeout (mesmo padrão do :app).
+            it.timeout.set(Duration.ofMinutes(35))
+        }
     }
 
     signingConfigs {
@@ -134,6 +193,23 @@ dependencies {
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.wear.compose:compose-material:1.3.1")
+    // Robolectric (mesmo padrão do :app): regressão do crash "abre e fecha" —
+    // a activity abre, o botão dispara o caminho GMS e o processo sobrevive.
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    // android-all exigido pelo Robolectric. A API 31 vem de
+    // src/test/resources/robolectric.properties; a API 34 é o targetSdk. Os
+    // jars ficam em build/robolectric-deps (modo offline).
+    robolectricAndroidApi31("org.robolectric:android-all-instrumented:12-robolectric-7732740-i6")
+    robolectricAndroidApi34("org.robolectric:android-all-instrumented:14-robolectric-10818077-i6")
+    testImplementation("androidx.test:core-ktx:1.5.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    // `ui-test` resolve o idle pelo Espresso; sem esta dependência o teste de
+    // Compose no Robolectric quebra em NoClassDefFoundError antes da primeira asserção.
+    testImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 // H4-16: schema exportado do Room do relógio, versionado (mesmo padrão de

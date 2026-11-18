@@ -3,6 +3,7 @@ package com.treinos.wear.ui
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -21,20 +22,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Button
-import com.google.android.gms.tasks.Tasks
-import com.google.android.gms.wearable.Wearable
+import androidx.wear.compose.material.ButtonDefaults
 import com.treinos.protocol.PATH_COMMAND
 import com.treinos.protocol.WearCommand
 import com.treinos.protocol.WearCommandKind
 import com.treinos.protocol.WearWorkoutState
 import com.treinos.wear.R
 import com.treinos.wear.WearApplication
+import com.treinos.wear.data.WearRpc
 import com.treinos.wear.data.WearStateStore
 import com.treinos.wear.tile.WorkoutTileService
 import kotlinx.coroutines.delay
@@ -50,6 +54,12 @@ class WorkoutWearActivity : ComponentActivity() {
         (application as WearApplication).stateStore
     }
 
+    /**
+     * Todas as chamadas GMS passam por aqui: `Tasks.await` na main derrubava o
+     * processo (crash "abre e fecha na sequência") — ver [WearRpc].
+     */
+    private val rpc = WearRpc()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -62,6 +72,7 @@ class WorkoutWearActivity : ComponentActivity() {
                 onDispose { connectionWatcher.stop() }
             }
             val connected by connectionWatcher.connected.collectAsState()
+            val state by stateStore.state.collectAsState()
 
             // H4-16: modo standalone — sem o celular, a sessão vem do snapshot
             // no Room (WearStandaloneStore) e o reducer local registra as
@@ -102,6 +113,13 @@ class WorkoutWearActivity : ComponentActivity() {
                 while (true) {
                     delay(1_000L)
                     agora = System.currentTimeMillis()
+                }
+            }
+            // Integração: abriu com o celular ao alcance e sem estado local —
+            // pede o estado na hora, em vez de mostrar tela vazia.
+            LaunchedEffect(connected, state == null) {
+                if (connected && state == null) {
+                    sendRequestState()
                 }
             }
 
@@ -156,7 +174,7 @@ class WorkoutWearActivity : ComponentActivity() {
             }
 
             WorkoutWearScreen(
-                state = stateStore.state.collectAsState().value,
+                state = state,
                 connected = connected,
                 onLogSet = { sessionId, reps, weightKg ->
                     scope.launch { sendCommand(sessionId, WearCommandKind.LOG_SET, reps, weightKg) }
@@ -187,7 +205,7 @@ class WorkoutWearActivity : ComponentActivity() {
     }
 
     private suspend fun sendRequestState() {
-        val nodes = Tasks.await(Wearable.getNodeClient(this).getConnectedNodes())
+        val nodes = rpc.connectedNodes(this)
         val comando = WearCommand(
             commandId = UUID.randomUUID().toString(),
             sessionId = -1,
@@ -195,11 +213,9 @@ class WorkoutWearActivity : ComponentActivity() {
         )
         val payload = Json.encodeToString(WearCommand.serializer(), comando)
         for (node in nodes) {
-            try {
-                Tasks.await(Wearable.getMessageClient(this).sendMessage(node.id, PATH_COMMAND, payload.toByteArray()))
-            } catch (e: Exception) {
-                // Ignorado: sem relógio/conexão não deve quebrar a tela.
-            }
+            // Falha de entrega não quebra a tela: sem relógio/conexão o
+            // usuário continua com o estado local (ou pede de novo).
+            rpc.sendMessage(this, node.id, PATH_COMMAND, payload.toByteArray())
         }
     }
 
@@ -223,15 +239,12 @@ class WorkoutWearActivity : ComponentActivity() {
         fila.add(comando)
         stateStore.savePendingCommands(fila)
 
-        val nodes = Tasks.await(Wearable.getNodeClient(this).getConnectedNodes())
+        val nodes = rpc.connectedNodes(this)
         val payload = Json.encodeToString(WearCommand.serializer(), comando)
         var entregue = false
         for (node in nodes) {
-            try {
-                Tasks.await(Wearable.getMessageClient(this).sendMessage(node.id, PATH_COMMAND, payload.toByteArray()))
+            if (rpc.sendMessage(this, node.id, PATH_COMMAND, payload.toByteArray())) {
                 entregue = true
-            } catch (e: Exception) {
-                // Tenta o próximo node; se nenhum confirmar, o comando segue na fila.
             }
         }
         if (entregue) {
@@ -262,6 +275,7 @@ fun WorkoutWearScreen(
     var timerState by remember { mutableStateOf(WearTimerState(0, false, false)) }
     val debounce = remember { WearDebounce() }
     var buttonsEnabled by remember { mutableStateOf(true) }
+    val haptic = LocalHapticFeedback.current
 
     fun dispatch(action: () -> Unit) {
         val now = System.currentTimeMillis()
@@ -284,42 +298,82 @@ fun WorkoutWearScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        // H4-16: modo standalone — sem o celular, a sessão vem do snapshot do
-        // Room e o reducer local registra as séries; nada aqui envia comando.
-        if (!connected) {
-            StandaloneScreen(
-                standalone = standalone,
-                started = standaloneStarted,
-                restante = standaloneRestante,
-                onStart = onStandaloneStart,
-                onLogSet = onStandaloneLogSet,
-                onSkipRest = onStandaloneSkipRest,
-                onFinish = onStandaloneFinish,
-                onRequestState = onRequestState,
-            )
-        } else if (state == null || state.status == "finished") {
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            ) {
-                val finishedLabel = stringResource(R.string.workout_finished)
-                val refreshLabel = stringResource(R.string.refresh)
-                Text(
-                    text = finishedLabel,
-                    fontSize = 20.sp,
-                    style = MaterialTheme.typography.titleLarge,
+        // Tela redonda: canto recorta texto colado na borda — padding maior
+        // quando a tela é quadrada em pixels (relógio redondo).
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val redonda = maxWidth == maxHeight
+            val padHorizontal: Dp = if (redonda) 22.dp else 16.dp
+
+            // H4-16: modo standalone — sem o celular, a sessão vem do snapshot do
+            // Room e o reducer local registra as séries; nada aqui envia comando.
+            if (!connected) {
+                StandaloneScreen(
+                    standalone = standalone,
+                    started = standaloneStarted,
+                    restante = standaloneRestante,
+                    padHorizontal = padHorizontal,
+                    onStart = onStandaloneStart,
+                    onLogSet = onStandaloneLogSet,
+                    onSkipRest = onStandaloneSkipRest,
+                    onFinish = onStandaloneFinish,
+                    onRequestState = onRequestState,
                 )
-                Button(
-                    onClick = onRequestState,
-                    modifier = Modifier.semantics { contentDescription = refreshLabel },
+            } else if (state == null) {
+                // Sem estado publicado pelo celular (primeira abertura, celular
+                // longe do app): NÃO é "treino concluído" — pede o estado.
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = padHorizontal, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                 ) {
-                    Text(text = refreshLabel)
+                    val semTreino = stringResource(R.string.no_workout_state)
+                    val dica = stringResource(R.string.no_workout_hint)
+                    Text(
+                        text = semTreino,
+                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { contentDescription = semTreino },
+                    )
+                    Text(
+                        text = dica,
+                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val refreshLabel = stringResource(R.string.refresh)
+                    Button(
+                        onClick = onRequestState,
+                        modifier = Modifier.semantics { contentDescription = refreshLabel },
+                    ) {
+                        Text(text = refreshLabel)
+                    }
                 }
-            }
-        } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
+            } else if (state.status == "finished") {
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = padHorizontal, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                ) {
+                    val finishedLabel = stringResource(R.string.workout_finished)
+                    val refreshLabel = stringResource(R.string.refresh)
+                    Text(
+                        text = finishedLabel,
+                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { contentDescription = finishedLabel },
+                    )
+                    Button(
+                        onClick = onRequestState,
+                        modifier = Modifier.semantics { contentDescription = refreshLabel },
+                    ) {
+                        Text(text = refreshLabel)
+                    }
+                }
+            } else if (WearSessionKind.from(state.modality) == WearSessionKind.Strength) {
                 // H4-15: editor de carga/reps da próxima série. Parte do default
                 // ao abrir e reseta ao trocar de exercício (sessionId ou
                 // exerciseIndex novos); a edição não persiste entre aberturas.
@@ -350,25 +404,16 @@ fun WorkoutWearScreen(
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(horizontal = padHorizontal, vertical = 16.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (!connected) {
-                        val noConnectionLabel = stringResource(R.string.no_connection)
-                        Text(
-                            text = noConnectionLabel,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.semantics { contentDescription = noConnectionLabel },
-                        )
-                    }
                     Text(
                         text = "${state.dayName}",
-                        fontSize = 16.sp,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
+                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                     Text(
                         text = "${state.exerciseName}",
@@ -378,19 +423,21 @@ fun WorkoutWearScreen(
                     )
                     Text(
                         text = stringResource(R.string.set_progress_format, state.setNumber, state.plannedSets),
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (state.targetReps.isNotBlank()) {
                         Text(
                             text = stringResource(R.string.target_reps_format, state.targetReps),
-                            fontSize = 16.sp,
+                            fontSize = 14.sp,
                         )
                     }
                     val ultima = formatLastSet(state.lastWeightKg, state.lastReps)
                     if (ultima != null) {
                         Text(
                             text = stringResource(R.string.last_set_format, ultima),
-                            fontSize = 16.sp,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     // H4-15: controles +/− de carga e reps (passos de 2,5 kg e
@@ -442,17 +489,21 @@ fun WorkoutWearScreen(
                         )
                     }
                     if (timerState.remainingSeconds > 0) {
+                        // Descanso em curso: a informação mais importante da tela
+                        // agora — número grande e na cor de destaque.
                         val restLabel = stringResource(R.string.rest_remaining_format, timerState.remainingSeconds)
                         Text(
                             text = restLabel,
-                            fontSize = 18.sp,
-                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 26.sp,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.semantics { contentDescription = restLabel },
                         )
                     }
                     val completeSetLabel = stringResource(R.string.complete_set)
                     Button(
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             dispatch {
                                 // H4-15: carga 0,0 = sem carga (peso corporal) →
                                 // null no comando, mesma regra de
@@ -479,32 +530,22 @@ fun WorkoutWearScreen(
                         Text(text = skipRestLabel)
                     }
                     val finishLabel = stringResource(R.string.finish_workout)
-                    Button(
-                        onClick = { dispatch { onFinish(state.sessionId) } },
+                    val confirmLabel = stringResource(R.string.confirm_finish)
+                    ConfirmFinalizeButton(
+                        label = finishLabel,
+                        confirmLabel = confirmLabel,
                         enabled = buttonsEnabled,
-                        modifier = Modifier.semantics { contentDescription = finishLabel },
-                    ) {
-                        Text(text = finishLabel)
-                    }
+                        onConfirmed = { dispatch { onFinish(state.sessionId) } },
+                    )
                 }
             } else {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(horizontal = padHorizontal, vertical = 16.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (!connected) {
-                        val noConnectionLabel = stringResource(R.string.no_connection)
-                        Text(
-                            text = noConnectionLabel,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.semantics { contentDescription = noConnectionLabel },
-                        )
-                    }
                     Text(
                         text = state.dayName,
                         fontSize = 20.sp,
@@ -516,15 +557,60 @@ fun WorkoutWearScreen(
                         fontSize = 18.sp,
                     )
                     val finishLabel = stringResource(R.string.finish_workout)
-                    Button(
-                        onClick = { dispatch { onFinish(state.sessionId) } },
+                    val confirmLabel = stringResource(R.string.confirm_finish)
+                    ConfirmFinalizeButton(
+                        label = finishLabel,
+                        confirmLabel = confirmLabel,
                         enabled = buttonsEnabled,
-                        modifier = Modifier.semantics { contentDescription = finishLabel },
-                    ) {
-                        Text(text = finishLabel)
-                    }
+                        onConfirmed = { dispatch { onFinish(state.sessionId) } },
+                    )
                 }
             }
+        }
+    }
+}
+
+/**
+ * "Finalizar Treino" em duas etapas: o primeiro toque vira "Confirmar fim?"
+ * (vermelho) e volta sozinho depois de 4 s — fim de treino acidental no pulso
+ * era irreversível.
+ */
+@Composable
+private fun ConfirmFinalizeButton(
+    label: String,
+    confirmLabel: String,
+    enabled: Boolean,
+    onConfirmed: () -> Unit,
+) {
+    var pedindoConfirmacao by remember { mutableStateOf(false) }
+    LaunchedEffect(pedindoConfirmacao) {
+        if (pedindoConfirmacao) {
+            delay(4_000L)
+            pedindoConfirmacao = false
+        }
+    }
+    Button(
+        onClick = {
+            if (pedindoConfirmacao) {
+                pedindoConfirmacao = false
+                onConfirmed()
+            } else {
+                pedindoConfirmacao = true
+            }
+        },
+        enabled = enabled,
+        colors = if (pedindoConfirmacao) {
+            // Posicional: a assinatura de buttonColors varia entre versões do
+            // wear compose (backgroundColor/containerColor).
+            ButtonDefaults.buttonColors(MaterialTheme.colorScheme.error)
+        } else {
+            ButtonDefaults.buttonColors()
+        },
+        modifier = Modifier.semantics {
+            contentDescription = if (pedindoConfirmacao) confirmLabel else label
+        },
+    ) {
+        Text(text = if (pedindoConfirmacao) confirmLabel else label)
     }
 }
 
@@ -561,6 +647,7 @@ private fun StandaloneScreen(
     standalone: WearStandaloneState?,
     started: Boolean,
     restante: Int,
+    padHorizontal: Dp,
     onStart: () -> Unit,
     onLogSet: (Int?, Double?) -> Unit,
     onSkipRest: () -> Unit,
@@ -570,7 +657,7 @@ private fun StandaloneScreen(
     androidx.compose.foundation.layout.Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = padHorizontal, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
@@ -598,11 +685,13 @@ private fun StandaloneScreen(
                     text = finishedLabel,
                     fontSize = 20.sp,
                     style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { contentDescription = finishedLabel },
                 )
                 Text(
                     text = stringResource(R.string.standalone_waiting_sync),
                     fontSize = 14.sp,
                     style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             !started -> {
@@ -632,9 +721,10 @@ private fun StandaloneScreen(
                 }
                 Text(
                     text = standalone.dayName,
-                    fontSize = 16.sp,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
+                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
                 Text(
                     text = standalone.exercise?.exerciseName ?: "",
@@ -644,13 +734,14 @@ private fun StandaloneScreen(
                 )
                 Text(
                     text = stringResource(R.string.set_progress_format, standalone.setNumber, standalone.plannedSets),
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val alvo = standalone.exercise?.targetReps ?: ""
                 if (alvo.isNotBlank()) {
                     Text(
                         text = stringResource(R.string.target_reps_format, alvo),
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                     )
                 }
                 androidx.compose.foundation.layout.Row(
@@ -691,14 +782,17 @@ private fun StandaloneScreen(
                     val restLabel = stringResource(R.string.rest_remaining_format, restante)
                     Text(
                         text = restLabel,
-                        fontSize = 18.sp,
-                        style = MaterialTheme.typography.labelLarge,
+                        fontSize = 26.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.semantics { contentDescription = restLabel },
                     )
                 }
                 val completeSetLabel = stringResource(R.string.complete_set)
+                val haptic = LocalHapticFeedback.current
                 Button(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         // H4-15: carga 0,0 = sem carga (peso corporal) → null.
                         onLogSet(editor.reps, editor.weightKg.takeIf { it != 0.0 })
                     },
@@ -714,12 +808,13 @@ private fun StandaloneScreen(
                     Text(text = skipRestLabel)
                 }
                 val finishLabel = stringResource(R.string.finish_workout)
-                Button(
-                    onClick = onFinish,
-                    modifier = Modifier.semantics { contentDescription = finishLabel },
-                ) {
-                    Text(text = finishLabel)
-                }
+                val confirmLabel = stringResource(R.string.confirm_finish)
+                ConfirmFinalizeButton(
+                    label = finishLabel,
+                    confirmLabel = confirmLabel,
+                    enabled = true,
+                    onConfirmed = onFinish,
+                )
             }
             else -> {
                 // Corrida/mobilidade: finaliza offline, sem séries.
@@ -734,12 +829,13 @@ private fun StandaloneScreen(
                     fontSize = 18.sp,
                 )
                 val finishLabel = stringResource(R.string.finish_workout)
-                Button(
-                    onClick = onFinish,
-                    modifier = Modifier.semantics { contentDescription = finishLabel },
-                ) {
-                    Text(text = finishLabel)
-                }
+                val confirmLabel = stringResource(R.string.confirm_finish)
+                ConfirmFinalizeButton(
+                    label = finishLabel,
+                    confirmLabel = confirmLabel,
+                    enabled = true,
+                    onConfirmed = onFinish,
+                )
             }
         }
     }

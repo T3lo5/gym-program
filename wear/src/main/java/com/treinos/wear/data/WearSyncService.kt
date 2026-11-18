@@ -3,7 +3,6 @@ package com.treinos.wear.data
 import android.app.Service
 import android.content.Intent
 import android.util.Log
-import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -28,6 +27,14 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
 
     private var stateStore: WearStateStore? = null
 
+    /**
+     * Todas as chamadas GMS passam por aqui: `Tasks.await` na main lança
+     * `IllegalStateException` e derrubava o processo (crash "abre e fecha na
+     * sequência" — o `onPeerConnected` roda na main e o relógio reconecta ao
+     * celular justo quando o usuário abre o app). Ver [WearRpc].
+     */
+    private val rpc = WearRpc()
+
     companion object {
         @Volatile private var store: WearStateStore? = null
 
@@ -48,21 +55,28 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
     override fun onCreate() {
         super.onCreate()
         stateStore = store
-        Wearable.getDataClient(this).addListener(this)
+        // GMS indisponível (update em curso, boot) não pode derrubar o
+        // processo — o app do pulso segue abrindo.
+        runCatching { Wearable.getDataClient(this).addListener(this) }
+            .onFailure { Log.w("WearSyncService", "DataClient indisponível", it) }
     }
 
     override fun onDestroy() {
-        Wearable.getDataClient(this).removeListener(this)
+        runCatching { Wearable.getDataClient(this).removeListener(this) }
         super.onDestroy()
     }
 
     override fun onPeerConnected(peer: com.google.android.gms.wearable.Node) {
         super.onPeerConnected(peer)
-        resendPendingCommands()
-        sendRequestState()
-        // H4-16: além da fila da H3-20, envia o lote de séries registradas
-        // offline no Room do relógio (PATH_SYNC_BATCH).
-        sendPendingSets()
+        // Tudo que fala com o GMS sai da main: `Tasks.await` lança na main e
+        // o processo morria com o app na tela.
+        serviceScope.launch {
+            resendPendingCommands()
+            sendRequestState()
+            // H4-16: além da fila da H3-20, envia o lote de séries registradas
+            // offline no Room do relógio (PATH_SYNC_BATCH).
+            sendPendingSets()
+        }
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
@@ -131,26 +145,18 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         }
     }
 
-    private fun resendPendingCommands() {
+    private suspend fun resendPendingCommands() {
         val store = stateStore ?: return
         val queue = store.loadPendingCommands()
         if (queue.isEmpty()) return
-        val nodes = runCatching {
-            Tasks.await(Wearable.getNodeClient(this).getConnectedNodes())
-        }.getOrNull() ?: return
+        val nodes = rpc.connectedNodes(this)
         if (nodes.isEmpty()) return
         for (comando in queue.all()) {
             val payload = Json.encodeToString(WearCommand.serializer(), comando)
             var delivered = false
             for (node in nodes) {
-                try {
-                    Tasks.await(
-                        Wearable.getMessageClient(this)
-                            .sendMessage(node.id, PATH_COMMAND, payload.toByteArray()),
-                    )
+                if (rpc.sendMessage(this, node.id, PATH_COMMAND, payload.toByteArray())) {
                     delivered = true
-                } catch (e: Exception) {
-                    Log.w("WearSyncService", "Falha ao reenviar ${comando.commandId}", e)
                 }
             }
             if (delivered) {
@@ -160,8 +166,8 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         store.savePendingCommands(queue)
     }
 
-    private fun sendRequestState() {
-        val nodes = Tasks.await(Wearable.getNodeClient(this).getConnectedNodes())
+    private suspend fun sendRequestState() {
+        val nodes = rpc.connectedNodes(this)
         val comando = WearCommand(
             commandId = java.util.UUID.randomUUID().toString(),
             sessionId = -1,
@@ -169,10 +175,8 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         )
         val payload = Json.encodeToString(WearCommand.serializer(), comando)
         for (node in nodes) {
-            try {
-                Tasks.await(Wearable.getMessageClient(this).sendMessage(node.id, PATH_COMMAND, payload.toByteArray()))
-            } catch (e: Exception) {
-                Log.w("WearSyncService", "Falha ao enviar REQUEST_STATE", e)
+            if (!rpc.sendMessage(this, node.id, PATH_COMMAND, payload.toByteArray())) {
+                Log.w("WearSyncService", "Falha ao enviar REQUEST_STATE para ${node.id}")
             }
         }
     }
@@ -183,54 +187,44 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
      * deixam de ser pendentes (`pending = false`) — reenviar o mesmo lote não
      * duplica: o celular deduplica por `clientSetId`.
      */
-    private fun sendPendingSets() {
+    private suspend fun sendPendingSets() {
         val room = standaloneStore ?: return
-        serviceScope.launch {
-            val pendentes = runCatching { room.pendingSets() }
-                .onFailure { Log.w("WearSyncService", "Falha ao ler pendentes", it) }
-                .getOrNull()
-                ?: return@launch
-            if (pendentes.isEmpty()) return@launch
-            val nodes = runCatching {
-                Tasks.await(Wearable.getNodeClient(this@WearSyncService).getConnectedNodes())
-            }.getOrNull().orEmpty()
-            if (nodes.isEmpty()) return@launch
-            val ativa = runCatching { room.activeSession() }.getOrNull()
-            val lote = WearSyncBatch(
-                sessionId = ativa?.id ?: pendentes.first().sessionId,
-                batchId = java.util.UUID.randomUUID().toString(),
-                // H4-16: sessão finalizada offline → o lote vai com finished = true
-                // e o celular aplica as séries e finaliza a sessão.
-                finished = ativa?.status == "finished",
-                sets = pendentes.map {
-                    com.treinos.protocol.WearLoggedSet(
-                        clientSetId = it.clientSetId,
-                        sessionExerciseId = it.sessionExerciseId,
-                        exerciseIndex = it.exerciseIndex,
-                        setNumber = it.setNumber,
-                        reps = it.reps,
-                        weightKg = it.weightKg,
-                        rpe = it.rpe,
-                        loggedAt = it.loggedAt,
-                    )
-                },
-            )
-            val payload = Json.encodeToString(WearSyncBatch.serializer(), lote)
-            var entregue = false
-            for (node in nodes) {
-                try {
-                    Tasks.await(
-                        Wearable.getMessageClient(this@WearSyncService)
-                            .sendMessage(node.id, PATH_SYNC_BATCH, payload.toByteArray()),
-                    )
-                    entregue = true
-                } catch (e: Exception) {
-                    Log.w("WearSyncService", "Falha ao enviar lote para ${node.id}", e)
-                }
+        val pendentes = runCatching { room.pendingSets() }
+            .onFailure { Log.w("WearSyncService", "Falha ao ler pendentes", it) }
+            .getOrNull()
+            ?: return
+        if (pendentes.isEmpty()) return
+        val nodes = rpc.connectedNodes(this)
+        if (nodes.isEmpty()) return
+        val ativa = runCatching { room.activeSession() }.getOrNull()
+        val lote = WearSyncBatch(
+            sessionId = ativa?.id ?: pendentes.first().sessionId,
+            batchId = java.util.UUID.randomUUID().toString(),
+            // H4-16: sessão finalizada offline → o lote vai com finished = true
+            // e o celular aplica as séries e finaliza a sessão.
+            finished = ativa?.status == "finished",
+            sets = pendentes.map {
+                com.treinos.protocol.WearLoggedSet(
+                    clientSetId = it.clientSetId,
+                    sessionExerciseId = it.sessionExerciseId,
+                    exerciseIndex = it.exerciseIndex,
+                    setNumber = it.setNumber,
+                    reps = it.reps,
+                    weightKg = it.weightKg,
+                    rpe = it.rpe,
+                    loggedAt = it.loggedAt,
+                )
+            },
+        )
+        val payload = Json.encodeToString(WearSyncBatch.serializer(), lote)
+        var entregue = false
+        for (node in nodes) {
+            if (rpc.sendMessage(this, node.id, PATH_SYNC_BATCH, payload.toByteArray())) {
+                entregue = true
             }
-            if (entregue) {
-                runCatching { room.markSynced(pendentes.map { it.clientSetId }) }
-            }
+        }
+        if (entregue) {
+            runCatching { room.markSynced(pendentes.map { it.clientSetId }) }
         }
     }
 }

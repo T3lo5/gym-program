@@ -42,4 +42,9 @@
     <string name="standalone_no_workout">Sem treino no relógio</string>
     <string name="standalone_start_today">Iniciar treino de hoje</string>
     <string name="standalone_waiting_sync">Sincroniza quando o celular reconectar</string>
+
+    <!-- Estado ausente na abertura (não é "treino concluído") e fim em duas etapas -->
+    <string name="no_workout_state">Nenhum treino em andamento</string>
+    <string name="no_workout_hint">Inicie um treino no celular</string>
+    <string name="confirm_finish">Confirmar fim?</string>
 </resources>
