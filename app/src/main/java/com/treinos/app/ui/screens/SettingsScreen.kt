@@ -47,6 +47,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.LinearProgressIndicator
@@ -56,6 +58,7 @@ import com.treinos.app.R
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.discovery.DiscoveredBackend
+import com.treinos.app.data.remote.BackendDiagnosticsDto
 import com.treinos.app.data.health.HealthConnectAvailability
 import com.treinos.app.ui.AppViewModel
 import com.treinos.app.ui.BackupImportState
@@ -80,6 +83,10 @@ fun SettingsScreen(
     useRemoteBackend: Boolean = false,
     remoteBackendUrl: String = "",
     apiToken: String = "",
+    diagnostics: BackendDiagnosticsDto? = null,
+    isLoadingDiagnostics: Boolean = false,
+    diagnosticsMessage: String? = null,
+    onRefreshDiagnostics: () -> Unit = {},
     isTesting: Boolean,
     isSyncing: Boolean,
     isDownloading: Boolean,
@@ -154,6 +161,7 @@ fun SettingsScreen(
     onRequestInstallPackages: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
+    val clipboard = LocalClipboardManager.current
     var remoteEnabled by remember(useRemoteBackend) { mutableStateOf(useRemoteBackend) }
     var remoteUrl by remember(remoteBackendUrl) { mutableStateOf(remoteBackendUrl) }
     var remoteToken by remember(apiToken) { mutableStateOf(apiToken) }
@@ -359,6 +367,76 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_diagnostics_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_diagnostics_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        diagnosticsMessage?.let {
+                            StatusText(text = it, isSuccess = false, announce = true)
+                        }
+                        diagnostics?.let { report ->
+                            val yes = stringResource(R.string.settings_yes)
+                            val no = stringResource(R.string.settings_no)
+                            Text(stringResource(
+                                R.string.settings_diagnostics_status,
+                                report.status,
+                            ))
+                            Text(stringResource(
+                                R.string.settings_diagnostics_catalog,
+                                if (report.catalogLoaded) yes else no,
+                            ))
+                            Text(stringResource(
+                                R.string.settings_diagnostics_database,
+                                if (report.databaseWritable) yes else no,
+                            ))
+                            Text(stringResource(
+                                R.string.settings_diagnostics_generation,
+                                report.generation.pending,
+                                report.generation.running,
+                                report.generation.failed24h,
+                            ))
+                            val lastAccepted = report.sync.lastAcceptedAt ?: "—"
+                            Text(stringResource(
+                                R.string.settings_diagnostics_sync,
+                                report.sync.mutations24h,
+                                lastAccepted,
+                            ))
+                            val text = buildString {
+                                append("status=").append(report.status).append('\n')
+                                append("catalogLoaded=").append(report.catalogLoaded).append('\n')
+                                append("databaseWritable=").append(report.databaseWritable).append('\n')
+                                append("generation.pending=").append(report.generation.pending).append('\n')
+                                append("generation.running=").append(report.generation.running).append('\n')
+                                append("generation.failed24h=").append(report.generation.failed24h).append('\n')
+                                append("sync.mutations24h=").append(report.sync.mutations24h)
+                            }
+                            OutlinedButton(
+                                onClick = { clipboard.setText(AnnotatedString(text)) },
+                                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                            ) {
+                                Text(stringResource(R.string.settings_diagnostics_copy))
+                            }
+                        }
+                        BusyButton(
+                            busy = isLoadingDiagnostics,
+                            idleText = stringResource(R.string.settings_diagnostics_refresh),
+                            busyText = stringResource(R.string.settings_diagnostics_refresh),
+                            onClick = onRefreshDiagnostics,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }

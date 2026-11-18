@@ -92,6 +92,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val useRemoteBackend by viewModel.useRemoteBackend.collectAsStateWithLifecycle()
     val remoteBackendUrl by viewModel.remoteBackendUrl.collectAsStateWithLifecycle()
     val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
+    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+    val isLoadingDiagnostics by viewModel.isLoadingDiagnostics.collectAsStateWithLifecycle()
+    val diagnosticsMessage by viewModel.diagnosticsMessage.collectAsStateWithLifecycle()
     val connectionMessage by viewModel.connectionMessage.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val downloadMessage by viewModel.downloadMessage.collectAsStateWithLifecycle()
@@ -643,6 +646,10 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onBack = viewModel::voltar,
                     onSaveUrl = viewModel::saveBackendUrl,
                     onSaveRemote = viewModel::saveRemoteBackend,
+                    diagnostics = diagnostics,
+                    isLoadingDiagnostics = isLoadingDiagnostics,
+                    diagnosticsMessage = diagnosticsMessage,
+                    onRefreshDiagnostics = viewModel::refreshDiagnostics,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,
                     onDownload = viewModel::downloadNow,

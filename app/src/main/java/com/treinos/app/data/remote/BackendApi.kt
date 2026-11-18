@@ -27,5 +27,9 @@ interface BackendApi {
 
     suspend fun catalog(): CatalogResponseDto
 
+    /** H5-4: diagnóstico agregado e redigido do backend sob demanda. */
+    suspend fun diagnostics(): BackendDiagnosticsDto =
+        BackendDiagnosticsDto(status = "degraded", databaseWritable = false)
+
     suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse
 }

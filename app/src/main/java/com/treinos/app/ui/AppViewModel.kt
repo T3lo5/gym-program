@@ -58,6 +58,7 @@ import com.treinos.app.data.remote.ReviewPlanSession
 import com.treinos.app.data.remote.WorkoutDayDto
 import com.treinos.app.data.remote.WorkoutExerciseDto
 import com.treinos.app.data.remote.WorkoutPlanDto
+import com.treinos.app.data.remote.BackendDiagnosticsDto
 import com.treinos.app.data.backup.BackupFile
 import com.treinos.app.data.backup.BackupPreview
 import com.treinos.app.data.backup.BackupValidator
@@ -606,6 +607,15 @@ class AppViewModel(
 
     private val _apiToken = MutableStateFlow(preferences.apiToken)
     val apiToken: StateFlow<String> = _apiToken.asStateFlow()
+
+    private val _diagnostics = MutableStateFlow<BackendDiagnosticsDto?>(null)
+    val diagnostics: StateFlow<BackendDiagnosticsDto?> = _diagnostics.asStateFlow()
+
+    private val _isLoadingDiagnostics = MutableStateFlow(false)
+    val isLoadingDiagnostics: StateFlow<Boolean> = _isLoadingDiagnostics.asStateFlow()
+
+    private val _diagnosticsMessage = MutableStateFlow<String?>(null)
+    val diagnosticsMessage: StateFlow<String?> = _diagnosticsMessage.asStateFlow()
 
     private val _connectionMessage = MutableStateFlow<String?>(null)
     val connectionMessage: StateFlow<String?> = _connectionMessage.asStateFlow()
@@ -2616,6 +2626,25 @@ class AppViewModel(
         _remoteBackendUrl.value = preferences.remoteBackendUrl
         _apiToken.value = preferences.apiToken
         _connectionMessage.value = null
+    }
+
+    fun refreshDiagnostics() {
+        if (_isLoadingDiagnostics.value) return
+        viewModelScope.launch {
+            _isLoadingDiagnostics.value = true
+            _diagnosticsMessage.value = null
+            try {
+                _diagnostics.value = repository.getDiagnostics()
+            } catch (error: Exception) {
+                _diagnosticsMessage.value = uiErrorMessage(
+                    error,
+                    context,
+                    R.string.settings_diagnostics_error,
+                )
+            } finally {
+                _isLoadingDiagnostics.value = false
+            }
+        }
     }
 
     fun testConnection() {

@@ -60,6 +60,7 @@ import com.treinos.app.data.remote.SyncChangeDto
 import com.treinos.app.data.remote.SyncChangesRequestDto
 import com.treinos.app.data.remote.SyncChangesResponseDto
 import com.treinos.app.data.remote.SyncMutationDto
+import com.treinos.app.data.remote.BackendDiagnosticsDto
 import com.treinos.app.data.remote.SyncSessionDto
 import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
@@ -1461,6 +1462,11 @@ open class WorkoutRepository(
     suspend fun testConnection() = withContext(Dispatchers.IO) {
         backendClient.health()
     }
+
+    suspend fun getDiagnostics(): BackendDiagnosticsDto =
+        withContext(Dispatchers.IO) {
+            backendClient.diagnostics()
+        }
 
     private suspend fun enqueueSyncOutbox(payload: SyncRequestDto) {
         val now = System.currentTimeMillis()

@@ -4,10 +4,11 @@ import os
 import random
 import re
 import socket
+import sqlite3
 import threading
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
 from typing import Any, Dict, List, Literal, Optional
@@ -26,6 +27,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from . import database as db
 from .auth import is_authorized, validate_public_deploy
+from .diagnostics import build_diagnostics
 from .plan_builder import (
     MUSCLE_ALIASES,
     build_local_plan,
@@ -799,7 +801,6 @@ async def health():
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "model": MODEL_ID,
         "catalogSize": len(EXERCISE_CATALOG),
-        "database": str(db.DB_PATH),
     }
 
 
@@ -1782,6 +1783,22 @@ async def sync_changes(request: SyncChangesRequest):
 @app.get("/v1/sync/status")
 async def sync_status(deviceId: str = "default"):
     return db.sync_status(deviceId)
+
+
+@app.get("/v1/diagnostics")
+async def diagnostics():
+    try:
+        with db.get_connection() as conn:
+            return build_diagnostics(conn, len(EXERCISE_CATALOG))
+    except sqlite3.DatabaseError:
+        return {
+            "status": "degraded",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "catalogLoaded": len(EXERCISE_CATALOG) > 0,
+            "databaseWritable": False,
+            "generation": {"pending": 0, "running": 0, "failed24h": 0},
+            "sync": {"lastAcceptedAt": None, "mutations24h": 0},
+        }
 
 
 @app.get("/v1/sync/plans")

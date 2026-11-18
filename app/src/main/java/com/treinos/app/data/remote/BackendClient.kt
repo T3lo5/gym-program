@@ -68,6 +68,9 @@ class BackendClient(
 
     override suspend fun catalog(): CatalogResponseDto = get("/v1/catalog")
 
+    override suspend fun diagnostics(): BackendDiagnosticsDto =
+        get("/v1/diagnostics")
+
     override suspend fun reviewPlan(request: ReviewPlanRequest): ReviewPlanResponse =
         post("/v1/review-plan", json.encodeToString(ReviewPlanRequest.serializer(), request))
 

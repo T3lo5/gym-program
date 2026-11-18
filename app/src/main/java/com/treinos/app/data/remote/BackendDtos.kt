@@ -274,6 +274,29 @@ data class SyncChangesResponseDto(
 )
 
 @Serializable
+data class DiagnosticsGenerationDto(
+    val pending: Int = 0,
+    val running: Int = 0,
+    val failed24h: Int = 0,
+)
+
+@Serializable
+data class DiagnosticsSyncDto(
+    val lastAcceptedAt: String? = null,
+    val mutations24h: Int = 0,
+)
+
+@Serializable
+data class BackendDiagnosticsDto(
+    val status: String = "degraded",
+    val timestamp: String = "",
+    val catalogLoaded: Boolean = false,
+    val databaseWritable: Boolean = false,
+    val generation: DiagnosticsGenerationDto = DiagnosticsGenerationDto(),
+    val sync: DiagnosticsSyncDto = DiagnosticsSyncDto(),
+)
+
+@Serializable
 data class SyncDownloadDto(
     val deviceId: String,
     val plans: List<SyncDownloadPlanDto> = emptyList(),
