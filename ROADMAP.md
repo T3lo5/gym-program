@@ -666,5 +666,26 @@ se o backend puder ficar desligado sem perder geração ou dados.
 
 Nenhum H5 entra em implementação sem spec aprovada e sem gate verde.
 
+### Horizon 6 — Polimento UX/UI (auditoria 2026-11-18)
+
+Levantado na [auditoria UX/UI de 2026-11-18](docs/auditoria-ux-ui-2026-11-18.md)
+(4 auditorias paralelas somente-leitura, 47 achados com evidência file:line,
+referências Hevy/Strong/Strava/M3/Wear OS). Regra do dono: **polir sem cortar
+função**. Specs criadas a partir de `_TEMPLATE.md`; nenhuma entra em
+implementação sem aprovação.
+
+| ID | Item | MoSCoW | Escopo | Spec |
+|----|------|--------|--------|------|
+| H6-1 | Correções de função morta na UI (P0: seletor de idioma, toggle de segurança, permissões, herói vazio, back do registro, restauração standalone, intervalos no pulso, warmup) | **M** | 8 correções com testes | [H6-1](docs/specs/H6-1-correcoes-funcao-morta-ui.md) |
+| H6-2 | Loop de execução: alvo, aquecimento e descanso de ponta a ponta | **M** | P1.1–1.12 | [H6-2](docs/specs/H6-2-loop-execucao-polimento.md) |
+| H6-3 | i18n e TalkBack completos | **S** | P3.1–3.5, 3.7, 3.8 | [H6-3](docs/specs/H6-3-i18n-talkback-completos.md) |
+| H6-4 | Consistência visual e componentes | **S** | P4.1–4.8 | [H6-4](docs/specs/H6-4-consistencia-visual-componentes.md) |
+| H6-5 | Telas de informação: medidas, gráficos, rascunhos e pulso | **S** | P2.1–2.8 + P3.6 | [H6-5](docs/specs/H6-5-telas-informacao-polimento.md) |
+| H6-6 | Revisão antecipada do plano com base na evolução | **M** | pedido do dono; corrige `nextReviewAt` do aceite | [H6-6](docs/specs/H6-6-revisao-antecipada-plano.md) |
+| H6-7 | Modernização visual: escuro + energético, redesenho completo | **S** | decisão do dono; 5 fases com gate | [H6-7](docs/specs/H6-7-modernizacao-visual.md) |
+
+Ordem proposta: H6-1 → H6-2 → H6-3 → H6-4 → H6-5 → H6-6 → H6-7 (H6-7 por
+último para não redesenhar o que H6-2/4/5 ainda mexem).
+
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".
