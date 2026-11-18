@@ -13,7 +13,7 @@ import os
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -294,6 +294,18 @@ def init_db() -> None:
                 "rir": "INTEGER",
             },
         )
+        _ensure_columns(
+            conn,
+            "generation_jobs",
+            {
+                "attempt": "INTEGER NOT NULL DEFAULT 0",
+                "max_attempts": "INTEGER NOT NULL DEFAULT 2",
+                "available_at": "TEXT",
+                "lease_owner": "TEXT",
+                "lease_expires_at": "TEXT",
+                "interrupted_at": "TEXT",
+            },
+        )
 
 
 def create_generation_job(job_id: str, device_id: str, request_payload: Dict[str, Any]) -> None:
@@ -303,10 +315,11 @@ def create_generation_job(job_id: str, device_id: str, request_payload: Dict[str
         conn.execute(
             """
             INSERT INTO generation_jobs (
-                id, device_id, request_json, status, created_at, updated_at
-            ) VALUES (?, ?, ?, 'pending', ?, ?)
+                id, device_id, request_json, status, created_at, updated_at,
+                attempt, max_attempts, available_at
+            ) VALUES (?, ?, ?, 'pending', ?, ?, 0, 2, ?)
             """,
-            (job_id, device_id, json.dumps(request_payload, ensure_ascii=False), now, now),
+            (job_id, device_id, json.dumps(request_payload, ensure_ascii=False), now, now, now),
         )
 
 
@@ -332,16 +345,127 @@ def get_active_generation_job(device_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
-def mark_generation_job_running(job_id: str) -> bool:
-    """pending → running; False quando o job já terminou (cancelado antes de começar)."""
+def get_pending_generation_jobs(limit: int = 20) -> List[Dict[str, Any]]:
+    """Jobs pendentes prontos para serem retomados no startup/worker."""
+    now = _now_iso()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM generation_jobs
+            WHERE status = 'pending'
+              AND (available_at IS NULL OR available_at <= ?)
+            ORDER BY created_at ASC
+            LIMIT ?
+            """,
+            (now, max(1, limit)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def mark_generation_job_running(
+    job_id: str,
+    worker_id: Optional[str] = None,
+    lease_seconds: int = 600,
+) -> bool:
+    """pending → running com lease exclusivo. Um claim só avança a tentativa uma vez."""
+    now = datetime.now(timezone.utc)
+    lease_expires = (now.timestamp() + max(30, lease_seconds))
+    lease_expires_at = datetime.fromtimestamp(lease_expires, timezone.utc).isoformat()
+    owner = worker_id or "default-worker"
+    with _lock, get_connection() as conn:
+        row = conn.execute(
+            "SELECT attempt, max_attempts, status FROM generation_jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if row is None or row["status"] != "pending":
+            return False
+        attempt = int(row["attempt"])
+        max_attempts = int(row["max_attempts"])
+        if attempt >= max_attempts:
+            return False
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = 'running', attempt = attempt + 1,
+                lease_owner = ?, lease_expires_at = ?, updated_at = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (owner, lease_expires_at, _now_iso(), job_id),
+        )
+        return cursor.rowcount > 0
+
+
+def renew_generation_job_lease(job_id: str, worker_id: str, lease_seconds: int = 600) -> bool:
+    """Renova somente se o job ainda pertence ao worker e continua running."""
+    lease_expires = datetime.now(timezone.utc).timestamp() + max(30, lease_seconds)
+    lease_expires_at = datetime.fromtimestamp(lease_expires, timezone.utc).isoformat()
     with _lock, get_connection() as conn:
         cursor = conn.execute(
             """
             UPDATE generation_jobs
-            SET status = 'running', updated_at = ?
-            WHERE id = ? AND status = 'pending'
+            SET lease_expires_at = ?, updated_at = ?
+            WHERE id = ? AND status = 'running' AND lease_owner = ?
             """,
-            (_now_iso(), job_id),
+            (lease_expires_at, _now_iso(), job_id, worker_id),
+        )
+        return cursor.rowcount > 0
+
+
+def requeue_expired_generation_jobs(now: Optional[str] = None) -> int:
+    """Recupera jobs running cujo lease expirou; pending permanece pendente."""
+    now_iso = now or _now_iso()
+    with _lock, get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = 'pending',
+                lease_owner = NULL,
+                lease_expires_at = NULL,
+                available_at = ?,
+                interrupted_at = COALESCE(interrupted_at, ?),
+                updated_at = ?
+            WHERE status = 'running'
+              AND (lease_expires_at IS NULL OR lease_expires_at <= ?)
+            """,
+            (now_iso, now_iso, now_iso, now_iso),
+        )
+        return cursor.rowcount
+
+
+def requeue_generation_job(job_id: str, error: str) -> bool:
+    """Backoff limitado após falha temporária do worker."""
+    now = _now_iso()
+    with _lock, get_connection() as conn:
+        row = conn.execute(
+            "SELECT attempt, max_attempts FROM generation_jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        attempt = int(row["attempt"])
+        max_attempts = int(row["max_attempts"])
+        if attempt >= max_attempts:
+            cursor = conn.execute(
+                """
+                UPDATE generation_jobs
+                SET status = 'failed', error = ?, updated_at = ?
+                WHERE id = ? AND status = 'running'
+                """,
+                (error, now, job_id),
+            )
+            return cursor.rowcount > 0
+        delay_seconds = 5 if attempt == 1 else 30
+        available_at = (
+            datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        ).isoformat()
+        cursor = conn.execute(
+            """
+            UPDATE generation_jobs
+            SET status = 'pending', lease_owner = NULL, lease_expires_at = NULL,
+                available_at = ?, error = ?, updated_at = ?
+            WHERE id = ? AND status = 'running'
+            """,
+            (available_at, error, now, job_id),
         )
         return cursor.rowcount > 0
 
@@ -351,6 +475,7 @@ def finish_generation_job(
     status: str,
     result: Optional[Dict[str, Any]] = None,
     error: Optional[str] = None,
+    worker_id: Optional[str] = None,
 ) -> bool:
     """Transição terminal guardada: só pending/running muda de estado.
 
@@ -358,34 +483,56 @@ def finish_generation_job(
     se o job já está terminal, retorna False e o chamador descarta o resultado.
     """
     with _lock, get_connection() as conn:
-        cursor = conn.execute(
-            """
-            UPDATE generation_jobs
-            SET status = ?, result_json = ?, error = ?, updated_at = ?
-            WHERE id = ? AND status IN ('pending', 'running')
-            """,
-            (
-                status,
-                json.dumps(result, ensure_ascii=False) if result is not None else None,
-                error,
-                _now_iso(),
-                job_id,
-            ),
-        )
+        if worker_id:
+            cursor = conn.execute(
+                """
+                UPDATE generation_jobs
+                SET status = ?, result_json = ?, error = ?, updated_at = ?
+                WHERE id = ? AND status IN ('pending', 'running') AND lease_owner = ?
+                """,
+                (
+                    status,
+                    json.dumps(result, ensure_ascii=False) if result is not None else None,
+                    error,
+                    _now_iso(),
+                    job_id,
+                    worker_id,
+                ),
+            )
+        else:
+            cursor = conn.execute(
+                """
+                UPDATE generation_jobs
+                SET status = ?, result_json = ?, error = ?, updated_at = ?
+                WHERE id = ? AND status IN ('pending', 'running')
+                """,
+                (
+                    status,
+                    json.dumps(result, ensure_ascii=False) if result is not None else None,
+                    error,
+                    _now_iso(),
+                    job_id,
+                ),
+            )
         return cursor.rowcount > 0
 
 
 def mark_interrupted_jobs() -> int:
-    """Startup sweep: pending/running de uma execução anterior não têm task
-    viva neste processo — viram failed com error='interrupted' (H3-40)."""
+    """Startup recovery H5-2: running vira pending pelo lease; pending aguarda."""
+    now_iso = _now_iso()
     with _lock, get_connection() as conn:
         cursor = conn.execute(
             """
             UPDATE generation_jobs
-            SET status = 'failed', error = 'interrupted', updated_at = ?
-            WHERE status IN ('pending', 'running')
+            SET status = 'pending',
+                lease_owner = NULL,
+                lease_expires_at = NULL,
+                available_at = ?,
+                interrupted_at = COALESCE(interrupted_at, ?),
+                updated_at = ?
+            WHERE status = 'running'
             """,
-            (_now_iso(),),
+            (now_iso, now_iso, now_iso),
         )
         return cursor.rowcount
 

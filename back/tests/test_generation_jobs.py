@@ -247,7 +247,7 @@ def test_cancel_de_job_running_marca_cancelled():
     assert body["result"] is None
 
 
-def test_startup_sweep_marca_jobs_interrompidos_como_failed():
+def test_startup_sweep_recoloca_jobs_interrompidos_como_pending():
     setup_test_db()
     db.create_generation_job("job-pending", "d1", {})
     db.create_generation_job("job-running", "d1", {})
@@ -263,8 +263,9 @@ def test_startup_sweep_marca_jobs_interrompidos_como_failed():
 
     for job_id in ("job-pending", "job-running"):
         row = db.get_generation_job(job_id)
-        assert row["status"] == "failed"
-        assert row["error"] == "interrupted"
+        assert row["status"] == "pending"
+        assert row["lease_owner"] is None
+        assert row["lease_expires_at"] is None
     assert db.get_generation_job("job-done")["status"] == "done"
 
 

@@ -366,15 +366,36 @@ mdns_service = MDNSService()
 # Tasks dos jobs de geração em voo (H3-40), para cancel/shutdown.
 _job_tasks: Dict[str, asyncio.Task] = {}
 
+
+async def _recover_pending_generation_jobs() -> None:
+    """Reconsulta a fila SQLite periodicamente sem Redis ou worker externo."""
+    while True:
+        await asyncio.sleep(5)
+        for row in db.get_pending_generation_jobs():
+            if row["id"] in _job_tasks:
+                continue
+            try:
+                request = GenerateRequest.model_validate_json(row["request_json"])
+                _spawn_generation_job(row["id"], request)
+            except Exception as exc:
+                db.finish_generation_job(row["id"], "failed", error=f"{type(exc).__name__}: {exc}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     db.init_db()
-    # H3-40: jobs pending/running de uma execução anterior não têm task viva
-    # neste processo — o app oferece "Tentar de novo" a partir do failed.
+    # H5-2: running da execução anterior volta ao pool pending; pending
+    # disponível é retomado no mesmo processo, sem fila externa.
     interrupted = db.mark_interrupted_jobs()
     if interrupted:
-        print(f"[jobs] {interrupted} job(s) interrompido(s) marcados como failed")
+        print(f"[jobs] {interrupted} job(s) em execução retomados como pending")
+    for row in db.get_pending_generation_jobs():
+        try:
+            request = GenerateRequest.model_validate_json(row["request_json"])
+            _spawn_generation_job(row["id"], request)
+        except Exception as exc:
+            db.finish_generation_job(row["id"], "failed", error=f"{type(exc).__name__}: {exc}")
+    recovery_task = asyncio.create_task(_recover_pending_generation_jobs())
     print("Treinos Backend started")
     print(f"Model: {MODEL_ID}")
     print(f"Catalog loaded: {len(EXERCISE_CATALOG)} exercises")
@@ -391,6 +412,8 @@ async def lifespan(app: FastAPI):
         task.cancel()
     if _job_tasks:
         await asyncio.gather(*list(_job_tasks.values()), return_exceptions=True)
+    recovery_task.cancel()
+    await asyncio.gather(recovery_task, return_exceptions=True)
     _job_tasks.clear()
     if MDNS_ENABLED:
         mdns_service.stop()
@@ -1376,29 +1399,44 @@ async def run_generation_job(job_id: str, request: GenerateRequest) -> None:
     é descartado. IA falha/esgota o orçamento ⇒ fallback local ⇒ done;
     failed só quando nem o fallback é possível (pool vazio) ou erro inesperado.
     """
+    worker_id = f"{uuid.uuid4()}"
+    heartbeat: Optional[asyncio.Task] = None
+
+    async def renew_lease() -> None:
+        while True:
+            await asyncio.sleep(60)
+            if not db.renew_generation_job_lease(job_id, worker_id, 600):
+                return
+
     try:
-        if not db.mark_generation_job_running(job_id):
+        if not db.mark_generation_job_running(job_id, worker_id, 600):
             return  # cancelado antes de a task começar
+        heartbeat = asyncio.create_task(renew_lease())
         try:
             response = await _generate_plan_response(request)
         except ValueError as exc:
             # Pool vazio do complementar (H3-16): nem o fallback é possível.
-            db.finish_generation_job(job_id, "failed", error=str(exc))
+            db.finish_generation_job(job_id, "failed", error=str(exc), worker_id=worker_id)
             return
         except Exception as exc:
-            db.finish_generation_job(job_id, "failed", error=f"{type(exc).__name__}: {exc}")
+            db.requeue_generation_job(job_id, f"{type(exc).__name__}: {exc}")
             return
-        db.finish_generation_job(job_id, "done", result=response.model_dump())
+        db.finish_generation_job(job_id, "done", result=response.model_dump(), worker_id=worker_id)
     except asyncio.CancelledError:
-        db.finish_generation_job(job_id, "cancelled")
+        db.finish_generation_job(job_id, "cancelled", worker_id=worker_id)
         raise
     finally:
+        if heartbeat is not None:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
         _job_tasks.pop(job_id, None)
 
 
 def _spawn_generation_job(job_id: str, request: GenerateRequest) -> None:
     """Costura dos testes: o TestClient não mantém o event loop entre
     requests, então os testes desligam o spawn e dirigem o runner na mão."""
+    if job_id in _job_tasks:
+        return
     _job_tasks[job_id] = asyncio.create_task(run_generation_job(job_id, request))
 
 
