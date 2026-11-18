@@ -322,6 +322,23 @@ o asset offline volta a carregar instruções/imagem/nome em PT do catálogo do
 backend (revisão da decisão da H3-44 — o substituto da troca "Só hoje" abria o
 detalhe sem imagem e sem descrição); e a troca "Todos os treinos" atualiza a
 mídia do substituto no plano e limpa a carga-alvo do exercício antigo.
+**Patch 1.5.3 (2026-11-17):** `version.properties` sobe para `1.5.3` — corrige o
+crash "abre e fecha na sequência" do app do relógio: `Tasks.await` do GMS lança
+`IllegalStateException` na main thread e os callbacks da activity
+(`scope.launch` do Compose) e do `WearableListenerService` (`onPeerConnected`)
+rodam na main — o relógio reconecta ao celular justo quando o usuário abre o
+app e o processo morria com a tela aberta. Toda chamada GMS do pulso passa pelo
+novo `WearRpc` (IO + runCatching, nunca lança; falha vira valor neutro e o
+comando fica na fila da H3-20); regressão travada em Robolectric no `:wear`
+(activity abre e toca o botão que crashava — infra espelhada do `:app`). No
+mesmo patch: polimento do pulso (estado hidratado na abertura,
+`REQUEST_STATE` automático com peer, tela sem estado deixou de mostrar "Treino
+Concluído!", finalizar em duas etapas, descanso em destaque, padding para tela
+redonda, háptico ao concluir série) e o app do celular passa a pedir as
+permissões em tela (card na Home e seção em Ajustes: notificações, Health
+Connect e apps desconhecidos do instalador de update da H3-51) em vez de o
+usuário adivinhar em Configurações; o celular também republica estado/snapshot
+ao voltar ao primeiro plano.
 
 **Migrations Room (ordem da fila):** o banco está em 7 (H4-4 consumiu
 `MIGRATION_6_7`, colunas `setType`/`rir` com backfill de `isWarmup`). H4-7 →
