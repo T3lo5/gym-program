@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BodyMeasurementEntity::class,
         SyncOutboxEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -182,6 +182,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H5-6: metadados aditivos de conflito das séries enviadas pelo Wear.
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE set_logs ADD COLUMN clientSetId TEXT DEFAULT ''")
+                db.execSQL("ALTER TABLE set_logs ADD COLUMN revisionAt INTEGER")
+                db.execSQL("ALTER TABLE set_logs ADD COLUMN revisionOrigin TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE set_logs ADD COLUMN revisionId TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -200,6 +210,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_8_9,
                         MIGRATION_9_10,
                         MIGRATION_10_11,
+                        MIGRATION_11_12,
                     )
                     .build()
                     .also { instance = it }

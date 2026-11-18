@@ -115,6 +115,11 @@ class WearSyncBatchTest {
         finished: Boolean = false,
         protocolVersion: Int = 1,
         clientSetId: String = "set-1",
+        weightKg: Double = 60.0,
+        loggedAt: Long = 1_700_000_000_000,
+        originDeviceId: String = "wear",
+        revisionId: String = "",
+        deleted: Boolean = false,
     ): WearSyncBatch =
         WearSyncBatch(
             protocolVersion = protocolVersion,
@@ -128,8 +133,11 @@ class WearSyncBatchTest {
                     exerciseIndex = 0,
                     setNumber = 1,
                     reps = 10,
-                    weightKg = 60.0,
-                    loggedAt = 1_700_000_000_000,
+                    weightKg = weightKg,
+                    loggedAt = loggedAt,
+                    originDeviceId = originDeviceId,
+                    revisionId = revisionId,
+                    deleted = deleted,
                 ),
             ),
         )
@@ -210,5 +218,91 @@ class WearSyncBatchTest {
             } ?: error("Sessão não foi finalizada pelo lote")
         }
         assertEquals("completed", finalizada.first().session.status)
+    }
+
+    @Test
+    fun revisao_mais_recente_vence() {
+        val (sessionId, sessionExerciseId) = runBlocking { iniciarSessao() }
+
+        wearRepo.onSyncBatchReceived(
+            lote(
+                sessionId,
+                sessionExerciseId,
+                clientSetId = "revision-set",
+                weightKg = 60.0,
+                loggedAt = 1_700_000_000_000,
+                originDeviceId = "watch-a",
+                revisionId = "1700000000000|a",
+            ),
+        )
+        wearRepo.onSyncBatchReceived(
+            lote(
+                sessionId,
+                sessionExerciseId,
+                clientSetId = "revision-set",
+                weightKg = 50.0,
+                loggedAt = 1_700_000_001_000,
+                originDeviceId = "watch-a",
+                revisionId = "1700000001000|b",
+            ),
+        )
+
+        val aplicado = runBlocking {
+            withTimeoutOrNull(5_000) {
+                repository.observeSessions().first { list ->
+                    list.firstOrNull()?.exercises?.firstOrNull()?.sets?.any {
+                        it.clientSetId == "revision-set" && it.weightKg == 50.0
+                    } == true
+                }
+            } ?: error("Revisão não aplicada")
+        }
+        val serie = aplicado.first().exercises.first().sets.single { it.clientSetId == "revision-set" }
+        assertEquals(50.0, serie.weightKg!!, 0.0)
+    }
+
+    @Test
+    fun deleted_remove_serie_por_client_set_id() {
+        val (sessionId, sessionExerciseId) = runBlocking { iniciarSessao() }
+
+        wearRepo.onSyncBatchReceived(
+            lote(
+                sessionId,
+                sessionExerciseId,
+                clientSetId = "delete-set",
+                loggedAt = 1_700_000_000_000,
+                revisionId = "1700000000000|a",
+            ),
+        )
+        runBlocking {
+            withTimeoutOrNull(5_000) {
+                repository.observeSessions().first { list ->
+                    list.firstOrNull()?.exercises?.firstOrNull()?.sets?.any {
+                        it.clientSetId == "delete-set"
+                    } == true
+                }
+            }
+        }
+
+        wearRepo.onSyncBatchReceived(
+            lote(
+                sessionId,
+                sessionExerciseId,
+                clientSetId = "delete-set",
+                loggedAt = 1_700_000_001_000,
+                revisionId = "1700000001000|b",
+                deleted = true,
+            ),
+        )
+
+        val estado = runBlocking {
+            withTimeoutOrNull(5_000) {
+                repository.observeSessions().first { list ->
+                    list.firstOrNull()?.exercises?.firstOrNull()?.sets?.none {
+                        it.clientSetId == "delete-set"
+                    } == true
+                }
+            } ?: error("Exclusão não aplicada")
+        }
+        assertTrue(estado.first().exercises.first().sets.none { it.clientSetId == "delete-set" })
     }
 }

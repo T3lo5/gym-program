@@ -77,6 +77,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -84,6 +86,7 @@ import java.security.SecureRandom
 import java.util.UUID
 import java.time.Instant
 import java.time.LocalDate
+import com.treinos.protocol.WearLoggedSet
 
 /**
  * Fonte única de dados do app.
@@ -126,6 +129,9 @@ open class WorkoutRepository(
      */
     private val healthGateway: HealthConnectGateway? = null,
 ) : SnapshotDownloader {
+
+    // H5-6: evita que dois lotes rápidos vejam a mesma série antes do primeiro insert.
+    private val wearSetMutex = Mutex()
 
     fun observeActivePlans(): Flow<List<WorkoutPlanWithDetails>> = combine(
         dao.observeActivePlanEntities(),
@@ -603,10 +609,15 @@ open class WorkoutRepository(
         restTakenSeconds: Int? = null,
         setType: String = SET_TYPE_NORMAL,
         rir: Int? = null,
+        clientSetId: String? = null,
+        revisionAt: Long? = null,
+        revisionOrigin: String = "",
+        revisionId: String = "",
+        setNumberOverride: Int? = null,
     ): Int = withContext(Dispatchers.IO) {
         val type = normalizeSetType(setType)
         val isWarmup = type == SET_TYPE_WARMUP
-        val setNumber = dao.maxSetNumber(exerciseLogId) + 1
+        val setNumber = setNumberOverride ?: (dao.maxSetNumber(exerciseLogId) + 1)
         val now = System.currentTimeMillis()
         dao.insertSetLog(
             SetLogEntity(
@@ -621,6 +632,10 @@ open class WorkoutRepository(
                 rir = rir,
                 restTakenSeconds = restTakenSeconds,
                 completedAt = now,
+                clientSetId = clientSetId,
+                revisionAt = revisionAt,
+                revisionOrigin = revisionOrigin,
+                revisionId = revisionId,
             )
         )
         if (!isWarmup) {
@@ -628,6 +643,60 @@ open class WorkoutRepository(
         }
         dao.setExerciseEndedAt(exerciseLogId, now)
         setNumber
+    }
+
+    /** H5-6: reconcila uma série do Wear por clientSetId e revisão determinística. */
+    suspend fun reconcileWearSet(
+        exerciseLogId: Long,
+        set: WearLoggedSet,
+    ) = withContext(Dispatchers.IO) {
+        wearSetMutex.withLock {
+            val existing = dao.getSetLogByClientSetId(set.clientSetId)
+            val incomingRevisionAt = set.loggedAt
+            val incomingRevisionId = set.revisionId.ifBlank { "${set.loggedAt}|${set.clientSetId}" }
+            val incomingOrigin = set.originDeviceId.ifBlank { "wear" }
+            val incomingWins = existing?.let {
+                val existingAt = it.revisionAt ?: it.completedAt ?: 0L
+                when {
+                    incomingRevisionAt != existingAt -> incomingRevisionAt > existingAt
+                    incomingRevisionId != it.revisionId -> incomingRevisionId > it.revisionId
+                    else -> incomingOrigin > it.revisionOrigin
+                }
+            } ?: true
+            if (!incomingWins) return@withLock
+
+            if (set.deleted) {
+                dao.deleteSetLogByClientSetId(set.clientSetId)
+                return@withLock
+            }
+
+            if (existing != null) {
+                dao.updateSetLog(
+                    existing.copy(
+                        reps = set.reps,
+                        weightKg = set.weightKg,
+                        rpe = set.rpe,
+                        setNumber = set.setNumber,
+                        revisionAt = incomingRevisionAt,
+                        revisionOrigin = incomingOrigin,
+                        revisionId = incomingRevisionId,
+                    ),
+                )
+            } else {
+                logSet(
+                    exerciseLogId = exerciseLogId,
+                    reps = set.reps,
+                    weightKg = set.weightKg,
+                    rpe = set.rpe,
+                    setType = SET_TYPE_NORMAL,
+                    clientSetId = set.clientSetId,
+                    revisionAt = incomingRevisionAt,
+                    revisionOrigin = incomingOrigin,
+                    revisionId = incomingRevisionId,
+                    setNumberOverride = set.setNumber,
+                )
+            }
+        }
     }
 
     suspend fun finishSession(sessionId: Long) = withContext(Dispatchers.IO) {

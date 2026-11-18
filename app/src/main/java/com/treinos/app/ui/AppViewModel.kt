@@ -1000,15 +1000,7 @@ class AppViewModel(
                         it.exercise.id == set.sessionExerciseId
                     } ?: activeSession.exercises.getOrNull(set.exerciseIndex)
                     ?: continue
-                    repository.logSet(
-                        exerciseLogId = exercicio.exercise.id,
-                        reps = set.reps,
-                        weightKg = set.weightKg,
-                        rpe = set.rpe,
-                        // H4-4: série do relógio é sempre normal, sem RIR.
-                        setType = com.treinos.app.data.local.SET_TYPE_NORMAL,
-                        rir = null,
-                    )
+                    repository.reconcileWearSet(exercicio.exercise.id, set)
                 }
                 if (batch.finished) {
                     if (_activeSessionId.value == batch.sessionId) {

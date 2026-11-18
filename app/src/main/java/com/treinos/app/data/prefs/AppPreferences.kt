@@ -301,6 +301,23 @@ class AppPreferences private constructor(
         prefs.edit().putStringSet(KEY_WEAR_SYNCED_SET_IDS, ids).apply()
     }
 
+    /** H5-6: revisão compacta por série: "<loggedAt>|<revisionId>|<origin>". */
+    fun getWearSetRevision(clientSetId: String): String? =
+        prefs.getStringSet(KEY_WEAR_SET_REVISIONS, emptySet())
+            ?.firstOrNull { it.startsWith("$clientSetId|") }
+            ?.substringAfter("$clientSetId|")
+
+    fun putWearSetRevision(clientSetId: String, loggedAt: Long, revisionId: String, origin: String) {
+        val revisions = (prefs.getStringSet(KEY_WEAR_SET_REVISIONS, emptySet()) ?: emptySet())
+            .toMutableSet()
+        revisions.removeAll { it.startsWith("$clientSetId|") }
+        revisions.add("$clientSetId|$loggedAt|$revisionId|$origin")
+        while (revisions.size > MAX_SYNCED_SET_IDS) {
+            revisions.remove(revisions.first())
+        }
+        prefs.edit().putStringSet(KEY_WEAR_SET_REVISIONS, revisions).apply()
+    }
+
     companion object {
         /** Nome do arquivo de prefs (vira treinos_prefs.xml no disco; rules de backup o citam). */
         const val PREFS_NAME = "treinos_prefs"
@@ -356,6 +373,7 @@ class AppPreferences private constructor(
 
         /** H4-16: dedupe das séries do lote de sync do relógio. */
         private const val KEY_WEAR_SYNCED_SET_IDS = "wear_synced_set_ids"
+        private const val KEY_WEAR_SET_REVISIONS = "wear_set_revisions"
         private const val MAX_SYNCED_SET_IDS = 500
         private const val KEY_GENERATE_CONFIG_V1 = "generate_config_v1"
         private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"

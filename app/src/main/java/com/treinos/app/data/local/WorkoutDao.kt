@@ -192,6 +192,12 @@ interface WorkoutDao {
     @Insert
     suspend fun insertSetLog(setLog: SetLogEntity): Long
 
+    @Query("SELECT * FROM set_logs WHERE clientSetId = :clientSetId LIMIT 1")
+    suspend fun getSetLogByClientSetId(clientSetId: String): SetLogEntity?
+
+    @Query("DELETE FROM set_logs WHERE clientSetId = :clientSetId")
+    suspend fun deleteSetLogByClientSetId(clientSetId: String)
+
     @Insert
     suspend fun insertSetLogs(setLogs: List<SetLogEntity>): List<Long>
 

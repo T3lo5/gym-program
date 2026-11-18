@@ -209,4 +209,41 @@ class WearProtocolTest {
         assertEquals(2, lote.protocolVersion)
         assertNotEquals(1, lote.protocolVersion)
     }
+
+    @Test
+    fun lote_aditivo_revisao_round_trip() {
+        val lote = WearSyncBatch(
+            sessionId = 42,
+            batchId = "batch-revision",
+            cursor = "cursor-1",
+            sets = listOf(
+                WearLoggedSet(
+                    clientSetId = "set-revision",
+                    sessionExerciseId = 100,
+                    exerciseIndex = 0,
+                    setNumber = 1,
+                    reps = 12,
+                    weightKg = 55.0,
+                    loggedAt = 1_700_000_010_000,
+                    originDeviceId = "watch-a",
+                    revisionId = "1700000010000|mutation-a",
+                    deleted = false,
+                ),
+            ),
+        )
+        val serializado = json.encodeToString(WearSyncBatch.serializer(), lote)
+        val novamente = json.decodeFromString(WearSyncBatch.serializer(), serializado)
+        assertEquals("cursor-1", novamente.cursor)
+        assertEquals("watch-a", novamente.sets.single().originDeviceId)
+        assertEquals("1700000010000|mutation-a", novamente.sets.single().revisionId)
+    }
+
+    @Test
+    fun lote_antigo_sem_revisao_decodifica() {
+        val payload =
+            "{\"protocolVersion\":1,\"sessionId\":42,\"batchId\":\"old\",\"finished\":false,\"sets\":[]}"
+        val lote = json.decodeFromString(WearSyncBatch.serializer(), payload)
+        assertEquals("", lote.cursor)
+        assertTrue(lote.sets.isEmpty())
+    }
 }

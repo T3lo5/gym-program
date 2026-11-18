@@ -200,6 +200,7 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
         val lote = WearSyncBatch(
             sessionId = ativa?.id ?: pendentes.first().sessionId,
             batchId = java.util.UUID.randomUUID().toString(),
+            cursor = "",
             // H4-16: sessão finalizada offline → o lote vai com finished = true
             // e o celular aplica as séries e finaliza a sessão.
             finished = ativa?.status == "finished",
@@ -213,6 +214,9 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
                     weightKg = it.weightKg,
                     rpe = it.rpe,
                     loggedAt = it.loggedAt,
+                    originDeviceId = it.originDeviceId,
+                    revisionId = it.revisionId,
+                    deleted = it.deleted,
                 )
             },
         )

@@ -8,6 +8,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
@@ -62,6 +64,9 @@ data class WearSetLogEntity(
     val rpe: Double? = null,
     val loggedAt: Long,
     val pending: Boolean,
+    val originDeviceId: String = "",
+    val revisionId: String = "",
+    val deleted: Boolean = false,
 )
 
 @Dao
@@ -118,7 +123,7 @@ interface WearStandaloneDao {
 }
 
 @Database(
-    version = 1,
+    version = 2,
     entities = [
         WearSessionEntity::class,
         WearSessionExerciseEntity::class,
@@ -131,8 +136,17 @@ abstract class WearDatabase : RoomDatabase() {
     abstract fun standaloneDao(): WearStandaloneDao
 
     companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE wear_set_logs ADD COLUMN originDeviceId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE wear_set_logs ADD COLUMN revisionId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE wear_set_logs ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun build(context: Context): WearDatabase =
             Room.databaseBuilder(context, WearDatabase::class.java, "wear-standalone.db")
+                .addMigrations(MIGRATION_1_2)
                 // H4-16: NUNCA fallbackToDestructiveMigration — Room corrompido
                 // ou com versão inesperada falha a abrir e a tela mostra erro;
                 // nunca apagar dados em silêncio.

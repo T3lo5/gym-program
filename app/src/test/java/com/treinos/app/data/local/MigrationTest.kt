@@ -589,6 +589,44 @@ class MigrationTest {
         migrated.close()
     }
 
+    @Test
+    @Throws(IOException::class)
+    fun migracao_11_12_preserva_series_e_adiciona_revisao() {
+        helper.createDatabase(testDb, 11).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','in_progress',1,NULL,0,'','strength','plan','A')"
+            )
+            db.execSQL(
+                "INSERT INTO session_exercises (id, sessionId, exerciseId, exerciseName, " +
+                    "exerciseOrder, plannedSets, completedSets, restSeconds, startedAt, endedAt, targetReps) " +
+                    "VALUES (500,50,'ex1','Ex',0,3,1,90,1,NULL,'8-12')"
+            )
+            db.execSQL(
+                "INSERT INTO set_logs (id, exerciseLogId, setNumber, reps, weightKg, rpe, " +
+                    "durationSeconds, distanceMeters, isCompleted, isWarmup, setType, rir, " +
+                    "restTakenSeconds, completedAt) " +
+                    "VALUES (5000,500,1,10,40.0,8.0,NULL,NULL,1,0,'normal',NULL,90,2)"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 12, true, AppDatabase.MIGRATION_11_12)
+
+        assertEquals(1, migrated.rowCount("set_logs"))
+        migrated.query(
+            "SELECT clientSetId, revisionAt, revisionOrigin, revisionId FROM set_logs WHERE id = 5000"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("", cursor.getString(0))
+            assertTrue(cursor.isNull(1))
+            assertEquals("", cursor.getString(2))
+            assertEquals("", cursor.getString(3))
+        }
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

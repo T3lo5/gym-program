@@ -121,6 +121,9 @@ class WearStandaloneStore(
                 rpe = rpe,
                 loggedAt = loggedAt,
                 pending = true,
+                originDeviceId = "wear",
+                revisionId = "$loggedAt|$clientSetId",
+                deleted = false,
             ),
         )
         aplicarCapDePendentes()
@@ -135,6 +138,7 @@ class WearStandaloneStore(
             sessionId = sessionId,
             batchId = batchId,
             finished = finished,
+            cursor = batchId,
             sets = dao.pendingSets().map { it.toLoggedSet() },
         )
 
@@ -171,6 +175,9 @@ class WearStandaloneStore(
             weightKg = weightKg,
             rpe = rpe,
             loggedAt = loggedAt,
+            originDeviceId = originDeviceId,
+            revisionId = revisionId,
+            deleted = deleted,
         )
 
     companion object {

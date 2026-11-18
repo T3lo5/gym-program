@@ -82,7 +82,31 @@ class WearSyncRepository(
      */
     fun onSyncBatchReceived(batch: WearSyncBatch) {
         if (batch.protocolVersion != 1) return
-        val novas = batch.sets.filter { !preferences.isSyncedSet(it.clientSetId) }
+        val novas = batch.sets.filter { set ->
+            val revisionId = set.revisionId.ifBlank { "${set.loggedAt}|${set.clientSetId}" }
+            val origin = set.originDeviceId.ifBlank { "wear" }
+            val existing = preferences.getWearSetRevision(set.clientSetId)
+            val incomingWins = existing?.let { old ->
+                val oldLogged = old.substringBefore("|").toLongOrNull() ?: set.loggedAt
+                val oldRevision = old.substringAfter("|").substringBeforeLast("|")
+                val oldOrigin = old.substringAfterLast("|")
+                when {
+                    set.loggedAt != oldLogged -> set.loggedAt > oldLogged
+                    revisionId != oldRevision -> revisionId > oldRevision
+                    else -> origin > oldOrigin
+                }
+            } ?: true
+            if (incomingWins) {
+                preferences.putWearSetRevision(
+                    set.clientSetId,
+                    set.loggedAt,
+                    revisionId,
+                    origin,
+                )
+                preferences.addSyncedSets(listOf(set.clientSetId))
+            }
+            incomingWins
+        }
         if (novas.isEmpty() && !batch.finished) return
         preferences.addSyncedSets(batch.sets.map { it.clientSetId })
         _syncBatches.tryEmit(batch.copy(sets = novas))

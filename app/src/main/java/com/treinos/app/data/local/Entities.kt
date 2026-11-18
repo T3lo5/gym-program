@@ -233,6 +233,13 @@ data class SetLogEntity(
     val rir: Int? = null,
     val restTakenSeconds: Int? = null,
     val completedAt: Long? = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "")
+    val clientSetId: String? = null,
+    val revisionAt: Long? = null,
+    @ColumnInfo(defaultValue = "")
+    val revisionOrigin: String = "",
+    @ColumnInfo(defaultValue = "")
+    val revisionId: String = "",
 )
 
 /** Fonte de uma medida corporal: registrada no app (H4-8) ou importada do Health Connect (H4-9). */

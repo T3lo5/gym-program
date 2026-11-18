@@ -90,6 +90,7 @@ data class WearSyncBatch(
     @SerialName("batchId") val batchId: String,
     @SerialName("finished") val finished: Boolean = false,
     @SerialName("sets") val sets: List<WearLoggedSet> = emptyList(),
+    @SerialName("cursor") val cursor: String = "",
 )
 
 /** Série registrada offline no relógio. */
@@ -103,4 +104,7 @@ data class WearLoggedSet(
     @SerialName("weightKg") val weightKg: Double? = null,
     @SerialName("rpe") val rpe: Double? = null,
     @SerialName("loggedAt") val loggedAt: Long,
+    @SerialName("originDeviceId") val originDeviceId: String = "",
+    @SerialName("revisionId") val revisionId: String = "",
+    @SerialName("deleted") val deleted: Boolean = false,
 )
