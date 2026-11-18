@@ -5,10 +5,11 @@
 | Campo | Valor |
 |---|---|
 | Item do roadmap | `H3-4` |
-| MoSCoW | `W` |
-| Spec aprovada em | `2026-11-03` |
+| MoSCoW | `M` |
+| Versão alvo | `Horizon 5` |
+| Spec aprovada em | `pendente de aprovação` (aprovação original: `2026-11-03`; revisão: `2026-11-18`) |
 | Implementação | `pendente` |
-| Depende de | H1-4 (backup local antes de expor dados) |
+| Depende de | H1-4 (backup local) e H5-1 (sync remoto seguro) |
 
 ## Objetivo
 

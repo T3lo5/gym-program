@@ -235,6 +235,45 @@ data class SyncResponseDto(
 )
 
 @Serializable
+data class SyncMutationDto(
+    val mutationId: String,
+    val entity: String,
+    val entityId: String,
+    val operation: String,
+    val updatedAt: Long = 0,
+    val payload: String = "{}",
+)
+
+@Serializable
+data class SyncChangesRequestDto(
+    val deviceId: String,
+    val syncedAt: String,
+    val baseCursor: Int = 0,
+    val mutations: List<SyncMutationDto> = emptyList(),
+)
+
+@Serializable
+data class SyncChangeDto(
+    val seq: Int = 0,
+    val deviceId: String = "",
+    val mutationId: String = "",
+    val entity: String = "",
+    val entityId: String = "",
+    val operation: String = "",
+    val updatedAt: Long = 0,
+    val payload: String = "{}",
+    val syncedAt: String = "",
+)
+
+@Serializable
+data class SyncChangesResponseDto(
+    val accepted: List<String> = emptyList(),
+    val ignored: List<String> = emptyList(),
+    val cursor: Int = 0,
+    val changes: List<SyncChangeDto> = emptyList(),
+)
+
+@Serializable
 data class SyncDownloadDto(
     val deviceId: String,
     val plans: List<SyncDownloadPlanDto> = emptyList(),

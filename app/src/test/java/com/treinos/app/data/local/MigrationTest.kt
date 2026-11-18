@@ -554,6 +554,41 @@ class MigrationTest {
         migrated.close()
     }
 
+    /**
+     * H5-1: a migration 10→11 cria apenas a outbox persistente. Plano/sessão
+     * existentes não são alterados e mutations podem ser reinseridas depois.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun migracao_10_11_preserva_dados_e_cria_outbox() {
+        helper.createDatabase(testDb, 10).let { db ->
+            db.execSQL(
+                "INSERT INTO workout_plans (id, name, description, goal, daysPerWeek, isActive, " +
+                    "generatedByAi, createdAt, updatedAt, version, nextReviewAt, reviewAfterWeeks, source, kind) " +
+                    "VALUES (1,'Principal','d','hypertrophy',4,1,0,1,2,1,NULL,4,'local','main')"
+            )
+            db.execSQL(
+                "INSERT INTO workout_sessions (id, planId, dayId, planName, dayName, status, " +
+                    "startedAt, endedAt, totalDurationSeconds, notes, modality, source, title) " +
+                    "VALUES (50,1,10,'P','A','completed',1,10,9,'','strength','plan','A')"
+            )
+            db.close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDb, 11, true, AppDatabase.MIGRATION_10_11)
+
+        assertEquals(1, migrated.rowCount("workout_plans"))
+        assertEquals(1, migrated.rowCount("workout_sessions"))
+        assertEquals(0, migrated.rowCount("sync_outbox"))
+        migrated.execSQL(
+            "INSERT INTO sync_outbox " +
+                "(mutationId, entity, entityId, operation, updatedAt, payloadJson, createdAt) " +
+                "VALUES ('m1','plan','1','upsert',2,'{}',2)"
+        )
+        assertEquals(1, migrated.rowCount("sync_outbox"))
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.rowCount(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())

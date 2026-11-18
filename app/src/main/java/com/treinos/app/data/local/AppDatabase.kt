@@ -17,8 +17,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SetLogEntity::class,
         ExerciseUsageEvent::class,
         BodyMeasurementEntity::class,
+        SyncOutboxEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -157,6 +158,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // H5-1: outbox persistente para sincronização incremental. Nenhum dado
+        // existente é alterado; mutations reenviadas ficam após crash/reinício.
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS sync_outbox (
+                        mutationId TEXT PRIMARY KEY NOT NULL,
+                        entity TEXT NOT NULL,
+                        entityId TEXT NOT NULL,
+                        operation TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        payloadJson TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_outbox_createdAt` " +
+                        "ON `sync_outbox` (`createdAt`)"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -174,6 +199,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_8_9,
                         MIGRATION_9_10,
+                        MIGRATION_10_11,
                     )
                     .build()
                     .also { instance = it }

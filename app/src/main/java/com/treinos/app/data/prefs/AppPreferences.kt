@@ -46,6 +46,25 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_LAST_SYNC_AT, value).apply()
         }
 
+    /** H5-1: cursor global do lote incremental recebido do backend. */
+    var syncCursor: Int
+        get() = prefs.getInt(KEY_SYNC_CURSOR, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_SYNC_CURSOR, value).apply()
+        }
+
+    var lastSyncedPlanIds: Set<String>
+        get() = prefs.getStringSet(KEY_LAST_SYNCED_PLAN_IDS, emptySet()).orEmpty()
+        set(value) {
+            prefs.edit().putStringSet(KEY_LAST_SYNCED_PLAN_IDS, value).apply()
+        }
+
+    var lastSyncedSessionIds: Set<String>
+        get() = prefs.getStringSet(KEY_LAST_SYNCED_SESSION_IDS, emptySet()).orEmpty()
+        set(value) {
+            prefs.edit().putStringSet(KEY_LAST_SYNCED_SESSION_IDS, value).apply()
+        }
+
     override var bodyWeightKg: Double?
         get() = if (prefs.contains(KEY_BODY_WEIGHT_KG)) prefs.getFloat(KEY_BODY_WEIGHT_KG, 0f).toDouble() else null
         set(value) {
@@ -266,6 +285,9 @@ class AppPreferences private constructor(
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_SYNC_CURSOR = "sync_cursor"
+        private const val KEY_LAST_SYNCED_PLAN_IDS = "last_synced_plan_ids"
+        private const val KEY_LAST_SYNCED_SESSION_IDS = "last_synced_session_ids"
         private const val KEY_LANGUAGE = "language"
         private const val KEY_REST_DEADLINE_AT = "rest_deadline_at"
         private const val KEY_REST_TOTAL = "rest_total"

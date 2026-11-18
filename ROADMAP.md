@@ -31,9 +31,9 @@ O relógio (Wear OS) mostra o treino em andamento sem precisar olhar o celular.
 |------|--------|-----------|
 | Banco local (Room) | ✅ | Planos, dias, exercícios, sessões, séries |
 | Execução de treino | ✅ | Timer de descanso, séries, RPE, carga, histórico (H1-2) |
-| Geração via IA | ✅ | Backend + SenseNova + fallback local existe; robustez entregue (H3-22): prompt com o pool completo do request (sem cap de 136 IDs), parse tolerante, salvamento parcial de IDs inválidos, timeout 60 s + retry; diagnóstico no ar (H3-21: `fallbackReason` no contrato, log `[fallback]` e motivo no app); foco do usuário priorizado nas sessões (H3-23); **plano B (dois níveis) ativo em 2026-11-10**: gatilho de 22.000 chars disparou com request amplo (29.067 chars, IA levava 74,5s, fallback `reason=timeout`) e cortou o prompt para ~14.000 chars sem perder nenhum ID elegível (Tier A: 8 detalhados por músculo; Tier B: IDs agrupados por músculo); seleção por nome entregue (H3-25, concluída em 2026-11-15); geração assíncrona proposta (H3-40) |
+| Geração via IA | ✅ | Backend + SenseNova + fallback local; geração assíncrona entregue (H3-40), com job persistido no SQLite e consulta sob demanda; robustez, diagnóstico e seleção por nome entregues (H3-21/H3-22/H3-25) |
 | Foco muscular no plano principal | ✅ | No principal, foco é **prioridade**: cada sessão de força garante ≥ 1 exercício de cada grupo pedido antes do split do ciclo (`user_target_muscles` em `build_strength_session`/`build_hybrid_plan`), regra explícita no prompt e dica na GenerateScreen; exclusivo só no complementar (H3-16) (H3-23) |
-| Sincronização app → backend | ✅ | Snapshot manual (`AppViewModel.syncNow`) |
+| Sincronização app → backend | 🟡 | Snapshot manual funcional (`AppViewModel.syncNow`); restauração e sync completos existem, mas o próximo passo é sync incremental e idempotente (`H5-1`) |
 | Restauração por `deviceId` | ✅ | `RestoreByDeviceId` valida o ID, baixa, só persiste o `deviceId` após sucesso e tem tela de confirmação em Ajustes (H1-7) |
 | Download do backend | ✅ | `downloadSync` valida o snapshot antes de escrever e grava tudo em uma transação (`replaceAllData`); snapshot vazio mantém os dados locais (H1-7) |
 | Testes + CI | ✅ | 35 arquivos de teste JVM (`:app`, `:protocol`, `:wear`) + gate (`./scripts/verify.sh`); Compose no Robolectric, Room em memória e contrato nos dois lados dentro do gate; instrumentados compilam no gate (H3-1) |
@@ -380,7 +380,7 @@ precedente H3-7/H3-45).
 | Must Have (agora) | Should Have (próximo) | Could Have (depois) | Won't now |
 |-------------------|-----------------------|---------------------|-----------|
 | **Correções prioritárias: H3-21 ✅ H3-22 ✅ H3-23 ✅ H3-24 ✅ — fila concluída; segue o MVP do relógio** | | | |
-| Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | Backend na nuvem (H3-4) |
+| Fundação de dados (H1-6) ✅ | Registro avulso (H2-5) ✅ | Mobilidade (H2-7) ✅ | |
 | Correções de restauração/backup (H1-7) ✅ | Plano híbrido (H2-6) ✅ | Polimento + animações (H3-2) ✅ | Export CSV/Sheets |
 | Peso/altura (H1-5) ✅ | Descoberta LAN (H2-1) ✅ | Acessibilidade (H3-3) ✅ | Widget/complicação do relógio |
 | Testes de UI/Room (H3-1) ✅ | Wear OS MVP (H2-2) ✅ | Nuvem via SAF (H3-8) | Backup automático (H3-9) |
@@ -400,6 +400,10 @@ precedente H3-7/H3-45).
 | | Peso/medidas (H4-8) ✅ | Wear: editar carga (H4-15) ✅ | |
 | | Health Connect (H4-9) ✅ | Standalone relógio (H4-16) ✅ | |
 | | Programas prontos (H4-10) ✅ | | |
+| **Horizon 5 — backend sob demanda confiável** | | | |
+| Backend remoto HTTPS/token (H3-4) | Deploy sob demanda (H5-3) | Sync multi-dispositivo (H5-5) | Corrida GPS/FC (H4-17) |
+| Sync incremental (H5-1) | Diagnóstico operacional (H5-4) | Wear sync robusto (H5-6) | |
+| Job de geração durável (H5-2) | | | |
 
 ---
 
@@ -646,6 +650,24 @@ commit da fila); **H4-17** segue Won't now.
 - [H4-15 — Wear: editar carga/reps no pulso](docs/specs/H4-15-wear-editar-carga-reps.md) — concluída (2026-11-15: `WearSetEditor` puro com passos de 2,5 kg/1 rep e carga 0,0 → `null`; `sendCommand` preenche o `WearCommand` e o celular grava os valores editados; sem mudança em `:protocol`)
 - [H4-16 — Modo standalone do relógio](docs/specs/H4-16-wear-standalone.md) — concluída (2026-11-16: Room próprio no `:wear` v1 com snapshot da sessão; séries offline viram lote `PATH_SYNC_BATCH` deduplicado por `clientSetId`; `standalone = true` no manifest)
 - [H4-17 — Corrida com GPS, FC e intervalados](docs/specs/H4-17-corrida-gps-fc.md) — proposta (**Won't now** na 1.5.0)
+
+### Horizon 5 — Backend sob demanda confiável
+
+**Ordem obrigatória:** H3-4 -> H5-1 -> H5-2 -> H5-3 -> H5-4 -> H5-5 -> H5-6.
+Acesso remoto seguro precede otimização, porque o core só permanece local-first
+se o backend puder ficar desligado sem perder geração ou dados.
+
+| ID | Item | MoSCoW | Problema | Solução prevista | Esforço | Depende de | Spec |
+|----|------|--------|----------|------------------|---------|------------|------|
+| H3-4 | Backend remoto HTTPS com token | **M** | O app pode usar LAN, mas não existe uma configuração segura consolidada para fora de casa. | URL remota separada da LAN, HTTPS obrigatório, Bearer token e fallback seguro. | 1–2 dias | H1-4 | [H3-4](docs/specs/H3-4-cloud-backend.md) |
+| H5-1 | Sync incremental e idempotente | **M** | Sync atual envia snapshots e repõe dados em massa. | Outbox persistente, mutações, cursor, tombstones e revisão determinística por entidade. | 4–6 dias | H1-6, H3-15 | [H5-1](docs/specs/H5-1-sync-incremental.md) (concluída em 2026-11-18) |
+| H5-2 | Geração assíncrona durável | **M** | O SQLite já guarda estados, mas reinício pode perder a execução em memória e não retoma jobs de forma determinística. | Lease/worker leve no próprio backend, recovery no startup e retry limitado sem fila externa. | 2–3 dias | H3-40 | [H5-2](docs/specs/H5-2-generation-job-duravel.md) |
+| H5-3 | Deploy do backend sob demanda | **S** | Não existe operação única e verificável para ligar/desligar instâncias pessoais. | Guia e configuração de Oracle/Codespaces/Cloudflare/Tailscale, backup persistente e health seguro. | 1–2 dias | H3-4 | [H5-3](docs/specs/H5-3-deploy-backend-sob-demanda.md) |
+| H5-4 | Diagnóstico operacional | **S** | Falhas de rede, sync e geração aparecem sem causa técnica suficiente e sem estado agregado. | Endpoint autenticado redigido, card no app e diagnóstico copiável sem IDs ou segredos. | 1–2 dias | H3-29, H3-40 | [H5-4](docs/specs/H5-4-diagnostico-operacional.md) |
+| H5-5 | Sync multi-dispositivo sem conta | **C** | `deviceId` identifica restore, mas não representa um espaço seguro compartilhado. | Espaço local no app com segredo de 128 bits, namespace isolado no backend e revogação. | 3–5 dias | H3-4, H5-1 | [H5-5](docs/specs/H5-5-sync-multiplos-dispositivos.md) |
+| H5-6 | Wear sync robusto e conflitos | **C** | Standalone já transmite lotes, mas falta reconciliar revisões e edição concorrente. | `clientSetId` + revisão/origem, confirmação persistente e rejeição de finalização concorrente. | 2–4 dias | H4-16, H5-1 | [H5-6](docs/specs/H5-6-wear-sync-multidispositivo.md) |
+
+Nenhum H5 entra em implementação sem spec aprovada e sem gate verde.
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

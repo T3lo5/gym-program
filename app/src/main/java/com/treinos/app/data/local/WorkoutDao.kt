@@ -2,6 +2,7 @@ package com.treinos.app.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -9,6 +10,20 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WorkoutDao {
+
+    // ---------- H5-1 sync outbox ----------
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSyncOutbox(items: List<SyncOutboxEntity>)
+
+    @Query("SELECT * FROM sync_outbox ORDER BY createdAt ASC LIMIT :limit")
+    suspend fun getSyncOutbox(limit: Int = 500): List<SyncOutboxEntity>
+
+    @Query("DELETE FROM sync_outbox WHERE mutationId IN (:mutationIds)")
+    suspend fun deleteSyncOutbox(mutationIds: List<String>)
+
+    @Query("DELETE FROM sync_outbox")
+    suspend fun clearSyncOutbox()
 
     // ---------- Planos ----------
 

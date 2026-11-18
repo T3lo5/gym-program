@@ -171,6 +171,36 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sync_mutations (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    mutation_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    synced_at TEXT NOT NULL,
+    UNIQUE(device_id, mutation_id)
+);
+
+CREATE TABLE IF NOT EXISTS sync_entity_revisions (
+    device_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    mutation_id TEXT NOT NULL,
+    PRIMARY KEY(device_id, entity, entity_id)
+);
+
+CREATE TABLE IF NOT EXISTS sync_device_cursors (
+    device_id TEXT NOT NULL,
+    cursor INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(device_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_synced_plans_device
     ON synced_plans(device_id);
 CREATE INDEX IF NOT EXISTS idx_synced_sessions_device
@@ -672,6 +702,182 @@ def sync_status(device_id: str) -> Dict[str, Any]:
         "sessions": int(session_count),
         "setLogs": int(set_count),
         "lastSyncAt": device["last_sync_at"] if device else None,
+    }
+
+
+def _revision_wins(
+    current: Optional[sqlite3.Row],
+    updated_at: int,
+    mutation_id: str,
+) -> bool:
+    if current is None:
+        return True
+    if updated_at != int(current["updated_at"]):
+        return updated_at > int(current["updated_at"])
+    return mutation_id >= str(current["mutation_id"])
+
+
+def sync_changes(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Aplica mutations aditivas do app sem substituir todas as entidades."""
+    device_id = str(payload.get("deviceId") or "unknown")
+    synced_at = str(payload.get("syncedAt") or _now_iso())
+    base_cursor = int(payload.get("baseCursor") or 0)
+    mutations: List[Dict[str, Any]] = payload.get("mutations", [])
+    accepted: List[str] = []
+    ignored: List[str] = []
+
+    with _lock, get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO devices (device_id, last_sync_at, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(device_id) DO UPDATE SET
+                last_sync_at = excluded.last_sync_at,
+                updated_at = excluded.updated_at
+            """,
+            (device_id, synced_at, _now_iso()),
+        )
+
+        for mutation in mutations:
+            mutation_id = str(mutation.get("mutationId") or "")
+            entity = str(mutation.get("entity") or "")
+            entity_id = str(mutation.get("entityId") or "")
+            operation = str(mutation.get("operation") or "")
+            updated_at = int(mutation.get("updatedAt") or 0)
+            if not mutation_id or not entity or not entity_id or operation not in {"upsert", "delete"}:
+                continue
+
+            duplicate = conn.execute(
+                "SELECT 1 FROM sync_mutations WHERE device_id = ? AND mutation_id = ?",
+                (device_id, mutation_id),
+            ).fetchone()
+            if duplicate:
+                ignored.append(mutation_id)
+                continue
+
+            current = conn.execute(
+                """
+                SELECT operation, updated_at, mutation_id
+                FROM sync_entity_revisions
+                WHERE device_id = ? AND entity = ? AND entity_id = ?
+                """,
+                (device_id, entity, entity_id),
+            ).fetchone()
+            if not _revision_wins(current, updated_at, mutation_id):
+                ignored.append(mutation_id)
+                continue
+
+            raw_payload = mutation.get("payload")
+            if isinstance(raw_payload, str):
+                try:
+                    entity_payload = json.loads(raw_payload)
+                except json.JSONDecodeError:
+                    ignored.append(mutation_id)
+                    continue
+            elif isinstance(raw_payload, dict):
+                entity_payload = raw_payload
+            else:
+                entity_payload = {}
+
+            if operation == "delete":
+                if entity == "plan":
+                    row = conn.execute(
+                        "SELECT id FROM synced_plans WHERE device_id = ? AND local_id = ?",
+                        (device_id, int(entity_id)),
+                    ).fetchone()
+                    if row:
+                        conn.execute("DELETE FROM synced_plans WHERE id = ?", (int(row["id"]),))
+                elif entity == "session":
+                    conn.execute(
+                        "DELETE FROM synced_sessions WHERE device_id = ? AND local_id = ?",
+                        (device_id, int(entity_id)),
+                    )
+            elif entity == "plan":
+                _upsert_plan(conn, device_id, entity_payload, synced_at)
+            elif entity == "session":
+                _upsert_session(conn, device_id, entity_payload, synced_at)
+            else:
+                ignored.append(mutation_id)
+                continue
+
+            conn.execute(
+                """
+                INSERT INTO sync_mutations (
+                    device_id, mutation_id, entity, entity_id, operation,
+                    updated_at, payload_json, synced_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    device_id,
+                    mutation_id,
+                    entity,
+                    entity_id,
+                    operation,
+                    updated_at,
+                    json.dumps(entity_payload, ensure_ascii=False),
+                    synced_at,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO sync_entity_revisions (
+                    device_id, entity, entity_id, operation, updated_at, mutation_id
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(device_id, entity, entity_id) DO UPDATE SET
+                    operation = excluded.operation,
+                    updated_at = excluded.updated_at,
+                    mutation_id = excluded.mutation_id
+                """,
+                (device_id, entity, entity_id, operation, updated_at, mutation_id),
+            )
+            accepted.append(mutation_id)
+
+        cursor_row = conn.execute(
+            "SELECT COALESCE(MAX(seq), 0) AS cursor FROM sync_mutations"
+        ).fetchone()
+        cursor = int(cursor_row["cursor"])
+        conn.execute(
+            """
+            INSERT INTO sync_device_cursors (device_id, cursor, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(device_id) DO UPDATE SET
+                cursor = excluded.cursor,
+                updated_at = excluded.updated_at
+            """,
+            (device_id, cursor, _now_iso()),
+        )
+
+        changes_rows = conn.execute(
+            """
+            SELECT seq, device_id, mutation_id, entity, entity_id, operation,
+                   updated_at, payload_json, synced_at
+            FROM sync_mutations
+            WHERE seq > ?
+            ORDER BY seq ASC
+            LIMIT 500
+            """,
+            (base_cursor,),
+        ).fetchall()
+
+    changes = [
+        {
+            "seq": int(row["seq"]),
+            "deviceId": row["device_id"],
+            "mutationId": row["mutation_id"],
+            "entity": row["entity"],
+            "entityId": row["entity_id"],
+            "operation": row["operation"],
+            "updatedAt": int(row["updated_at"]),
+            "payload": row["payload_json"],
+            "syncedAt": row["synced_at"],
+        }
+        for row in changes_rows
+    ]
+    return {
+        "accepted": accepted,
+        "ignored": ignored,
+        "cursor": cursor,
+        "changes": changes,
     }
 
 

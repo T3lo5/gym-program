@@ -59,6 +59,9 @@ class BackendClient(
     override suspend fun sync(request: SyncRequestDto): SyncResponseDto =
         post("/v1/sync", json.encodeToString(SyncRequestDto.serializer(), request))
 
+    override suspend fun syncChanges(request: SyncChangesRequestDto): SyncChangesResponseDto =
+        post("/v1/sync/changes", json.encodeToString(SyncChangesRequestDto.serializer(), request))
+
     override suspend fun syncDownload(deviceId: String): SyncDownloadDto =
         get("/v1/sync/download?deviceId=$deviceId")
 

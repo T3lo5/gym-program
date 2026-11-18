@@ -19,6 +19,10 @@ interface BackendApi {
 
     suspend fun sync(request: SyncRequestDto): SyncResponseDto
 
+    /** H5-1: envia mutações aditivas e recebe cursor/revisões incrementais. */
+    suspend fun syncChanges(request: SyncChangesRequestDto): SyncChangesResponseDto =
+        throw UnsupportedOperationException("Sync incremental não implementado pelo fake")
+
     suspend fun syncDownload(deviceId: String): SyncDownloadDto
 
     suspend fun catalog(): CatalogResponseDto

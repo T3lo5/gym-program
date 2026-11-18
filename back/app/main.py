@@ -716,6 +716,41 @@ class SyncResponse(BaseModel):
     syncedAt: str
 
 
+class SyncMutation(BaseModel):
+    mutationId: str
+    entity: str
+    entityId: str
+    operation: str
+    updatedAt: int = 0
+    payload: Optional[Any] = None
+
+
+class SyncChangesRequest(BaseModel):
+    deviceId: str
+    syncedAt: Optional[str] = None
+    baseCursor: int = 0
+    mutations: List[SyncMutation] = Field(default_factory=list)
+
+
+class SyncChange(BaseModel):
+    seq: int
+    deviceId: str
+    mutationId: str
+    entity: str
+    entityId: str
+    operation: str
+    updatedAt: int
+    payload: str
+    syncedAt: str
+
+
+class SyncChangesResponse(BaseModel):
+    accepted: List[str]
+    ignored: List[str]
+    cursor: int
+    changes: List[SyncChange]
+
+
 # Routes
 @app.get("/health")
 async def health():
@@ -1680,6 +1715,13 @@ async def sync_data(request: SyncRequest):
     payload = request.model_dump()
     result = db.sync_snapshot(payload)
     return SyncResponse(**result)
+
+
+@app.post("/v1/sync/changes", response_model=SyncChangesResponse)
+async def sync_changes(request: SyncChangesRequest):
+    """Recebe mutations aditivas e idempotentes sem substituir o snapshot inteiro."""
+    payload = request.model_dump()
+    return SyncChangesResponse(**db.sync_changes(payload))
 
 
 @app.get("/v1/sync/status")

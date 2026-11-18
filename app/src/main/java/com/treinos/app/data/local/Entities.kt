@@ -178,6 +178,20 @@ val VALID_SET_TYPES = setOf(SET_TYPE_NORMAL, SET_TYPE_WARMUP, SET_TYPE_DROP, SET
 fun normalizeSetType(value: String): String =
     if (value in VALID_SET_TYPES) value else SET_TYPE_NORMAL
 
+@Entity(
+    tableName = "sync_outbox",
+    indices = [Index(value = ["createdAt"])],
+)
+data class SyncOutboxEntity(
+    @PrimaryKey val mutationId: String,
+    val entity: String,
+    val entityId: String,
+    val operation: String,
+    val updatedAt: Long,
+    val payloadJson: String,
+    val createdAt: Long,
+)
+
 /**
  * Resolve a dupla legada (H4-4): `setType` vence; sem `setType` útil,
  * `isWarmup` marca aquecimento. Nunca deixa os dois divergentes no banco.

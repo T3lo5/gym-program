@@ -9,6 +9,7 @@ import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
+import com.treinos.app.data.local.SyncOutboxEntity
 import com.treinos.app.data.local.WorkoutDao
 import com.treinos.app.data.local.WorkoutDayEntity
 import com.treinos.app.data.local.WorkoutDayWithExercises
@@ -22,6 +23,7 @@ import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.data.media.rawImagePathFromUrl
 import com.treinos.app.data.prefs.AppPreferences
 import com.treinos.app.data.remote.BackendApi
+import com.treinos.app.data.remote.BackendHttpException
 import com.treinos.app.data.remote.GenerateJobAck
 import com.treinos.app.data.remote.GenerateJobStatus
 import com.treinos.app.data.remote.GeneratePlanRequest
@@ -54,6 +56,10 @@ import com.treinos.app.data.remote.SyncDownloadSessionDto
 import com.treinos.app.data.remote.SyncDownloadSessionExerciseDto
 import com.treinos.app.data.remote.SyncRequestDto
 import com.treinos.app.data.remote.SyncResponseDto
+import com.treinos.app.data.remote.SyncChangeDto
+import com.treinos.app.data.remote.SyncChangesRequestDto
+import com.treinos.app.data.remote.SyncChangesResponseDto
+import com.treinos.app.data.remote.SyncMutationDto
 import com.treinos.app.data.remote.SyncSessionDto
 import com.treinos.app.data.remote.SyncSessionExerciseDto
 import com.treinos.app.data.remote.SyncSetLogDto
@@ -68,6 +74,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -886,9 +893,52 @@ open class WorkoutRepository(
 
     suspend fun sync(): SyncResponseDto {
         val payload = buildSyncPayload()
-        val response = backendClient.sync(payload)
-        preferences.lastSyncAt = response.syncedAt
-        return response
+        enqueueSyncOutbox(payload)
+        val pending = dao.getSyncOutbox(500)
+        val request = SyncChangesRequestDto(
+            deviceId = preferences.deviceId,
+            syncedAt = Instant.now().toString(),
+            baseCursor = preferences.syncCursor,
+            mutations = pending.map { item ->
+                SyncMutationDto(
+                    mutationId = item.mutationId,
+                    entity = item.entity,
+                    entityId = item.entityId,
+                    operation = item.operation,
+                    updatedAt = item.updatedAt,
+                    payload = item.payloadJson,
+                )
+            },
+        )
+        val response = try {
+            backendClient.syncChanges(request)
+        } catch (error: BackendHttpException) {
+            if (error.code in setOf(404, 405)) {
+                val legacy = backendClient.sync(payload)
+                dao.clearSyncOutbox()
+                preferences.lastSyncAt = legacy.syncedAt
+                preferences.lastSyncedPlanIds = payload.plans.map { it.localId.toString() }.toSet()
+                preferences.lastSyncedSessionIds = payload.sessions.map { it.localId.toString() }.toSet()
+                return legacy
+            }
+            throw error
+        }
+
+        val completed = (response.accepted + response.ignored).distinct()
+        if (completed.isNotEmpty()) dao.deleteSyncOutbox(completed)
+        preferences.syncCursor = response.cursor
+        preferences.lastSyncAt = Instant.now().toString()
+        preferences.lastSyncedPlanIds = payload.plans.map { it.localId.toString() }.toSet()
+        preferences.lastSyncedSessionIds = payload.sessions.map { it.localId.toString() }.toSet()
+        return SyncResponseDto(
+            ok = true,
+            plans = payload.plans.size,
+            sessions = payload.sessions.size,
+            setLogs = payload.sessions.sumOf { session ->
+                session.exercises.sumOf { exercise -> exercise.sets.size }
+            },
+            syncedAt = preferences.lastSyncAt.orEmpty(),
+        )
     }
 
     override suspend fun downloadSync(deviceId: String): SyncDownloadResult =
@@ -1410,6 +1460,80 @@ open class WorkoutRepository(
 
     suspend fun testConnection() = withContext(Dispatchers.IO) {
         backendClient.health()
+    }
+
+    private suspend fun enqueueSyncOutbox(payload: SyncRequestDto) {
+        val now = System.currentTimeMillis()
+        val encoder = Json { encodeDefaults = true }
+        val items = mutableListOf<SyncOutboxEntity>()
+
+        payload.plans.forEach { plan ->
+            val payloadJson = encoder.encodeToString(SyncPlanDto.serializer(), plan)
+            val mutationId = stableSyncMutationId(
+                entity = "plan",
+                entityId = plan.localId.toString(),
+                operation = "upsert",
+                payloadJson = payloadJson,
+            )
+            items += SyncOutboxEntity(
+                mutationId = mutationId,
+                entity = "plan",
+                entityId = plan.localId.toString(),
+                operation = "upsert",
+                updatedAt = plan.updatedAt,
+                payloadJson = payloadJson,
+                createdAt = now,
+            )
+        }
+        payload.sessions.forEach { session ->
+            val payloadJson = encoder.encodeToString(SyncSessionDto.serializer(), session)
+            val updatedAt = session.endedAt ?: session.startedAt
+            val mutationId = stableSyncMutationId(
+                entity = "session",
+                entityId = session.localId.toString(),
+                operation = "upsert",
+                payloadJson = payloadJson,
+            )
+            items += SyncOutboxEntity(
+                mutationId = mutationId,
+                entity = "session",
+                entityId = session.localId.toString(),
+                operation = "upsert",
+                updatedAt = updatedAt,
+                payloadJson = payloadJson,
+                createdAt = now,
+            )
+        }
+
+        val currentPlanIds = payload.plans.map { it.localId.toString() }.toSet()
+        (preferences.lastSyncedPlanIds - currentPlanIds).forEach { entityId ->
+            val mutationId = stableSyncMutationId("plan", entityId, "delete", "{}")
+            items += SyncOutboxEntity(
+                mutationId = mutationId,
+                entity = "plan",
+                entityId = entityId,
+                operation = "delete",
+                updatedAt = now,
+                payloadJson = "{}",
+                createdAt = now,
+            )
+        }
+
+        val currentSessionIds = payload.sessions.map { it.localId.toString() }.toSet()
+        (preferences.lastSyncedSessionIds - currentSessionIds).forEach { entityId ->
+            val mutationId = stableSyncMutationId("session", entityId, "delete", "{}")
+            items += SyncOutboxEntity(
+                mutationId = mutationId,
+                entity = "session",
+                entityId = entityId,
+                operation = "delete",
+                updatedAt = now,
+                payloadJson = "{}",
+                createdAt = now,
+            )
+        }
+
+        if (items.isNotEmpty()) dao.insertSyncOutbox(items)
     }
 
     private suspend fun buildSyncPayload(): SyncRequestDto = withContext(Dispatchers.IO) {
