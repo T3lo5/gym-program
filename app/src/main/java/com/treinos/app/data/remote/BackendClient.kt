@@ -38,6 +38,7 @@ class BackendResponseException(message: String, cause: Throwable?) : IOException
  */
 class BackendClient(
     private val baseUrlProvider: () -> String,
+    private val tokenProvider: () -> String = { "" },
     private val client: OkHttpClient = defaultClient(),
 ) : BackendApi {
     private val json = Json {
@@ -74,6 +75,9 @@ class BackendClient(
         val request = Request.Builder()
             .url(baseUrlProvider() + path)
             .get()
+            .apply {
+                authHeader(tokenProvider())?.let { header("Authorization", it) }
+            }
             .build()
         execute(request)
     }
@@ -83,6 +87,9 @@ class BackendClient(
             val request = Request.Builder()
                 .url(baseUrlProvider() + path)
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
+                .apply {
+                    authHeader(tokenProvider())?.let { header("Authorization", it) }
+                }
                 .build()
             execute(request)
         }

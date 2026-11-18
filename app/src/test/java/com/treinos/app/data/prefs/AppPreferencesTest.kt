@@ -57,6 +57,28 @@ class AppPreferencesTest {
     }
 
     @Test
+    fun modo_remoto_preserva_url_local() {
+        preferences.backendUrl = "http://192.168.1.16:3000"
+        preferences.remoteBackendUrl = "https://treinos.example.com/"
+        preferences.useRemoteBackend = true
+        preferences.apiToken = "  abc  "
+
+        assertEquals("http://192.168.1.16:3000", preferences.backendUrl)
+        assertEquals("https://treinos.example.com", preferences.effectiveBackendUrl)
+        assertEquals("abc", preferences.apiToken)
+    }
+
+    @Test
+    fun modo_local_desativa_remota_sem_apagar_token() {
+        preferences.remoteBackendUrl = "https://treinos.example.com"
+        preferences.apiToken = "abc"
+        preferences.useRemoteBackend = false
+
+        assertEquals("http://10.0.2.2:3000", preferences.effectiveBackendUrl)
+        assertEquals("abc", preferences.apiToken)
+    }
+
+    @Test
     fun language_default_pt_e_normalizado() {
         // H3-36: conteúdo de exercício nasce em português; valor desconhecido
         // cai para o default e só "en"/"pt" são aceitos.

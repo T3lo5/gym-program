@@ -29,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -75,6 +77,9 @@ import com.treinos.app.updater.UpdateState
 @Composable
 fun SettingsScreen(
     backendUrl: String,
+    useRemoteBackend: Boolean = false,
+    remoteBackendUrl: String = "",
+    apiToken: String = "",
     isTesting: Boolean,
     isSyncing: Boolean,
     isDownloading: Boolean,
@@ -90,6 +95,7 @@ fun SettingsScreen(
     restoreMessage: String?,
     onBack: () -> Unit,
     onSaveUrl: (String) -> Unit,
+    onSaveRemote: (Boolean, String, String) -> Unit = { _, _, _ -> },
     onTest: () -> Unit,
     onSync: () -> Unit,
     onDownload: () -> Unit,
@@ -148,6 +154,9 @@ fun SettingsScreen(
     onRequestInstallPackages: () -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
+    var remoteEnabled by remember(useRemoteBackend) { mutableStateOf(useRemoteBackend) }
+    var remoteUrl by remember(remoteBackendUrl) { mutableStateOf(remoteBackendUrl) }
+    var remoteToken by remember(apiToken) { mutableStateOf(apiToken) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
     var showRestoreConfirm by remember { mutableStateOf(false) }
     var showReplaceConfirm by remember { mutableStateOf(false) }
@@ -351,6 +360,60 @@ fun SettingsScreen(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_remote_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Switch(
+                                checked = remoteEnabled,
+                                onCheckedChange = {
+                                    remoteEnabled = it
+                                    onSaveRemote(it, remoteUrl, remoteToken)
+                                },
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.settings_remote_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = remoteUrl,
+                            onValueChange = { remoteUrl = it },
+                            label = { Text(stringResource(R.string.settings_remote_url_label)) },
+                            supportingText = { Text(stringResource(R.string.settings_remote_url_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = remoteToken,
+                            onValueChange = { remoteToken = it },
+                            label = { Text(stringResource(R.string.settings_remote_token_label)) },
+                            supportingText = { Text(stringResource(R.string.settings_remote_token_hint)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedButton(
+                            onClick = { onSaveRemote(remoteEnabled, remoteUrl, remoteToken) },
+                            modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                        ) {
+                            Text(stringResource(R.string.settings_remote_save))
+                        }
                     }
                 }
 

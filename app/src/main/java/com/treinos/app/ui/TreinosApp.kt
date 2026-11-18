@@ -89,6 +89,9 @@ fun TreinosApp(viewModel: AppViewModel) {
     val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
     val isTesting by viewModel.isTesting.collectAsStateWithLifecycle()
     val backendUrl by viewModel.backendUrl.collectAsStateWithLifecycle()
+    val useRemoteBackend by viewModel.useRemoteBackend.collectAsStateWithLifecycle()
+    val remoteBackendUrl by viewModel.remoteBackendUrl.collectAsStateWithLifecycle()
+    val apiToken by viewModel.apiToken.collectAsStateWithLifecycle()
     val connectionMessage by viewModel.connectionMessage.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val downloadMessage by viewModel.downloadMessage.collectAsStateWithLifecycle()
@@ -621,6 +624,9 @@ fun TreinosApp(viewModel: AppViewModel) {
 
                 Screen.Settings -> SettingsScreen(
                     backendUrl = backendUrl,
+                    useRemoteBackend = useRemoteBackend,
+                    remoteBackendUrl = remoteBackendUrl,
+                    apiToken = apiToken,
                     isTesting = isTesting,
                     isSyncing = isSyncing,
                     isDownloading = isDownloading,
@@ -636,6 +642,7 @@ fun TreinosApp(viewModel: AppViewModel) {
                     restoreMessage = restoreMessage,
                     onBack = viewModel::voltar,
                     onSaveUrl = viewModel::saveBackendUrl,
+                    onSaveRemote = viewModel::saveRemoteBackend,
                     onTest = viewModel::testConnection,
                     onSync = viewModel::syncNow,
                     onDownload = viewModel::downloadNow,

@@ -28,7 +28,8 @@ class AppContainer(context: Context) {
     private val database: AppDatabase = AppDatabase.get(context)
 
     private val backendClient: BackendClient = BackendClient(
-        baseUrlProvider = { preferences.backendUrl }
+        baseUrlProvider = { preferences.effectiveBackendUrl },
+        tokenProvider = { preferences.apiToken },
     )
 
     /**

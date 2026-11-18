@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Literal, Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 from zeroconf import ServiceInfo, Zeroconf
@@ -24,6 +25,7 @@ from zeroconf import ServiceInfo, Zeroconf
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from . import database as db
+from .auth import is_authorized, validate_public_deploy
 from .plan_builder import (
     MUSCLE_ALIASES,
     build_local_plan,
@@ -62,6 +64,9 @@ SENSENOVA_API_KEY = os.getenv("SENSENOVA_API_KEY")
 SENSENOVA_BASE_URL = os.getenv("SENSENOVA_BASE_URL", "https://token.sensenova.ai/v1")
 MODEL_ID = os.getenv("MODEL_ID", "sensenova-6.8-flash")
 MDNS_ENABLED = os.getenv("MDNS_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+API_TOKEN = os.getenv("API_TOKEN")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL")
+INSTANCE_MODE = os.getenv("INSTANCE_MODE", "local").strip().lower()
 
 # T7 experiment flag: usar shortlist com IDs + schema rígido
 # Valores: "0"/"false"/"no" = desligado (padrão), "1"/"true"/"yes" = ligado
@@ -383,6 +388,7 @@ async def _recover_pending_generation_jobs() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    validate_public_deploy(PUBLIC_BASE_URL, API_TOKEN)
     db.init_db()
     # H5-2: running da execução anterior volta ao pool pending; pending
     # disponível é retomado no mesmo processo, sem fila externa.
@@ -426,6 +432,17 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+
+@app.middleware("http")
+async def api_token_middleware(request, call_next):
+    if request.url.path.startswith("/v1/"):
+        if not is_authorized(request.headers.get("authorization"), API_TOKEN):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Unauthorized"},
+            )
+    return await call_next(request)
 
 # CORS for local development
 app.add_middleware(

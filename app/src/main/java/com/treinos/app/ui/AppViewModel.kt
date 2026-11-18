@@ -598,6 +598,15 @@ class AppViewModel(
     private val _backendUrl = MutableStateFlow(preferences.backendUrl)
     val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
 
+    private val _useRemoteBackend = MutableStateFlow(preferences.useRemoteBackend)
+    val useRemoteBackend: StateFlow<Boolean> = _useRemoteBackend.asStateFlow()
+
+    private val _remoteBackendUrl = MutableStateFlow(preferences.remoteBackendUrl)
+    val remoteBackendUrl: StateFlow<String> = _remoteBackendUrl.asStateFlow()
+
+    private val _apiToken = MutableStateFlow(preferences.apiToken)
+    val apiToken: StateFlow<String> = _apiToken.asStateFlow()
+
     private val _connectionMessage = MutableStateFlow<String?>(null)
     val connectionMessage: StateFlow<String?> = _connectionMessage.asStateFlow()
 
@@ -2592,6 +2601,21 @@ class AppViewModel(
         // H3-24: URL salva, catálogo recarrega em fundo; se o backend não
         // responder, o cache atual permanece (resposta vazia não envenena).
         loadExerciseMedia(false)
+    }
+
+    fun saveRemoteBackend(useRemote: Boolean, remoteUrl: String, token: String) {
+        val validation = com.treinos.app.data.remote.validateRemoteUrl(remoteUrl)
+        if (useRemote && validation != null) {
+            _connectionMessage.value = validation
+            return
+        }
+        preferences.useRemoteBackend = useRemote
+        preferences.remoteBackendUrl = remoteUrl
+        preferences.apiToken = token
+        _useRemoteBackend.value = useRemote
+        _remoteBackendUrl.value = preferences.remoteBackendUrl
+        _apiToken.value = preferences.apiToken
+        _connectionMessage.value = null
     }
 
     fun testConnection() {

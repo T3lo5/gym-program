@@ -29,6 +29,31 @@ class AppPreferences private constructor(
             prefs.edit().putString(KEY_BACKEND_URL, normalizeBackendUrl(value)).apply()
         }
 
+    var useRemoteBackend: Boolean
+        get() = prefs.getBoolean(KEY_USE_REMOTE_BACKEND, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_USE_REMOTE_BACKEND, value).apply()
+        }
+
+    var remoteBackendUrl: String
+        get() = prefs.getString(KEY_REMOTE_BACKEND_URL, "").orEmpty()
+        set(value) {
+            prefs.edit().putString(KEY_REMOTE_BACKEND_URL, normalizeRemoteUrl(value)).apply()
+        }
+
+    var apiToken: String
+        get() = prefs.getString(KEY_API_TOKEN, "").orEmpty()
+        set(value) {
+            prefs.edit().putString(KEY_API_TOKEN, value.trim()).apply()
+        }
+
+    val effectiveBackendUrl: String
+        get() = if (useRemoteBackend && remoteBackendUrl.isNotBlank()) {
+            remoteBackendUrl
+        } else {
+            backendUrl
+        }
+
     override var deviceId: String
         get() {
             prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
@@ -282,9 +307,15 @@ class AppPreferences private constructor(
             return withScheme.trimEnd('/')
         }
 
+        internal fun normalizeRemoteUrl(raw: String): String =
+            raw.trim().trimEnd('/')
+
         const val KEY_DEVICE_ID = "device_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_USE_REMOTE_BACKEND = "use_remote_backend"
+        private const val KEY_REMOTE_BACKEND_URL = "remote_backend_url"
+        private const val KEY_API_TOKEN = "api_token"
         private const val KEY_SYNC_CURSOR = "sync_cursor"
         private const val KEY_LAST_SYNCED_PLAN_IDS = "last_synced_plan_ids"
         private const val KEY_LAST_SYNCED_SESSION_IDS = "last_synced_session_ids"

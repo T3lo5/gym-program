@@ -16,6 +16,9 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_PATH=/app/data/treinos.db
+      - API_TOKEN=${API_TOKEN:-}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - INSTANCE_MODE=${INSTANCE_MODE:-local}
       # O Docker bridge não consegue anunciar mDNS na rede local.
       # Use a execução nativa (sem Docker) se precisar de descoberta automática.
       - MDNS_ENABLED=false

@@ -463,6 +463,13 @@
     <string name="settings_server_url_desc">Endereço usado para gerar treinos e sincronizar. No celular, use o IP do computador na rede local (ex.: http://192.168.0.10:3000). Veja o Manual para o endereço do emulador.</string>
     <string name="settings_label_server_url">URL do servidor</string>
     <string name="settings_server_url_ex">Ex.: http://192.168.0.10:3000</string>
+    <string name="settings_remote_title">Backend remoto sob demanda</string>
+    <string name="settings_remote_desc">Quando ativo, o app usa a URL HTTPS remota em vez da rede local. Mantenha o backend remoto protegido por token.</string>
+    <string name="settings_remote_url_label">URL HTTPS remota</string>
+    <string name="settings_remote_url_hint">Ex.: https://treinos.example.com</string>
+    <string name="settings_remote_token_label">Token do backend</string>
+    <string name="settings_remote_token_hint">Mesmo API_TOKEN configurado no servidor</string>
+    <string name="settings_remote_save">Salvar remoto</string>
     <string name="settings_btn_test">Testar conexão</string>
     <string name="settings_btn_testing">Testando…</string>
     <string name="settings_btn_save">Salvar</string>

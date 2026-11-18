@@ -460,6 +460,13 @@
     <string name="settings_server_url_desc">Address used to generate workouts and sync. On the phone, use the computer\'s IP on the local network (e.g. http://192.168.0.10:3000). See the Manual for the emulator address.</string>
     <string name="settings_label_server_url">Server URL</string>
     <string name="settings_server_url_ex">Ex.: http://192.168.0.10:3000</string>
+    <string name="settings_remote_title">On-demand remote backend</string>
+    <string name="settings_remote_desc">When enabled, the app uses the remote HTTPS URL instead of the local network. Keep the remote backend protected by a token.</string>
+    <string name="settings_remote_url_label">Remote HTTPS URL</string>
+    <string name="settings_remote_url_hint">Ex.: https://treinos.example.com</string>
+    <string name="settings_remote_token_label">Backend token</string>
+    <string name="settings_remote_token_hint">Same API_TOKEN configured on the server</string>
+    <string name="settings_remote_save">Save remote</string>
     <string name="settings_btn_test">Test connection</string>
     <string name="settings_btn_testing">Testing…</string>
     <string name="settings_btn_save">Save</string>

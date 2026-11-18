@@ -7,8 +7,8 @@
 | Item do roadmap | `H5-3` |
 | MoSCoW | `S` |
 | Versão alvo | `Horizon 5` |
-| Spec aprovada em | `pendente de aprovação` |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-18` |
+| Implementação | `concluída em 2026-11-18` |
 | Depende de | H3-4 |
 
 ## Objetivo
