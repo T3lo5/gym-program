@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.treinos.app.ui.HapticEvent
@@ -195,7 +197,21 @@ private fun MobilityRoutineList(
                             text = stringResource(R.string.mobility_safety_body),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        Text(if (showSafety) stringResource(R.string.mobility_safety_hide) else stringResource(R.string.mobility_safety_show))
+                        // H6-1: o toggle estava morto — onToggleSafety chegava
+                        // mas nenhum elemento era clicável (conteúdo de saúde
+                        // inalcançável). Text acionável com alvo de 48 dp.
+                        Text(
+                            text = if (showSafety) {
+                                stringResource(R.string.mobility_safety_hide)
+                            } else {
+                                stringResource(R.string.mobility_safety_show)
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(onClick = onToggleSafety, role = Role.Button),
+                        )
                         if (showSafety) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(stringResource(R.string.mobility_safety_seek), style = MaterialTheme.typography.labelLarge)

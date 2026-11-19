@@ -105,6 +105,10 @@ interface WearStandaloneDao {
     @Query("UPDATE wear_sessions SET restEndsAt = :restEndsAt WHERE id = :sessionId")
     suspend fun updateRestEndsAt(sessionId: Long, restEndsAt: Long?)
 
+    /** H6-1: leitura do deadline persistido (o UPDATE existia, a leitura não). */
+    @Query("SELECT restEndsAt FROM wear_sessions WHERE id = :sessionId")
+    suspend fun restEndsAtOf(sessionId: Long): Long?
+
     @Query("UPDATE wear_sessions SET status = :status WHERE id = :sessionId")
     suspend fun updateStatus(sessionId: Long, status: String)
 

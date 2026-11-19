@@ -256,6 +256,42 @@ fun HomeScreen(
                 )
             }
 
+            // H6-1: permissões em qualquer dia — o bloco estava aninhado por
+            // acidente dentro do `if (todaySession != null)` e desaparecia em
+            // dia de descanso.
+            if (!permissionsDismissed) {
+                item {
+                    PermissionsCard(
+                        rows = listOf(
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_notifications),
+                                granted = permissions.notificationsGranted,
+                                actionLabel = stringResource(R.string.permissions_btn_grant),
+                                onAction = onRequestNotifications,
+                            ),
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_health),
+                                granted = healthAvailability == HealthConnectAvailability.AVAILABLE &&
+                                    healthPermissionsGranted,
+                                actionLabel = if (healthAvailability == HealthConnectAvailability.AVAILABLE) {
+                                    stringResource(R.string.permissions_btn_connect)
+                                } else {
+                                    null
+                                },
+                                onAction = onRequestHealthPermissions,
+                            ),
+                            PermissionRowState(
+                                label = stringResource(R.string.permissions_install),
+                                granted = permissions.canInstallPackages,
+                                actionLabel = stringResource(R.string.permissions_btn_grant),
+                                onAction = onRequestInstallPackages,
+                            ),
+                        ),
+                        onDismiss = { permissionsDismissed = true },
+                    )
+                }
+            }
+
             if (plan == null) {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
@@ -307,44 +343,10 @@ fun HomeScreen(
                     )
                 }
             } else {
-                // H3-28: herói do dia logo após o InProgressCard — o treino de
-                // hoje fica acima da dobra, com ação direta.
-                if (todaySession != null) {
+                // H6-1: plano flexível (Rest) não renderiza herói — a spec H3-28
+                // manda não mostrar card quando hoje é descanso sem sessão fixa.
+                if (todaySession != null && todaySession !is TodaySession.Rest) {
                     item { TodayHeroCard(todaySession, onStartDay) }
-            // Permissões em tela: só o que falta, com o botão que pede —
-            // o usuário deixa de adivinhar em Configurações.
-            if (!permissionsDismissed) {
-                item {
-                    PermissionsCard(
-                        rows = listOf(
-                            PermissionRowState(
-                                label = stringResource(R.string.permissions_notifications),
-                                granted = permissions.notificationsGranted,
-                                actionLabel = stringResource(R.string.permissions_btn_grant),
-                                onAction = onRequestNotifications,
-                            ),
-                            PermissionRowState(
-                                label = stringResource(R.string.permissions_health),
-                                granted = healthAvailability == HealthConnectAvailability.AVAILABLE &&
-                                    healthPermissionsGranted,
-                                actionLabel = if (healthAvailability == HealthConnectAvailability.AVAILABLE) {
-                                    stringResource(R.string.permissions_btn_connect)
-                                } else {
-                                    null
-                                },
-                                onAction = onRequestHealthPermissions,
-                            ),
-                            PermissionRowState(
-                                label = stringResource(R.string.permissions_install),
-                                granted = permissions.canInstallPackages,
-                                actionLabel = stringResource(R.string.permissions_btn_grant),
-                                onAction = onRequestInstallPackages,
-                            ),
-                        ),
-                        onDismiss = { permissionsDismissed = true },
-                    )
-                }
-            }
                 }
 
                 item { HomeQuickActions(onGenerate, onLogActivity, onOpenMobility) }

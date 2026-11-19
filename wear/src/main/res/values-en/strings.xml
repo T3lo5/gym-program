@@ -48,4 +48,9 @@
     <string name="no_workout_hint">Start a workout on your phone</string>
     <string name="idle_today_format">Today: %1$s</string>
     <string name="confirm_finish">Confirm finish?</string>
+    <!-- H6-1: run intervals on the watch -->
+    <string name="run_phase_warmup">Warm-up</string>
+    <string name="run_phase_work">Sprint</string>
+    <string name="run_phase_recover">Recovery</string>
+    <string name="run_interval_format">%1$s — %2$ds</string>
 </resources>

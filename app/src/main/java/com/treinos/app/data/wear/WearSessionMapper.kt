@@ -4,6 +4,7 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.ui.ExerciseSessionData
 import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.calculateProgress
+import com.treinos.app.ui.run.intervalPhaseAt
 import com.treinos.protocol.WearWorkoutState
 
 object WearSessionMapper {
@@ -12,6 +13,7 @@ object WearSessionMapper {
         session: SessionWithExercises,
         exerciseIndex: Int,
         restRemainingSeconds: Int?,
+        nowMillis: Long = System.currentTimeMillis(),
     ): WearWorkoutState {
         val exercicios = session.exercises
         val idx = exerciseIndex.coerceIn(0, (exercicios.size - 1).coerceAtLeast(0))
@@ -37,6 +39,17 @@ object WearSessionMapper {
         var setNumber = (setCount + 1).coerceAtLeast(1)
         if (plannedSets > 0) setNumber = setNumber.coerceAtMost(plannedSets)
 
+        // H6-1: intervalos da corrida no pulso — fase + contagem derivadas do
+        // tempo decorrido com a MESMA regra pura da tela (intervalPhaseAt,
+        // H4-17). O pulso recalcula o restante localmente com `updatedAt`.
+        val intervalo = if (session.session.modality == "run") {
+            val elapsed = ((nowMillis - session.session.startedAt) / 1000L).coerceAtLeast(0L)
+            val (fase, restante) = intervalPhaseAt(elapsed)
+            fase to restante
+        } else {
+            null
+        }
+
         return WearWorkoutState(
             sessionId = session.session.id,
             dayName = session.session.dayName,
@@ -54,12 +67,14 @@ object WearSessionMapper {
             lastReps = ultimoSet?.reps,
             restSeconds = ex?.restSeconds ?: 90,
             restRemainingSeconds = restRemainingSeconds,
+            intervalPhase = intervalo?.first,
+            intervalRemainingSeconds = intervalo?.second,
             nextExerciseName = proximo?.let { e ->
                 val nome = e.exercise.exerciseName
                 if (nome.isNotEmpty()) nome else e.exercise.exerciseId
             },
             status = session.session.status,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = nowMillis,
             liveDistanceMeters = session.session.totalDistanceMeters,
             liveHeartRate = null,
         )

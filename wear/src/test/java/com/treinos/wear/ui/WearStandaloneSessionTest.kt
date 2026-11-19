@@ -39,7 +39,7 @@ class WearStandaloneSessionTest {
             WearStandaloneState(),
             WearStandaloneAction.Start(
                 snapshot = snapshot(Triple(42L, 3, "Supino")),
-                loggedSets = 0,
+                loggedByExercise = emptyMap(),
                 pendingCount = 0,
             ),
         )
@@ -55,7 +55,7 @@ class WearStandaloneSessionTest {
     fun registra_serie_e_avanca() {
         val inicio = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), 0, 0),
+            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), emptyMap(), 0),
         )
         val now = 1_700_000_000_000
         val depois = WearStandaloneSession.reduce(
@@ -73,7 +73,7 @@ class WearStandaloneSessionTest {
     fun ultima_serie_avanca_exercicio() {
         val inicio = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot(Triple(42L, 2, "Supino"), Triple(42L, 3, "Remada")), 1, 1),
+            WearStandaloneAction.Start(snapshot(Triple(42L, 2, "Supino"), Triple(42L, 3, "Remada")), mapOf(42L to 1), 1),
         )
         assertEquals(2, inicio.setNumber)
         val now = 1_700_000_000_000
@@ -92,7 +92,7 @@ class WearStandaloneSessionTest {
     fun finaliza_ultimo_exercicio() {
         val inicio = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot(Triple(42L, 1, "Supino")), 0, 0),
+            WearStandaloneAction.Start(snapshot(Triple(42L, 1, "Supino")), emptyMap(), 0),
         )
         val depois = WearStandaloneSession.reduce(
             inicio,
@@ -105,7 +105,7 @@ class WearStandaloneSessionTest {
     fun rest_ends_at_calculado() {
         val inicio = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), 0, 0),
+            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), emptyMap(), 0),
         )
         val now = 1_700_000_000_000
         val depois = WearStandaloneSession.reduce(
@@ -130,7 +130,7 @@ class WearStandaloneSessionTest {
     fun sem_snapshot_nao_quebra() {
         val estado = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot = null, loggedSets = 0, pendingCount = 3),
+            WearStandaloneAction.Start(snapshot = null, loggedByExercise = emptyMap(), pendingCount = 3),
         )
         assertFalse(estado.hasSnapshot)
         assertEquals(3, estado.pendingCount)
@@ -149,7 +149,7 @@ class WearStandaloneSessionTest {
         // das pendentes é o Room; o reducer só deriva a posição).
         val estado = WearStandaloneSession.reduce(
             WearStandaloneState(),
-            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), loggedSets = 2, pendingCount = 2),
+            WearStandaloneAction.Start(snapshot(Triple(42L, 3, "Supino")), loggedByExercise = mapOf(42L to 2), pendingCount = 2),
         )
         assertEquals(3, estado.setNumber)
         assertEquals(2, estado.pendingCount)
@@ -169,7 +169,7 @@ class WearStandaloneSessionTest {
                     startedAt = 1_700_000_000_000,
                     exercises = emptyList(),
                 ),
-                loggedSets = 0,
+                loggedByExercise = emptyMap(),
                 pendingCount = 0,
             ),
         )
@@ -180,5 +180,85 @@ class WearStandaloneSessionTest {
             WearStandaloneAction.Finish(now = 1_700_000_000_000),
         )
         assertEquals("finished", depois.status)
+    }
+
+    // ---- H6-1: restauração da posição e do descanso após reinício ----
+
+    @Test
+    fun start_deriva_exercicio_e_serie_das_series_registradas() {
+        // Exercício 1 completo (3/3) e exercício 2 com 1 série registrada:
+        // a posição restaurada é o exercício 2, série 2 — não o exercício 1.
+        val estado = WearStandaloneSession.reduce(
+            WearStandaloneState(),
+            WearStandaloneAction.Start(
+                snapshot = snapshot(Triple(42L, 3, "Supino"), Triple(43L, 3, "Remada")),
+                loggedByExercise = mapOf(42L to 3, 43L to 1),
+                pendingCount = 4,
+            ),
+        )
+        assertEquals(1, estado.exerciseIndex)
+        assertEquals(2, estado.setNumber)
+        assertEquals("Remada", estado.exercise?.exerciseName)
+        assertEquals(3, estado.plannedSets)
+    }
+
+    @Test
+    fun start_sem_series_comeca_no_primeiro_exercicio() {
+        val estado = WearStandaloneSession.reduce(
+            WearStandaloneState(),
+            WearStandaloneAction.Start(
+                snapshot = snapshot(Triple(42L, 3, "Supino"), Triple(43L, 3, "Remada")),
+                loggedByExercise = emptyMap(),
+                pendingCount = 0,
+            ),
+        )
+        assertEquals(0, estado.exerciseIndex)
+        assertEquals(1, estado.setNumber)
+        assertEquals("Supino", estado.exercise?.exerciseName)
+    }
+
+    @Test
+    fun start_todos_completos_fica_no_ultimo_com_serie_extra() {
+        val estado = WearStandaloneSession.reduce(
+            WearStandaloneState(),
+            WearStandaloneAction.Start(
+                snapshot = snapshot(Triple(42L, 2, "Supino")),
+                loggedByExercise = mapOf(42L to 2),
+                pendingCount = 2,
+            ),
+        )
+        assertEquals(0, estado.exerciseIndex)
+        assertEquals(3, estado.setNumber)
+    }
+
+    @Test
+    fun start_restaura_descanso_do_rest_ends_at() {
+        val now = 1_700_000_000_000
+        val futuro = WearStandaloneSession.reduce(
+            WearStandaloneState(),
+            WearStandaloneAction.Start(
+                snapshot = snapshot(Triple(42L, 3, "Supino")),
+                loggedByExercise = emptyMap(),
+                pendingCount = 1,
+                restEndsAt = now + 60_000L,
+                now = now,
+            ),
+        )
+        // Deadline no futuro sobrevive ao reinício do relógio.
+        assertEquals(now + 60_000L, futuro.restEndsAt)
+        assertEquals(60, WearStandaloneSession.restante(futuro.restEndsAt, now))
+
+        val passado = WearStandaloneSession.reduce(
+            WearStandaloneState(),
+            WearStandaloneAction.Start(
+                snapshot = snapshot(Triple(42L, 3, "Supino")),
+                loggedByExercise = emptyMap(),
+                pendingCount = 1,
+                restEndsAt = now - 1_000L,
+                now = now,
+            ),
+        )
+        // Deadline no passado zera (sem card fantasma).
+        assertNull(passado.restEndsAt)
     }
 }

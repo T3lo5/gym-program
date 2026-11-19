@@ -48,4 +48,9 @@
     <string name="no_workout_hint">Inicie um treino no celular</string>
     <string name="idle_today_format">Hoje: %1$s</string>
     <string name="confirm_finish">Confirmar fim?</string>
+    <!-- H6-1: intervalos da corrida no pulso -->
+    <string name="run_phase_warmup">Aquecimento</string>
+    <string name="run_phase_work">Tiro</string>
+    <string name="run_phase_recover">Recuperação</string>
+    <string name="run_interval_format">%1$s — %2$ds</string>
 </resources>

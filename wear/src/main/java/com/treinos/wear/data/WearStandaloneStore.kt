@@ -84,6 +84,12 @@ class WearStandaloneStore(
         dao.updateRestEndsAt(sessionId, restEndsAt)
     }
 
+    /**
+     * H6-1: lê o deadline persistido — o `UPDATE` existia e nada lia; sem
+     * isto, reiniciar o relógio perdia o descanso em curso.
+     */
+    suspend fun restEndsAtOf(sessionId: Long): Long? = dao.restEndsAtOf(sessionId)
+
     /** Finaliza a sessão no Room; o lote com `finished = true` vai ao reconectar. */
     suspend fun finishSession(sessionId: Long) {
         dao.updateStatus(sessionId, "finished")

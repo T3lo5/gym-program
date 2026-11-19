@@ -1328,6 +1328,14 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // H6-1: o seletor existia (H3-37) e nunca era chamado — o
+                    // card prometia a troca mas só renderizava título+descrição.
+                    // A activity é recriada pelo per-app locale, então o
+                    // `onChange` não precisa de estado aqui.
+                    LanguageSelector(
+                        current = currentAppLanguage(),
+                        onChange = {},
+                    )
                 }
             }
         }

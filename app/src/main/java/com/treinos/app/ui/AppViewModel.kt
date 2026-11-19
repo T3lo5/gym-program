@@ -22,6 +22,7 @@ import com.treinos.app.data.swapCandidates
 import com.treinos.app.data.sessionSwapCandidates
 import com.treinos.app.data.local.SessionExerciseEntity
 import com.treinos.app.data.local.SessionExerciseWithSets
+import com.treinos.app.data.local.SET_TYPE_WARMUP
 import com.treinos.app.data.local.BodyMeasurementEntity
 import com.treinos.app.data.local.MEASUREMENT_SOURCE_MANUAL
 import com.treinos.app.data.local.SessionWithExercises
@@ -1887,7 +1888,13 @@ class AppViewModel(
                 )
                 // H4-6: membro de superset que não é o último do grupo descansa
                 // a transição em vez do descanso cheio do plano.
-                startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
+                // H6-1: aquecimento não paga o descanso do plano — descanso
+                // curto fixo de 30 s (o warmup também não vira "última série").
+                if (input.setType == SET_TYPE_WARMUP) {
+                    startRest(WARMUP_REST_SECONDS)
+                } else {
+                    startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
+                }
                 syncWearState()
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
@@ -1911,7 +1918,13 @@ class AppViewModel(
                 )
                 // H4-6: mesma regra do caminho da tela — o LOG_SET do relógio
                 // passa por aqui e usa o descanso de transição do superset.
-                startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
+                // H6-1: aquecimento não paga o descanso do plano — descanso
+                // curto fixo de 30 s (o warmup também não vira "última série").
+                if (input.setType == SET_TYPE_WARMUP) {
+                    startRest(WARMUP_REST_SECONDS)
+                } else {
+                    startRest(restAfterSet(activeSessionPlanExercises.value, exercise.exerciseId, exercise.restSeconds))
+                }
                 syncWearState()
             } catch (error: Exception) {
                 _message.value = uiErrorMessage(error, context, R.string.msg_save_set_error)
@@ -2256,6 +2269,9 @@ class AppViewModel(
         _activityEditingId.value = null
         _activityPrefill.value = null
         _activityErrors.value = emptyMap()
+        // H6-1: pilha origem→destino (H3-38) — sem o backTarget, "Voltar" e o
+        // próprio salvamento caíam na Home em vez de retornar à origem.
+        _backTarget.value = _screen.value
         _screen.value = Screen.LogActivity
         refreshCanCopyLastActivity(ActivityModality.SWIM)
     }
@@ -2266,6 +2282,9 @@ class AppViewModel(
             _message.value = context.getString(R.string.msg_only_manual_editable)
             return
         }
+        // H6-1: mesma pilha do openLogActivity — editar vindo do Histórico
+        // retorna ao Histórico, não à Home.
+        _backTarget.value = _screen.value
         // H3-56: ao entrar em edição o `prefill` vence; o rascunho salvo não
         // deve vazar para a edição de uma sessão antiga.
         preferences.activityDraftV1 = null
@@ -3486,6 +3505,9 @@ class AppViewModel(
 
         /** "+15 s" padrão da faixa de descanso (H3-26). */
         const val REST_EXTEND_SECONDS = 15
+
+        /** H6-1: descanso fixo do aquecimento (não usa o descanso do plano). */
+        const val WARMUP_REST_SECONDS = 30
 
         /** H4-9: janela padrão de sincronização com o Health Connect (30 dias). */
         const val HEALTH_SYNC_WINDOW_MILLIS = 30L * 24L * 60L * 60L * 1000L

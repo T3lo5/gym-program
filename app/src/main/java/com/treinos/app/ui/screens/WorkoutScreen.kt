@@ -461,7 +461,12 @@ fun WorkoutScreen(
     }
 
     exerciseToLog?.let { exercise ->
-        val last = exercise.sets.maxByOrNull { it.setNumber }
+        // H6-1: o pré-preenchimento usa a última série de TRABALHO — aquecimento
+        // não vira "última série"; sem série de trabalho, a cascata cai no alvo
+        // do plano / sugestão (valores nulos seguem o fluxo existente).
+        val last = exercise.sets
+            .filter { it.setType != SET_TYPE_WARMUP }
+            .maxByOrNull { it.setNumber }
         // H3-52: os templates do anúncio são resolvidos na composição — o
         // callback roda fora dela e não pode chamar `stringResource`.
         val savedDetailTemplate = stringResource(R.string.workout_set_saved_detail)
@@ -1236,7 +1241,11 @@ private fun ExerciseCard(
 
                 // "Repetir última série" em 1 toque (H3-26): grava com carga/reps/RPE
                 // da última série e dispara o descanso, sem abrir o diálogo.
-                val lastSet = sets.maxByOrNull { it.setNumber }
+                // H6-1: só série de TRABALHO — aquecimento não é repetível como
+                // série de trabalho (sem warmup, o botão não aparece).
+                val lastSet = sets
+                    .filter { it.setType != SET_TYPE_WARMUP }
+                    .maxByOrNull { it.setNumber }
                 if (lastSet != null) {
                     OutlinedButton(
                         onClick = {

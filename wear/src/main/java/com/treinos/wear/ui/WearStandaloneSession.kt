@@ -31,9 +31,15 @@ sealed interface WearStandaloneAction {
     /** Snapshot recebido (ou relido do Room) — restaura o estado da sessão. */
     data class Start(
         val snapshot: WearSessionSnapshot?,
-        /** Séries já registradas do exercício atual (restauradas do Room). */
-        val loggedSets: Int,
+        /**
+         * H6-1: séries registradas por `sessionExerciseId` (Room do relógio) —
+         * a posição corrente é derivada delas em `resumePosition`.
+         */
+        val loggedByExercise: Map<Long, Int>,
         val pendingCount: Int,
+        /** Deadline persistido do descanso (`null` = sem descanso). */
+        val restEndsAt: Long? = null,
+        val now: Long = 0L,
     ) : WearStandaloneAction
 
     /** Série registrada offline; `clientSetId` é gerado pelo store. */
@@ -47,6 +53,12 @@ sealed interface WearStandaloneAction {
     data class Tick(val now: Long) : WearStandaloneAction
 }
 
+/** Posição restaurada da sessão (H6-1): exercício corrente e próxima série. */
+data class WearStandaloneResume(
+    val exerciseIndex: Int,
+    val setNumber: Int,
+)
+
 object WearStandaloneSession {
 
     /**
@@ -56,6 +68,33 @@ object WearStandaloneSession {
      */
     fun restante(restEndsAt: Long?, now: Long): Int =
         restEndsAt?.let { end -> ((end - now) / 1000L).toInt().coerceAtLeast(0) } ?: 0
+
+    /**
+     * H6-1: posição corrente derivada das séries registradas no relógio —
+     * o primeiro exercício com séries abaixo do planejado é o corrente
+     * (`setNumber = registradas + 1`); todos completos → último exercício com
+     * série extra. Sem exercícios, não há posição (tela de "sem treino").
+     *
+     * Limitação documentada na spec: séries registradas no CELULAR antes de
+     * ficar offline não estão no Room do relógio — a derivação usa só o que o
+     * pulso registrou (fallback: exercício 1, como antes da correção).
+     */
+    fun resumePosition(
+        snapshot: WearSessionSnapshot,
+        loggedByExercise: Map<Long, Int>,
+    ): WearStandaloneResume? {
+        val exercicios = snapshot.exercises.sortedBy { it.exerciseIndex }
+        val primeiroIncompleto = exercicios.firstOrNull { ex ->
+            val registradas = loggedByExercise[ex.sessionExerciseId] ?: 0
+            registradas < ex.plannedSets.coerceAtLeast(1)
+        }
+        val alvo = primeiroIncompleto ?: exercicios.lastOrNull() ?: return null
+        val registradas = loggedByExercise[alvo.sessionExerciseId] ?: 0
+        return WearStandaloneResume(
+            exerciseIndex = alvo.exerciseIndex,
+            setNumber = (registradas + 1).coerceAtLeast(1),
+        )
+    }
 
     fun reduce(state: WearStandaloneState, action: WearStandaloneAction): WearStandaloneState =
         when (action) {
@@ -71,25 +110,27 @@ object WearStandaloneSession {
             pendingCount = action.pendingCount,
         )
         val exercicios = snapshot.exercises
-        val primeiro = exercicios.firstOrNull()
-        // Série atual = séries já registradas do primeiro exercício + 1,
-        // limitada ao planejado; sem pendentes, começa na 1ª.
-        val setNumber = if (primeiro != null) {
-            (action.loggedSets.coerceAtLeast(0) + 1).coerceIn(1, primeiro.plannedSets.coerceAtLeast(1))
-        } else {
-            1
-        }
+        // H6-1: exercício/série correntes derivados das séries registradas —
+        // reiniciar o relógio no meio da sessão não volta mais ao exercício 1.
+        val resume = resumePosition(snapshot, action.loggedByExercise)
+        val exercicio = exercicios.firstOrNull { it.exerciseIndex == resume?.exerciseIndex }
+            ?: exercicios.firstOrNull()
+        val setNumber = resume?.setNumber
+            ?: ((action.loggedByExercise[exercicio?.sessionExerciseId] ?: 0) + 1)
+                .coerceIn(1, exercicio?.plannedSets?.coerceAtLeast(1) ?: 1)
         return WearStandaloneState(
             sessionId = snapshot.sessionId,
             dayName = snapshot.dayName,
             modality = snapshot.modality,
-            exerciseIndex = 0,
+            exerciseIndex = resume?.exerciseIndex ?: 0,
             setNumber = setNumber,
-            plannedSets = primeiro?.plannedSets ?: 0,
-            restEndsAt = null,
+            plannedSets = exercicio?.plannedSets ?: 0,
+            // H6-1: o descanso persistido (`restEndsAt` futuro) sobrevive ao
+            // reinício; no passado zera (sem card fantasma).
+            restEndsAt = action.restEndsAt?.takeIf { it > action.now },
             status = "in_progress",
             pendingCount = action.pendingCount,
-            exercise = primeiro,
+            exercise = exercicio,
             exerciseCount = exercicios.size,
         )
     }

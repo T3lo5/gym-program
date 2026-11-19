@@ -91,16 +91,23 @@ class WorkoutWearActivity : ComponentActivity() {
                         if (snapshot == null) {
                             WearStandaloneState(pendingCount = store.pendingCount())
                         } else {
+                            // H6-1: posição corrente derivada das séries
+                            // registradas no relógio + descanso persistido —
+                            // reiniciar o relógio não volta mais ao exercício 1.
                             val sets = store.setsOfSession(snapshot.sessionId)
-                            val primeiro = snapshot.exercises.firstOrNull()
+                            val loggedByExercise = sets
+                                .filter { !it.deleted }
+                                .groupingBy { it.sessionExerciseId }
+                                .eachCount()
+                            val agora = System.currentTimeMillis()
                             WearStandaloneSession.reduce(
                                 WearStandaloneState(),
                                 WearStandaloneAction.Start(
                                     snapshot = snapshot,
-                                    loggedSets = sets.count {
-                                        it.sessionExerciseId == primeiro?.sessionExerciseId
-                                    },
+                                    loggedByExercise = loggedByExercise,
                                     pendingCount = store.pendingCount(),
+                                    restEndsAt = store.restEndsAtOf(snapshot.sessionId),
+                                    now = agora,
                                 ),
                             )
                         }
@@ -617,6 +624,32 @@ fun WorkoutWearScreen(
                         text = stringResource(R.string.in_progress),
                         fontSize = 18.sp,
                     )
+                    val agora = System.currentTimeMillis()
+                    // H6-1: intervalos da corrida no pulso — fase + contagem
+                    // derivadas do que o celular publicou (`updatedAt`) e do
+                    // tick local de 1 s (`agora`); sem intervalo, nada aparece.
+                    state.intervalPhase?.let { fase ->
+                        val restante = state.intervalRemainingSeconds?.let { publicados ->
+                            val decorrido = ((agora - state.updatedAt) / 1000L).coerceAtLeast(0L)
+                            (publicados - decorrido.toInt()).coerceAtLeast(0)
+                        }
+                        val faseLabel = stringResource(
+                            when (fase) {
+                                "work" -> R.string.run_phase_work
+                                "recover" -> R.string.run_phase_recover
+                                else -> R.string.run_phase_warmup
+                            },
+                        )
+                        Text(
+                            text = if (restante != null) {
+                                stringResource(R.string.run_interval_format, faseLabel, restante)
+                            } else {
+                                faseLabel
+                            },
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     state.liveDistanceMeters?.takeIf { it > 0.0 }?.let { meters ->
                         Text(
                             text = "${"%.1f".format(meters / 1000.0)} km",

@@ -208,4 +208,36 @@ class WearSessionMapperTest {
         // offline no relógio sem séries.
         assertEquals(0, snapshot.exercises.size)
     }
+
+    // ---- H6-1: intervalos da corrida publicados ao pulso ----
+
+    @Test
+    fun publica_intervalo_da_corrida() {
+        val agora = 1_700_000_100_000L
+        val base = session(modality = "run")
+        val sessao = base.copy(session = base.session.copy(startedAt = agora - 310_000L))
+        val estado = WearSessionMapper.toWearState(
+            sessao,
+            0,
+            restRemainingSeconds = null,
+            nowMillis = agora,
+        )
+        // 310 s decorridos: warmup (300 s) terminou; ciclo de 10 s no work
+        // (60 s) → restante 50 s (mesma regra pura de intervalPhaseAt).
+        assertEquals("work", estado.intervalPhase)
+        assertEquals(50, estado.intervalRemainingSeconds)
+    }
+
+    @Test
+    fun sem_intervalo_publica_nulo() {
+        val sessao = session(sessionExercise(1, "Supino reto", 3))
+        val estado = WearSessionMapper.toWearState(
+            sessao,
+            0,
+            restRemainingSeconds = null,
+            nowMillis = 1_700_000_100_000L,
+        )
+        assertNull(estado.intervalPhase)
+        assertNull(estado.intervalRemainingSeconds)
+    }
 }
