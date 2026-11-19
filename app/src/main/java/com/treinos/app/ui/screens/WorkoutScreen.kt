@@ -87,6 +87,7 @@ import com.treinos.app.ui.SetRecord
 import com.treinos.app.ui.DEFAULT_PLATE_INVENTORY
 import com.treinos.app.ui.components.EmptyState
 import com.treinos.app.ui.components.ExerciseImage
+import com.treinos.app.ui.components.ModalityBadge
 import com.treinos.app.ui.components.NoteEditDialog
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SetEditDialog
@@ -319,11 +320,26 @@ fun WorkoutScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Text(
-                                text = current.session.planName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = current.session.planName,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                ModalityBadge(
+                                    kind = current.session.modality,
+                                    label = when (current.session.modality) {
+                                        "run" -> stringResource(R.string.modality_run)
+                                        "mobility" -> stringResource(R.string.modality_mobility)
+                                        "swim" -> stringResource(R.string.modality_swim)
+                                        else -> stringResource(R.string.modality_strength)
+                                    },
+                                )
+                            }
                             Text(
                                 text = stringResource(R.string.workout_started, formatDateTime(current.session.startedAt)),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -1038,8 +1054,8 @@ private fun RestBar(
             }
             Text(
                 text = message,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
             )
             if (!finished) {
                 LinearProgressIndicator(

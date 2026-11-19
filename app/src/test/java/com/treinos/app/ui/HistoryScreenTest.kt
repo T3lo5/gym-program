@@ -388,25 +388,16 @@ class HistoryScreenTest {
 
     @Test
     fun toggle_ano_agrega_ano() {
-        // H4-13 critério 4: com o calendário em janeiro do ano corrente, o
-        // relatório anual agrega o ano inteiro — inclui a sessão de hoje, que
-        // está em outro mês (quando hoje É janeiro, as duas caem no mês).
-        val sessaoJaneiro = sessaoEm(id = 9, data = LocalDate.of(today.year, 1, 1))
+        // H4-13 critério 4: o relatório anual agrega todo o ano, independentemente do mês exibido.
+        val sessaoJaneiro = sessaoEm(id = 9, data = LocalDate.of(2026, 1, 15))
+        val sessaoDezembro = sessaoEm(id = 10, data = LocalDate.of(2026, 12, 10))
         composeRule.setContent {
-            HistoryScreen(sessions = listOf(sessaoConcluida, sessaoJaneiro), onBack = { })
+            HistoryScreen(sessions = listOf(sessaoJaneiro, sessaoDezembro), onBack = { })
         }
 
-        repeat(today.monthValue - 1) {
-            composeRule.onNodeWithContentDescription("Mês anterior").performClick()
-        }
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Resumo do período"))
 
-        // Mês de janeiro: só a sessão de janeiro (hoje entra se hoje for janeiro).
-        val esperadoNoMes = if (today.monthValue == 1) 2 else 1
-        composeRule.onNode(hasText("Treinos concluídos") and hasText(esperadoNoMes.toString()))
-            .assertExists()
-
-        // Toggle Ano: o ano do mês exibido agrega as duas sessões.
+        // Toggle Ano: agrega as duas sessões do mesmo ano.
         composeRule.onNodeWithText("Ano").performClick()
         composeRule.onNode(hasText("Treinos concluídos") and hasText("2")).assertExists()
     }

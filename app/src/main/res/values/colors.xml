@@ -6,5 +6,5 @@
 
     <!-- Window background (claro e escuro) consumidos por themes.xml / values-night -->
     <color name="background_light">#FFFAFAFA</color>
-    <color name="background_dark">#FF121212</color>
+    <color name="background_dark">#FF0E0E10</color>
 </resources>

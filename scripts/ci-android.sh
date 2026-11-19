@@ -28,6 +28,13 @@ DIST="$ROOT/dist"
 
 export GRADLE_OPTS="${GRADLE_OPTS:--Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8 -Dorg.gradle.daemon=false}"
 
+# O local.properties do host (bind mount no container) aponta para um sdk.dir
+# que não existe dentro do container. Sobrescreve para o ANDROID_HOME do
+# container para que o -Dsdk.dir=$ANDROID_HOME do Gradle funcione.
+if [[ -n "${ANDROID_HOME:-}" && -f "$ROOT/local.properties" ]]; then
+  echo "sdk.dir=$ANDROID_HOME" > "$ROOT/local.properties"
+fi
+
 TASKS=(clean)
 if [[ "${SKIP_TESTS:-0}" != "1" ]]; then
   TASKS+=(":protocol:test")

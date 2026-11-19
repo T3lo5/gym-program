@@ -517,6 +517,17 @@ class AppViewModel(
     val lastFallbackReason: StateFlow<String> = _lastFallbackReason.asStateFlow()
 
     /**
+     * H6-7: usa cores do sistema (dynamic color) em vez da paleta da marca.
+     * Default desligado — a identidade própria da marca é o rosto do app.
+     */
+    val useDynamicColor: Boolean
+        get() = preferences.useDynamicColor
+
+    fun setUseDynamicColor(enabled: Boolean) {
+        preferences.useDynamicColor = enabled
+    }
+
+    /**
      * H3-40: envelope da geração em andamento (jobId, kind, request, config).
      * Sobrevive a processo morto; restaurado no init. Nulo quando não há job.
      */

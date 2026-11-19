@@ -81,7 +81,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContent {
-            TreinosTheme {
+            TreinosTheme(
+                dynamicColorEnabled = viewModel.useDynamicColor,
+            ) {
                 // H3-35: atalho "Retomar treino" abre direto a tela de treino.
                 // H4-14: o widget "Retomar treino" reusa o mesmo extra.
                 if (intent.getBooleanExtra(EXTRA_RESUME_SESSION, false)) {

@@ -743,6 +743,11 @@ fun TreinosApp(viewModel: AppViewModel) {
                             )
                         }
                     },
+                    // H6-7: toggle "Usar cores do sistema".
+                    useDynamicColor = viewModel.useDynamicColor,
+                    onDynamicColorChanged = { enabled ->
+                        viewModel.setUseDynamicColor(enabled)
+                    },
                 )
 
                 // H4-8: peso corporal e medidas ao longo do tempo — gráfico da

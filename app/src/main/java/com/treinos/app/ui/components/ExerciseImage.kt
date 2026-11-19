@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.treinos.app.ui.modalityAccentFor
 
 /**
  * Imagem de exercício resiliente (H3-32): cantos do tema, crossfade e fallback
@@ -30,6 +31,9 @@ import coil.request.ImageRequest
  * H3-39: `imageRes` é o drawable local de fallback (APK, offline) usado quando
  * não há `imageUrl`. A URL do catálogo remoto vence sobre o drawable local
  * (fonte preferencial).
+ *
+ * H6-7: fallback de letra com fundo tonal da modalidade em vez de letra cinza
+ * sobre `surfaceVariant`.
  */
 @Composable
 fun ExerciseImage(
@@ -39,13 +43,16 @@ fun ExerciseImage(
     modifier: Modifier = Modifier,
     size: Dp = 72.dp,
     contentDescription: String? = null,
+    modalityKind: String = "strength",
 ) {
     val shape = MaterialTheme.shapes.small
+    val accent = modalityAccentFor(modalityKind)
     if (imageUrl.isNullOrBlank() && imageRes == null) {
         ExerciseImageFallback(
             exerciseName = exerciseName,
             size = size,
             modifier = modifier.size(size).clip(shape),
+            accent = accent,
         )
         return
     }
@@ -80,26 +87,28 @@ fun ExerciseImage(
             .clip(shape)
             .semantics { this.contentDescription = description },
         contentScale = ContentScale.Crop,
-        loading = { ExerciseImageFallback(exerciseName, size) },
-        error = { ExerciseImageFallback(exerciseName, size) },
+        loading = { ExerciseImageFallback(exerciseName, size, accent = accent) },
+        error = { ExerciseImageFallback(exerciseName, size, accent = accent) },
     )
 }
 
 /**
  * Fallback de letra do [ExerciseImage], compartilhado com o detalhe do
- * exercício: fundo `surfaceVariant` e a inicial do nome, escalada pelo tamanho
- * (`titleMedium` até 48 dp, `headlineMedium` acima). Nunca um quadrado vazio.
+ * exercício: fundo tonal da modalidade e a inicial do nome, escalada pelo
+ * tamanho (`titleMedium` até 48 dp, `headlineMedium` acima). Nunca um quadrado vazio.
  */
 @Composable
 fun ExerciseImageFallback(
     exerciseName: String,
     size: Dp,
     modifier: Modifier = Modifier,
+    accent: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(accent.copy(alpha = 0.15f))
+            .clip(MaterialTheme.shapes.small),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -109,7 +118,7 @@ fun ExerciseImageFallback(
             } else {
                 MaterialTheme.typography.headlineMedium
             },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = accent,
         )
     }
 }

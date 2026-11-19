@@ -283,6 +283,13 @@ class AppPreferences private constructor(
         prefs.edit().putStringSet(KEY_WEAR_RECENT_COMMANDS, ids).apply()
     }
 
+    /** H6-7: usa cores do sistema (dynamic color) em vez da paleta da marca. Default desligado. */
+    var useDynamicColor: Boolean
+        get() = prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_USE_DYNAMIC_COLOR, value).apply()
+        }
+
     /** H4-16: `clientSetId` já aplicado de um lote do relógio (dedupe persistido). */
     fun isSyncedSet(clientSetId: String): Boolean {
         val ids = prefs.getStringSet(KEY_WEAR_SYNCED_SET_IDS, emptySet()) ?: emptySet()
@@ -379,5 +386,6 @@ class AppPreferences private constructor(
         private const val KEY_LAST_FALLBACK_REASON = "last_fallback_reason"
         private const val KEY_PENDING_GENERATION_V1 = "pending_generation_v1"
         private const val KEY_ACTIVITY_DRAFT_V1 = "activity_draft_v1"
+        private const val KEY_USE_DYNAMIC_COLOR = "use_dynamic_color"
     }
 }

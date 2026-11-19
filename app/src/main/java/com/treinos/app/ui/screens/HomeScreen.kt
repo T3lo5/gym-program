@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -93,8 +94,10 @@ import com.treinos.app.ui.history.buildStreak
 import com.treinos.app.ui.history.sessionDates
 import com.treinos.app.ui.UiState
 import com.treinos.app.ui.components.BusyButton
+import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ExerciseImage
 import com.treinos.app.ui.components.LoadingState
+import com.treinos.app.ui.components.ModalityBadge
 import com.treinos.app.ui.components.PermissionRowState
 import com.treinos.app.ui.components.PermissionsCard
 import com.treinos.app.ui.components.ScreenTopBar
@@ -611,6 +614,8 @@ private fun modalityTabOf(kind: SessionKind): ModalityTab = when (kind) {
 /**
  * H3-28: card-herói do dia. Com sessão hoje, mostra o nome e "Iniciar" direto;
  * em dia de descanso, aponta a próxima sessão do plano.
+ * H6-7: herói em superfície tonal da modalidade, número grande de séries,
+ * gradiente sutil via container colorido.
  */
 @Composable
 private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
@@ -621,14 +626,14 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when (today) {
                 is TodaySession.Today -> {
                     Text(
                         text = stringResource(R.string.home_hero_today, today.day.day.name),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { heading() },
                     )
@@ -655,7 +660,7 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
                 is TodaySession.Next -> {
                     Text(
                         text = stringResource(R.string.home_hero_rest),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { heading() },
                     )
@@ -787,13 +792,14 @@ private fun HomeQuickAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Button(
+        onClick = onClick,
         modifier = modifier
-            .minimumInteractiveComponentSize()
-            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            .minimumInteractiveComponentSize(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -803,7 +809,6 @@ private fun HomeQuickAction(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = label,
@@ -845,8 +850,9 @@ private fun MeasurementsShortcutCard(
                     text = latestWeightKg?.let {
                         stringResource(R.string.home_measurements_last_weight, formatKg(it))
                     } ?: stringResource(R.string.home_measurements_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Icon(
@@ -868,7 +874,7 @@ private fun TodayBadge() {
     ) {
         Text(
                         text = stringResource(R.string.home_today),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
@@ -946,6 +952,19 @@ private fun ModalityDayCard(
                         }
                     }
                 }
+                ModalityBadge(
+                    kind = when (kind) {
+                        SessionKind.RUN -> "run"
+                        SessionKind.MOBILITY -> "mobility"
+                        SessionKind.STRENGTH -> "strength"
+                    },
+                    label = when (kind) {
+                        SessionKind.RUN -> stringResource(R.string.modality_run)
+                        SessionKind.MOBILITY -> stringResource(R.string.modality_mobility)
+                        SessionKind.STRENGTH -> stringResource(R.string.modality_strength)
+                    },
+                    modifier = Modifier.align(Alignment.Bottom),
+                )
             }
 
             if (day.day.isRestDay) {
@@ -972,6 +991,11 @@ private fun ModalityDayCard(
                                     imageUrl = exerciseMedia[exercise.exerciseId]?.imageUrl,
                                     exerciseName = exercise.exerciseName.ifBlank { exercise.exerciseId },
                                     size = 36.dp,
+                                    modalityKind = when (kind) {
+                                        SessionKind.RUN -> "run"
+                                        SessionKind.MOBILITY -> "mobility"
+                                        SessionKind.STRENGTH -> "strength"
+                                    },
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f),
@@ -1016,6 +1040,7 @@ private fun ModalityDayCard(
     }
 }
 
+/** H3-27: card de treino em andamento com número grande do descanso/progresso. */
 @Composable
 private fun InProgressCard(
     session: SessionWithExercises,
@@ -1068,33 +1093,14 @@ private fun InProgressCard(
         }
     }
     if (showAbandonConfirm) {
-        AlertDialog(
-            onDismissRequest = { showAbandonConfirm = false },
-            title = { Text(stringResource(R.string.home_abandon_title)) },
-            text = {
-                Text(
-                    stringResource(R.string.home_abandon_body)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showAbandonConfirm = false
-                        onAbandon()
-                    },
-                    modifier = Modifier.minimumInteractiveComponentSize(),
-                ) {
-                    Text(
-                        stringResource(R.string.home_abandon_confirm),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAbandonConfirm = false }, modifier = Modifier.minimumInteractiveComponentSize()) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+        ConfirmationDialog(
+            visible = true,
+            onDismiss = { showAbandonConfirm = false },
+            onConfirm = onAbandon,
+            title = stringResource(R.string.home_abandon_title),
+            message = stringResource(R.string.home_abandon_body),
+            confirmLabel = stringResource(R.string.home_abandon_confirm),
+            isDestructive = true,
         )
     }
 }
@@ -1103,6 +1109,7 @@ private fun InProgressCard(
  * H4-13: card de consistência da Home — sequência atual e melhor sequência de
  * dias com treino concluído, calculadas por [buildStreak] a partir das sessões
  * já recebidas pela tela. Só é renderizado quando `bestDays > 0` (regra 12).
+ * H6-7: números protagonistas (display).
  */
 @Composable
 private fun StreakCard(streak: StreakSummary) {
@@ -1123,7 +1130,8 @@ private fun StreakCard(streak: StreakSummary) {
                     streak.currentDays,
                     streak.currentDays,
                 ),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Bold,
             )
             Text(
                 text = pluralStringResource(
@@ -1169,7 +1177,8 @@ private fun ActivePlanCard(
             )
             Text(
                 text = planVolumeLabel(plan),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 // H3-30: quando o plano veio do fallback local, o selo cita o

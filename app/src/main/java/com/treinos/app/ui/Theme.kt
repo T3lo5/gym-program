@@ -10,6 +10,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -17,17 +20,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Green = Color(0xFF2E7D32)
-private val GreenDark = Color(0xFF81C784)
-private val Teal = Color(0xFF00695C)
+private const val BrandPrimary = 0xFF00C853
+private const val BrandPrimaryDark = 0xFF00E676
+private const val BrandSecondary = 0xFF00BFA5
+private const val BrandAccentEnergy = 0xFFFF6F00
+
+private val StrengthAccent = Color(0xFF00C853)
+private val RunAccent = Color(0xFFE65100)
+private val MobilityAccent = Color(0xFF3D5AFE)
+private val SwimAccent = Color(0xFF7C4DFF)
+
+/** Acento por modalidade — única fonte de cor de modalidade no app (regra H6-7 #3). */
+internal object ModalityAccent {
+    val strength = StrengthAccent
+    val run = RunAccent
+    val mobility = MobilityAccent
+    val swim = SwimAccent
+}
+
+internal val LocalModalityAccent = staticCompositionLocalOf<ModalityAccent> { ModalityAccent }
 
 internal object ThemeColors {
     const val LightSurface = 0xFFFFFFFF
     const val LightOnSurface = 0xFF1C1B1F
     const val LightOnSurfaceVariant = 0xFF49494F
-    const val LightPrimaryContainer = 0xFFE8F5E9
-    const val LightOnPrimaryContainer = 0xFF1B5E20
-    const val LightSecondaryContainer = 0xFFE0F2F1
+    const val LightPrimaryContainer = 0xFFDCFCE7
+    const val LightOnPrimaryContainer = 0xFF006400
+    const val LightSecondaryContainer = 0xFFCCFBF1
     const val LightOnSecondaryContainer = 0xFF004D40
     const val LightTertiaryContainer = 0xFFE8DEF8
     const val LightOnTertiaryContainer = 0xFF21005E
@@ -35,13 +54,13 @@ internal object ThemeColors {
     const val LightOnError = 0xFFFFFFFF
     const val LightErrorContainer = 0xFFEF9A9A
     const val LightOnErrorContainer = 0xFF4D0000
-    const val DarkSurface = 0xFF1E1E1E
+    const val DarkSurface = 0xFF0E0E10
     const val DarkOnSurface = 0xFFE6E1E5
     const val DarkOnSurfaceVariant = 0xFFCAC4D0
-    const val DarkPrimaryContainer = 0xFF387C3C
-    const val DarkOnPrimaryContainer = 0xFFE8F5E9
-    const val DarkSecondaryContainer = 0xFF00695C
-    const val DarkOnSecondaryContainer = 0xFFE0F2F1
+    const val DarkPrimaryContainer = 0xFF1B5E20
+    const val DarkOnPrimaryContainer = 0xFFDCFCE7
+    const val DarkSecondaryContainer = 0xFF004D40
+    const val DarkOnSecondaryContainer = 0xFFCCFBF1
     const val DarkTertiaryContainer = 0xFF2D2240
     const val DarkOnTertiaryContainer = 0xFFE8DEF8
     const val DarkError = 0xFFEF5350
@@ -51,46 +70,51 @@ internal object ThemeColors {
 }
 
 private val LightColors = lightColorScheme(
-    primary = Green,
+    primary = Color(BrandPrimary),
     onPrimary = Color.White,
     primaryContainer = Color(ThemeColors.LightPrimaryContainer),
     onPrimaryContainer = Color(ThemeColors.LightOnPrimaryContainer),
-    secondary = Teal,
+    secondary = Color(BrandSecondary),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE0F2F1),
-    onSecondaryContainer = Color(0xFF004D40),
+    secondaryContainer = Color(ThemeColors.LightSecondaryContainer),
+    onSecondaryContainer = Color(ThemeColors.LightOnSecondaryContainer),
     background = Color(0xFFFAFAFA),
     surface = Color(ThemeColors.LightSurface),
     onSurface = Color(ThemeColors.LightOnSurface),
     surfaceVariant = Color(0xFFF1F8E9),
     surfaceContainer = Color(0xFFF1F8E9),
-    error = Color(0xFFB3261E),
+    error = Color(ThemeColors.LightError),
     onError = Color.White,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = GreenDark,
-    onPrimary = Color(0xFF1B5E20),
+    primary = Color(BrandPrimaryDark),
+    onPrimary = Color(0xFF003300),
     primaryContainer = Color(ThemeColors.DarkPrimaryContainer),
     onPrimaryContainer = Color(ThemeColors.DarkOnPrimaryContainer),
-    secondary = Color(0xFF4DB6AC),
-    onSecondary = Color(0xFF00332E),
-    secondaryContainer = Color(0xFF00695C),
-    onSecondaryContainer = Color(0xFFE0F2F1),
-    background = Color(0xFF121212),
+    secondary = Color(BrandSecondary),
+    onSecondary = Color.White,
+    secondaryContainer = Color(ThemeColors.DarkSecondaryContainer),
+    onSecondaryContainer = Color(ThemeColors.DarkOnSecondaryContainer),
+    background = Color(ThemeColors.DarkSurface),
     surface = Color(ThemeColors.DarkSurface),
     onSurface = Color(ThemeColors.DarkOnSurface),
-    surfaceVariant = Color(0xFF2C2C2C),
-    surfaceContainer = Color(0xFF2C2C2C),
-    error = Color(0xFFEF5350),
-    onError = Color.Black,
+    surfaceVariant = Color(0xFF1A1A24),
+    surfaceContainer = Color(0xFF1A1A24),
+    error = Color(ThemeColors.DarkError),
+    onError = Color(ThemeColors.DarkOnError),
 )
 
 internal val TreinosTypography = Typography(
+    displayLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 57.sp, lineHeight = 64.sp),
+    displayMedium = TextStyle(fontWeight = FontWeight.Bold, fontSize = 45.sp, lineHeight = 52.sp),
+    headlineLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
     titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
     bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp),
+    labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
     labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
 )
 
@@ -101,11 +125,16 @@ internal val TreinosShapes = Shapes(
 )
 
 @Composable
-fun TreinosTheme(content: @Composable () -> Unit) {
+fun TreinosTheme(
+    dynamicColorEnabled: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val colorScheme = when {
-        Build.VERSION.SDK_INT >= 31 && isSystemInDarkTheme() -> dynamicDarkColorScheme(context)
-        Build.VERSION.SDK_INT >= 31 -> dynamicLightColorScheme(context)
+        dynamicColorEnabled && Build.VERSION.SDK_INT >= 31 && isSystemInDarkTheme() ->
+            dynamicDarkColorScheme(context)
+        dynamicColorEnabled && Build.VERSION.SDK_INT >= 31 ->
+            dynamicLightColorScheme(context)
         isSystemInDarkTheme() -> DarkColors
         else -> LightColors
     }
@@ -113,6 +142,18 @@ fun TreinosTheme(content: @Composable () -> Unit) {
         colorScheme = colorScheme,
         typography = TreinosTypography,
         shapes = TreinosShapes,
-        content = content,
+        content = {
+            CompositionLocalProvider(LocalModalityAccent provides ModalityAccent) {
+                content()
+            }
+        },
     )
+}
+
+/** Retorna o acento da modalidade vigente na composição atual. */
+internal fun modalityAccentFor(kind: String): Color = when (kind) {
+    "run" -> ModalityAccent.run
+    "mobility" -> ModalityAccent.mobility
+    "swim" -> ModalityAccent.swim
+    else -> ModalityAccent.strength
 }

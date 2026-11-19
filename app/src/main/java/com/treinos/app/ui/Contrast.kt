@@ -1,5 +1,8 @@
 package com.treinos.app.ui
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -19,6 +22,13 @@ fun contrastRatio(foregroundArgb: Long, backgroundArgb: Long): Double {
     val lighter = max(l1, l2)
     val darker = min(l1, l2)
     return (lighter + 0.05) / (darker + 0.05)
+}
+
+/** Mapa único de estado → cor (H6-4). Fonte única para "em andamento"/sucesso/erro em qualquer tela. */
+internal object StatusColors {
+    fun inProgress(scheme: ColorScheme): Color = scheme.tertiary
+    fun success(scheme: ColorScheme): Color = scheme.primary
+    fun error(scheme: ColorScheme): Color = scheme.error
 }
 
 /** Mistura [foregroundArgb] sobre [backgroundArgb] quando o alfa for < 1 (opacas ficam inalteradas). */

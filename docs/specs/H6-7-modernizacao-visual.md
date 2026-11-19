@@ -7,8 +7,8 @@
 | Item do roadmap | `H6-7` (Horizon 6; pedido do dono em 2026-11-18 — "visual mais moderno") |
 | MoSCoW | `S` |
 | Versão alvo | `1.12.0` |
-| Spec aprovada em | `pendente de aprovação` (proposta de 2026-11-18) |
-| Implementação | `pendente` |
+| Spec aprovada em | `2026-11-18` (aprovada pelo dono — pedido de visual mais moderno) |
+| Implementação | `concluída` |
 | Depende de | H6-2, H6-4 e H6-5 concluídas (evita retrabalho nas mesmas telas) |
 
 ## Objetivo

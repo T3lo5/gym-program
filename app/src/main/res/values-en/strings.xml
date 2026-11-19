@@ -49,6 +49,11 @@
     <string name="settings_language_en">English</string>
     <string name="settings_language_desc">Choose the app interface language. Change is applied immediately.</string>
 
+    <!-- H6-7: system colors (dynamic color) -->
+    <string name="settings_dynamic_color_title">Appearance</string>
+    <string name="settings_dynamic_color_desc">Choose whether the app uses system colors or the brand identity (dark, energetic).</string>
+    <string name="settings_dynamic_color_label">Use system colors</string>
+
     <!-- Home: today / start modality -->
     <string name="home_today">Today</string>
     <string name="home_start_modality">Start %1$s</string>
@@ -630,6 +635,12 @@
     <string name="log_edit_title">Edit entry</string>
     <string name="activity_modality_swim">Swimming</string>
     <string name="activity_modality_other">Other</string>
+
+    <!-- H6-7: short labels for modality badge -->
+    <string name="modality_strength">Gym</string>
+    <string name="modality_run">Run</string>
+    <string name="modality_mobility">Mobility</string>
+    <string name="modality_swim">Swim</string>
     <string name="log_stroke_crawl">Crawl</string>
     <string name="log_stroke_backstroke">Backstroke</string>
     <string name="log_stroke_breaststroke">Breaststroke</string>

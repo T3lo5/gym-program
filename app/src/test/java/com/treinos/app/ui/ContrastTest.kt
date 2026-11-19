@@ -80,10 +80,21 @@ class ContrastTest {
 
     @Test
     fun alpha_blend_calculado() {
-        // Cor com alpha sobre fundo claro deve blendar (contraste menor que a opaca).
+        // Cor com alpha sobre fundo claro deve blender (contraste menor que a opaca).
         val opaco = contrastRatio(0xFF49494F, ThemeColors.LightSurface)
         val comAlpha = contrastRatio(0xBF49494F, ThemeColors.LightSurface)
         assertTrue(comAlpha < opaco)
         assertTrue(comAlpha > 0.0)
+    }
+
+    @Test
+    fun numero_destaque_contraste_fundo_escuro() {
+        // Número de destaque (display, texto grande) sobre fundo escuro ≥ 3:1.
+        assertTrue(contrastRatio(0xFFFFFFFF, ThemeColors.DarkSurface) >= 3.0)
+    }
+
+    @Test
+    fun numero_destaque_contraste_fundo_claro() {
+        assertTrue(contrastRatio(0xFF000000, ThemeColors.LightSurface) >= 3.0)
     }
 }

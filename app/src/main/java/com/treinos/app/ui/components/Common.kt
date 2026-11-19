@@ -1,5 +1,6 @@
 package com.treinos.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -49,7 +51,10 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.treinos.app.R
+import com.treinos.app.ui.ModalityAccent
 import com.treinos.app.ui.exerciseContentDescription
+import com.treinos.app.ui.modalityAccentFor
+import com.treinos.app.ui.StatusColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,9 +89,24 @@ fun ScreenTopBar(
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(top = 12.dp, bottom = 6.dp).semantics { heading() },
+        modifier = modifier.padding(top = 16.dp, bottom = 8.dp).semantics { heading() },
+    )
+}
+
+/** Chip de acento por modalidade (H6-7): cor da modalidade sobre superfície. */
+@Composable
+fun ModalityBadge(
+    kind: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val accent = modalityAccentFor(kind)
+    Box(
+        modifier = modifier
+            .background(accent.copy(alpha = 0.15f), MaterialTheme.shapes.small)
+            .semantics { contentDescription = label },
     )
 }
 
@@ -142,7 +162,7 @@ fun KeyValueRow(
     }
 }
 
-/** Card de métrica do histórico. Altura variável para não cortar com fonte grande. */
+/** Card de métrica do histórico. Número protagonista em display/título. */
 @Composable
 fun MetricCard(
     label: String,
@@ -154,23 +174,23 @@ fun MetricCard(
         Column(
             modifier = Modifier
                 .wrapContentHeight()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             detail?.let {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -210,7 +230,7 @@ fun ErrorState(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.error,
         )
         Text(
@@ -239,7 +259,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = title, style = MaterialTheme.typography.titleLarge)
+        Text(text = title, style = MaterialTheme.typography.headlineMedium)
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
@@ -286,7 +306,7 @@ fun BusyButton(
 
 /**
  * Mensagem de status com semântica visual (H3-32): sucesso em `primary` com
- * check, erro em `error` com alerta — antes ambas eram idênticas em `primary`.
+ * check, erro em `error` com alerta.
  */
 @Composable
 fun StatusText(
@@ -295,7 +315,7 @@ fun StatusText(
     modifier: Modifier = Modifier,
     announce: Boolean = false,
 ) {
-    val color = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    val color = if (isSuccess) StatusColors.success(MaterialTheme.colorScheme) else StatusColors.error(MaterialTheme.colorScheme)
     Row(
         modifier = modifier.semantics(mergeDescendants = true) {
             if (announce) liveRegion = LiveRegionMode.Polite
@@ -311,7 +331,7 @@ fun StatusText(
         )
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = color,
         )
     }

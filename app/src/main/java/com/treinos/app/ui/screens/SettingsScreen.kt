@@ -170,6 +170,9 @@ fun SettingsScreen(
     watchSyncMessage: String? = null,
     onSyncWatch: () -> Unit = {},
     onClearWatchSyncMessage: () -> Unit = {},
+    // H6-7: estado e callback do toggle "Usar cores do sistema".
+    useDynamicColor: Boolean = false,
+    onDynamicColorChanged: (Boolean) -> Unit = {},
 ) {
     var url by remember(backendUrl) { mutableStateOf(backendUrl) }
     val clipboard = LocalClipboardManager.current
@@ -1336,6 +1339,41 @@ fun SettingsScreen(
                         current = currentAppLanguage(),
                         onChange = {},
                     )
+                }
+            }
+
+            // H6-7: toggle "Usar cores do sistema" — desligado por default; a
+            // identidade própria da marca é o rosto do app.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_dynamic_color_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_dynamic_color_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_dynamic_color_label),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Switch(
+                            checked = useDynamicColor,
+                            onCheckedChange = { onDynamicColorChanged(it) },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        )
+                    }
                 }
             }
         }

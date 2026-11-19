@@ -682,7 +682,7 @@ implementação sem aprovação.
 | H6-4 | Consistência visual e componentes | **S** | P4.1–4.8 | [H6-4](docs/specs/H6-4-consistencia-visual-componentes.md) |
 | H6-5 | Telas de informação: medidas, gráficos, rascunhos e pulso | **S** | P2.1–2.8 + P3.6 | [H6-5](docs/specs/H6-5-telas-informacao-polimento.md) |
 | H6-6 | Revisão antecipada do plano com base na evolução | **M** | pedido do dono; corrige `nextReviewAt` do aceite | [H6-6](docs/specs/H6-6-revisao-antecipada-plano.md) |
-| H6-7 | Modernização visual: escuro + energético, redesenho completo | **S** | decisão do dono; 5 fases com gate | [H6-7](docs/specs/H6-7-modernizacao-visual.md) |
+| H6-7 | Modernização visual: escuro + energético, redesenho completo | **S** | decisão do dono; 5 fases com gate | [H6-7](docs/specs/H6-7-modernizacao-visual.md) (concluída) |
 
 Ordem proposta: H6-1 → H6-2 → H6-3 → H6-4 → H6-5 → H6-6 → H6-7 (H6-7 por
 último para não redesenhar o que H6-2/4/5 ainda mexem).
