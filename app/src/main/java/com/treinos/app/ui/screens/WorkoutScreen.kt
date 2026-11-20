@@ -253,9 +253,13 @@ fun WorkoutScreen(
                             onClick = { showFinishConfirm = true },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(horizontal = 20.dp, vertical = 14.dp),
                         ) {
-                            Text(stringResource(R.string.action_finish))
+                            Text(
+                                stringResource(R.string.action_finish),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
@@ -317,8 +321,8 @@ fun WorkoutScreen(
                         ),
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -327,8 +331,9 @@ fun WorkoutScreen(
                             ) {
                                 Text(
                                     text = current.session.planName,
-                                    style = MaterialTheme.typography.headlineMedium,
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                                 ModalityBadge(
                                     kind = current.session.modality,
@@ -343,6 +348,7 @@ fun WorkoutScreen(
                             Text(
                                 text = stringResource(R.string.workout_started, formatDateTime(current.session.startedAt)),
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                             val done = current.exercises.sumOf { it.exercise.completedSets }
                             val planned = current.exercises.sumOf { it.exercise.plannedSets }
@@ -359,6 +365,7 @@ fun WorkoutScreen(
                             Text(
                                 text = progressStateDescription(done, planned),
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                             // H4-11: nota da sessão — texto atual ou convite
                             // para adicionar; tocar abre o diálogo de nota.
@@ -377,6 +384,7 @@ fun WorkoutScreen(
                                         stringResource(R.string.workout_note_add)
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                             }
                         }
@@ -1034,7 +1042,7 @@ private fun RestBar(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp).semantics(mergeDescendants = true) {
+            modifier = Modifier.padding(20.dp).semantics(mergeDescendants = true) {
                 stateDescription = when {
                     finished -> restStateDone
                     paused -> restStatePaused
@@ -1042,7 +1050,7 @@ private fun RestBar(
                 }
                 if (announce) liveRegion = LiveRegionMode.Polite
             },
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             restStartedAnnouncement?.let {
                 Text(
@@ -1054,8 +1062,9 @@ private fun RestBar(
             }
             Text(
                 text = message,
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             if (!finished) {
                 LinearProgressIndicator(
@@ -1064,7 +1073,8 @@ private fun RestBar(
                 )
                 Text(
                     text = stringResource(R.string.workout_rest_total, formatSeconds(total)),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             Row(
@@ -1138,14 +1148,14 @@ private fun ExerciseCard(
     val haptics = LocalHapticFeedback.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // H4-6: cabeçalho do grupo dentro do card do primeiro membro.
             supersetHeader?.let { header ->
                 Text(
                     text = header,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -1154,7 +1164,7 @@ private fun ExerciseCard(
             // o botão de ação fica fora do bloco, em contraste pleno.
             Column(
                 modifier = Modifier.alpha(if (completed) 0.55f else 1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Row(
                     modifier = Modifier
@@ -1172,12 +1182,12 @@ private fun ExerciseCard(
                         imageUrl = media?.imageUrl,
                         exerciseName = name,
                         contentDescription = decorativeContentDescription(),
-                        size = 72.dp,
+                        size = 80.dp,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = name,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
                         )
@@ -1185,21 +1195,21 @@ private fun ExerciseCard(
                         supersetLabel?.let { label ->
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
                         Text(
                             text = stringResource(R.string.workout_planned_sets, exercise.exercise.plannedSets, exercise.exercise.restSeconds),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (showPrSeal) {
                             // H4-1: selo do recorde batido nesta sessão.
                             Text(
                                 text = stringResource(R.string.workout_pr_seal),
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -1211,12 +1221,12 @@ private fun ExerciseCard(
                 if (sets.isEmpty()) {
                     Text(
                         text = stringResource(R.string.workout_no_sets),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     sets.forEach { set ->
-                        HorizontalDivider()
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1239,12 +1249,12 @@ private fun ExerciseCard(
                         ) {
                             Text(
                                 text = stringResource(R.string.workout_set, set.setNumber),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
                                 text = setDetailText(set),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
                             )
                             Icon(
                                 imageVector = Icons.Default.Check,
@@ -1313,14 +1323,15 @@ private fun ExerciseCard(
             if (suggestionText != null) {
                 Text(
                     text = suggestionText,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
             if (canApplyProgression) {
                 OutlinedButton(
                     onClick = onApplyProgression,
-                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 8.dp),
                 ) {
                     Text(stringResource(R.string.workout_apply_progression))
                 }

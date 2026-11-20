@@ -168,168 +168,168 @@ fun HistoryScreen(
     Scaffold(
         topBar = { ScreenTopBar(title = stringResource(R.string.screen_history), onBack = onBack) },
     ) { padding ->
-        if (sessions.isEmpty()) {
-            EmptyState(
-                title = stringResource(R.string.history_empty_title),
-                description = stringResource(R.string.history_empty_body),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                action = {
-                    Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
-                        Text(stringResource(R.string.history_empty_cta))
-                    }
-                },
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    MonthNavigator(
-                        month = month,
-                        canGoNext = isBeforeCurrentMonth(month.year, month.monthValue, today),
-                        onNavigate = { deltaMonths ->
-                            month = month.plusMonths(deltaMonths)
-                            selectedDate = null
-                        },
-                    )
-                }
-
-                item {
-                    MonthCalendar(
-                        month = month,
-                        today = today,
-                        selectedDate = selectedDate,
-                        completedDates = completedDates,
-                        inProgressDates = inProgressDates,
-                        onSelectDay = { date ->
-                            selectedDate = if (selectedDate == date) null else date
-                        },
-                    )
-                }
-
-                // H3-28: chips logo após o calendário — filtrar muda o que está
-                // na área visível, sem rolar uma tela.
-                if (modalities.size > 1) {
+            if (sessions.isEmpty()) {
+                EmptyState(
+                    title = stringResource(R.string.history_empty_title),
+                    description = stringResource(R.string.history_empty_body),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    action = {
+                        Button(onClick = onGenerate, modifier = Modifier.minimumInteractiveComponentSize()) {
+                            Text(stringResource(R.string.history_empty_cta))
+                        }
+                    },
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     item {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            FilterChip(
-                                selected = modalityFilter == null,
-                                onClick = { modalityFilter = null },
-                                label = { Text(stringResource(R.string.history_filter_all)) },
-                            )
-                            modalities.forEach { modality ->
+                        MonthNavigator(
+                            month = month,
+                            canGoNext = isBeforeCurrentMonth(month.year, month.monthValue, today),
+                            onNavigate = { deltaMonths ->
+                                month = month.plusMonths(deltaMonths)
+                                selectedDate = null
+                            },
+                        )
+                    }
+
+                    item {
+                        MonthCalendar(
+                            month = month,
+                            today = today,
+                            selectedDate = selectedDate,
+                            completedDates = completedDates,
+                            inProgressDates = inProgressDates,
+                            onSelectDay = { date ->
+                                selectedDate = if (selectedDate == date) null else date
+                            },
+                        )
+                    }
+
+                    // H3-28: chips logo após o calendário — filtrar muda o que está
+                    // na área visível, sem rolar uma tela.
+                    if (modalities.size > 1) {
+                        item {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 FilterChip(
-                                    selected = modalityFilter == modality,
-                                    onClick = { modalityFilter = modality },
-                                    label = {
-                                        Text(activityModalityLabel(ActivityModality.fromStorageValue(modality)))
-                                    },
+                                    selected = modalityFilter == null,
+                                    onClick = { modalityFilter = null },
+                                    label = { Text(stringResource(R.string.history_filter_all)) },
                                 )
+                                modalities.forEach { modality ->
+                                    FilterChip(
+                                        selected = modalityFilter == modality,
+                                        onClick = { modalityFilter = modality },
+                                        label = {
+                                            Text(activityModalityLabel(ActivityModality.fromStorageValue(modality)))
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                selectedDate?.let { date ->
-                    item {
-                        FilterChip(
-                            selected = true,
-                            onClick = { selectedDate = null },
-                            label = { Text(stringResource(R.string.history_day_label, formatDateShort(date))) },
+                    selectedDate?.let { date ->
+                        item {
+                            FilterChip(
+                                selected = true,
+                                onClick = { selectedDate = null },
+                                label = { Text(stringResource(R.string.history_day_label, formatDateShort(date))) },
+                            )
+                        }
+                    }
+
+                    if (selectedDate == null) {
+                        item {
+                            MetricsCards(metrics)
+                        }
+                        if (metrics.volumeByMuscle.isNotEmpty()) {
+                            item { VolumeByMuscle(metrics) }
+                        }
+                        // H4-2: gráficos de progresso — só na visão do mês inteiro;
+                        // com um dia selecionado o foco é a lista daquele dia.
+                        item {
+                            ExerciseEvolutionSection(
+                                monthSessions = monthSessions,
+                                firstDay = firstDay,
+                                lastDay = lastDay,
+                            )
+                        }
+                        item {
+                            WeeklyMuscleVolumeSection(
+                                sessions = modalitySessions,
+                                muscleByExerciseId = muscleByExerciseId,
+                                weekStart = weekStart,
+                                weekEnd = weekEnd,
+                            )
+                        }
+                    }
+
+                    if (visible.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (monthSessions.isEmpty()) {
+                                    stringResource(
+                                        R.string.history_no_train_month,
+                                        formatMonthYear(month.year, month.monthValue),
+                                    )
+                                } else {
+                                    stringResource(R.string.history_no_record_day)
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    items(visible, key = { it.session.id }) { session ->
+                        HistorySessionRow(
+                            session = session,
+                            exerciseMedia = exerciseMedia,
+                            onOpenExerciseDetail = onOpenExerciseDetail,
+                            onOpenExerciseHistory = onOpenExerciseHistory,
+                            onEditActivity = onEditActivity,
+                            onDeleteActivity = onDeleteActivity,
+                            onUpdateSet = onUpdateSet,
+                            onDeleteSet = onDeleteSet,
                         )
                     }
-                }
 
-                if (selectedDate == null) {
-                    item {
-                        MetricsCards(metrics)
+                    if (selectedDate == null) {
+                        // H4-13: resumo do período (mês/ano) no fim da lista — as
+                        // sessões continuam escaneáveis no topo (H3-28) e o toggle
+                        // não muda o calendário.
+                        item {
+                            PeriodReportCard(
+                                sessions = modalitySessions,
+                                muscleByExerciseId = muscleByExerciseId,
+                                reference = month.atDay(1),
+                            )
+                        }
                     }
-                    if (metrics.volumeByMuscle.isNotEmpty()) {
-                        item { VolumeByMuscle(metrics) }
-                    }
-                    // H4-2: gráficos de progresso — só na visão do mês inteiro;
-                    // com um dia selecionado o foco é a lista daquele dia.
-                    item {
-                        ExerciseEvolutionSection(
-                            monthSessions = monthSessions,
-                            firstDay = firstDay,
-                            lastDay = lastDay,
-                        )
-                    }
-                    item {
-                        WeeklyMuscleVolumeSection(
-                            sessions = modalitySessions,
-                            muscleByExerciseId = muscleByExerciseId,
-                            weekStart = weekStart,
-                            weekEnd = weekEnd,
-                        )
-                    }
-                }
 
-                if (visible.isEmpty()) {
-                    item {
-                        Text(
-                            text = if (monthSessions.isEmpty()) {
-                                stringResource(
-                                    R.string.history_no_train_month,
-                                    formatMonthYear(month.year, month.monthValue),
-                                )
-                            } else {
-                                stringResource(R.string.history_no_record_day)
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                items(visible, key = { it.session.id }) { session ->
-                    HistorySessionRow(
-                        session = session,
-                        exerciseMedia = exerciseMedia,
-                        onOpenExerciseDetail = onOpenExerciseDetail,
-                        onOpenExerciseHistory = onOpenExerciseHistory,
-                        onEditActivity = onEditActivity,
-                        onDeleteActivity = onDeleteActivity,
-                        onUpdateSet = onUpdateSet,
-                        onDeleteSet = onDeleteSet,
-                    )
-                }
-
-                if (selectedDate == null) {
-                    // H4-13: resumo do período (mês/ano) no fim da lista — as
-                    // sessões continuam escaneáveis no topo (H3-28) e o toggle
-                    // não muda o calendário.
-                    item {
-                        PeriodReportCard(
-                            sessions = modalitySessions,
-                            muscleByExerciseId = muscleByExerciseId,
-                            reference = month.atDay(1),
-                        )
-                    }
-                }
-
-                if (selectedDate != null) {
-                    // H3-28: com dia selecionado, a lista daquele dia vem antes
-                    // das métricas e do volume.
-                    item {
-                        MetricsCards(metrics)
-                    }
-                    if (metrics.volumeByMuscle.isNotEmpty()) {
-                        item { VolumeByMuscle(metrics) }
+                    if (selectedDate != null) {
+                        // H3-28: com dia selecionado, a lista daquele dia vem antes
+                        // das métricas e do volume.
+                        item {
+                            MetricsCards(metrics)
+                        }
+                        if (metrics.volumeByMuscle.isNotEmpty()) {
+                            item { VolumeByMuscle(metrics) }
+                        }
                     }
                 }
             }
-        }
     }
 }
 
@@ -977,6 +977,7 @@ private fun SessionCard(
                     append(" • $setsText")
                 },
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // H4-11: nota da sessão no histórico — só quando existe; sessões
@@ -1034,7 +1035,7 @@ private fun SessionCard(
                                     }
                                 }
                             }
-                            // H4-3: ação secundária da linha — drill-down do
+                            // H4-3: ação secundária da linha de exercício — drill-down do
                             // exercício. O toque no botão não abre o detalhe.
                             val openHistoryDesc = stringResource(R.string.a11y_exercise_history_action)
                             TextButton(
