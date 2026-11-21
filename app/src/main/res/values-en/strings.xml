@@ -887,4 +887,34 @@
     <string name="settings_health_error_write_hint">The workout is still saved in the app. Tap Try again to send it to Health Connect.</string>
     <string name="settings_health_error_permission">Health Connect permission denied. Connect again to sync.</string>
     <string name="settings_health_privacy">Privacy: health data stays on this device only, in the app and in Android\'s Health Connect. Nothing is sent to the backend, to AI or to third parties.</string>
+
+    <!-- H6-8: gamification (Progress screen) -->
+    <string name="screen_gamification">Progress</string>
+    <string name="screen_gamification_title">Your progress</string>
+    <string name="section_badges">Achievements</string>
+    <string name="metric_sessoes">Workouts completed</string>
+    <string name="metric_streak">Current streak</string>
+    <string name="metric_recordes">Personal records</string>
+    <string name="msg_no_badges_yet">You haven\'t unlocked any achievements yet. Keep training!</string>
+    <string name="badge_unlocked">Unlocked</string>
+    <string name="badge_locked">Locked</string>
+    <string name="bottom_bar_progresso">Progress</string>
+
+    <!-- H6-8: badge titles (EN) -->
+    <string name="badge_primeiro_treino_title">First workout</string>
+    <string name="badge_primeiro_treino_desc">Complete your first session.</string>
+    <string name="badge_semana_de_ouro_title">Gold week</string>
+    <string name="badge_semana_de_ouro_desc">Complete 7 sessions.</string>
+    <string name="badge_marcador_cem_title">Hundred mark</string>
+    <string name="badge_marcador_cem_desc">Complete 100 sessions.</string>
+    <string name="badge_estreia_de_streak_title">Streak debut</string>
+    <string name="badge_estreia_de_streak_desc">Keep a 3-day streak.</string>
+    <string name="badge_semana_ininterrupta_title">Uninterrupted week</string>
+    <string name="badge_semana_ininterrupta_desc">Keep a 7-day streak.</string>
+    <string name="badge_primeiro_recorde_title">First record</string>
+    <string name="badge_primeiro_recorde_desc">Beat your first personal record.</string>
+    <string name="badge_colecionador_de_recordes_title">Record collector</string>
+    <string name="badge_colecionador_de_recordes_desc">Beat 5 personal records.</string>
+    <string name="badge_maratonista_modalidade_title">Multi-modality athlete</string>
+    <string name="badge_maratonista_modalidade_desc">Train in all three modalities (strength, running, mobility).</string>
 </resources>

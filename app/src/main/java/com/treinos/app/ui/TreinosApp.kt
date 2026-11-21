@@ -52,6 +52,7 @@ import com.treinos.app.ui.screens.MobilityScreen
 import com.treinos.app.ui.screens.RunWorkoutScreen
 import com.treinos.app.ui.screens.SettingsScreen
 import com.treinos.app.ui.screens.WorkoutScreen
+import com.treinos.app.ui.gamification.GamificationScreen
 import com.treinos.app.ui.measurements.latestMeasurement
 import com.treinos.app.ui.components.BottomNavigationBar
 import com.treinos.app.ui.components.ExerciseDetailSheet
@@ -136,6 +137,8 @@ fun TreinosApp(viewModel: AppViewModel) {
     val applicableProgressions by viewModel.applicableProgressions.collectAsStateWithLifecycle()
     val planTargetWeights by viewModel.planTargetWeights.collectAsStateWithLifecycle()
     val personalRecords by viewModel.personalRecords.collectAsStateWithLifecycle()
+    // H6-8: estado de gamificação (nível, XP, badges).
+    val gamificationState by viewModel.gamificationState.collectAsStateWithLifecycle()
     // H4-6: plano do dia da sessão em andamento para os rótulos de superset.
     val activeSessionPlanExercises by viewModel.activeSessionPlanExercises.collectAsStateWithLifecycle()
     // H4-8: peso corporal e medidas ao longo do tempo.
@@ -372,11 +375,12 @@ fun TreinosApp(viewModel: AppViewModel) {
         BackHandler(enabled = screen != Screen.Home, onBack = onBackFromStack)
     }
 
-    val isHub = screen == Screen.Home || screen == Screen.History || screen == Screen.Settings
+    val isHub = screen == Screen.Home || screen == Screen.History || screen == Screen.Settings || screen == Screen.Gamification
     val bottomBarSelected = when (screen) {
         Screen.Home -> 0
         Screen.History -> 1
         Screen.Settings -> 2
+        Screen.Gamification -> 3
         else -> -1
     }
 
@@ -748,6 +752,11 @@ fun TreinosApp(viewModel: AppViewModel) {
                     onDynamicColorChanged = { enabled ->
                         viewModel.setUseDynamicColor(enabled)
                     },
+                )
+
+                Screen.Gamification -> GamificationScreen(
+                    state = gamificationState,
+                    onBack = viewModel::voltar,
                 )
 
                 // H4-8: peso corporal e medidas ao longo do tempo — gráfico da

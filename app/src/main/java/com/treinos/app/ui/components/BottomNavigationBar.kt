@@ -3,6 +3,7 @@ package com.treinos.app.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -17,7 +18,7 @@ import com.treinos.app.R
 import com.treinos.app.ui.AppViewModel
 
 /**
- * H3-38: bottom bar nos hubs — Treinar, Histórico, Ajustes.
+ * H3-38: bottom bar nos hubs — Treinar, Histórico, Ajustes, Progresso (H6-8).
  * `selected` é derivado da [AppViewModel.screen] no chamador ([TreinosApp]).
  */
 @Composable
@@ -43,6 +44,12 @@ fun BottomNavigationBar(selected: Int, viewModel: AppViewModel) {
             onClick = { viewModel.openSettings() },
             icon = { Icon(imageVector = Icons.Default.Settings, contentDescription = null) },
             label = { Text(stringResource(R.string.bottom_bar_ajustes)) },
+        )
+        NavigationBarItem(
+            selected = selected == 3,
+            onClick = { viewModel.openGamification() },
+            icon = { Icon(imageVector = Icons.Default.Favorite, contentDescription = null) },
+            label = { Text(stringResource(R.string.bottom_bar_progresso)) },
         )
     }
 }

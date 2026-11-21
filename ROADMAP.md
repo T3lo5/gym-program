@@ -683,9 +683,10 @@ implementação sem aprovação.
 | H6-5 | Telas de informação: medidas, gráficos, rascunhos e pulso | **S** | P2.1–2.8 + P3.6 | [H6-5](docs/specs/H6-5-telas-informacao-polimento.md) |
 | H6-6 | Revisão antecipada do plano com base na evolução | **M** | pedido do dono; corrige `nextReviewAt` do aceite | [H6-6](docs/specs/H6-6-revisao-antecipada-plano.md) |
 | H6-7 | Modernização visual: escuro + energético, redesenho completo | **S** | decisão do dono; 5 fases com gate | [H6-7](docs/specs/H6-7-modernizacao-visual.md) (concluída) |
+| H6-8 | Gamificação: badges, XP e níveis | **S** | Tela própria de progresso com nível, barra de XP e catálogo de badges (primeiro treino, streak, recordes, modalidades) | [H6-8](docs/specs/H6-8-gamificacao-badges-xp-niveis.md) — concluída em 2026-11-21 |
 
-Ordem proposta: H6-1 → H6-2 → H6-3 → H6-4 → H6-5 → H6-6 → H6-7 (H6-7 por
-último para não redesenhar o que H6-2/4/5 ainda mexem).
+Ordem proposta: H6-1 → H6-2 → H6-3 → H6-4 → H6-5 → H6-6 → H6-7 → H6-8 (H6-7 por
+último para não redesenhar o que H6-2/4/5 ainda mexem; H6-8 é independente).
 
 Um item sem spec não entra em execução. A spec é o contrato que impede um modelo
 mais simples de "compilar verde e entregar a coisa errada".

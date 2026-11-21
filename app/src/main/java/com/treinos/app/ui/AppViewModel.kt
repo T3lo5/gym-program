@@ -92,6 +92,12 @@ import com.treinos.app.ui.progression.progressionHistory
 import com.treinos.app.ui.progression.suggestProgression
 import com.treinos.app.ui.history.ExerciseHistory
 import com.treinos.app.ui.history.buildExerciseHistory
+import com.treinos.app.ui.history.buildStreak
+import com.treinos.app.ui.history.sessionDay
+import com.treinos.app.ui.history.STATUS_COMPLETED
+import com.treinos.app.ui.history.StreakSummary
+import com.treinos.app.ui.gamification.UserGamificationState
+import com.treinos.app.ui.gamification.computeGamificationState
 import com.treinos.app.ui.measurements.latestMeasurement
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.progressText
@@ -123,6 +129,7 @@ import kotlin.math.roundToInt
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoField
 import com.treinos.protocol.WearCommand
@@ -148,6 +155,7 @@ enum class Screen {
     LogActivity,
     Mobility,
     Measurements,
+    Gamification,
 }
 
 /**
@@ -703,6 +711,28 @@ class AppViewModel(
         }
         ids.mapNotNull { id -> personalRecord(list, id)?.let { id to it } }.toMap()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /**
+     * H6-8: estado de gamificação — nível, XP e badges derivados das sessões,
+     * streak e recordes. Tudo leitura pura, recalculado a cada emissão de
+     * `sessions`; nada é gravado.
+     */
+    val gamificationState: StateFlow<UserGamificationState> = combine(
+        sessions,
+        personalRecords,
+    ) { sessions, records ->
+        val streak = buildStreak(
+            completedDates = sessions
+                .filter { it.session.status == STATUS_COMPLETED }
+                .mapNotNull { sessionDay(it) }
+                .toSet(),
+            today = LocalDate.now(ZoneId.systemDefault()),
+        )
+        computeGamificationState(
+            sessions = sessions,
+            streak = streak,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), computeGamificationState(emptyList(), StreakSummary(0, 0, null)))
 
     /** H4-1: recorde do exercício aberto no `ExerciseDetailSheet`. */
     val selectedExerciseRecord: StateFlow<PersonalRecord?> = combine(
@@ -1320,6 +1350,12 @@ class AppViewModel(
         _measurementMessage.value = null
         _backTarget.value = _screen.value
         _screen.value = Screen.Measurements
+    }
+
+    /** H6-8: abrir a tela de progresso/gamificação. */
+    fun openGamification() {
+        _backTarget.value = _screen.value
+        _screen.value = Screen.Gamification
     }
 
     fun goHome() {
