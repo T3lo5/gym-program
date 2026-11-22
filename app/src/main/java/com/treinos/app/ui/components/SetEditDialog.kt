@@ -43,6 +43,7 @@ import com.treinos.app.ui.PlateInventory
 import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.SetInputErrors
 import com.treinos.app.ui.SetInputValidation
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.hapticFeedbackForEvent
@@ -124,7 +125,7 @@ fun SetEditDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
             ) {
                 helper?.let {
                     Text(
@@ -145,7 +146,7 @@ fun SetEditDialog(
                     text = stringResource(R.string.workout_set_dialog_type),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
                     listOf(
                         SET_TYPE_NORMAL to R.string.workout_set_type_normal,
                         SET_TYPE_WARMUP to R.string.workout_set_type_warmup,
@@ -293,7 +294,7 @@ fun SetEditDialog(
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
                 if (onDelete != null) {
                     TextButton(
                         onClick = {

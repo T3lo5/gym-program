@@ -110,6 +110,7 @@ import com.treinos.app.ui.progression.isPersonalRecord
 import com.treinos.app.ui.progressStateDescription
 import com.treinos.app.ui.restStateDescription
 import com.treinos.app.ui.setContentDescription
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.timerShouldAnnounce
 import com.treinos.app.ui.workoutexecution.SupersetGroup
 import com.treinos.app.ui.workoutexecution.canJoinSuperset
@@ -253,7 +254,7 @@ fun WorkoutScreen(
                             onClick = { showFinishConfirm = true },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                                .padding(horizontal = TreinosSpacing.spaceL, vertical = TreinosSpacing.spaceM),
                         ) {
                             Text(
                                 stringResource(R.string.action_finish),
@@ -321,8 +322,8 @@ fun WorkoutScreen(
                         ),
                     ) {
                         Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(TreinosSpacing.spaceL),
+                            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1175,7 +1176,7 @@ private fun ExerciseCard(
                             onClickLabel = stringResource(R.string.a11y_open_exercise_details),
                             onClick = onOpenDetail,
                         ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ExerciseImage(
@@ -1226,7 +1227,7 @@ private fun ExerciseCard(
                     )
                 } else {
                     sets.forEach { set ->
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        HorizontalDivider(modifier = Modifier                .padding(vertical = TreinosSpacing.space2xs))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1303,7 +1304,7 @@ private fun ExerciseCard(
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp),
+                                modifier = Modifier.padding(end = TreinosSpacing.spaceXs),
                     )
                 }
                 // H3-27: cumprido o planejado, o botão avança em vez de empilhar
@@ -1325,13 +1326,13 @@ private fun ExerciseCard(
                     text = suggestionText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = TreinosSpacing.space2xs),
                 )
             }
             if (canApplyProgression) {
                 OutlinedButton(
                     onClick = onApplyProgression,
-                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = TreinosSpacing.spaceXs),
                 ) {
                     Text(stringResource(R.string.workout_apply_progression))
                 }

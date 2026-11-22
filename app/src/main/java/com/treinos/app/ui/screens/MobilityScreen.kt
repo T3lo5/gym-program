@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.timerShouldAnnounce
 import com.treinos.app.ui.KeepScreenOnEffect
@@ -174,8 +175,8 @@ private fun MobilityRoutineList(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             item {
                 Card(
@@ -185,7 +186,7 @@ private fun MobilityRoutineList(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceM),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
@@ -213,7 +214,7 @@ private fun MobilityRoutineList(
                                 .clickable(onClick = onToggleSafety, role = Role.Button),
                         )
                         if (showSafety) {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs)) {
                                 Text(stringResource(R.string.mobility_safety_seek), style = MaterialTheme.typography.labelLarge)
                                 Text(stringResource(R.string.mobility_safety_arm_leg), style = MaterialTheme.typography.bodySmall)
                                 Text(stringResource(R.string.mobility_safety_numbness), style = MaterialTheme.typography.bodySmall)
@@ -231,8 +232,8 @@ private fun MobilityRoutineList(
             items(MobilityRoutineTemplates.routines.filter { it.movements.isNotEmpty() }) { routine ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceM),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                     ) {
                         val cover = routine.movements.firstOrNull { movement ->
                             movement.catalogId?.let { exerciseMedia[it]?.imageUrl } != null
@@ -315,9 +316,9 @@ private fun MobilityPlayer(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(TreinosSpacing.spaceM)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceM),
         ) {
             timerAnnouncement?.let {
                 Text(
@@ -329,8 +330,8 @@ private fun MobilityPlayer(
             }
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(TreinosSpacing.spaceM),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                 ) {
                     Text(
                         "Movimento ${session.movementIndex + 1} de ${routine.movements.size}",
@@ -404,7 +405,7 @@ private fun MobilityPlayer(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
             ) {
                 OutlinedButton(
                     onClick = {

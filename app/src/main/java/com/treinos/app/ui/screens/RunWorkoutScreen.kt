@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.local.SessionWithExercises
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.HapticEvent
 import com.treinos.app.ui.KeepScreenOnEffect
 import com.treinos.app.ui.RunLogInput
@@ -284,7 +285,7 @@ private fun RunWorkoutForm(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             if (planTarget != null) {
                 // H3-31: o alvo do dia planejado no topo — a corrida se comporta
@@ -296,8 +297,8 @@ private fun RunWorkoutForm(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceM),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                     ) {
                         Text(
                             text = stringResource(R.string.run_plan_target),
@@ -331,8 +332,8 @@ private fun RunWorkoutForm(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceM),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                     ) {
                         Text(
                             text = stringResource(R.string.run_record_planned),
@@ -355,8 +356,8 @@ private fun RunWorkoutForm(
                 ),
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(TreinosSpacing.spaceM),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                 ) {
                     Text(
                         text = if (trackingActive) "Rastreando corrida" else "Rastreamento opcional",
@@ -405,7 +406,7 @@ private fun RunWorkoutForm(
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
             ) {
                 OutlinedTextField(
                     value = durationMinutes,
@@ -453,7 +454,7 @@ private fun RunWorkoutForm(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     ),
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(TreinosSpacing.spaceM)) {
                         Text(
                             text = stringResource(R.string.run_estimated_pace, p),
                             style = MaterialTheme.typography.titleLarge,
@@ -490,7 +491,7 @@ private fun RunWorkoutForm(
                 enabled = durationError == null && distanceError == null && rpeError == null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp)
+                    .padding(top = TreinosSpacing.spaceM)
                     .minimumInteractiveComponentSize(),
             ) {
                 Text(stringResource(R.string.run_finish))

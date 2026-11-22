@@ -34,6 +34,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.treinos.app.data.media.ExerciseMedia
 import com.treinos.app.R
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.equipmentLabel
 import com.treinos.app.ui.formatKg
 import com.treinos.app.ui.muscleLabel
@@ -63,9 +64,9 @@ fun ExerciseDetailSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = TreinosSpacing.spaceM)
+                .padding(bottom = TreinosSpacing.spaceXL),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

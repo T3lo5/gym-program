@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.treinos.app.R
 import com.treinos.app.ui.ModalityAccent
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.modalityAccentFor
 import com.treinos.app.ui.StatusColors
@@ -91,7 +92,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(top = 16.dp, bottom = 8.dp).semantics { heading() },
+        modifier = modifier.padding(top = TreinosSpacing.spaceM, bottom = TreinosSpacing.spaceXs).semantics { heading() },
     )
 }
 
@@ -120,7 +121,7 @@ fun ChipGroup(
 ) {
     FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         val chipSelectedDesc = stringResource(R.string.chip_selected)
         val chipNotSelectedDesc = stringResource(R.string.chip_not_selected)
@@ -174,8 +175,8 @@ fun MetricCard(
         Column(
             modifier = Modifier
                 .wrapContentHeight()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
         ) {
             Text(
                 text = label,
@@ -202,7 +203,7 @@ fun MetricCard(
 fun LoadingState(modifier: Modifier = Modifier) {
     val loadingDesc = stringResource(R.string.common_loading)
     Box(
-        modifier = modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) {
+        modifier = modifier.fillMaxWidth().padding(TreinosSpacing.spaceXL).semantics(mergeDescendants = true) {
             contentDescription = loadingDesc
         },
         contentAlignment = Alignment.Center,
@@ -224,9 +225,9 @@ fun ErrorState(
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) { },
+        modifier = modifier.fillMaxWidth().padding(TreinosSpacing.spaceXL).semantics(mergeDescendants = true) { },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
     ) {
         Text(
             text = title,
@@ -254,10 +255,10 @@ fun EmptyState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(24.dp)
+            .padding(TreinosSpacing.spaceXL)
             .semantics(mergeDescendants = true) { },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
     ) {
         Text(text = title, style = MaterialTheme.typography.headlineMedium)
         Text(
@@ -296,7 +297,7 @@ fun BusyButton(
                 strokeWidth = 2.dp,
                 color = LocalContentColor.current,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(TreinosSpacing.spaceXs))
             Text(busyText)
         } else {
             Text(idleText)
@@ -321,7 +322,7 @@ fun StatusText(
             if (announce) liveRegion = LiveRegionMode.Polite
         },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         Icon(
             imageVector = if (isSuccess) Icons.Default.Check else Icons.Default.Warning,

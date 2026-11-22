@@ -67,6 +67,8 @@ internal object ThemeColors {
     const val DarkOnError = 0xFF000000
     const val DarkErrorContainer = 0xFF9A3A3A
     const val DarkOnErrorContainer = 0xFFFFFFFF
+    /** Superfície elevada para cards de destaque em tema escuro. */
+    const val DarkSurfaceContainerHigh = 0xFF232330
 }
 
 private val LightColors = lightColorScheme(
@@ -123,6 +125,17 @@ internal val TreinosShapes = Shapes(
     medium = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
     large = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
 )
+
+/** Escala de espaçamento centralizada (regra do DESIGN.md §4). */
+internal object TreinosSpacing {
+    val space2xs = 4.dp
+    val spaceXs = 8.dp
+    val spaceS = 12.dp
+    val spaceM = 16.dp
+    val spaceL = 20.dp
+    val spaceXL = 24.dp
+    val spaceXXL = 32.dp
+}
 
 @Composable
 fun TreinosTheme(

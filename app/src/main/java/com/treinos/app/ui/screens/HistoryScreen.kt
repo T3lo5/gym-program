@@ -66,6 +66,7 @@ import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.SetLogEntity
 import com.treinos.app.data.local.WorkoutSessionEntity
 import com.treinos.app.data.media.ExerciseMedia
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.ActivityModality
 import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.EmptyState
@@ -186,8 +187,8 @@ fun HistoryScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(TreinosSpacing.spaceM),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                 ) {
                     item {
                         MonthNavigator(
@@ -219,7 +220,7 @@ fun HistoryScreen(
                         item {
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                             ) {
                                 FilterChip(
                                     selected = modalityFilter == null,
@@ -338,7 +339,7 @@ fun HistoryScreen(
 private fun VolumeByMuscle(metrics: HistoryMetrics) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         SectionTitle(stringResource(R.string.history_volume_section))
         metrics.volumeByMuscle.entries
@@ -386,12 +387,12 @@ private fun ExerciseEvolutionSection(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         SectionTitle(stringResource(R.string.chart_exercise_title))
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             options.forEach { option ->
                 FilterChip(
@@ -403,7 +404,7 @@ private fun ExerciseEvolutionSection(
         }
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             ExerciseChartMetric.entries.forEach { candidate ->
                 FilterChip(
@@ -467,7 +468,7 @@ private fun WeeklyMuscleVolumeSection(
     }
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         SectionTitle(stringResource(R.string.chart_weekly_title))
         if (bars.isEmpty()) {
@@ -525,12 +526,12 @@ private fun PeriodReportCard(
     }
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         SectionTitle(stringResource(R.string.history_report_title))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             FilterChip(
                 selected = period == ReportPeriod.MONTH,
@@ -545,8 +546,8 @@ private fun PeriodReportCard(
         }
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(TreinosSpacing.spaceM),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
             ) {
                 KeyValueRow(
                     label = stringResource(R.string.history_report_workouts),
@@ -611,7 +612,7 @@ private fun MonthNavigator(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         IconButton(onClick = { onNavigate(-1L) }) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.history_nav_prev))
@@ -642,8 +643,8 @@ private fun MonthCalendar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(TreinosSpacing.spaceS),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
         ) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 weekDayLabels().forEach { label ->
@@ -708,7 +709,7 @@ private fun DayCell(
         modifier = modifier
             .minimumInteractiveComponentSize()
             .wrapContentSize(Alignment.Center)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(TreinosSpacing.spaceXs))
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
             )
@@ -728,7 +729,7 @@ private fun DayCell(
                     Modifier.clearAndSetSemantics { }
                 },
             )
-            .padding(vertical = 4.dp),
+            .padding(vertical = TreinosSpacing.space2xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -763,11 +764,11 @@ private fun DayDot(filled: Boolean) {
 private fun MetricsCards(metrics: HistoryMetrics) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             MetricCard(
                 label = stringResource(R.string.history_metric_workouts),
@@ -791,7 +792,7 @@ private fun MetricsCards(metrics: HistoryMetrics) {
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             MetricCard(
                 label = stringResource(R.string.history_metric_volume),
@@ -840,7 +841,7 @@ private fun ActivityCard(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
@@ -869,7 +870,7 @@ private fun ActivityCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
                 TextButton(onClick = onEdit, modifier = Modifier.minimumInteractiveComponentSize()) { Text(stringResource(R.string.history_activity_edit)) }
                 TextButton(onClick = { showDeleteDialog = true }, modifier = Modifier.minimumInteractiveComponentSize()) {
                     Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
@@ -930,7 +931,7 @@ private fun SessionCard(
             .clickable { expanded = !expanded },
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
@@ -945,7 +946,7 @@ private fun SessionCard(
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
                     Text(
                         text = if (completed) completedDesc else inProgressDesc,
@@ -1004,7 +1005,7 @@ private fun SessionCard(
                                     onClickLabel = stringResource(R.string.a11y_open_exercise_details),
                                     onClick = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
                                 ),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             ExerciseImage(
@@ -1047,7 +1048,7 @@ private fun SessionCard(
                                 Text(stringResource(R.string.history_exercise_history_action))
                             }
                         }
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = TreinosSpacing.space2xs))
                     }
 
                 // H3-54: corrigir registro de treino passado — só sessão concluída.
@@ -1138,9 +1139,9 @@ private fun SessionSetsEditSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = TreinosSpacing.spaceM)
+                .padding(bottom = TreinosSpacing.spaceXL),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(R.string.history_edit_sets_title),
@@ -1181,7 +1182,7 @@ private fun SessionSetsEditSheet(
                                     .minimumInteractiveComponentSize()
                                     .semantics { role = Role.Button }
                                     .clickable(onClick = { onEditSet(exercise, set) }),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
@@ -1192,12 +1193,12 @@ private fun SessionSetsEditSheet(
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = decorativeContentDescription(),
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(TreinosSpacing.spaceM),
                                 )
                             }
                         }
                     }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = TreinosSpacing.space2xs))
                 }
         }
     }

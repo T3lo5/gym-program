@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.treinos.app.data.prefs.AppPreferences
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.ActivityLogDraft
 import com.treinos.app.ui.ActivityLogDraftCodec
 import com.treinos.app.ui.ActivityLogField
@@ -196,8 +197,8 @@ fun LogActivityScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             item { SectionTitle(stringResource(R.string.log_section_modality)) }
             item {
@@ -247,7 +248,7 @@ fun LogActivityScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                 ) {
                     OutlinedTextField(
                         value = draft.durationText,
@@ -344,7 +345,7 @@ fun LogActivityScreen(
                     enabled = errors.isEmpty(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = TreinosSpacing.spaceM),
                 )
             }
 
@@ -368,7 +369,7 @@ fun LogActivityScreen(
                     text = stringResource(R.string.log_info),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 12.dp),
+                    modifier = Modifier.padding(vertical = TreinosSpacing.spaceS),
                 )
             }
         }

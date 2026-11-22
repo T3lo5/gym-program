@@ -182,7 +182,7 @@ class GenerateScreenTest {
         composeRule.onNodeWithText("1500").assertIsDisplayed()
 
         composeRule.onNode(hasScrollAction())
-            .performScrollToNode(hasText("Dias por semana"))
+            .performScrollToNode(hasText("5x"))
         composeRule.onNodeWithText("5x").assertIsDisplayed()
 
         // Há modalidade inclusa: o CTA restaurado nasce habilitado.

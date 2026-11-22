@@ -53,6 +53,7 @@ import com.treinos.app.R
 import com.treinos.app.data.MeasurementPhotoStore
 import com.treinos.app.data.MeasurementValidator
 import com.treinos.app.data.local.BodyMeasurementEntity
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.MeasurementDraft
 import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ProgressLineChart
@@ -117,8 +118,8 @@ fun MeasurementsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceM),
         ) {
             item {
                 MeasurementFormCard(
@@ -138,9 +139,9 @@ fun MeasurementsScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier.padding(TreinosSpacing.spaceXL),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                         ) {
                             Text(
                                 text = stringResource(R.string.measurements_empty_title),
@@ -246,7 +247,7 @@ private fun MeasurementFormCard(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -443,8 +444,8 @@ private fun MeasurementPhotoSection(
     onOpenCamera: () -> Unit,
     onOpenGallery: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
             Button(onClick = onOpenCamera, modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.measurements_photo_camera))
             }
@@ -455,7 +456,7 @@ private fun MeasurementPhotoSection(
         if (pendingPhotoPath != null && MeasurementPhotoStore.exists(pendingPhotoPath)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
             ) {
                 AsyncImage(
                     model = File(pendingPhotoPath),
@@ -485,7 +486,7 @@ private fun MeasurementTrendCard(
     val delta = remember(measurements) { trendDeltaKg(measurements) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -528,13 +529,13 @@ private fun MeasurementRow(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceS),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
             ) {
                 Text(
                     text = formatDateTime(measurement.measuredAt),

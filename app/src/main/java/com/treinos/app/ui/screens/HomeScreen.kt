@@ -69,6 +69,7 @@ import com.treinos.app.ui.PlanCycle
 import com.treinos.app.ui.PendingGeneration
 import com.treinos.app.ui.SessionKind
 import com.treinos.app.ui.TodaySession
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.WorkoutSummary
 import com.treinos.app.ui.defaultModalityTab
 import com.treinos.app.ui.groupSessionsByModality
@@ -206,8 +207,8 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             // H3-53: resumo do treino recém-finalizado no topo — o fechamento
             // mostra o que foi feito e some com "Fechar".
@@ -299,7 +300,7 @@ fun HomeScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier.padding(TreinosSpacing.spaceXL),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
@@ -360,7 +361,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             plans.forEach { option ->
@@ -539,8 +540,8 @@ private fun PendingGenerationCard(
         colors = if (isFailed) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer) else CardDefaults.cardColors(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = if (isFailed) stringResource(R.string.home_pending_titulo_falhou) else stringResource(R.string.home_pending_titulo_andamento),
@@ -557,7 +558,7 @@ private fun PendingGenerationCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
             ) {
                 if (status == "pending" || status == "running") {
                     BusyButton(
@@ -626,15 +627,15 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceL),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             when (today) {
                 is TodaySession.Today -> {
                     Text(
                         text = stringResource(R.string.home_hero_today, today.day.day.name),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
@@ -660,8 +661,8 @@ private fun TodayHeroCard(today: TodaySession, onStartDay: (Long) -> Unit) {
                 is TodaySession.Next -> {
                     Text(
                         text = stringResource(R.string.home_hero_rest),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
@@ -714,8 +715,8 @@ private fun PostWorkoutSummaryCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(R.string.home_summary_title),
@@ -762,7 +763,7 @@ private fun HomeQuickActions(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         HomeQuickAction(
             label = stringResource(R.string.home_quick_new_workout),
@@ -838,7 +839,7 @@ private fun MeasurementsShortcutCard(
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -870,7 +871,7 @@ private fun TodayBadge() {
     Box(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(horizontal = TreinosSpacing.spaceXs, vertical = TreinosSpacing.space2xs),
     ) {
         Text(
                         text = stringResource(R.string.home_today),
@@ -890,8 +891,8 @@ private fun ModalityDayCard(
     val kind = SessionKind.fromModality(day.day.modality)
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -900,7 +901,7 @@ private fun ModalityDayCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
                     Text(
                         text = day.day.name,
@@ -976,7 +977,7 @@ private fun ModalityDayCard(
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
                     day.exercises
                         .sortedBy { it.exerciseOrder }
@@ -985,7 +986,7 @@ private fun ModalityDayCard(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                             ) {
                                 ExerciseImage(
                                     imageUrl = exerciseMedia[exercise.exerciseId]?.imageUrl,
@@ -999,7 +1000,7 @@ private fun ModalityDayCard(
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                                 ) {
                                     Text(
                                         text = exercise.exerciseName,
@@ -1031,7 +1032,7 @@ private fun ModalityDayCard(
                 }
                 Button(
                     onClick = onStart,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
+                    modifier = Modifier.fillMaxWidth().padding(top = TreinosSpacing.space2xs).minimumInteractiveComponentSize(),
                 ) {
                     Text(stringResource(R.string.home_start_modality, stringResource(tabLabel(modalityTabOf(kind)))))
                 }
@@ -1056,8 +1057,8 @@ private fun InProgressCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
                             Text(
                                 text = stringResource(R.string.home_in_progress),
@@ -1115,8 +1116,8 @@ private fun InProgressCard(
 private fun StreakCard(streak: StreakSummary) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(R.string.home_streak_title),
@@ -1164,8 +1165,8 @@ private fun ActivePlanCard(
         // H3-28: card neutro — o destaque da tela passa a ser o herói de hoje.
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = entity.name,
@@ -1221,8 +1222,8 @@ private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpon
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(R.string.home_review_card_title),
@@ -1234,7 +1235,7 @@ private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpon
                 text = stringResource(R.string.home_review_card_body, reviewDate),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
                 Button(
                     onClick = onGenerate,
                     modifier = Modifier.minimumInteractiveComponentSize(),
@@ -1256,8 +1257,8 @@ private fun ReviewPlanCard(reviewDate: String, onGenerate: () -> Unit, onPostpon
 private fun DeloadNoticeCard(week: Int, onDismiss: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(R.string.home_cycle_title),
@@ -1293,8 +1294,8 @@ private fun DayCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1303,7 +1304,7 @@ private fun DayCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
                     Text(
                         text = day.day.name,
@@ -1335,7 +1336,7 @@ private fun DayCard(
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
                     day.exercises
                         .sortedBy { it.exerciseOrder }
@@ -1344,7 +1345,7 @@ private fun DayCard(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                             ) {
                                 ExerciseImage(
                                     imageUrl = exerciseMedia[exercise.exerciseId]?.imageUrl,
@@ -1353,7 +1354,7 @@ private fun DayCard(
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                                 ) {
                                     Text(
                                         text = exercise.exerciseName,
@@ -1385,7 +1386,7 @@ private fun DayCard(
                 }
                 Button(
                     onClick = onStart,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).minimumInteractiveComponentSize(),
+                    modifier = Modifier.fillMaxWidth().padding(top = TreinosSpacing.space2xs).minimumInteractiveComponentSize(),
                 ) {
                     Text(stringResource(R.string.action_start_workout))
                 }
@@ -1418,8 +1419,8 @@ private fun ActivitySummaryCard(session: SessionWithExercises) {
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
         ) {
             Text(
                 text = title,

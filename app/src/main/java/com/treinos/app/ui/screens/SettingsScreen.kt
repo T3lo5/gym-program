@@ -60,6 +60,7 @@ import com.treinos.app.data.csv.CsvImportState
 import com.treinos.app.data.discovery.DiscoveredBackend
 import com.treinos.app.data.remote.BackendDiagnosticsDto
 import com.treinos.app.data.health.HealthConnectAvailability
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.AppViewModel
 import com.treinos.app.ui.BackupImportState
 import com.treinos.app.ui.HealthConnectUiState
@@ -251,8 +252,8 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = TreinosSpacing.spaceM, vertical = TreinosSpacing.spaceXs),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
         ) {
             // H3-35: seção Treino (catálogo de exercícios).
             CollapsibleSection(
@@ -262,8 +263,8 @@ fun SettingsScreen(
             ) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_catalog),
@@ -282,7 +283,7 @@ fun SettingsScreen(
                         catalogMessage?.let {
                             StatusText(text = it, isSuccess = statusIsSuccess(it), announce = true)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs)) {
                             Button(
                                 onClick = onUpdateCatalog,
                                 enabled = !isUpdatingCatalog,
@@ -307,8 +308,8 @@ fun SettingsScreen(
                         .clickable(onClick = onOpenMeasurements),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_measurements_title),
@@ -339,8 +340,8 @@ fun SettingsScreen(
             ) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_server_desc),
@@ -397,8 +398,8 @@ fun SettingsScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         // Correção do "pedir no relógio e nada acontece": o
                         // celular publica estado/snapshot ao pulso sob demanda.
@@ -432,8 +433,8 @@ fun SettingsScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_sync_space_title),
@@ -507,8 +508,8 @@ fun SettingsScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_diagnostics_title),
@@ -579,8 +580,8 @@ fun SettingsScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -635,8 +636,8 @@ fun SettingsScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_section_local),
@@ -668,7 +669,7 @@ fun SettingsScreen(
                             ) {
                                 if (isDiscovering) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
+                                        modifier = Modifier.size(TreinosSpacing.spaceM),
                                         strokeWidth = 2.dp,
                                     )
                                     Text(stringResource(R.string.settings_btn_searching))
@@ -740,8 +741,8 @@ fun SettingsScreen(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_btn_sync),
@@ -808,8 +809,8 @@ fun SettingsScreen(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_section_restore_device),
@@ -871,11 +872,11 @@ fun SettingsScreen(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -891,7 +892,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                         ) {
                             BusyButton(
                                 busy = backupImportState is BackupImportState.Importing,
@@ -925,7 +926,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                                 ) {
                                     Button(
                                         onClick = { showReplaceConfirm = true },
@@ -979,8 +980,8 @@ fun SettingsScreen(
                 // gravar. Import aditivo: nada existente é apagado.
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         Text(
                             text = stringResource(R.string.settings_csv_title),
@@ -994,7 +995,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                         ) {
                             BusyButton(
                                 busy = csvImportState is CsvImportState.Importing,
@@ -1035,7 +1036,7 @@ fun SettingsScreen(
                                     )
                                 }
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                                 ) {
                                     Button(
                                         onClick = onConfirmCsvImport,
@@ -1091,8 +1092,8 @@ fun SettingsScreen(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         when (val state = updateState) {
                             is UpdateState.Available -> {
@@ -1184,8 +1185,8 @@ fun SettingsScreen(
             ) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(TreinosSpacing.spaceL),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                     ) {
                         PermissionStatusRow(
                             label = stringResource(R.string.permissions_notifications),
@@ -1219,8 +1220,8 @@ fun SettingsScreen(
                 ) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(TreinosSpacing.spaceL),
+                            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                         ) {
                             Text(
                                 text = stringResource(R.string.settings_health_title),
@@ -1349,8 +1350,8 @@ fun SettingsScreen(
             // H3-37: seletor de idioma do app (per-app locale).
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(TreinosSpacing.spaceL),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                 ) {
                     Text(
                         text = stringResource(R.string.settings_language_title),
@@ -1378,8 +1379,8 @@ fun SettingsScreen(
             // identidade própria da marca é o rosto do app.
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(TreinosSpacing.spaceL),
+                    verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                 ) {
                     Text(
                         text = stringResource(R.string.settings_dynamic_color_title),
@@ -1507,7 +1508,7 @@ private fun CollapsibleSection(
         }
         if (localExpanded) {
             Column(
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = TreinosSpacing.spaceXs),
             ) {
                 content()
             }
@@ -1555,7 +1556,7 @@ private fun LanguageSelector(
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         options.forEach { (lang, resId) ->
             val selected = current == lang

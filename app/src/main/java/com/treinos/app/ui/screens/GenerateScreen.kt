@@ -57,6 +57,7 @@ import com.treinos.app.ui.ModalityDraft
 import com.treinos.app.ui.ProfileValidator
 import com.treinos.app.ui.ProfileValidator.ProfileField
 import com.treinos.app.ui.UiError
+import com.treinos.app.ui.TreinosSpacing
 import com.treinos.app.ui.formatDecimal
 import com.treinos.app.ui.parse5k
 import com.treinos.app.ui.components.BusyButton
@@ -313,8 +314,8 @@ fun GenerateScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                            .padding(horizontal = TreinosSpacing.spaceM, vertical = TreinosSpacing.spaceXs),
+                        verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                     ) {
                         val ctaHint = when {
                             !canGenerate -> generateHint
@@ -395,8 +396,8 @@ fun GenerateScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(TreinosSpacing.spaceM),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
             ) {
                 // H4-10: programas prontos no topo — começar a treinar sem IA
                 // e sem backend, com um toque.
@@ -428,7 +429,7 @@ fun GenerateScreen(
                         Text(
                             text = stringResource(R.string.generate_info),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(TreinosSpacing.spaceM),
                         )
                     }
                 }
@@ -496,10 +497,10 @@ fun GenerateScreen(
                                     val stateOn = stringResource(R.string.common_state_on)
                                     val stateOff = stringResource(R.string.common_state_off)
 
-                                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = TreinosSpacing.space2xs)) {
                                         Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.padding(TreinosSpacing.spaceS),
+                                            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                                         ) {
                                             Row(
                                                 modifier = Modifier
@@ -546,7 +547,7 @@ fun GenerateScreen(
                                             if (included) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                                                 ) {
                                                     OutlinedTextField(
                                                         value = sessionsText,
@@ -586,7 +587,7 @@ fun GenerateScreen(
                                                                 keyboardType = KeyboardType.Number,
                                                                 imeAction = ImeAction.Done,
                                                             ),
-                                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                            modifier = Modifier.fillMaxWidth().padding(top = TreinosSpacing.space2xs),
                                                         )
                                                     }
                                                     "mobility" -> {
@@ -603,7 +604,7 @@ fun GenerateScreen(
                                                             label = { Text(stringResource(R.string.generate_focus_label)) },
                                                             supportingText = { Text(stringResource(R.string.common_optional)) },
                                                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                            modifier = Modifier.fillMaxWidth().padding(top = TreinosSpacing.space2xs),
                                                         )
                                                     }
                                                 }
@@ -620,7 +621,7 @@ fun GenerateScreen(
                             text = stringResource(R.string.generate_swim_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier = Modifier.padding(vertical = TreinosSpacing.spaceXs),
                         )
                     }
                 }
@@ -720,9 +721,9 @@ fun GenerateScreen(
                                 indication = null,
                                 role = Role.Button,
                             ) { showMoreOptions = !showMoreOptions }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = TreinosSpacing.spaceXs),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                     ) {
                         Text(
                             text = if (showMoreOptions) stringResource(R.string.generate_less_options) else stringResource(R.string.generate_more_options),
@@ -746,7 +747,7 @@ fun GenerateScreen(
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                         ) {
                             OutlinedTextField(
                                 value = bodyWeightKgText,
@@ -778,7 +779,7 @@ fun GenerateScreen(
                     item {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
                         ) {
                             Text(
                                 text = stringResource(R.string.generate_sex_section),
@@ -820,11 +821,11 @@ fun GenerateScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             ),
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = TreinosSpacing.spaceM),
                         ) {
                             Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(TreinosSpacing.spaceM),
+                                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                             ) {
                                 Text(
                                     text = stringResource(R.string.generate_profile_saved),
@@ -872,7 +873,7 @@ fun GenerateScreen(
                         text = stringResource(R.string.generate_ai_fallback),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 12.dp),
+                        modifier = Modifier.padding(vertical = TreinosSpacing.spaceS),
                     )
                 }
             }
@@ -903,8 +904,8 @@ private fun ProgramCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
         ) {
             Text(
                 text = stringResource(programNameRes(template.id)),

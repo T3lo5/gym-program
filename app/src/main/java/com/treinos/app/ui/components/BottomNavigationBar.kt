@@ -2,8 +2,8 @@ package com.treinos.app.ui.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -36,7 +36,7 @@ fun BottomNavigationBar(selected: Int, viewModel: AppViewModel) {
         NavigationBarItem(
             selected = selected == 1,
             onClick = { viewModel.openHistory() },
-            icon = { Icon(imageVector = Icons.Default.Edit, contentDescription = null) },
+            icon = { Icon(imageVector = Icons.Default.List, contentDescription = null) },
             label = { Text(stringResource(R.string.bottom_bar_historico)) },
         )
         NavigationBarItem(
