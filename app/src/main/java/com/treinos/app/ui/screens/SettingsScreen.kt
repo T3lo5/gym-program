@@ -14,11 +14,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -70,6 +69,7 @@ import com.treinos.app.ui.components.ConfirmationDialog
 import com.treinos.app.ui.components.ErrorState
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.StatusText
+import com.treinos.app.ui.components.TreinosCard
 import com.treinos.app.ui.components.statusIsSuccess
 import com.treinos.app.ui.formatDateTime
 import com.treinos.app.ui.formatIsoDateTime
@@ -245,7 +245,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = { ScreenTopBar(title = stringResource(R.string.screen_settings), onBack = onBack) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_settings), onBack = onBack, showBack = false) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -261,7 +261,7 @@ fun SettingsScreen(
                 expanded = treinoExpanded,
                 onToggle = { treinoExpanded = it },
             ) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -302,7 +302,7 @@ fun SettingsScreen(
                 }
 
                 // H4-8: card "Peso e medidas" abrindo a tela dedicada.
-                Card(
+                TreinosCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(onClick = onOpenMeasurements),
@@ -338,7 +338,7 @@ fun SettingsScreen(
                 expanded = syncExpanded,
                 onToggle = { syncExpanded = it },
             ) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -396,7 +396,7 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -431,7 +431,7 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -506,7 +506,7 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -578,7 +578,7 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -634,7 +634,7 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -734,11 +734,8 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(
+                TreinosCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    ),
                 ) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
@@ -802,11 +799,8 @@ fun SettingsScreen(
                     }
                 }
 
-                Card(
+                TreinosCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    ),
                 ) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
@@ -865,11 +859,8 @@ fun SettingsScreen(
                 expanded = backupExpanded,
                 onToggle = { backupExpanded = it },
             ) {
-                Card(
+                TreinosCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
                 ) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
@@ -978,7 +969,7 @@ fun SettingsScreen(
                 // H4-7: CSV — saída que o Excel/Sheets abre e entrada dos
                 // exportes do Strong e do Hevy, com pré-visualização antes de
                 // gravar. Import aditivo: nada existente é apagado.
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -1085,11 +1076,8 @@ fun SettingsScreen(
                 expanded = updateExpanded,
                 onToggle = { updateExpanded = it },
             ) {
-                Card(
+                TreinosCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
                 ) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
@@ -1183,7 +1171,7 @@ fun SettingsScreen(
                 expanded = permissionsExpanded,
                 onToggle = { permissionsExpanded = it },
             ) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                TreinosCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(TreinosSpacing.spaceL),
                         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -1218,7 +1206,7 @@ fun SettingsScreen(
                     expanded = healthExpanded,
                     onToggle = { healthExpanded = it },
                 ) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    TreinosCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(TreinosSpacing.spaceL),
                             verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -1348,7 +1336,7 @@ fun SettingsScreen(
             }
 
             // H3-37: seletor de idioma do app (per-app locale).
-            Card(modifier = Modifier.fillMaxWidth()) {
+            TreinosCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(TreinosSpacing.spaceL),
                     verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -1377,7 +1365,7 @@ fun SettingsScreen(
 
             // H6-7: toggle "Usar cores do sistema" — desligado por default; a
             // identidade própria da marca é o rosto do app.
-            Card(modifier = Modifier.fillMaxWidth()) {
+            TreinosCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(TreinosSpacing.spaceL),
                     verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
@@ -1558,29 +1546,46 @@ private fun LanguageSelector(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
-        options.forEach { (lang, resId) ->
-            val selected = current == lang
-            if (selected) {
-                Button(
-                    onClick = {
-                        onChange(lang)
-                        applyAppLanguage(lang)
-                    },
-                    enabled = true,
-                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                ) {
-                    Text(stringResource(resId), color = MaterialTheme.colorScheme.onPrimary)
-                }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        onChange(lang)
-                        applyAppLanguage(lang)
-                    },
-                    enabled = true,
-                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                ) {
-                    Text(stringResource(resId), color = MaterialTheme.colorScheme.primary)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
+        ) {
+            options.forEachIndexed { index, (lang, resId) ->
+                val selected = current == lang
+                if (selected) {
+                    Button(
+                        onClick = {
+                            onChange(lang)
+                            applyAppLanguage(lang)
+                        },
+                        enabled = true,
+                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                    ) {
+                        Text(
+                            text = stringResource(resId),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            onChange(lang)
+                            applyAppLanguage(lang)
+                        },
+                        enabled = true,
+                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                    ) {
+                        Text(
+                            text = stringResource(resId),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }

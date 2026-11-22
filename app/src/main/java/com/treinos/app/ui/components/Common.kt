@@ -1,6 +1,7 @@
 package com.treinos.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.treinos.app.R
 import com.treinos.app.ui.ModalityAccent
 import com.treinos.app.ui.TreinosSpacing
+import com.treinos.app.ui.ThemeColors
 import com.treinos.app.ui.exerciseContentDescription
 import com.treinos.app.ui.modalityAccentFor
 import com.treinos.app.ui.StatusColors
@@ -62,12 +65,13 @@ import com.treinos.app.ui.StatusColors
 fun ScreenTopBar(
     title: String,
     onBack: (() -> Unit)? = null,
+    showBack: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
         title = { Text(title, modifier = Modifier.semantics { heading() }) },
         navigationIcon = {
-            if (onBack != null) {
+            if (showBack && onBack != null) {
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier.minimumInteractiveComponentSize(),
@@ -84,6 +88,26 @@ fun ScreenTopBar(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
     )
+}
+
+/**
+ * Card padrão da superfície com borda sutil (1dp, #242926) sobre o background
+ * escuro (#0B0D0C). Usado em todas as telas para manter a identidade visual.
+ */
+@Composable
+fun TreinosCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = modifier
+            .border(1.dp, Color(ThemeColors.DarkSurfaceBorder), MaterialTheme.shapes.medium),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        content()
+    }
 }
 
 @Composable

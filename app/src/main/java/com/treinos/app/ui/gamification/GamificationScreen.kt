@@ -42,7 +42,7 @@ fun GamificationScreen(
 ) {
     val nivelDesc = "Nível ${state.level} — ${state.xp} XP"
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        ScreenTopBar(title = stringResource(com.treinos.app.R.string.screen_gamification_title), onBack = onBack)
+        ScreenTopBar(title = stringResource(com.treinos.app.R.string.screen_gamification_title), onBack = onBack, showBack = false)
 
         // Nível e barra de XP.
         Card(

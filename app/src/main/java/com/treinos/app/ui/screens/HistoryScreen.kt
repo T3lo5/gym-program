@@ -56,7 +56,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SET_TYPE_AMRAP
 import com.treinos.app.data.local.SET_TYPE_DROP
@@ -80,6 +82,7 @@ import com.treinos.app.ui.components.ProgressLineChart
 import com.treinos.app.ui.components.ScreenTopBar
 import com.treinos.app.ui.components.SectionTitle
 import com.treinos.app.ui.components.SetEditDialog
+import com.treinos.app.ui.components.TreinosCard
 import com.treinos.app.ui.SetInput
 import com.treinos.app.ui.decorativeContentDescription
 import com.treinos.app.ui.formatDateTime
@@ -167,7 +170,7 @@ fun HistoryScreen(
     val visible = selectedDate?.let { day -> monthSessions.filter { sessionDay(it) == day } } ?: monthSessions
 
     Scaffold(
-        topBar = { ScreenTopBar(title = stringResource(R.string.screen_history), onBack = onBack) },
+        topBar = { ScreenTopBar(title = stringResource(R.string.screen_history), onBack = onBack, showBack = false) },
     ) { padding ->
             if (sessions.isEmpty()) {
                 EmptyState(
@@ -921,7 +924,7 @@ private fun SessionCard(
     val completedDesc = stringResource(R.string.history_session_done)
     val inProgressDesc = stringResource(R.string.history_session_in_progress)
 
-    Card(
+    TreinosCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
@@ -943,17 +946,30 @@ private fun SessionCard(
                     text = session.session.dayName.ifBlank { stringResource(R.string.screen_workout) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
-                    Text(
-                        text = if (completed) completedDesc else inProgressDesc,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (completed) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.tertiary,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp, 18.dp)
+                            .background(Color(0xFF14532D).copy(alpha = 0.4f), RoundedCornerShape(6.dp)),
+                    ) {
+                        Text(
+                            text = if (completed) completedDesc else inProgressDesc,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontSize = 12.sp,
+                                color = Color(0xFF4ADE80),
+                            ),
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp
                         else Icons.Default.KeyboardArrowDown,

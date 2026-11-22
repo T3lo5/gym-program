@@ -11,7 +11,6 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
@@ -20,10 +19,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private const val BrandPrimary = 0xFF00C853
-private const val BrandPrimaryDark = 0xFF00E676
-private const val BrandSecondary = 0xFF00BFA5
-private const val BrandAccentEnergy = 0xFFFF6F00
+private const val BrandPrimary = 0xFFA3E635  // Verde Lima vibrante (primária)
+private const val BrandPrimaryOn = 0xFF0B0D0C // Preto puro sobre primária (alto contraste)
+
+private const val SurfaceBg = 0xFF0B0D0C      // Background principal da tela
+private const val SurfaceCard = 0xFF151816    // Superfície de cards
+private const val SurfaceBorder = 0xFF242926  // Borda sutil 1dp
+private const val NavigationBarBg = 0xFF111412 // Barra de navegação inferior
+private const val NavigationBarActive = 0xFFA3E635 // Indicador/texto ativo
+private const val TextPrimary = 0xFFF9FAFB    // Texto primário
+private const val TextSecondary = 0xFF9CA3AF  // Texto secundário/legendas
+private const val OutlinedBorder = 0xFF323834 // Borda de OutlinedButton
+private const val OutlinedText = 0xFFF3F4F6   // Texto de OutlinedButton
 
 private val StrengthAccent = Color(0xFF00C853)
 private val RunAccent = Color(0xFFE65100)
@@ -41,71 +48,22 @@ internal object ModalityAccent {
 internal val LocalModalityAccent = staticCompositionLocalOf<ModalityAccent> { ModalityAccent }
 
 internal object ThemeColors {
-    const val LightSurface = 0xFFFFFFFF
-    const val LightOnSurface = 0xFF1C1B1F
-    const val LightOnSurfaceVariant = 0xFF49494F
-    const val LightPrimaryContainer = 0xFFDCFCE7
-    const val LightOnPrimaryContainer = 0xFF006400
-    const val LightSecondaryContainer = 0xFFCCFBF1
-    const val LightOnSecondaryContainer = 0xFF004D40
-    const val LightTertiaryContainer = 0xFFE8DEF8
-    const val LightOnTertiaryContainer = 0xFF21005E
-    const val LightError = 0xFFB3261E
-    const val LightOnError = 0xFFFFFFFF
-    const val LightErrorContainer = 0xFFEF9A9A
-    const val LightOnErrorContainer = 0xFF4D0000
-    const val DarkSurface = 0xFF0E0E10
-    const val DarkOnSurface = 0xFFE6E1E5
-    const val DarkOnSurfaceVariant = 0xFFCAC4D0
-    const val DarkPrimaryContainer = 0xFF1B5E20
-    const val DarkOnPrimaryContainer = 0xFFDCFCE7
-    const val DarkSecondaryContainer = 0xFF004D40
-    const val DarkOnSecondaryContainer = 0xFFCCFBF1
-    const val DarkTertiaryContainer = 0xFF2D2240
-    const val DarkOnTertiaryContainer = 0xFFE8DEF8
+    const val DarkSurface = SurfaceBg
+    const val DarkNavigationBar = NavigationBarBg
+    const val DarkSurfaceCard = SurfaceCard
+    const val DarkSurfaceBorder = SurfaceBorder
+    const val DarkOnSurface = TextPrimary
+    const val DarkOnSurfaceVariant = TextSecondary
+    const val DarkPrimary = BrandPrimary
+    const val DarkOnPrimary = BrandPrimaryOn
+    const val DarkPrimaryContainer = BrandPrimary
+    const val DarkOnPrimaryContainer = BrandPrimaryOn
+    const val DarkSurfaceContainerHigh = SurfaceCard
     const val DarkError = 0xFFEF5350
     const val DarkOnError = 0xFF000000
     const val DarkErrorContainer = 0xFF9A3A3A
     const val DarkOnErrorContainer = 0xFFFFFFFF
-    /** Superfície elevada para cards de destaque em tema escuro. */
-    const val DarkSurfaceContainerHigh = 0xFF232330
 }
-
-private val LightColors = lightColorScheme(
-    primary = Color(BrandPrimary),
-    onPrimary = Color.White,
-    primaryContainer = Color(ThemeColors.LightPrimaryContainer),
-    onPrimaryContainer = Color(ThemeColors.LightOnPrimaryContainer),
-    secondary = Color(BrandSecondary),
-    onSecondary = Color.White,
-    secondaryContainer = Color(ThemeColors.LightSecondaryContainer),
-    onSecondaryContainer = Color(ThemeColors.LightOnSecondaryContainer),
-    background = Color(0xFFFAFAFA),
-    surface = Color(ThemeColors.LightSurface),
-    onSurface = Color(ThemeColors.LightOnSurface),
-    surfaceVariant = Color(0xFFF1F8E9),
-    surfaceContainer = Color(0xFFF1F8E9),
-    error = Color(ThemeColors.LightError),
-    onError = Color.White,
-)
-
-private val DarkColors = darkColorScheme(
-    primary = Color(BrandPrimaryDark),
-    onPrimary = Color(0xFF003300),
-    primaryContainer = Color(ThemeColors.DarkPrimaryContainer),
-    onPrimaryContainer = Color(ThemeColors.DarkOnPrimaryContainer),
-    secondary = Color(BrandSecondary),
-    onSecondary = Color.White,
-    secondaryContainer = Color(ThemeColors.DarkSecondaryContainer),
-    onSecondaryContainer = Color(ThemeColors.DarkOnSecondaryContainer),
-    background = Color(ThemeColors.DarkSurface),
-    surface = Color(ThemeColors.DarkSurface),
-    onSurface = Color(ThemeColors.DarkOnSurface),
-    surfaceVariant = Color(0xFF1A1A24),
-    surfaceContainer = Color(0xFF1A1A24),
-    error = Color(ThemeColors.DarkError),
-    onError = Color(ThemeColors.DarkOnError),
-)
 
 internal val TreinosTypography = Typography(
     displayLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 57.sp, lineHeight = 64.sp),
@@ -137,20 +95,32 @@ internal object TreinosSpacing {
     val spaceXXL = 32.dp
 }
 
+/**
+ * Tema do Treinos — Dark Mode profundo com Verde Lima/Neon como identidade.
+ *
+ * `dynamicColorEnabled` é ignorado por padrão (desligado): a identidade da
+ * marca (escuro, energético) se mantém independentemente do sistema.
+ */
 @Composable
 fun TreinosTheme(
     dynamicColorEnabled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val colorScheme = when {
-        dynamicColorEnabled && Build.VERSION.SDK_INT >= 31 && isSystemInDarkTheme() ->
-            dynamicDarkColorScheme(context)
-        dynamicColorEnabled && Build.VERSION.SDK_INT >= 31 ->
-            dynamicLightColorScheme(context)
-        isSystemInDarkTheme() -> DarkColors
-        else -> LightColors
-    }
+    val colorScheme = darkColorScheme(
+        primary = Color(BrandPrimary),
+        onPrimary = Color(BrandPrimaryOn),
+        primaryContainer = Color(BrandPrimary),
+        onPrimaryContainer = Color(BrandPrimaryOn),
+        background = Color(SurfaceBg),
+        surface = Color(SurfaceCard),
+        surfaceVariant = Color(SurfaceCard),
+        surfaceContainer = Color(SurfaceCard),
+        surfaceContainerHigh = Color(SurfaceCard),
+        onSurface = Color(TextPrimary),
+        onSurfaceVariant = Color(TextSecondary),
+        error = Color(ThemeColors.DarkError),
+        onError = Color(ThemeColors.DarkOnError),
+    )
     MaterialTheme(
         colorScheme = colorScheme,
         typography = TreinosTypography,

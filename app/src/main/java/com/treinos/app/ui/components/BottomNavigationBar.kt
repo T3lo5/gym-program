@@ -13,9 +13,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.treinos.app.R
 import com.treinos.app.ui.AppViewModel
+import com.treinos.app.ui.ThemeColors
 
 /**
  * H3-38: bottom bar nos hubs — Treinar, Histórico, Ajustes, Progresso (H6-8).
@@ -25,7 +27,7 @@ import com.treinos.app.ui.AppViewModel
 fun BottomNavigationBar(selected: Int, viewModel: AppViewModel) {
     NavigationBar(
         modifier = Modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color(ThemeColors.DarkNavigationBar),
     ) {
         NavigationBarItem(
             selected = selected == 0,
