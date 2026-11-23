@@ -373,9 +373,9 @@ class HomeScreenTest {
                 onOpenMobility = {},
             )
         }
-        // O botão de mais opções abre o menu; o item "Excluir plano complementar"
+        // O botão de gerenciar (ícone de editar) abre o menu; o item "Excluir plano complementar"
         // só abre o diálogo, não apaga.
-        composeRule.onNodeWithContentDescription("Mais opções do plano").performClick()
+        composeRule.onNodeWithContentDescription("Gerenciar plano").performClick()
         composeRule.onNodeWithText("Excluir plano complementar").performClick()
         composeRule.onNodeWithText("Excluir plano?").assertIsDisplayed()
         composeRule.onAllNodesWithText("Excluir").onLast().performClick()
@@ -479,9 +479,9 @@ class HomeScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("Sequência de treinos").assertIsDisplayed()
-        composeRule.onNodeWithText("Sequência atual: 3 dias").assertIsDisplayed()
-        composeRule.onNodeWithText("Melhor sequência: 3 dias").assertIsDisplayed()
+        // TopMetricsCard mostra apenas o valor da sequência atual e o rótulo "dias"
+        composeRule.onNodeWithText("3").assertIsDisplayed()
+        composeRule.onNodeWithText("dias").assertIsDisplayed()
     }
 
     @Test
@@ -503,7 +503,8 @@ class HomeScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("Sequência de treinos").assertDoesNotExist()
+        // Sem histórico, só o card de medidas aparece (streak não é renderizado)
+        composeRule.onNodeWithText("dias").assertDoesNotExist()
     }
 
     /** H4-13: sessão de musculação concluída `diasAtras` dias, às 10h locais. */

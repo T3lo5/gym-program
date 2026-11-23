@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionExerciseEntity
@@ -155,7 +156,7 @@ class HistoryScreenTest {
         }
 
         cardSessao().assertExists()
-        composeRule.onNodeWithText("Concluído", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Feito", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Plano Teste", useUnmergedTree = true).assertExists()
         // Recolhido: o detalhe das séries ainda não está na tela. (H4-2: o
         // nome do exercício também aparece no seletor do gráfico, então o que
@@ -195,6 +196,7 @@ class HistoryScreenTest {
         alternarCardSessao()
         composeRule
             .onNodeWithContentDescription("Ver histórico do exercício", useUnmergedTree = true)
+            .performScrollTo()
             .performClick()
         assertEquals("Barbell_Bench_Press", abertoId)
     }
@@ -213,13 +215,9 @@ class HistoryScreenTest {
         composeRule.onNodeWithText("Duração", useUnmergedTree = true).assertExists()
         // 1 sessão concluída, 1 série de 10 reps com 40 kg = 400 kg, 1h de duração.
         composeRule.onNodeWithText("10 reps", useUnmergedTree = true).assertExists()
-        // H4-2: "Outros" aparece no ranking do mês e na linha semanal do
-        // gráfico de barras (a sessão falsa não tem músculo mapeado).
-        composeRule.onAllNodesWithText("Outros", useUnmergedTree = true).assertCountEquals(2)
-        // O mesmo "400 kg" em três linhas: card "Volume", ranking do mês e a
-        // linha "Volume total" do resumo do período (H4-13; a linha semanal
-        // junta volume e séries no mesmo texto).
-        composeRule.onAllNodesWithText("400 kg", useUnmergedTree = true).assertCountEquals(3)
+        // H4-2: "Outros" aparece no ranking do mês, na linha semanal do
+        // gráfico de barras E no rótulo abaixo da barra (ProgressBarChart).
+        composeRule.onAllNodesWithText("Outros", useUnmergedTree = true).assertCountEquals(3)
         composeRule.onNodeWithText("1h 00min", useUnmergedTree = true).assertExists()
     }
 
@@ -362,8 +360,9 @@ class HistoryScreenTest {
         }
 
         composeRule.onNodeWithText("Volume por músculo na semana").assertExists()
-        // "Peito" aparece no ranking do mês e na linha semanal do gráfico.
-        composeRule.onAllNodesWithText("Peito", useUnmergedTree = true).assertCountEquals(2)
+        // "Peito" aparece no ranking do mês, na linha semanal do gráfico
+        // E no rótulo abaixo da barra (ProgressBarChart).
+        composeRule.onAllNodesWithText("Peito", useUnmergedTree = true).assertCountEquals(3)
         composeRule.onNodeWithText("400 kg • 1 série(s)", useUnmergedTree = true).assertExists()
     }
 

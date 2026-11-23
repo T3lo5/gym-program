@@ -37,6 +37,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -354,11 +356,11 @@ private fun VolumeByMuscle(metrics: HistoryMetrics) {
 }
 
 /**
- * H4-2: evolução do exercício no mês selecionado — seletor por chips, métrica
+ * H4-2: evolução do exercício no mês selecionado — seletor dropdown, métrica
  * (melhor série ou volume) e gráfico de linha. Sem exercício de musculação no
  * mês, a seção não aparece.
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ExerciseEvolutionSection(
     monthSessions: List<SessionWithExercises>,
@@ -388,20 +390,56 @@ private fun ExerciseEvolutionSection(
         { value -> formatVolumeKg(value) }
     }
 
+    var expanded by remember { mutableStateOf(false) }
+    val selectedExercise = options.firstOrNull { it.exerciseId == selectedId } ?: options.first()
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
     ) {
         SectionTitle(stringResource(R.string.chart_exercise_title))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
+        // Seletor dropdown do exercício (card clicável + DropdownMenu)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = TreinosSpacing.spaceXs)
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    RoundedCornerShape(TreinosSpacing.spaceXs),
+                )
+                .clickable(onClick = { expanded = true }),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = TreinosSpacing.spaceM, vertical = TreinosSpacing.spaceS),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = selectedExercise.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
         ) {
             options.forEach { option ->
-                FilterChip(
-                    selected = option.exerciseId == selected.exerciseId,
-                    onClick = { selectedId = option.exerciseId },
-                    label = { Text(option.name) },
+                DropdownMenuItem(
+                    text = { Text(option.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    onClick = {
+                        selectedId = option.exerciseId
+                        expanded = false
+                    },
                 )
             }
         }
@@ -921,32 +959,33 @@ private fun SessionCard(
         formatDuration(session.session.totalDurationSeconds),
     )
     val setsText = stringResource(R.string.history_series_count, totalSets)
-    val completedDesc = stringResource(R.string.history_session_done)
-    val inProgressDesc = stringResource(R.string.history_session_in_progress)
 
     TreinosCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                stateDescription = if (expanded) expandedDesc else collapsedDesc
-            }
-            .clickable { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(TreinosSpacing.spaceM),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            // H4-3: só o cabeçalho alterna expand/recolher — o clickable fica
+            // aqui, não no card inteiro, para não interceptar os botões das
+            // linhas de exercício (Ver histórico, editar séries).
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        stateDescription = if (expanded) expandedDesc else collapsedDesc
+                    }
+                    .clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = session.session.dayName.ifBlank { stringResource(R.string.screen_workout) },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -954,22 +993,18 @@ private fun SessionCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp, 18.dp)
-                            .background(Color(0xFF14532D).copy(alpha = 0.4f), RoundedCornerShape(6.dp)),
-                    ) {
-                        Text(
-                            text = if (completed) completedDesc else inProgressDesc,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontSize = 12.sp,
-                                color = Color(0xFF4ADE80),
-                            ),
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                    }
+                    Text(
+                        text = if (completed) stringResource(R.string.history_badge_done)
+                        else stringResource(R.string.history_badge_in_progress),
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    )
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp
                         else Icons.Default.KeyboardArrowDown,
@@ -1015,40 +1050,48 @@ private fun SessionCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .minimumInteractiveComponentSize()
-                                .semantics { role = Role.Button }
-                                .clickable(
-                                    onClickLabel = stringResource(R.string.a11y_open_exercise_details),
-                                    onClick = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
-                                ),
+                                .minimumInteractiveComponentSize(),
                             horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            ExerciseImage(
-                                imageUrl = exerciseMedia[exercise.exercise.exerciseId]?.imageUrl,
-                                exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
-                                contentDescription = decorativeContentDescription(),
-                                size = 48.dp,
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
+                            // H4-3: imagem + nome abrem o detalhe do exercício.
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { role = Role.Button }
+                                    .clickable(
+                                        onClickLabel = stringResource(R.string.a11y_open_exercise_details),
+                                        onClick = { onOpenExerciseDetail(exercise.exercise.exerciseId) },
+                                    ),
+                                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                ExerciseImage(
+                                    imageUrl = exerciseMedia[exercise.exercise.exerciseId]?.imageUrl,
+                                    exerciseName = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                                    contentDescription = decorativeContentDescription(),
+                                    size = 48.dp,
                                 )
-                                if (exercise.sets.isEmpty()) {
+                                Column {
                                     Text(
-                                        text = stringResource(R.string.history_series_empty),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        text = exercise.exercise.exerciseName.ifBlank { exercise.exercise.exerciseId },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
                                     )
-                                } else {
-                                    exercise.sets.sortedBy { it.setNumber }.forEach { set ->
+                                    if (exercise.sets.isEmpty()) {
                                         Text(
-                                            text = historySetLabel(set),
+                                            text = stringResource(R.string.history_series_empty),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                    } else {
+                                        exercise.sets.sortedBy { it.setNumber }.forEach { set ->
+                                            Text(
+                                                text = historySetLabel(set),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }

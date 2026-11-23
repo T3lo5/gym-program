@@ -3,6 +3,7 @@ package com.treinos.app.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1546,46 +1547,43 @@ private fun LanguageSelector(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
-        ) {
-            options.forEachIndexed { index, (lang, resId) ->
-                val selected = current == lang
-                if (selected) {
-                    Button(
-                        onClick = {
-                            onChange(lang)
-                            applyAppLanguage(lang)
-                        },
-                        enabled = true,
-                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                    ) {
-                        Text(
-                            text = stringResource(resId),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = {
-                            onChange(lang)
-                            applyAppLanguage(lang)
-                        },
-                        enabled = true,
-                        modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
-                    ) {
-                        Text(
-                            text = stringResource(resId),
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+        options.forEachIndexed { index, (lang, resId) ->
+            val selected = current == lang
+            if (selected) {
+                Button(
+                    onClick = {
+                        onChange(lang)
+                        applyAppLanguage(lang)
+                    },
+                    enabled = true,
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                ) {
+                    Text(
+                        text = stringResource(resId),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        onChange(lang)
+                        applyAppLanguage(lang)
+                    },
+                    enabled = true,
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.weight(1f).minimumInteractiveComponentSize(),
+                ) {
+                    Text(
+                        text = stringResource(resId),
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

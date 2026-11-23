@@ -66,6 +66,7 @@ fun ScreenTopBar(
     title: String,
     onBack: (() -> Unit)? = null,
     showBack: Boolean = true,
+    modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
@@ -84,6 +85,7 @@ fun ScreenTopBar(
             }
         },
         actions = actions,
+        modifier = modifier,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),

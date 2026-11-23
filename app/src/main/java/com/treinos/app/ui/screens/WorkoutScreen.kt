@@ -4,14 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,11 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -218,6 +224,7 @@ fun WorkoutScreen(
             ScreenTopBar(
                 title = session?.session?.dayName?.ifBlank { stringResource(R.string.screen_workout) }
                     ?: stringResource(R.string.screen_workout),
+                modifier = Modifier.statusBarsPadding(),
                 onBack = onLeave,
                 actions = {
                     if (session != null) {
@@ -1168,52 +1175,105 @@ private fun ExerciseCard(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .minimumInteractiveComponentSize()
-                        .semantics { role = Role.Button }
-                        .clickable(
-                            onClickLabel = stringResource(R.string.a11y_open_exercise_details),
-                            onClick = onOpenDetail,
-                        ),
-                    horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    ExerciseImage(
-                        imageUrl = media?.imageUrl,
-                        exerciseName = name,
-                        contentDescription = decorativeContentDescription(),
-                        size = 80.dp,
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .minimumInteractiveComponentSize()
+                            .semantics { role = Role.Button }
+                            .clickable(
+                                onClickLabel = stringResource(R.string.a11y_open_exercise_details),
+                                onClick = onOpenDetail,
+                            ),
+                        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ExerciseImage(
+                            imageUrl = media?.imageUrl,
+                            exerciseName = name,
+                            contentDescription = decorativeContentDescription(),
+                            size = 80.dp,
                         )
-                        // H4-6: rótulo do membro na ordem de execução (A1, A2…).
-                        supersetLabel?.let { label ->
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelLarge,
+                                text = name,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.semantics { heading(); contentDescription = exerciseContentDescription(name) },
+                            )
+                            // H4-6: rótulo do membro na ordem de execução (A1, A2…).
+                            supersetLabel?.let { label ->
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.workout_planned_sets, exercise.exercise.plannedSets, exercise.exercise.restSeconds),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (showPrSeal) {
+                                // H4-1: selo do recorde batido nesta sessão.
+                                Text(
+                                    text = stringResource(R.string.workout_pr_seal),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.workout_exercise_options),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text(
-                            text = stringResource(R.string.workout_planned_sets, exercise.exercise.plannedSets, exercise.exercise.restSeconds),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (showPrSeal) {
-                            // H4-1: selo do recorde batido nesta sessão.
-                            Text(
-                                text = stringResource(R.string.workout_pr_seal),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                        ) {
+                            if (onSwapExercise != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.workout_swap_exercise)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onSwapExercise()
+                                    },
+                                )
+                            }
+                            if (canToggleSuperset) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                if (isSuperset) {
+                                                    R.string.workout_superset_toggle_off
+                                                } else {
+                                                    R.string.workout_superset_toggle_on
+                                                },
+                                            ),
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onToggleSuperset(!isSuperset)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -1297,14 +1357,16 @@ private fun ExerciseCard(
                         onNextExercise()
                     }
                 } else onLogSet,
-                modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
             ) {
                 // H3-32: ícone de add na ação principal de registrar série.
                 if (!completed) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
-                                modifier = Modifier.padding(end = TreinosSpacing.spaceXs),
+                        modifier = Modifier.padding(end = TreinosSpacing.spaceXs),
                     )
                 }
                 // H3-27: cumprido o planejado, o botão avança em vez de empilhar
@@ -1336,41 +1398,6 @@ private fun ExerciseCard(
                 ) {
                     Text(stringResource(R.string.workout_apply_progression))
                 }
-            }
-
-            // Troca de exercício durante o treino em andamento (H3-41/H3-42).
-            if (onSwapExercise != null) {
-                OutlinedButton(
-                    onClick = onSwapExercise,
-                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
-                ) {
-                    Text(stringResource(R.string.workout_swap_exercise))
-                }
-            }
-
-            // H4-6: alternar o superset com o exercício anterior. O botão
-            // mostra o estado atual e pede o inverso; gravar o estado já
-            // vigente é no-op. Não aparece no primeiro exercício do dia.
-            if (canToggleSuperset) {
-                OutlinedButton(
-                    onClick = { onToggleSuperset(!isSuperset) },
-                    modifier = Modifier.fillMaxWidth().minimumInteractiveComponentSize().padding(top = 4.dp),
-                ) {
-                    Text(
-                        stringResource(
-                            if (isSuperset) {
-                                R.string.workout_superset_toggle_off
-                            } else {
-                                R.string.workout_superset_toggle_on
-                            },
-                        ),
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.workout_superset_toggle_helper),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             // H4-11: nota do exercício no plano — texto atual ou convite;

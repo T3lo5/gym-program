@@ -4,11 +4,11 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
@@ -179,10 +179,18 @@ class WorkoutScreenTest {
         ),
     )
 
-    private fun abrirDialogoDeTroca() {
+    /** Abre o menu ⋮ de um card de exercício via contentDescription. */
+    private fun abrirMenuExercicio(contentDescription: String = "Opções do exercício") {
         composeRule
             .onNode(hasScrollAction())
-            .performScrollToNode(hasText("Trocar exercício"))
+            .performScrollToNode(hasText("Registrar série", substring = true))
+        composeRule
+            .onNode(hasContentDescription(contentDescription))
+            .performClick()
+    }
+
+    private fun abrirDialogoDeTroca() {
+        abrirMenuExercicio()
         composeRule.onNodeWithText("Trocar exercício").performClick()
     }
 
@@ -649,23 +657,28 @@ class WorkoutScreenTest {
 
     @Test
     fun botao_superset_ausente_no_primeiro() {
-        // O primeiro exercício do dia nunca entra em grupo: sem botão nele;
-        // só o segundo card mostra a alternância.
+        // O primeiro exercício do dia nunca entra em grupo: sem opção nele no menu;
+        // só o segundo card expõe a opção de supersérie no menu ⋮.
         setContent(session = sessaoSuperset(), planExercises = planoSuperset(false, false))
 
+        // Rola até o segundo card e abre o menu do 2º ícone ⋮ (index 1).
         composeRule
             .onNode(hasScrollAction())
-            .performScrollToNode(hasText("Supersérie com o anterior"))
-        composeRule.onNodeWithText("Supersérie com o anterior").assertIsDisplayed()
+            .performScrollToNode(hasText("Remada alta"))
+        // Dois ícones ⋮ existem: index 0 = primeiro card, index 1 = segundo card.
+        composeRule
+            .onAllNodes(hasContentDescription("Opções do exercício"))[1]
+            .performClick()
+        composeRule.onNodeWithText("Vincular supersérie com o anterior").assertIsDisplayed()
         assertEquals(
             1,
-            composeRule.onAllNodesWithText("Supersérie com o anterior").fetchSemanticsNodes().size,
+            composeRule.onAllNodes(hasText("Vincular supersérie com o anterior")).fetchSemanticsNodes().size,
         )
     }
 
     @Test
     fun toggle_superset_dispara_callback() {
-        // Tocar em "Supersérie com o anterior" pede a ligação com o exercício
+        // Tocar em "Vincular supersérie com o anterior" no menu ⋮ pede a ligação com o exercício
         // anterior: o callback recebe o id da sessão e o estado novo (true).
         var alternado: Pair<Long, Boolean>? = null
         setContent(
@@ -676,8 +689,11 @@ class WorkoutScreenTest {
 
         composeRule
             .onNode(hasScrollAction())
-            .performScrollToNode(hasText("Supersérie com o anterior"))
-        composeRule.onNodeWithText("Supersérie com o anterior").performClick()
+            .performScrollToNode(hasText("Remada alta"))
+        composeRule
+            .onAllNodes(hasContentDescription("Opções do exercício"))[1]
+            .performClick()
+        composeRule.onNodeWithText("Vincular supersérie com o anterior").performClick()
 
         assertEquals(200L to true, alternado)
     }

@@ -44,7 +44,7 @@
 
     <!-- App language selector (in Settings) -->
     <string name="settings_language_title">App language</string>
-    <string name="settings_language_system">System default</string>
+    <string name="settings_language_system">System</string>
     <string name="settings_language_pt">Portuguese</string>
     <string name="settings_language_en">English</string>
     <string name="settings_language_desc">Choose the app interface language. Change is applied immediately.</string>
@@ -65,6 +65,12 @@
     <string name="home_quick_new_workout">New workout</string>
     <string name="home_quick_activity">Activity</string>
     <string name="home_quick_stretching">Stretching</string>
+    <string name="home_quick_new_workout_short">+ Plan</string>
+    <string name="home_quick_activity_short">Activity</string>
+    <string name="home_quick_stretching_short">Stretch</string>
+    <string name="home_streak_label">days</string>
+    <string name="home_weight_placeholder">— kg</string>
+    <string name="home_weight_label">weight</string>
     <!-- H4-8: "Weight and measurements" shortcut on Home. -->
     <string name="home_measurements_last_weight">Last weight: %1$s</string>
     <string name="home_measurements_subtitle">Track weight and measurements over time</string>
@@ -99,6 +105,8 @@
     <string name="home_plan_ai">Generated with AI</string>
     <string name="home_plan_local">Generated locally</string>
     <string name="home_plan_local_reason">Generated locally — %1$s</string>
+    <string name="home_plan_active_label">Active plan</string>
+    <string name="home_plan_manage">Manage plan</string>
     <string name="home_review_overdue">Review overdue since %1$s — generate a new workout.</string>
     <string name="home_review_next">Next review: %1$s</string>
     <string name="home_review_card_title">Review plan</string>
@@ -157,11 +165,12 @@
     <string name="workout_repeat_last">Repeat last set</string>
     <string name="workout_repeat_last_with_label">Repeat last set (%1$s)</string>
     <string name="workout_exercise_done">Exercise completed — next</string>
+    <string name="workout_exercise_options">Exercise options</string>
     <string name="workout_swap_exercise">Swap exercise</string>
     <!-- H4-6: supersets (bi/tri-set) -->
     <string name="workout_superset_header">Superset %1$s</string>
     <string name="workout_superset_label">%1$s</string>
-    <string name="workout_superset_toggle_on">Superset with previous</string>
+    <string name="workout_superset_toggle_on">Link superset with previous</string>
     <string name="workout_superset_toggle_off">Leave superset</string>
     <string name="workout_superset_toggle_helper">Applies to this workout and to future ones with this plan.</string>
     <string name="workout_log_set">Log set %1$d</string>
@@ -405,6 +414,8 @@
     <string name="history_activity_delete_body">%1$s leaves the history and the next backup. Cannot be undone.</string>
     <string name="history_session_done">Completed</string>
     <string name="history_session_in_progress">In progress</string>
+    <string name="history_badge_done">Done</string>
+    <string name="history_badge_in_progress">In prog.</string>
     <string name="history_session_selected">Selected</string>
     <string name="history_series_count">%1$d set(s)</string>
     <string name="history_series_empty">No sets recorded</string>

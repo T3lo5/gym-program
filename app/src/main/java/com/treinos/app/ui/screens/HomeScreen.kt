@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
@@ -56,6 +58,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.treinos.app.data.local.MANUAL_SESSION_SOURCE
 import com.treinos.app.data.local.SessionWithExercises
 import com.treinos.app.data.local.WorkoutDayWithExercises
@@ -249,15 +252,9 @@ fun HomeScreen(
             // só aparece com pelo menos um treino concluído (regra 12); sem
             // histórico, a Home fica como está.
             if (streak.bestDays > 0) {
-                item { StreakCard(streak) }
-            }
-
-            // H4-8: atalho "Peso e medidas" visível com e sem plano.
-            item {
-                MeasurementsShortcutCard(
-                    latestWeightKg = latestWeightKg,
-                    onOpen = onOpenMeasurements,
-                )
+                item { TopMetricsCard(streak, latestWeightKg, onOpenMeasurements) }
+            } else {
+                item { MeasurementsShortcutCard(latestWeightKg, onOpenMeasurements) }
             }
 
             // H6-1: permissões em qualquer dia — o bloco estava aninhado por
@@ -355,60 +352,8 @@ fun HomeScreen(
 
                 item { HomeQuickActions(onGenerate, onLogActivity, onOpenMobility) }
 
-                if (plans.size > 1 || plan.plan.kind == "extra") {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            plans.forEach { option ->
-                                FilterChip(
-                                    selected = option.plan.id == plan.plan.id,
-                                    onClick = { onSelectPlan(option.plan.id) },
-                                    label = { Text(option.plan.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    modifier = Modifier.minimumInteractiveComponentSize(),
-                                )
-                            }
-                            // H3-28: ação destrutiva sai do corpo da lista e vai
-                            // para o overflow do seletor (a confirmação se mantém).
-                            if (plan.plan.kind == "extra") {
-                                Box {
-                                    IconButton(
-                                        onClick = { showPlanMenu = true },
-                                        modifier = Modifier.minimumInteractiveComponentSize(),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MoreVert,
-                                            contentDescription = stringResource(R.string.home_plan_more_options),
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showPlanMenu,
-                                        onDismissRequest = { showPlanMenu = false },
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.home_plan_delete_menu),
-                                                    color = MaterialTheme.colorScheme.error,
-                                                )
-                                            },
-                                            onClick = {
-                                                showPlanMenu = false
-                                                showDeletePlanDialog = true
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                item { ActivePlanCard(plan, fallbackReasonLabel) }
+                // Seletor de plano ativo: dropdown + botão de gerenciar
+                item { ActivePlanSelector(plans, plan, fallbackReasonLabel, onSelectPlan, onDeletePlan) }
 
                 if (reviewIsDue(plan.plan.nextReviewAt)) {
                     item {
@@ -766,19 +711,19 @@ private fun HomeQuickActions(
         horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
     ) {
         HomeQuickAction(
-            label = stringResource(R.string.home_quick_new_workout),
+            label = stringResource(R.string.home_quick_new_workout_short),
             icon = Icons.Default.Add,
             onClick = onGenerate,
             modifier = Modifier.weight(1f),
         )
         HomeQuickAction(
-            label = stringResource(R.string.home_quick_activity),
+            label = stringResource(R.string.home_quick_activity_short),
             icon = Icons.Default.Edit,
             onClick = onLogActivity,
             modifier = Modifier.weight(1f),
         )
         HomeQuickAction(
-            label = stringResource(R.string.home_quick_stretching),
+            label = stringResource(R.string.home_quick_stretching_short),
             icon = Icons.Default.Favorite,
             onClick = onOpenMobility,
             modifier = Modifier.weight(1f),
@@ -796,6 +741,7 @@ private fun HomeQuickAction(
     Button(
         onClick = onClick,
         modifier = modifier
+            .padding(PaddingValues(horizontal = 8.dp, vertical = 8.dp))
             .minimumInteractiveComponentSize(),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -813,8 +759,10 @@ private fun HomeQuickAction(
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                softWrap = false,
             )
         }
     }
@@ -1147,65 +1095,265 @@ private fun StreakCard(streak: StreakSummary) {
     }
 }
 
+/**
+ * Top metrics row: streak + measurements shortcut side by side as compact mini-cards.
+ */
 @Composable
-private fun ActivePlanCard(
-    plan: WorkoutPlanWithDetails,
-    fallbackReasonLabel: String? = null,
+private fun TopMetricsCard(
+    streak: StreakSummary,
+    latestWeightKg: Double?,
+    onOpenMeasurements: () -> Unit,
 ) {
-    val entity = plan.plan
-    val review = formatReviewDate(entity.nextReviewAt)
-    val due = reviewIsDue(entity.nextReviewAt)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                review?.let { stateDescription = reviewStateDescription(it, due) }
-            },
-        // H3-28: card neutro — o destaque da tela passa a ser o herói de hoje.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
     ) {
-        Column(
-            modifier = Modifier.padding(TreinosSpacing.spaceM),
-            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
-        ) {
-            Text(
-                text = entity.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                text = planVolumeLabel(plan),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                // H3-30: quando o plano veio do fallback local, o selo cita o
-                // motivo persistido — não some com o snackbar de ~4 s.
-                text = when {
-                    entity.source == "ai" -> stringResource(R.string.home_plan_ai)
-                    fallbackReasonLabel != null -> stringResource(R.string.home_plan_local_reason, fallbackReasonLabel)
-                    else -> stringResource(R.string.home_plan_local)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (review != null) {
+        // Streak mini-card
+        Card(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.padding(TreinosSpacing.spaceM),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
                 Text(
-                                text = if (due) {
-                                    stringResource(R.string.home_review_overdue, review)
-                                } else {
-                                    stringResource(R.string.home_review_next, review)
-                                },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = if (due) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface,
+                    text = streak.currentDays.toString(),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = stringResource(R.string.home_streak_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
+
+        // Measurements mini-card
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onOpenMeasurements)
+                .fillMaxHeight(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(TreinosSpacing.spaceM),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = latestWeightKg?.let { formatKg(it) } ?: stringResource(R.string.home_weight_placeholder),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = stringResource(R.string.home_weight_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Seletor de plano ativo: dropdown com o nome do plano + botão de gerenciar (ícone de editar).
+ */
+@Composable
+private fun ActivePlanSelector(
+    plans: List<WorkoutPlanWithDetails>,
+    currentPlan: WorkoutPlanWithDetails,
+    fallbackReasonLabel: String? = null,
+    onSelectPlan: (Long) -> Unit,
+    onDeletePlan: (Long) -> Unit,
+) {
+    val entity = currentPlan.plan
+    val review = formatReviewDate(entity.nextReviewAt)
+    val due = reviewIsDue(entity.nextReviewAt)
+    var showPlanMenu by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var planToDelete: Long? by remember { mutableStateOf(null) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(TreinosSpacing.spaceM),
+            verticalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceS),
+        ) {
+            // Row com dropdown do plano + botão de gerenciar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
+            ) {
+                // Área clicável do plano (ocupa o espaço restante) - abre dropdown
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clickable(onClick = { showPlanMenu = true })
+                        .padding(vertical = TreinosSpacing.spaceXs, horizontal = TreinosSpacing.spaceS),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(TreinosSpacing.spaceXs),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = entity.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // Botão compacto de gerenciar (ícone de editar) - sempre abre o dropdown
+                IconButton(
+                    onClick = { showPlanMenu = true },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.home_plan_manage),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // Dropdown menu do seletor de plano
+            DropdownMenu(
+                expanded = showPlanMenu,
+                onDismissRequest = { showPlanMenu = false },
+            ) {
+                plans.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.plan.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        onClick = {
+                            showPlanMenu = false
+                            onSelectPlan(option.plan.id)
+                        },
+                        leadingIcon = {
+                            if (option.plan.id == entity.id) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        },
+                    )
+                }
+                if (entity.kind == "extra") {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.home_plan_delete_menu),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            showPlanMenu = false
+                            planToDelete = entity.id
+                            showDeleteDialog = true
+                        },
+                    )
+                }
+            }
+
+            // Info do plano (volume, origem, review)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(TreinosSpacing.space2xs),
+            ) {
+                Text(
+                    text = planVolumeLabel(currentPlan),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = when {
+                        entity.source == "ai" -> stringResource(R.string.home_plan_ai)
+                        fallbackReasonLabel != null -> stringResource(R.string.home_plan_local_reason, fallbackReasonLabel)
+                        else -> stringResource(R.string.home_plan_local)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (review != null) {
+                    Text(
+                        text = if (due) {
+                            stringResource(R.string.home_review_overdue, review)
+                        } else {
+                            stringResource(R.string.home_review_next, review)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = if (due) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showDeleteDialog && planToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text(stringResource(R.string.home_plan_delete_title)) },
+            text = {
+                Text(stringResource(R.string.home_plan_delete_body, currentPlan.plan.name))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDeletePlan(planToDelete!!)
+                        planToDelete = null
+                    },
+                ) {
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false; planToDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }
 

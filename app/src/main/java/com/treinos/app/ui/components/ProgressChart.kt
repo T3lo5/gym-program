@@ -1,12 +1,20 @@
 package com.treinos.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -16,7 +24,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.treinos.app.R
 import com.treinos.app.ui.history.MuscleBar
 import com.treinos.app.ui.history.ProgressPoint
@@ -30,6 +42,7 @@ private val LineStrokeWidth = 2.dp
 private val PointRadius = 3.dp
 private val BarGap = 8.dp
 private val BarCornerRadius = 4.dp
+private val BarLabelHeight = 20.dp
 
 /**
  * H4-2: gráfico de linha da evolução de um exercício, desenhado em Compose
@@ -113,6 +126,7 @@ fun ProgressLineChart(
  *   de 1.0 para não dividir por zero).
  * - [contentDescription] carrega a descrição por músculo montada pelo
  *   chamador; os números continuam no ranking textual da tela.
+ * - Rótulos dos músculos centralizados abaixo de cada barra no eixo X.
  */
 @Composable
 fun ProgressBarChart(
@@ -132,24 +146,52 @@ fun ProgressBarChart(
     }
     val barColor = MaterialTheme.colorScheme.primary
     val chartDescription = contentDescription
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = modifier
             .fillMaxWidth()
             .semantics { this.contentDescription = chartDescription },
     ) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(ChartHeight)) {
-            val maxValue = max(bars.maxOf { it.volumeKg }, 1.0)
-            val gap = BarGap.toPx()
-            val barWidth = (size.width - gap * (bars.size - 1)) / bars.size
-            bars.forEachIndexed { index, bar ->
-                val fraction = (bar.volumeKg / maxValue).toFloat().coerceIn(0f, 1f)
-                val barHeight = size.height * fraction
-                drawRoundRect(
-                    color = barColor,
-                    topLeft = Offset(x = index * (barWidth + gap), y = size.height - barHeight),
-                    size = Size(width = barWidth, height = barHeight),
-                    cornerRadius = CornerRadius(BarCornerRadius.toPx()),
-                )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(ChartHeight)) {
+                val maxValue = max(bars.maxOf { it.volumeKg }, 1.0)
+                val gap = BarGap.toPx()
+                val barWidth = (size.width - gap * (bars.size - 1)) / bars.size
+                bars.forEachIndexed { index, bar ->
+                    val fraction = (bar.volumeKg / maxValue).toFloat().coerceIn(0f, 1f)
+                    val barHeight = size.height * fraction
+                    drawRoundRect(
+                        color = barColor,
+                        topLeft = Offset(x = index * (barWidth + gap), y = size.height - barHeight),
+                        size = Size(width = barWidth, height = barHeight),
+                        cornerRadius = CornerRadius(BarCornerRadius.toPx()),
+                    )
+                }
+            }
+            // Rótulos dos músculos centralizados abaixo das barras
+            Row(
+                modifier = Modifier.fillMaxWidth().height(BarLabelHeight),
+                horizontalArrangement = Arrangement.spacedBy(BarGap),
+            ) {
+                bars.forEach { bar ->
+                    Text(
+                        text = bar.muscle,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = labelColor,
+                        ),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 2.dp),
+                    )
+                }
             }
         }
     }

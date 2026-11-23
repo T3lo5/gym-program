@@ -44,7 +44,7 @@
 
     <!-- Idioma do app (seletor em Ajustes) -->
     <string name="settings_language_title">Idioma do app</string>
-    <string name="settings_language_system">Padrão do sistema</string>
+    <string name="settings_language_system">Sistema</string>
     <string name="settings_language_pt">Português</string>
     <string name="settings_language_en">English</string>
     <string name="settings_language_desc">Escolha o idioma da interface do app. A mudança é aplicada imediatamente.</string>
@@ -65,6 +65,12 @@
     <string name="home_quick_new_workout">Novo treino</string>
     <string name="home_quick_activity">Atividade</string>
     <string name="home_quick_stretching">Alongamento</string>
+    <string name="home_quick_new_workout_short">+ Plano</string>
+    <string name="home_quick_activity_short">Atividade</string>
+    <string name="home_quick_stretching_short">Alongar</string>
+    <string name="home_streak_label">dias</string>
+    <string name="home_weight_placeholder">— kg</string>
+    <string name="home_weight_label">peso</string>
     <!-- H4-8: atalho "Peso e medidas" na Home. -->
     <string name="home_measurements_last_weight">Último peso: %1$s</string>
     <string name="home_measurements_subtitle">Acompanhe peso e medidas ao longo do tempo</string>
@@ -99,6 +105,8 @@
     <string name="home_plan_ai">Gerado com IA</string>
     <string name="home_plan_local">Gerado localmente</string>
     <string name="home_plan_local_reason">Gerado localmente — %1$s</string>
+    <string name="home_plan_active_label">Plano ativo</string>
+    <string name="home_plan_manage">Gerenciar plano</string>
     <string name="home_review_overdue">Revisão atrasada desde %1$s — gere um treino novo.</string>
     <string name="home_review_next">Próxima revisão: %1$s</string>
     <string name="home_review_card_title">Revisar plano</string>
@@ -160,11 +168,12 @@
     <string name="workout_repeat_last">Repetir última série</string>
     <string name="workout_repeat_last_with_label">Repetir última série (%1$s)</string>
     <string name="workout_exercise_done">Exercício concluído — próximo</string>
+    <string name="workout_exercise_options">Opções do exercício</string>
     <string name="workout_swap_exercise">Trocar exercício</string>
     <!-- H4-6: supersets (bi/tri-set) -->
     <string name="workout_superset_header">Supersérie %1$s</string>
     <string name="workout_superset_label">%1$s</string>
-    <string name="workout_superset_toggle_on">Supersérie com o anterior</string>
+    <string name="workout_superset_toggle_on">Vincular supersérie com o anterior</string>
     <string name="workout_superset_toggle_off">Sair da supersérie</string>
     <string name="workout_superset_toggle_helper">Vale para este treino e para os próximos com este plano.</string>
     <string name="workout_log_set">Registrar série %1$d</string>
@@ -408,6 +417,8 @@
     <string name="history_activity_delete_body">%1$s sai do histórico e do próximo backup. Não dá para desfazer.</string>
     <string name="history_session_done">Concluído</string>
     <string name="history_session_in_progress">Em andamento</string>
+    <string name="history_badge_done">Feito</string>
+    <string name="history_badge_in_progress">Em and.</string>
     <string name="history_session_selected">Selecionado</string>
     <string name="history_series_count">%1$d série(s)</string>
     <string name="history_series_empty">Sem séries registradas</string>
