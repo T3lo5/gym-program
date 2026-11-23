@@ -58,6 +58,7 @@ class WearSyncRepository(
             val payload = Json.encodeToString(WearWorkoutState.serializer(), state).toByteArray()
             val request = PutDataRequest.create(PATH_WORKOUT_STATE).apply {
                 setData(payload)
+                setUrgent()
             }
             try {
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request))
@@ -77,6 +78,7 @@ class WearSyncRepository(
             val payload = Json.encodeToString(WearSessionSnapshot.serializer(), snapshot).toByteArray()
             val request = PutDataRequest.create(PATH_SESSION_SNAPSHOT).apply {
                 setData(payload)
+                setUrgent()
             }
             try {
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request))

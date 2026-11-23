@@ -86,6 +86,39 @@ script — não duplique comandos Gradle no YAML.
 
 `docs/SPRINT-PLAN.md` é histórico e está superado; não use os IDs `S*` dele.
 
+### App Wear OS — sincronização celular ↔ relógio
+
+O Google Play Services Wearable Data Layer isola canais (DataClient,
+MessageClient, CapabilityClient) por **applicationId**. Antes de tocar em
+`wear/`, confirme cada regra abaixo:
+
+- **Mesmo `applicationId` (package name)** em `app/build.gradle.kts` e
+  `wear/build.gradle.kts`. O `namespace` pode continuar diferente (ex.: o wear
+  usa `com.treinos.wear` como namespace mas `com.treinos.app` como
+  `applicationId`). Pacotes distintos fazem o relógio não encontrar o nó do
+  celular e vice-versa — causa raiz do erro "Sem treino salvo no relógio".
+- **Mesma keystore de assinatura** nos dois módulos. Assinaturas diferentes
+  impedem a instalação por cima e o binding entre os nós.
+- **`WearableListenerService` no Manifest do wear:**
+  - `android:exported="true"` (o Play Services vincula externamente);
+  - remover `android:permission="com.google.android.gms.permission.BIND_NOTIFICATION_LISTENER_SERVICE"` (não existe no Play Services);
+  - substituir `<action android:name="com.google.android.gms.wearable.BIND_LISTENER" />`
+    pelas actions modernas `DATA_CHANGED`, `MESSAGE_RECEIVED` e
+    `CAPABILITY_CHANGED`, com `<data android:scheme="wear" android:host="*" android:pathPrefix="/treinos" />`.
+- **`WearableListenerService` no Manifest do celular:** mesma limpeza de
+  permissão fantasma e actions legadas; escutar `MESSAGE_RECEIVED` (e
+  `DATA_CHANGED` se aplicável) para comandos e lotes (`PATH_COMMAND`,
+  `PATH_SYNC_BATCH`) vindos do relógio.
+- **Publicação de DataItems:** chamar `.setUrgent()` em
+  `PutDataRequest` (`publish` e `publishSnapshot` em
+  `WearSyncRepository.kt`). Sem urgência, o GMS adia a entrega até 30 min.
+- **Não registrar `addListener`/`removeListener` manualmente** em
+  `WearSyncService.onCreate/onDestroy`: o `WearableListenerService` já gerencia
+  o ciclo de vida via binding do GMS. Registro concorrente vaza listener.
+- **Versões compatíveis:** `compileSdk`, `targetSdk`, `minSdk` e a versão do
+  `play-services-wearable` devem ser compatíveis entre `:app` e `:wear` para
+  evitar incompatibilidades de Data Layer.
+
 O gate é uma trava, não um obstáculo: **não** enfraqueça lint/teste para ficar
 verde (remover teste, `@Ignore`, `-x lint`, `--no-verify`, baixar `minSdk` ou
 comentar código). Corrija a causa.

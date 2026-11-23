@@ -64,7 +64,7 @@ android {
     val wearVersionName = (project.findProperty("versionName") as String?) ?: rootVersionName
 
     defaultConfig {
-        applicationId = "com.treinos.wear"
+        applicationId = "com.treinos.app"
         minSdk = 30
         targetSdk = 34
         versionCode = wearVersionCode

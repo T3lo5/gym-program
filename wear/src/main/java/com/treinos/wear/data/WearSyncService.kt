@@ -6,7 +6,6 @@ import android.util.Log
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
-import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.treinos.protocol.PATH_COMMAND
 import com.treinos.protocol.PATH_SESSION_SNAPSHOT
@@ -55,14 +54,9 @@ class WearSyncService : WearableListenerService(), DataClient.OnDataChangedListe
     override fun onCreate() {
         super.onCreate()
         stateStore = store
-        // GMS indisponível (update em curso, boot) não pode derrubar o
-        // processo — o app do pulso segue abrindo.
-        runCatching { Wearable.getDataClient(this).addListener(this) }
-            .onFailure { Log.w("WearSyncService", "DataClient indisponível", it) }
     }
 
     override fun onDestroy() {
-        runCatching { Wearable.getDataClient(this).removeListener(this) }
         super.onDestroy()
     }
 
